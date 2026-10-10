@@ -11,9 +11,9 @@ export interface SmartListDef {
 export const SMART_LISTS: SmartListDef[] = [
   { id: "today", label: "Today" },
   { id: "all", label: "All tasks" },
+  { id: "completed", label: "Completed" },
   { id: "upcoming", label: "Upcoming" },
   { id: "overdue", label: "Overdue" },
-  { id: "completed", label: "Completed" },
   { id: "canceled", label: "Canceled" },
 ];
 
