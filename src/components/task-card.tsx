@@ -728,7 +728,9 @@ export function TaskCard({
   const adjacent = showSectionArrows
     ? getAdjacentSections(task, navigableSections!, now)
     : { prev: null, next: null };
-  const currentSectionId = getTaskSectionId(task, navigableSections!, now);
+  // Use all sections (not just navigable) to determine current section,
+  // so the dropdown correctly reflects the task's section even if hidden.
+  const currentSectionId = getTaskSectionId(task, sections!, now);
   const prevSection = adjacent.prev ? (navigableSections!.find((s) => s.id === adjacent.prev) ?? null) : null;
   const nextSection = adjacent.next ? (navigableSections!.find((s) => s.id === adjacent.next) ?? null) : null;
   const assignFn = showSectionArrows ? assignTaskToSection! : null;
@@ -739,6 +741,7 @@ export function TaskCard({
       ? "gap-2.5 p-2.5 hover:border-primary/25 hover:shadow-md"
       : "gap-3.5 p-4 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
     status === "overdue" && !settled && "border-red-500/35 hover:border-red-500/50",
+    task.completed && "border-emerald-500/35 hover:border-emerald-500/50",
     dragging && "scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
     task.canceled && "border-dashed border-slate-400/45 bg-muted/40 hover:border-slate-400/70",
     selected && "border-primary/40 bg-primary/[0.04] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
