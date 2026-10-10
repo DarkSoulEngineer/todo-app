@@ -45,15 +45,29 @@ Aplicația permite gestionarea completă a activităților: adăugare, editare, 
 - **Căutare** după text.
 - **Sortare** după: dată limită, prioritate, dată creării.
 - **Drag-and-drop** pentru reordonarea activităților.
+- **Carduri de activitate** cu **tooltip** bogat la hover/focus, pentru detalii rapide.
 - **Dashboard de statistici**: rata de finalizare și număr de activități pe stări.
 - **Panou de insights**: tendința de finalizare pe ultimele **7 zile** și **streak-ul** curent (zile consecutive cu activități finalizate).
+
+### Board cu secțiuni personalizabile (Kanban)
+- **Coloane (secțiuni) personalizabile**, controlate de utilizator, peste stările implicite.
+- **Adăugare** de secțiuni noi și **redenumire în linie** (_inline-rename_) a secțiunilor custom.
+- **Ștergere** a secțiunilor custom; cardurile rămase **revin în coloana stării lor**.
+- **Afișare / ascundere** a secțiunilor de status ale sistemului.
+- **Reordonare** a secțiunilor prin **drag-and-drop**.
+- **Mutarea cardurilor între coloane**:
+  - aruncarea într-o **secțiune de status** setează statusul (Completed / Canceled / Overdue / Upcoming);
+  - aruncarea într-o **secțiune custom** păstrează cardul în acea secțiune.
+- Adăugarea de carduri **direct într-o secțiune**.
+- Secțiunile sunt **persistate** (în `localStorage`) și incluse în **export / import JSON**.
 
 ### Experiență de utilizare (UX)
 - Persistență în **`localStorage`** (datele rămân după reîncărcarea paginii).
 - **Temă dark / light** comutabilă.
 - **Scurtături de tastatură** (keyboard shortcuts).
 - **Clear completed** – ștergerea în masă a activităților finalizate.
-- **Backup și restaurare**: **export / import JSON** al datelor și opțiunea **Clear all**.
+- **Backup și restaurare**: **export / import JSON** al datelor (inclusiv secțiunile de board) și opțiunea **Clear all**.
+- **Tooltip bogat** pe carduri: titlu complet, descriere, status, prioritate, categorie și data limită; se afișează inteligent, cu **gestionarea focusului**.
 - **Animații** și **toasts** (notificări) pentru feedback vizual; la finalizarea tuturor activităților se afișează o **animație de confetti**.
 - **PWA / offline**: aplicația este **instalabilă** și funcționează **offline** prin **service worker**.
 - **Accesibilitate (a11y)**: roluri **ARIA**, navigare completă de la **tastatură** și **gestionare a focusului**.

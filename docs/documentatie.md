@@ -71,16 +71,18 @@ Pe lângă **cerințele minimale** ale temei (adăugare/ștergere activități �
 - **R13. Panou de insights** – tendința de finalizare pe ultimele **7 zile** și **streak-ul** curent (zile consecutive cu activități finalizate).
 - **R14. Backup și restaurare** – **export / import JSON** al datelor și opțiunea **Clear all** (ștergere totală).
 - **R15. Confetti** – animație celebratorie când toate activitățile sunt finalizate.
+- **R16. Board cu secțiuni personalizabile** (Kanban): adăugare de secțiuni custom, **redenumire în linie**, **ștergere** a secțiunilor custom (cardurile revin în coloana stării lor), **afișare / ascundere** a secțiunilor de status ale sistemului și **reordonare** a secțiunilor prin drag. Mutarea cardurilor între coloane: într-o **secțiune de status** setează statusul (Completed / Canceled / Overdue / Upcoming), iar într-o **secțiune custom** cardul rămâne în acea secțiune; se pot adăuga carduri **direct într-o secțiune**. Secțiunile sunt **persistate** (`localStorage`) și incluse în **export / import JSON**.
+- **R17. Tooltip bogat pe carduri** – la hover/focus se afișează titlul complet, descrierea, statusul, prioritatea, categoria și data limită, cu afișare inteligentă și gestionarea focusului.
 
 ### 3.2 Cerințe non-funcționale
-- **R16. Temă dark / light** comutabilă, cu persistența preferinței.
-- **R17. UX modern**: animații, toasts, feedback vizual imediat.
-- **R18. Interfață responsive, mobile-first**.
-- **R19. Cod tipizat** (TypeScript) și verificat prin ESLint.
-- **R20. Structură scalabilă** (Next.js App Router), pregătită pentru extindere către o aplicație mobilă React Native.
-- **R21. PWA / offline** – aplicație **instalabilă** pe dispozitiv, cu **service worker** pentru funcționare offline.
-- **R22. Accesibilitate (a11y)** – roluri **ARIA**, navigare completă de la **tastatură**, **gestionare a focusului**.
-- **R23. `prefers-reduced-motion`** – animațiile sunt reduse/dezactivate când utilizatorul își exprimă această preferință.
+- **R18. Temă dark / light** comutabilă, cu persistența preferinței.
+- **R19. UX modern**: animații, toasts, feedback vizual imediat.
+- **R20. Interfață responsive, mobile-first**.
+- **R21. Cod tipizat** (TypeScript) și verificat prin ESLint.
+- **R22. Structură scalabilă** (Next.js App Router), pregătită pentru extindere către o aplicație mobilă React Native.
+- **R23. PWA / offline** – aplicație **instalabilă** pe dispozitiv, cu **service worker** pentru funcționare offline.
+- **R24. Accesibilitate (a11y)** – roluri **ARIA**, navigare completă de la **tastatură**, **gestionare a focusului**.
+- **R25. `prefers-reduced-motion`** – animațiile sunt reduse/dezactivate când utilizatorul își exprimă această preferință.
 
 ---
 

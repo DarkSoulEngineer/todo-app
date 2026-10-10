@@ -53,6 +53,7 @@ export function TodoApp() {
     snapshot,
     restore,
     loadSample,
+    assignTaskToSection,
   } = useTasksContext();
   const now = useNow();
 
@@ -313,6 +314,8 @@ export function TodoApp() {
           now={now}
           sortable={sort === "manual"}
           onEdit={openEdit}
+          sections={sections}
+          assignTaskToSection={assignTaskToSection}
         />
       </div>
     );

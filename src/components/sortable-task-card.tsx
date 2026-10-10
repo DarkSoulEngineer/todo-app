@@ -5,7 +5,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { motion, useReducedMotion } from "framer-motion";
 import { GripVertical } from "lucide-react";
 import { TaskCard } from "@/components/task-card";
-import type { Task } from "@/lib/types";
+import type { Task, BoardSection } from "@/lib/types";
+import type { TasksApi } from "@/hooks/use-tasks";
+
+type AssignTaskToSection = TasksApi["assignTaskToSection"];
 
 interface SortableTaskCardProps {
   task: Task;
@@ -13,9 +16,18 @@ interface SortableTaskCardProps {
   onEdit: (task: Task) => void;
   /** Drag is only offered in manual sort mode. */
   sortable: boolean;
+  sections: BoardSection[];
+  assignTaskToSection: AssignTaskToSection;
 }
 
-export function SortableTaskCard({ task, now, onEdit, sortable }: SortableTaskCardProps) {
+export function SortableTaskCard({
+  task,
+  now,
+  onEdit,
+  sortable,
+  sections,
+  assignTaskToSection,
+}: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, disabled: !sortable });
   const reduceMotion = useReducedMotion();
@@ -43,7 +55,15 @@ export function SortableTaskCard({ task, now, onEdit, sortable }: SortableTaskCa
       transition={{ duration: reduceMotion ? 0 : 0.2 }}
       className="list-none"
     >
-      <TaskCard task={task} now={now} onEdit={onEdit} handle={handle} dragging={isDragging} />
+      <TaskCard
+        task={task}
+        now={now}
+        onEdit={onEdit}
+        handle={handle}
+        dragging={isDragging}
+        sections={sections}
+        assignTaskToSection={assignTaskToSection}
+      />
     </motion.li>
   );
 }

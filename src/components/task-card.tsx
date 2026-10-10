@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Ban, ChevronDown, ListChecks, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowUp, ArrowDown, Ban, ChevronDown, ListChecks, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CompleteToggle } from "@/components/complete-toggle";
@@ -10,8 +10,11 @@ import { CategoryPill, DueBadge, PriorityPill, StatusPill } from "@/components/t
 import { TaskTooltip } from "@/components/task-tooltip";
 import { useTasksContext } from "@/components/tasks-provider";
 import { deriveStatus } from "@/lib/status";
-import type { Task } from "@/lib/types";
+import { isCustomSection } from "@/lib/sections";
+import type { Task, BoardSection } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+type AssignTaskToSection = (taskId: string, sectionId: string) => void;
 
 interface TaskCardProps {
   task: Task;
@@ -22,12 +25,60 @@ interface TaskCardProps {
   dragging?: boolean;
   /** Compact layout for dense surfaces (e.g. board columns). */
   compact?: boolean;
+  /** Board sections for section navigation arrows. */
+  sections?: BoardSection[];
+  /** Function to move task to a section. */
+  assignTaskToSection?: AssignTaskToSection;
 }
 
 const ICON_BUTTON =
   "focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
-export function TaskCard({ task, now, onEdit, handle, dragging, compact }: TaskCardProps) {
+/**
+ * Determines which board section a task currently belongs to.
+ * Returns the section ID or undefined if not found.
+ */
+function getTaskSectionId(task: Task, sections: BoardSection[], now: Date): string | undefined {
+  if (task.sectionId) {
+    const customSection = sections.find((s) => s.id === task.sectionId);
+    if (customSection && isCustomSection(customSection)) return customSection.id;
+  }
+  const status = deriveStatus(task, now);
+  const statusSection = sections.find((s) => s.status === status);
+  return statusSection?.id;
+}
+
+/**
+ * Gets the previous and next section IDs relative to the task's current section,
+ * following the board's section order.
+ */
+function getAdjacentSections(
+  task: Task,
+  sections: BoardSection[],
+  now: Date
+): { prev: string | null; next: string | null } {
+  const currentSectionId = getTaskSectionId(task, sections, now);
+  if (!currentSectionId) return { prev: null, next: null };
+
+  const currentIndex = sections.findIndex((s) => s.id === currentSectionId);
+  if (currentIndex === -1) return { prev: null, next: null };
+
+  const prev = currentIndex > 0 ? sections[currentIndex - 1].id : null;
+  const next = currentIndex < sections.length - 1 ? sections[currentIndex + 1].id : null;
+
+  return { prev, next };
+}
+
+export function TaskCard({
+  task,
+  now,
+  onEdit,
+  handle,
+  dragging,
+  compact,
+  sections,
+  assignTaskToSection,
+}: TaskCardProps) {
   const { toggleComplete, toggleCancel, deleteTask, snapshot, restore } = useTasksContext();
   const [expanded, setExpanded] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -36,6 +87,14 @@ export function TaskCard({ task, now, onEdit, handle, dragging, compact }: TaskC
   const settled = task.completed || task.canceled;
   const doneSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
   const totalSubtasks = task.subtasks.length;
+
+  // Section navigation (only in list view, not compact/board)
+  const showSectionArrows = !compact && sections && sections.length > 0 && assignTaskToSection;
+  const prevSectionId = showSectionArrows ? getAdjacentSections(task, sections!, now).prev : null;
+  const nextSectionId = showSectionArrows ? getAdjacentSections(task, sections!, now).next : null;
+  const prevSection = prevSectionId ? sections!.find((s) => s.id === prevSectionId) : null;
+  const nextSection = nextSectionId ? sections!.find((s) => s.id === nextSectionId) : null;
+  const assignFn = showSectionArrows ? assignTaskToSection! : null;
 
   function handleDelete(): void {
     const before = snapshot();
@@ -64,6 +123,15 @@ export function TaskCard({ task, now, onEdit, handle, dragging, compact }: TaskC
     toast(canceling ? "Task canceled" : "Task restored", {
       duration: 3000,
       action: { label: "Undo", onClick: () => toggleCancel(task.id) },
+    });
+  }
+
+  function handleMoveToSection(sectionId: string, sectionTitle: string): void {
+    const before = snapshot();
+    assignFn?.(task.id, sectionId);
+    toast.success(`Moved to ${sectionTitle}`, {
+      duration: 3000,
+      action: { label: "Undo", onClick: () => restore(before) },
     });
   }
 
@@ -116,6 +184,29 @@ export function TaskCard({ task, now, onEdit, handle, dragging, compact }: TaskC
             )}
           >
             {handle}
+            {/* Section navigation arrows - only in list view */}
+            {showSectionArrows && prevSectionId && (
+              <button
+                type="button"
+                onClick={() => handleMoveToSection(prevSectionId, prevSection!.title)}
+                aria-label={`Move "${task.title}" to ${prevSection!.title}`}
+                title={`Move to ${prevSection!.title}`}
+                className={ICON_BUTTON}
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+            )}
+            {showSectionArrows && nextSectionId && (
+              <button
+                type="button"
+                onClick={() => handleMoveToSection(nextSectionId, nextSection!.title)}
+                aria-label={`Move "${task.title}" to ${nextSection!.title}`}
+                title={`Move to ${nextSection!.title}`}
+                className={ICON_BUTTON}
+              >
+                <ArrowDown className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onEdit(task)}
