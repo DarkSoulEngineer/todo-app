@@ -62,7 +62,7 @@ export function TodoApp() {
   const now = useNow();
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [smartList, setSmartList] = useState<SmartList>("today");
+  const [smartList, setSmartList] = useState<SmartList>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("manual");
   const [category, setCategory] = useState<string | "all">("all");
@@ -487,3 +487,4 @@ function emptyMessage(list: SmartList, query: string, category: string | "all"):
   if (list === "all") return "There is nothing to show here yet.";
   return `You have no ${smartListLabel(list).toLowerCase()} tasks right now.`;
 }
+
