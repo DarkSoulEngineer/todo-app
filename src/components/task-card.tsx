@@ -78,6 +78,12 @@ const COMPACT_ARROW =
 const MENU_ITEM =
   "focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted";
 
+/** Marks the title block, where a double-click still means "rename". */
+const TITLE_SELECTOR = "[data-card-title]";
+
+/** Interactive descendants that own their own double-click behaviour. */
+const INTERACTIVE_TARGET = "button, input, textarea, a, select, [role='menu']";
+
 /**
  * Leading accent rail so overdue / completed / canceled read at a glance.
  * Upcoming cards stay clean — the rail is reserved for status that needs air.
@@ -166,6 +172,7 @@ function TaskTitle({
       {(triggerProps) => (
         <div
           {...triggerProps}
+          data-card-title
           className="min-w-0"
           onClick={(e) => {
             // Don't trigger onEdit if we're selecting or renaming
@@ -188,8 +195,12 @@ function TaskTitle({
           ) : (
             <button
               type="button"
-              onClick={onOpenEdit}
-              className="focus-ring -m-1 min-w-0 w-full rounded-md p-1 text-left"
+              onClick={(e) => {
+                // ctrl/cmd/shift clicks are selection gestures, not "open".
+                if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+                onOpenEdit();
+              }}
+              className="focus-ring -m-1 min-w-0 w-full cursor-pointer rounded-md p-1 text-left"
             >
               <h3
                 className={cn(
@@ -672,20 +683,35 @@ export function TaskCard({
     setTimeout(handleRenameCommit, 0);
   }
 
-  function handleTitleClick(e: React.MouseEvent) {
-    if (e.detail === 2 && onRename && !compact) {
-      e.preventDefault();
-      setRenameValue(task.title);
-      setRenaming(true);
-      // Focus the input on next tick
-      setTimeout(() => renameInputRef.current?.focus(), 0);
-    }
+  /**
+   * A plain click must never select — it was far too easy to trigger by
+   * accident. Selection needs a deliberate gesture: ctrl/cmd+click (shift
+   * extends a range), a double-click, the row's checkbox, or the keyboard.
+   */
+  function handleSelectionClick(e: React.MouseEvent) {
+    if (!onSelect) return;
+    if (e.ctrlKey || e.metaKey || e.shiftKey) onSelect(task, e.shiftKey);
   }
 
-  function handleSelectionClick(e: React.MouseEvent) {
-    if (onSelect) {
-      onSelect(task, e.shiftKey);
+  /**
+   * Double-click keeps two meanings, split by target: on the task title it
+   * renames (the long-standing gesture), anywhere else on the card it selects.
+   */
+  function handleCardDoubleClick(e: React.MouseEvent) {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest(TITLE_SELECTOR) !== null) {
+      if (onRename && !compact) {
+        e.preventDefault();
+        setRenameValue(task.title);
+        setRenaming(true);
+        setTimeout(() => renameInputRef.current?.focus(), 0);
+      }
+      return;
     }
+    // Buttons on the card (toggle, arrows, menu) own their own double-clicks.
+    if (target.closest(INTERACTIVE_TARGET) !== null) return;
+    onSelect?.(task, false);
   }
 
   function handleCompleteWithPulse() {
@@ -734,7 +760,6 @@ export function TaskCard({
     highlighted && "border-primary/50 bg-primary/[0.07] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
     pulse === "complete" && "animate-pulse ring-2 ring-emerald-500/50",
     pulse === "cancel" && "animate-pulse ring-2 ring-slate-500/50",
-    !compact && "cursor-pointer",
   );
 
   return (
@@ -743,7 +768,7 @@ export function TaskCard({
       className="focus-ring list-none rounded-2xl"
       tabIndex={highlighted ? 0 : -1}
       onClick={handleSelectionClick}
-      onDoubleClick={handleTitleClick}
+      onDoubleClick={handleCardDoubleClick}
       onKeyDown={(e) => {
         if (e.key === " " || e.key === "Enter") {
           e.preventDefault();
