@@ -262,6 +262,7 @@ interface CardActionsProps {
   prevSection: BoardSection | null;
   nextSection: BoardSection | null;
   sections: BoardSection[];
+  currentSectionId: string | undefined;
   onMove: (sectionId: string, sectionTitle: string) => void;
   onEdit: (task: Task) => void;
   onCancelTask: () => void;
@@ -336,6 +337,7 @@ function CardActions({
   prevSection,
   nextSection,
   sections,
+  currentSectionId,
   onMove,
   onEdit,
   onCancelTask,
@@ -459,7 +461,7 @@ function CardActions({
           <select
             className="focus-ring h-6 w-auto min-w-[80px] max-w-[140px] text-xs rounded-md border border-input/50 bg-card px-2 py-0.5 pr-7 text-foreground appearance-none cursor-pointer transition-[border-color,background-color] duration-150 hover:border-primary/50 hover:bg-muted/30"
             aria-label={`Move "${task.title}" to section`}
-            defaultValue={moveTargets[0]?.id ?? ""}
+            value={currentSectionId ?? ""}
             onChange={(e) => {
               e.stopPropagation();
               const targetId = e.target.value;
@@ -726,6 +728,7 @@ export function TaskCard({
   const adjacent = showSectionArrows
     ? getAdjacentSections(task, navigableSections!, now)
     : { prev: null, next: null };
+  const currentSectionId = getTaskSectionId(task, navigableSections!, now);
   const prevSection = adjacent.prev ? (navigableSections!.find((s) => s.id === adjacent.prev) ?? null) : null;
   const nextSection = adjacent.next ? (navigableSections!.find((s) => s.id === adjacent.next) ?? null) : null;
   const assignFn = showSectionArrows ? assignTaskToSection! : null;
@@ -814,6 +817,7 @@ export function TaskCard({
               prevSection={prevSection}
               nextSection={nextSection}
               sections={sections ?? []}
+              currentSectionId={currentSectionId}
               onMove={handleMoveToSection}
               onEdit={onEdit}
               onCancelTask={handleCancelWithPulse}
