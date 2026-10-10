@@ -457,7 +457,7 @@ function CardActions({
         {/* 4. Section move — dropdown to move card to any section (list only, compact uses arrows) */}
         {!compact && sections && sections.length > 0 && (
           <select
-            className="focus-ring h-5 w-auto min-w-\[70px\] text-\[10px\] rounded border border-input/50 bg-transparent px-1.5 py-0 text-foreground appearance-none pr-5 cursor-pointer transition-colors hover:border-primary\/50"
+            className="focus-ring h-6 w-auto min-w-[80px] max-w-[140px] text-xs rounded-md border border-input/50 bg-card px-2 py-0.5 pr-7 text-foreground appearance-none cursor-pointer transition-[border-color,background-color] duration-150 hover:border-primary/50 hover:bg-muted/30"
             aria-label={`Move "${task.title}" to section`}
             defaultValue={moveTargets[0]?.id ?? ""}
             onChange={(e) => {
@@ -466,9 +466,15 @@ function CardActions({
               const targetSection = sections.find((s) => s.id === targetId);
               if (targetSection) onMove(targetId, targetSection.title);
             }}
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 6px center",
+              backgroundSize: "12px 12px",
+            }}
           >
             {sections.map((section) => (
-              <option key={section.id} value={section.id}>
+              <option key={section.id} value={section.id} className="py-1.5 px-2">
                 {section.title}
               </option>
             ))}
