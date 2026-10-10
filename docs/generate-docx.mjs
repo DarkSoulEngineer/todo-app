@@ -14,7 +14,6 @@ import {
   Paragraph,
   TextRun,
   HeadingLevel,
-  AlignmentType,
 } from "docx";
 
 const here = dirname(fileURLToPath(import.meta.url));
