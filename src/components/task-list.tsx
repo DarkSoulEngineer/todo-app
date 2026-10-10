@@ -19,6 +19,7 @@ import { AnimatePresence } from "framer-motion";
 import { useCallback, useMemo } from "react";
 import { SortableTaskCard } from "@/components/sortable-task-card";
 import { useTasksContext } from "@/components/tasks-provider";
+import { dismissTooltips } from "@/components/ui/tooltip";
 import type { Task } from "@/lib/types";
 
 interface TaskListProps {
@@ -53,7 +54,12 @@ export function TaskList({ tasks, now, sortable, onEdit }: TaskListProps) {
   );
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={() => dismissTooltips()}
+      onDragEnd={handleDragEnd}
+    >
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
         <ul className="flex flex-col gap-2.5">
           <AnimatePresence initial={false}>

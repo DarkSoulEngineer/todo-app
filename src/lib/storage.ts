@@ -1,12 +1,16 @@
 import { isValid, parseISO } from "date-fns";
 import { nanoid } from "nanoid";
 import { STORAGE_KEY } from "@/lib/constants";
-import type { Priority, Subtask, Task } from "@/lib/types";
+import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/sections";
+import type { BoardSection, Priority, Subtask, Task, Workspace } from "@/lib/types";
 
 interface PersistedState {
   version: number;
   tasks: Task[];
+  sections: BoardSection[];
 }
+
+const CURRENT_VERSION = 2;
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
 
@@ -62,6 +66,7 @@ function normalizeTask(value: unknown): Task | null {
     category: typeof record.category === "string" && record.category ? record.category : null,
     completed,
     canceled,
+    sectionId: typeof record.sectionId === "string" && record.sectionId ? record.sectionId : null,
     subtasks,
     createdAt,
     updatedAt: normalizeDate(record.updatedAt) ?? createdAt,
@@ -69,52 +74,62 @@ function normalizeTask(value: unknown): Task | null {
   };
 }
 
-/** Reads tasks from localStorage. Always safe to call, even on the server. */
-export function loadTasks(): { tasks: Task[]; hadData: boolean } {
-  if (typeof window === "undefined") return { tasks: [], hadData: false };
+/** Splits a parsed payload into a raw task array and a raw section value. */
+function extractParts(parsed: unknown): { tasks: unknown; sections: unknown } {
+  if (Array.isArray(parsed)) return { tasks: parsed, sections: undefined };
+  const record = (parsed ?? {}) as Record<string, unknown>;
+  return { tasks: record.tasks, sections: record.sections };
+}
+
+/** Builds a validated workspace from unknown persisted/imported data. */
+function buildWorkspace(parsed: unknown): Workspace | null {
+  const { tasks: rawTasks, sections: rawSections } = extractParts(parsed);
+  if (!Array.isArray(rawTasks)) return null;
+
+  const tasks = rawTasks.map(normalizeTask).filter((task): task is Task => task !== null);
+  const sections = normalizeSections(rawSections);
+  reconcileSectionIds(tasks, sections);
+  return { tasks, sections };
+}
+
+/** Reads the workspace from localStorage. Always safe to call, even on the server. */
+export function loadWorkspace(): { workspace: Workspace; hadData: boolean } {
+  const empty: Workspace = { tasks: [], sections: defaultSections() };
+  if (typeof window === "undefined") return { workspace: empty, hadData: false };
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { tasks: [], hadData: false };
+    if (!raw) return { workspace: empty, hadData: false };
 
-    const parsed: unknown = JSON.parse(raw);
-    const list = Array.isArray(parsed)
-      ? parsed
-      : ((parsed as Record<string, unknown>)?.tasks as unknown[] | undefined);
-
-    if (!Array.isArray(list)) return { tasks: [], hadData: false };
-
-    const tasks = list.map(normalizeTask).filter((task): task is Task => task !== null);
-    return { tasks, hadData: true };
+    const workspace = buildWorkspace(JSON.parse(raw));
+    if (!workspace) return { workspace: empty, hadData: false };
+    return { workspace, hadData: true };
   } catch {
-    return { tasks: [], hadData: false };
+    return { workspace: empty, hadData: false };
   }
 }
 
 /**
- * Reads a JSON backup string (either a bare array or a `{ tasks }` payload).
- * Returns null when the text is not a usable task list.
+ * Reads a JSON backup string (a bare task array or a `{ tasks, sections }`
+ * payload). Returns null when the text is not a usable backup.
  */
-export function parseTasksJson(raw: string): Task[] | null {
+export function parseWorkspaceJson(raw: string): Workspace | null {
   try {
-    const parsed: unknown = JSON.parse(raw);
-    const list = Array.isArray(parsed)
-      ? parsed
-      : ((parsed as Record<string, unknown>)?.tasks as unknown[] | undefined);
-
-    if (!Array.isArray(list)) return null;
-
-    return list.map(normalizeTask).filter((task): task is Task => task !== null);
+    return buildWorkspace(JSON.parse(raw));
   } catch {
     return null;
   }
 }
 
-/** Persists tasks to localStorage. Fails silently when storage is unavailable. */
-export function saveTasks(tasks: Task[]): void {
+/** Persists the workspace to localStorage. Fails silently when unavailable. */
+export function saveWorkspace(workspace: Workspace): void {
   if (typeof window === "undefined") return;
   try {
-    const payload: PersistedState = { version: 1, tasks };
+    const payload: PersistedState = {
+      version: CURRENT_VERSION,
+      tasks: workspace.tasks,
+      sections: workspace.sections,
+    };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // Storage full or blocked (private mode) — the app still works in-memory.

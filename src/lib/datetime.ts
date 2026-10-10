@@ -53,3 +53,13 @@ export function rescheduleToNextDay(dueAt: string | null, now: Date): string {
   target.setHours(9, 0, 0, 0);
   return target.toISOString();
 }
+
+/**
+ * Timestamp used when a task is dropped on the "Overdue" column: an hour in the
+ * past, so it reads as overdue without losing its rough time of day.
+ */
+export function overdueAt(now: Date): string {
+  const target = new Date(now);
+  target.setHours(target.getHours() - 1, target.getMinutes(), 0, 0);
+  return target.toISOString();
+}

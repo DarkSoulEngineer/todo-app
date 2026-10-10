@@ -13,6 +13,7 @@ export function createTask(draft: TaskDraft): Task {
     category: draft.category,
     completed: false,
     canceled: false,
+    sectionId: null,
     subtasks: draft.subtasks.map((subtask) => ({
       id: subtask.id || nanoid(8),
       title: subtask.title.trim(),

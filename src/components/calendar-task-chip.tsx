@@ -3,6 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { PRIORITY_META } from "@/lib/constants";
 import { deriveStatus } from "@/lib/status";
+import { TaskTooltip } from "@/components/task-tooltip";
 import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -41,20 +42,26 @@ export function CalendarTaskChip({ task, now, onEdit }: CalendarTaskChipProps) {
       : PRIORITY_META[task.priority].dot;
 
   return (
-    <button
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      onClick={() => onEdit(task)}
-      title={task.title}
-      className={cn(
-        "focus-ring flex w-full min-w-0 touch-none items-center gap-1 overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[11px] font-medium ring-1 ring-inset transition-colors",
-        tone,
-        isDragging && "opacity-40",
+    <TaskTooltip task={task} now={now}>
+      {(triggerProps) => (
+        <button
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          {...triggerProps}
+          onClick={() => onEdit(task)}
+          className={cn(
+            "focus-ring flex w-full min-w-0 touch-none items-center gap-1 overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[11px] font-medium ring-1 ring-inset transition-colors",
+            tone,
+            isDragging && "opacity-40",
+          )}
+        >
+          <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
+          <span className={cn("min-w-0 flex-1 truncate", settled && "line-through")}>
+            {task.title}
+          </span>
+        </button>
       )}
-    >
-      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
-      <span className={cn("min-w-0 flex-1 truncate", settled && "line-through")}>{task.title}</span>
-    </button>
+    </TaskTooltip>
   );
 }

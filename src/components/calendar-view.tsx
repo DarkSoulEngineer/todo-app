@@ -28,6 +28,7 @@ import { CalendarGrid, type CalendarMode } from "@/components/calendar-grid";
 import { CalendarTaskChip } from "@/components/calendar-task-chip";
 import { DayDialog } from "@/components/day-dialog";
 import { Button } from "@/components/ui/button";
+import { dismissTooltips } from "@/components/ui/tooltip";
 import { useTasksContext } from "@/components/tasks-provider";
 import { rescheduleToDay } from "@/lib/datetime";
 import { sortTasks } from "@/lib/tasks-selectors";
@@ -174,7 +175,12 @@ export function CalendarView({ tasks, now, onEdit, onCreateOn }: CalendarViewPro
         </div>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={() => dismissTooltips()}
+        onDragEnd={handleDragEnd}
+      >
         <CalendarGrid
           days={days}
           cursor={cursor}

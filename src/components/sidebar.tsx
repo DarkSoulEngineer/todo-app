@@ -7,6 +7,7 @@ import {
   CalendarClock,
   CalendarDays,
   Check,
+  Hash,
   Keyboard,
   ListChecks,
   PanelLeftClose,
@@ -21,7 +22,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { getCategory } from "@/lib/categories";
 import { SMART_LISTS, type SmartListCounts } from "@/lib/smart-lists";
 import type { TaskStats } from "@/lib/tasks-selectors";
-import type { SmartList, ViewMode } from "@/lib/types";
+import type { BoardSection, SmartList, ViewMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const LIST_ICONS: Record<SmartList, LucideIcon> = {
@@ -48,9 +49,15 @@ interface SidebarProps {
   stats: TaskStats;
   category: string | "all";
   categoryCounts: SidebarCategory[];
+  /** User-defined board sections (custom ones are surfaced here). */
+  sections: BoardSection[];
+  sectionCounts: Record<string, number>;
+  /** Id of the custom section currently focused on the board, if any. */
+  focusedSection: string | null;
   onSelectList: (list: SmartList) => void;
   onSelectView: (view: ViewMode) => void;
   onSelectCategory: (category: string | "all") => void;
+  onSelectSection: (id: string) => void;
   onShowHelp: () => void;
   onToggleCollapse: () => void;
   onClose?: () => void;
@@ -65,9 +72,13 @@ export function Sidebar({
   stats,
   category,
   categoryCounts,
+  sections,
+  sectionCounts,
+  focusedSection,
   onSelectList,
   onSelectView,
   onSelectCategory,
+  onSelectSection,
   onShowHelp,
   onToggleCollapse,
   onClose,
@@ -149,6 +160,30 @@ export function Sidebar({
             onClick={() => onSelectView("insights")}
           />
         </div>
+
+        {sections.some((section) => section.status === undefined) ? (
+          <div className="space-y-0.5">
+            {!collapsed ? (
+              <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                Sections
+              </p>
+            ) : null}
+            {sections
+              .filter((section) => section.status === undefined)
+              .map((section) => (
+                <NavItem
+                  key={section.id}
+                  icon={Hash}
+                  label={section.title}
+                  count={sectionCounts[section.id] ?? 0}
+                  active={focusedSection === section.id}
+                  collapsed={collapsed}
+                  layoutId={`${idPrefix}-section-pill`}
+                  onClick={() => onSelectSection(section.id)}
+                />
+              ))}
+          </div>
+        ) : null}
 
         {categoryCounts.length > 0 ? (
           <div className="space-y-0.5">

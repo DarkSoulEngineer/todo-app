@@ -1,0 +1,79 @@
+import { nanoid } from "nanoid";
+import { STATUS_META } from "@/lib/status";
+import type { BoardSection, TaskStatus } from "@/lib/types";
+
+/** Order of the built-in, status-backed columns. */
+export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed", "canceled"];
+
+/** Fresh copies of the default board layout (Upcoming, Overdue, Completed, Canceled). */
+export function defaultSections(): BoardSection[] {
+  return STATUS_SECTIONS.map((status) => ({
+    id: `status-${status}`,
+    title: STATUS_META[status].label,
+    status,
+  }));
+}
+
+export function isStatusSection(
+  section: BoardSection,
+): section is BoardSection & { status: TaskStatus } {
+  return typeof section.status === "string";
+}
+
+export function isCustomSection(section: BoardSection): boolean {
+  return section.status === undefined;
+}
+
+function asStatus(value: unknown): TaskStatus | undefined {
+  return STATUS_SECTIONS.includes(value as TaskStatus) ? (value as TaskStatus) : undefined;
+}
+
+/**
+ * Coerces unknown persisted data into a valid, ordered section list. Falls back
+ * to the defaults when nothing usable is found, and guarantees a column exists
+ * for every status so drag-to-status keeps working.
+ */
+export function normalizeSections(value: unknown): BoardSection[] {
+  const list = Array.isArray(value) ? value : [];
+  const seenIds = new Set<string>();
+  const result: BoardSection[] = [];
+
+  for (const item of list) {
+    if (typeof item !== "object" || item === null) continue;
+    const record = item as Record<string, unknown>;
+    const title = typeof record.title === "string" ? record.title.trim() : "";
+    if (!title) continue;
+
+    const status = asStatus(record.status);
+    // Only keep the first section for a given status; extras fall back to custom.
+    const duplicateStatus =
+      status !== undefined && result.some((section) => section.status === status);
+    const effectiveStatus = duplicateStatus ? undefined : status;
+
+    let id = typeof record.id === "string" && record.id ? record.id : nanoid(10);
+    if (seenIds.has(id)) id = `${id}-${nanoid(4)}`;
+    seenIds.add(id);
+
+    const section: BoardSection = { id, title };
+    if (effectiveStatus) section.status = effectiveStatus;
+    if (record.hidden === true) section.hidden = true;
+    result.push(section);
+  }
+
+  // Guarantee every status has a column, appending any that are missing.
+  for (const status of STATUS_SECTIONS) {
+    if (!result.some((section) => section.status === status)) {
+      result.push({ id: `status-${status}`, title: STATUS_META[status].label, status });
+    }
+  }
+
+  return result.length > 0 ? result : defaultSections();
+}
+
+/** Drops `sectionId` references that no longer point at a custom section. */
+export function reconcileSectionIds(tasks: { sectionId: string | null }[], sections: BoardSection[]): void {
+  const customIds = new Set(sections.filter(isCustomSection).map((section) => section.id));
+  for (const task of tasks) {
+    if (task.sectionId && !customIds.has(task.sectionId)) task.sectionId = null;
+  }
+}

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { CompleteToggle } from "@/components/complete-toggle";
 import { SubtaskList } from "@/components/subtask-list";
 import { CategoryPill, DueBadge, PriorityPill, StatusPill } from "@/components/task-badges";
+import { TaskTooltip } from "@/components/task-tooltip";
 import { useTasksContext } from "@/components/tasks-provider";
 import { deriveStatus } from "@/lib/status";
 import type { Task } from "@/lib/types";
@@ -85,21 +86,26 @@ export function TaskCard({ task, now, onEdit, handle, dragging, compact }: TaskC
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => onEdit(task)}
-            className="focus-ring -m-1 min-w-0 flex-1 rounded-md p-1 text-left"
-          >
-            <h3
-              className={cn(
-                "text-[0.95rem] leading-snug font-semibold",
-                compact ? "truncate" : "break-words",
-                settled ? "text-muted-foreground line-through" : "text-foreground",
-              )}
-            >
-              {task.title}
-            </h3>
-          </button>
+          <TaskTooltip task={task} now={now}>
+            {(triggerProps) => (
+              <button
+                type="button"
+                onClick={() => onEdit(task)}
+                {...triggerProps}
+                className="focus-ring -m-1 min-w-0 flex-1 rounded-md p-1 text-left"
+              >
+                <h3
+                  className={cn(
+                    "text-[0.95rem] leading-snug font-semibold",
+                    compact ? "truncate" : "break-words",
+                    settled ? "text-muted-foreground line-through" : "text-foreground",
+                  )}
+                >
+                  {task.title}
+                </h3>
+              </button>
+            )}
+          </TaskTooltip>
 
           <div
             className={cn(

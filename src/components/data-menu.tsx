@@ -5,7 +5,7 @@ import { Database, Download, Trash2, Upload, type LucideIcon } from "lucide-reac
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { useTasksContext } from "@/components/tasks-provider";
-import { parseTasksJson } from "@/lib/storage";
+import { parseWorkspaceJson } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 interface MenuItemProps {
@@ -35,7 +35,7 @@ function MenuItem({ icon: Icon, label, onClick, danger }: MenuItemProps) {
 }
 
 export function DataMenu() {
-  const { tasks, snapshot, restore } = useTasksContext();
+  const { tasks, sections, snapshot, restore } = useTasksContext();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,9 +62,10 @@ export function DataMenu() {
     setOpen(false);
     const payload = {
       app: "Stride",
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       tasks,
+      sections,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -85,7 +86,7 @@ export function DataMenu() {
     if (!file) return;
 
     const text = await file.text();
-    const imported = parseTasksJson(text);
+    const imported = parseWorkspaceJson(text);
     if (!imported) {
       toast.error("That file could not be read as a Stride backup.");
       return;
@@ -93,18 +94,21 @@ export function DataMenu() {
 
     const before = snapshot();
     restore(imported);
-    toast.success(`Imported ${imported.length} task${imported.length === 1 ? "" : "s"}`, {
-      duration: 6000,
-      action: { label: "Undo", onClick: () => restore(before) },
-    });
+    toast.success(
+      `Imported ${imported.tasks.length} task${imported.tasks.length === 1 ? "" : "s"} and ${imported.sections.length} section${imported.sections.length === 1 ? "" : "s"}`,
+      {
+        duration: 6000,
+        action: { label: "Undo", onClick: () => restore(before) },
+      },
+    );
   }
 
   function handleClearAll(): void {
     setOpen(false);
     if (tasks.length === 0) return;
     const before = snapshot();
-    restore([]);
-    toast(`Cleared ${before.length} task${before.length === 1 ? "" : "s"}`, {
+    restore({ tasks: [], sections: before.sections });
+    toast(`Cleared ${before.tasks.length} task${before.tasks.length === 1 ? "" : "s"}`, {
       duration: 6000,
       action: { label: "Undo", onClick: () => restore(before) },
     });

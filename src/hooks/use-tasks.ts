@@ -2,13 +2,16 @@
 
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { overdueAt, rescheduleToNextDay } from "@/lib/datetime";
 import { createSampleTasks } from "@/lib/sample";
-import { loadTasks, saveTasks } from "@/lib/storage";
+import { isCustomSection, isStatusSection } from "@/lib/sections";
+import { loadWorkspace, saveWorkspace } from "@/lib/storage";
 import { applyDraft, createTask } from "@/lib/task-factory";
-import type { Task, TaskDraft } from "@/lib/types";
+import type { BoardSection, Task, TaskDraft, Workspace } from "@/lib/types";
 
 export interface TasksApi {
   tasks: Task[];
+  sections: BoardSection[];
   isLoading: boolean;
   isEmpty: boolean;
   addTask: (draft: TaskDraft) => Task;
@@ -23,50 +26,70 @@ export interface TasksApi {
   setTaskStatus: (id: string, status: "completed" | "canceled" | "open") => void;
   /** Move a task to a due date (used by calendar drag-and-drop), or clear it. */
   setTaskDueAt: (id: string, dueAt: string | null) => void;
+  /** Assign a task to a board section (status or custom) honouring its meaning. */
+  assignTaskToSection: (taskId: string, sectionId: string) => void;
+  /** Point a task at a custom section (or null to release it). */
+  setTaskSectionId: (taskId: string, sectionId: string | null) => void;
+  addSection: (title: string) => BoardSection;
+  renameSection: (id: string, title: string) => void;
+  /** Removes a custom section; its tasks return to their status column. */
+  deleteSection: (id: string) => void;
+  toggleSectionHidden: (id: string) => void;
+  reorderSections: (orderedIds: string[]) => void;
   reorderTasks: (orderedIds: string[]) => void;
   clearCompleted: () => number;
   getCompletedIds: () => string[];
-  /** Immutable copy of the current list, for reversible bulk actions. */
-  snapshot: () => Task[];
-  restore: (tasks: Task[]) => void;
+  /** Immutable copy of the workspace, for reversible bulk actions. */
+  snapshot: () => Workspace;
+  restore: (workspace: Workspace) => void;
   loadSample: () => void;
 }
 
 export function useTasks(): TasksApi {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [sections, setSections] = useState<BoardSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const tasksRef = useRef<Task[]>([]);
+  const sectionsRef = useRef<BoardSection[]>([]);
 
-  // Keep a ref of the latest list for synchronous reads inside handlers.
+  // Keep refs of the latest state for synchronous reads inside handlers.
   useEffect(() => {
     tasksRef.current = tasks;
   }, [tasks]);
+
+  useEffect(() => {
+    sectionsRef.current = sections;
+  }, [sections]);
 
   // Hydrate from localStorage after mount. This is a deliberate external-store
   // read that must not run during SSR, so the server and first client render
   // agree and there is no hydration mismatch.
   useEffect(() => {
-    const { tasks: stored } = loadTasks();
+    const { workspace } = loadWorkspace();
     /* eslint-disable react-hooks/set-state-in-effect */
-    setTasks(stored);
+    setTasks(workspace.tasks);
+    setSections(workspace.sections);
     setIsLoading(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  // Persist after every change, but never before the initial load has settled.
+  // Persist after every change, once hydrated.
   useEffect(() => {
     if (isLoading) return;
-    saveTasks(tasks);
-  }, [tasks, isLoading]);
+    saveWorkspace({ tasks, sections });
+  }, [tasks, sections, isLoading]);
 
-  const updateById = useCallback((id: string, updater: (task: Task) => Task) => {
-    setTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
-  }, []);
+  const updateById = useCallback(
+    (id: string, updater: (task: Task) => Task) => {
+      setTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
+    },
+    [],
+  );
 
   const addTask = useCallback((draft: TaskDraft): Task => {
     const task = createTask(draft);
-    setTasks((prev) => [task, ...prev]);
+    setTasks((prev) => [...prev, task]);
     return task;
   }, []);
 
@@ -155,10 +178,24 @@ export function useTasks(): TasksApi {
       updateById(id, (task) => {
         const stamp = new Date().toISOString();
         if (status === "completed") {
-          return { ...task, completed: true, canceled: false, completedAt: stamp, updatedAt: stamp };
+          return {
+            ...task,
+            completed: true,
+            canceled: false,
+            completedAt: stamp,
+            sectionId: null,
+            updatedAt: stamp,
+          };
         }
         if (status === "canceled") {
-          return { ...task, completed: false, canceled: true, completedAt: null, updatedAt: stamp };
+          return {
+            ...task,
+            completed: false,
+            canceled: true,
+            completedAt: null,
+            sectionId: null,
+            updatedAt: stamp,
+          };
         }
         return { ...task, completed: false, canceled: false, completedAt: null, updatedAt: stamp };
       });
@@ -173,6 +210,133 @@ export function useTasks(): TasksApi {
     [updateById],
   );
 
+  const setTaskSectionId = useCallback(
+    (id: string, sectionId: string | null) => {
+      updateById(id, (task) => ({
+        ...task,
+        sectionId,
+        updatedAt: new Date().toISOString(),
+      }));
+    },
+    [updateById],
+  );
+
+  /**
+   * Moves a task into a board section. Status sections set the matching status
+   * (and clear `sectionId`); custom sections set `sectionId` and leave status
+   * flags alone.
+   */
+  const assignTaskToSection = useCallback(
+    (taskId: string, sectionId: string) => {
+      const section = sectionsRef.current.find((item) => item.id === sectionId);
+      if (!section) return;
+
+      const stamp = new Date().toISOString();
+      updateById(taskId, (task) => {
+        if (isStatusSection(section)) {
+          switch (section.status) {
+            case "completed":
+              return {
+                ...task,
+                completed: true,
+                canceled: false,
+                completedAt: stamp,
+                sectionId: null,
+                updatedAt: stamp,
+              };
+            case "canceled":
+              return {
+                ...task,
+                completed: false,
+                canceled: true,
+                completedAt: null,
+                sectionId: null,
+                updatedAt: stamp,
+              };
+            case "overdue":
+              return {
+                ...task,
+                completed: false,
+                canceled: false,
+                completedAt: null,
+                sectionId: null,
+                dueAt: overdueAt(new Date()),
+                updatedAt: stamp,
+              };
+            case "upcoming": {
+              const due = task.dueAt ? Date.parse(task.dueAt) : Number.POSITIVE_INFINITY;
+              const overdue = due < Date.now();
+              return {
+                ...task,
+                completed: false,
+                canceled: false,
+                completedAt: null,
+                sectionId: null,
+                dueAt: overdue ? rescheduleToNextDay(task.dueAt, new Date()) : task.dueAt,
+                updatedAt: stamp,
+              };
+            }
+          }
+        }
+        return { ...task, sectionId: section.id, updatedAt: stamp };
+      });
+    },
+    [updateById],
+  );
+
+  const addSection = useCallback((title: string): BoardSection => {
+    const section: BoardSection = {
+      id: `custom-${nanoid(8)}`,
+      title: title.trim() || "New section",
+    };
+    setSections((prev) => [...prev, section]);
+    return section;
+  }, []);
+
+  const renameSection = useCallback((id: string, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setSections((prev) =>
+      prev.map((section) => (section.id === id ? { ...section, title: trimmed } : section)),
+    );
+  }, []);
+
+  const deleteSection = useCallback((id: string) => {
+    setSections((prev) => {
+      const target = prev.find((section) => section.id === id);
+      if (!target || !isCustomSection(target)) return prev;
+      return prev.filter((section) => section.id !== id);
+    });
+    // Tasks that lived in this section return to their status column.
+    setTasks((prev) =>
+      prev.map((task) => (task.sectionId === id ? { ...task, sectionId: null } : task)),
+    );
+  }, []);
+
+  const toggleSectionHidden = useCallback((id: string) => {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id === id ? { ...section, hidden: !section.hidden } : section,
+      ),
+    );
+  }, []);
+
+  const reorderSections = useCallback((orderedIds: string[]) => {
+    setSections((prev) => {
+      const byId = new Map(prev.map((section) => [section.id, section]));
+      const next: BoardSection[] = [];
+      for (const id of orderedIds) {
+        const section = byId.get(id);
+        if (section) {
+          next.push(section);
+          byId.delete(id);
+        }
+      }
+      for (const section of byId.values()) next.push(section);
+      return next;
+    });
+  }, []);
+
   /** Reorders a (possibly filtered) subset within the slots those tasks already occupy. */
   const reorderTasks = useCallback((orderedIds: string[]) => {
     setTasks((prev) => {
@@ -181,25 +345,19 @@ export function useTasks(): TasksApi {
       if (moving.size === 0) return prev;
 
       const slots: number[] = [];
-      prev.forEach((task, index) => {
+      for (const [index, task] of prev.entries()) {
         if (moving.has(task.id)) slots.push(index);
-      });
+      }
 
       const next = [...prev];
-      orderedIds.forEach((id, index) => {
+      orderedIds.forEach((id, order) => {
         const task = byId.get(id);
-        const slot = slots[index];
+        const slot = slots[order];
         if (task && slot !== undefined) next[slot] = task;
       });
-
       return next;
     });
   }, []);
-
-  const getCompletedIds = useCallback(
-    () => tasksRef.current.filter((task) => task.completed).map((task) => task.id),
-    [],
-  );
 
   const clearCompleted = useCallback((): number => {
     const completedIds = new Set(
@@ -210,10 +368,22 @@ export function useTasks(): TasksApi {
     return completedIds.size;
   }, []);
 
-  const snapshot = useCallback((): Task[] => tasksRef.current.map((task) => ({ ...task })), []);
+  const getCompletedIds = useCallback(
+    () => tasksRef.current.filter((task) => task.completed).map((task) => task.id),
+    [],
+  );
 
-  const restore = useCallback((next: Task[]) => {
-    setTasks(next);
+  const snapshot = useCallback(
+    (): Workspace => ({
+      tasks: tasksRef.current.map((task) => ({ ...task })),
+      sections: sectionsRef.current.map((section) => ({ ...section })),
+    }),
+    [],
+  );
+
+  const restore = useCallback((workspace: Workspace) => {
+    setTasks(workspace.tasks);
+    setSections(workspace.sections);
   }, []);
 
   const loadSample = useCallback(() => {
@@ -223,6 +393,7 @@ export function useTasks(): TasksApi {
   return useMemo(
     () => ({
       tasks,
+      sections,
       isLoading,
       isEmpty: tasks.length === 0,
       addTask,
@@ -235,6 +406,13 @@ export function useTasks(): TasksApi {
       removeSubtask,
       setTaskStatus,
       setTaskDueAt,
+      setTaskSectionId,
+      assignTaskToSection,
+      addSection,
+      renameSection,
+      deleteSection,
+      toggleSectionHidden,
+      reorderSections,
       reorderTasks,
       clearCompleted,
       getCompletedIds,
@@ -244,6 +422,7 @@ export function useTasks(): TasksApi {
     }),
     [
       tasks,
+      sections,
       isLoading,
       addTask,
       updateTask,
@@ -255,6 +434,13 @@ export function useTasks(): TasksApi {
       removeSubtask,
       setTaskStatus,
       setTaskDueAt,
+      setTaskSectionId,
+      assignTaskToSection,
+      addSection,
+      renameSection,
+      deleteSection,
+      toggleSectionHidden,
+      reorderSections,
       reorderTasks,
       clearCompleted,
       getCompletedIds,

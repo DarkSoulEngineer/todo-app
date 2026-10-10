@@ -16,6 +16,7 @@ interface BoardCardProps {
 export function BoardCard({ task, now, onEdit }: BoardCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
     id: task.id,
+    data: { type: "card" },
   });
 
   const handle = (

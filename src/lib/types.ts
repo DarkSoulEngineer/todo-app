@@ -21,9 +21,30 @@ export interface Task {
   completed: boolean;
   canceled: boolean;
   subtasks: Subtask[];
+  /** Id of a custom board section, or null when the task lives in a status column. */
+  sectionId: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+}
+
+/**
+ * A board column. When `status` is set the column is backed by a derived task
+ * status (Upcoming/Overdue/Completed/Canceled). Custom sections omit `status`
+ * and collect tasks through `Task.sectionId`.
+ */
+export interface BoardSection {
+  id: string;
+  title: string;
+  status?: TaskStatus;
+  /** Status sections can be hidden rather than removed. */
+  hidden?: boolean;
+}
+
+/** The full persisted workspace: tasks plus the user's board layout. */
+export interface Workspace {
+  tasks: Task[];
+  sections: BoardSection[];
 }
 
 /** Editable shape used by the create/edit form. */

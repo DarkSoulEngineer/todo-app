@@ -44,6 +44,7 @@ function defaultDueForDay(date: Date, now: Date): string {
 export function TodoApp() {
   const {
     tasks,
+    sections,
     isLoading,
     isEmpty,
     addTask,
@@ -60,6 +61,7 @@ export function TodoApp() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("manual");
   const [category, setCategory] = useState<string | "all">("all");
+  const [focusedSection, setFocusedSection] = useState<string | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -73,6 +75,20 @@ export function TodoApp() {
 
   const counts = useMemo(() => countBySmartList(tasks, now), [tasks, now]);
   const stats = useMemo(() => computeStats(tasks, now), [tasks, now]);
+
+  // The section focus only applies while a section still exists.
+  const activeSection = useMemo(
+    () => (focusedSection ? (sections.find((section) => section.id === focusedSection) ?? null) : null),
+    [focusedSection, sections],
+  );
+
+  const sectionCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const task of tasks) {
+      if (task.sectionId) map[task.sectionId] = (map[task.sectionId] ?? 0) + 1;
+    }
+    return map;
+  }, [tasks]);
 
   const categoryCounts = useMemo<SidebarCategory[]>(() => {
     const map = new Map<string, number>();
@@ -142,17 +158,26 @@ export function TodoApp() {
 
   const selectList = useCallback((list: SmartList) => {
     setSmartList(list);
+    setFocusedSection(null);
     setViewMode("list");
     setMobileNavOpen(false);
   }, []);
 
   const selectView = useCallback((view: ViewMode) => {
     setViewMode(view);
+    // Section focus only makes sense on the board.
+    if (view !== "board") setFocusedSection(null);
     setMobileNavOpen(false);
   }, []);
 
   const selectCategory = useCallback((next: string | "all") => {
     setCategory(next);
+    setMobileNavOpen(false);
+  }, []);
+
+  const selectSection = useCallback((id: string) => {
+    setFocusedSection((current) => (current === id ? null : id));
+    setViewMode("board");
     setMobileNavOpen(false);
   }, []);
 
@@ -238,7 +263,7 @@ export function TodoApp() {
     viewMode === "list"
       ? smartListLabel(smartList)
       : viewMode === "board"
-        ? "Board"
+        ? (activeSection?.title ?? "Board")
         : viewMode === "calendar"
           ? "Calendar"
           : "Insights";
@@ -246,7 +271,9 @@ export function TodoApp() {
     viewMode === "list"
       ? pluralize(listTasks.length, "task")
       : viewMode === "board"
-        ? "Drag cards between columns to change status"
+        ? activeSection
+          ? "Custom board section"
+          : "Drag cards between sections to change status"
         : viewMode === "calendar"
           ? "Plan your month by due date"
           : "Your progress at a glance";
@@ -296,7 +323,14 @@ export function TodoApp() {
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">{noResultsState}</div>
     ) : (
       <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
-        <BoardView tasks={filteredAll} now={now} sort={sort} onEdit={openEdit} />
+        <BoardView
+          tasks={filteredAll}
+          now={now}
+          sort={sort}
+          focusedSectionId={activeSection?.id ?? null}
+          onClearFocus={() => setFocusedSection(null)}
+          onEdit={openEdit}
+        />
       </div>
     );
   } else if (viewMode === "calendar") {
@@ -322,9 +356,13 @@ export function TodoApp() {
     stats,
     category,
     categoryCounts,
+    sections,
+    sectionCounts,
+    focusedSection: activeSection?.id ?? null,
     onSelectList: selectList,
     onSelectView: selectView,
     onSelectCategory: selectCategory,
+    onSelectSection: selectSection,
     onShowHelp: () => setHelpOpen(true),
     onToggleCollapse: () => setSidebarCollapsed((value) => !value),
   };
@@ -348,7 +386,7 @@ export function TodoApp() {
             title={title}
             subtitle={subtitle}
             viewMode={viewMode}
-            onChangeView={setViewMode}
+            onChangeView={selectView}
             query={query}
             onQueryChange={setQuery}
             sort={sort}
