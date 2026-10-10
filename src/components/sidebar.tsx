@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import React from "react";
 import {
   Ban,
   BarChart3,
@@ -331,7 +332,7 @@ function NavItem({ icon: Icon, label, count, active, collapsed, layoutId, onClic
         />
       ) : (
         <span className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}>
-          {Icon}
+          {React.isValidElement(Icon) ? Icon : <span>{Icon}</span>}
         </span>
       )}
       {!collapsed ? <span className="relative flex-1 truncate text-left">{label}</span> : null}
