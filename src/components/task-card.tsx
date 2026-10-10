@@ -757,7 +757,9 @@ export function TaskCard({
     dragging && "scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
     task.canceled && "border-dashed border-slate-400/45 bg-muted/40 hover:border-slate-400/70",
     selected && "border-primary/40 bg-primary/[0.04] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
-    highlighted && "border-primary/50 bg-primary/[0.07] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
+    // Keyboard cursor: a cue, never a second selection ring (the root's own
+    // focus-ring already marks keyboard focus).
+    highlighted && "border-primary/40 bg-primary/[0.05]",
     pulse === "complete" && "animate-pulse ring-2 ring-emerald-500/50",
     pulse === "cancel" && "animate-pulse ring-2 ring-slate-500/50",
   );

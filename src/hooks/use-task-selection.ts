@@ -95,7 +95,9 @@ export function useTaskSelection(
         return {
           ...prev,
           selectedIds: newSelected,
-          highlightedId: id,
+          // The highlight would otherwise keep painting the last card as if it
+          // were still selected once the selection empties.
+          highlightedId: newSelected.size > 0 ? id : null,
           lastClickedId: id,
           selectMode: nextSelectMode,
         };
