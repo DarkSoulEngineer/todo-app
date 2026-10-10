@@ -21,7 +21,8 @@ interface ListViewProps {
   sections?: BoardSection[];
   /** Function to move task to a section. */
   assignTaskToSection?: (taskId: string, sectionId: string) => void;
-  /** Called after a card is moved to another section via the list arrows. */
+  /** Manual order: cards may be rearranged inside each group with up/down. */
+  reorderable?: boolean;  /** Called after a card is moved to another section via the list arrows. */
   onMovedToSection?: (sectionId: string) => void;
 }
 
@@ -34,6 +35,7 @@ export function ListView({
   onEdit,
   sections: sectionsProp,
   assignTaskToSection: assignTaskToSectionProp,
+  reorderable = false,
   onMovedToSection,
 }: ListViewProps) {
   const { sections: sectionsCtx, assignTaskToSection: assignTaskToSectionCtx } = useTasksContext();
@@ -48,7 +50,6 @@ export function ListView({
     selectedIds,
     highlightedId,
     selectMode,
-    toggleSelectMode,
     clearSelection,
     toggleTask,
   } = useTaskSelection(allTasks);
@@ -129,24 +130,10 @@ export function ListView({
             onSelectTask={handleSelectTask}
             onRenameTask={handleRenameTask}
             onMovedToSection={onMovedToSection}
+            reorderable={reorderable}
           />
         </section>
       ))}
-
-      {/* Enter select mode button when no selection */}
-      {!selectMode && allTasks.length > 0 && (
-        <button
-          type="button"
-          onClick={toggleSelectMode}
-          className="self-center focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M9 9h6v6H9z" />
-          </svg>
-          Select tasks
-        </button>
-      )}
     </div>
   );
 }

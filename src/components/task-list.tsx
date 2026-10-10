@@ -1,8 +1,10 @@
 "use client";
 
+import { arrayMove } from "@dnd-kit/sortable";
 import { AnimatePresence } from "framer-motion";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { SortableTaskCard } from "@/components/sortable-task-card";
+import { useTasksContext } from "@/components/tasks-provider";
 import { useTaskSelection } from "@/hooks/use-task-selection";
 import type { Task, BoardSection } from "@/lib/types";
 import type { TasksApi } from "@/hooks/use-tasks";
@@ -22,6 +24,8 @@ interface TaskListProps {
   onSelectionChange?: (selectedIds: Set<string>) => void;
   onSelectTask?: (task: Task, shiftKey: boolean) => void;
   onRenameTask?: (task: Task) => void;
+  /** Manual order: cards may be rearranged inside the group with up/down. */
+  reorderable: boolean;
   /** Called after a card is moved to another section via the list arrows. */
   onMovedToSection?: (sectionId: string) => void;
 }
@@ -38,9 +42,25 @@ export function TaskList({
   onSelectionChange,
   onSelectTask,
   onRenameTask,
+  reorderable,
   onMovedToSection,
 }: TaskListProps) {
+  const { reorderTasks } = useTasksContext();
   const { moveHighlight, selectHighlighted } = useTaskSelection(tasks, onSelectionChange);
+
+  const orderedIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
+
+  /** Swaps a card with its neighbour inside this group (manual order only). */
+  const handleReorder = useCallback(
+    (taskId: string, direction: "up" | "down") => {
+      const from = orderedIds.indexOf(taskId);
+      if (from === -1) return;
+      const to = from + (direction === "up" ? -1 : 1);
+      if (to < 0 || to >= orderedIds.length) return;
+      reorderTasks(arrayMove(orderedIds, from, to));
+    },
+    [orderedIds, reorderTasks],
+  );
 
   // Use parent selection state if provided, otherwise use local
   const effectiveSelectedIds = selectedIds ?? new Set();
@@ -75,7 +95,7 @@ export function TaskList({
       aria-label="Tasks"
     >
       <AnimatePresence initial={false}>
-        {tasks.map((task) => (
+        {tasks.map((task, index) => (
           <SortableTaskCard
             key={task.id}
             task={task}
@@ -89,6 +109,9 @@ export function TaskList({
             onSelect={handleSelect}
             onRename={onRenameTask}
             onMovedToSection={onMovedToSection}
+            reorderIndex={reorderable ? index : undefined}
+            reorderTotal={reorderable ? tasks.length : undefined}
+            onReorder={reorderable ? handleReorder : undefined}
           />
         ))}
       </AnimatePresence>

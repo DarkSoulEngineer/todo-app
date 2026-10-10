@@ -359,6 +359,8 @@ export function TodoApp() {
           now={now}
           // The list has no drag and drop: reordering happens on the board.
           sortable={false}
+          // Manual order still gets up/down arrows inside each group.
+          reorderable={sort === "manual"}
           onEdit={openEdit}
           sections={sections}
           assignTaskToSection={assignTaskToSection}

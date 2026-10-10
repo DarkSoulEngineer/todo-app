@@ -28,6 +28,12 @@ interface SortableTaskCardProps {
   onRename?: (task: Task) => void;
   /** Called after the card is moved to another section via the arrows. */
   onMovedToSection?: (sectionId: string) => void;
+  /** Zero-based position inside the list group / board column. */
+  reorderIndex?: number;
+  /** How many cards the list group / board column holds. */
+  reorderTotal?: number;
+  /** Moves the card up or down inside its list group / board column. */
+  onReorder?: (taskId: string, direction: "up" | "down") => void;
 }
 
 export function SortableTaskCard({
@@ -42,6 +48,9 @@ export function SortableTaskCard({
   onSelect,
   onRename,
   onMovedToSection,
+  reorderIndex,
+  reorderTotal,
+  onReorder,
 }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, disabled: !sortable });
@@ -83,6 +92,9 @@ export function SortableTaskCard({
         onSelect={onSelect}
         onRename={onRename}
         onMovedToSection={onMovedToSection}
+        reorderIndex={reorderIndex}
+        reorderTotal={reorderTotal}
+        onReorder={onReorder}
       />
     </motion.li>
   );
