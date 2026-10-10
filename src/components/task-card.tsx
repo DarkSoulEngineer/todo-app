@@ -425,9 +425,8 @@ function CardActions({
           <div className="hidden sm:block">{handle}</div>
         )}
 
-        {/* 3. In-column reorder arrows (up/down) — always on list when enabled, hidden on board (drag handles reorder) */}
-        {!compact &&
-          reorderEnabled &&
+        {/* 3. In-column reorder arrows (up/down) — on list and board when enabled */}
+        {reorderEnabled &&
           REORDER_DIRECTIONS.map((direction) => {
             const isUp = direction === "up";
             const enabled = isUp ? canMoveUp : canMoveDown;
@@ -439,7 +438,10 @@ function CardActions({
                 key={direction}
                 type="button"
                 disabled={!enabled}
-                className={cn(ICON_BUTTON, "disabled:pointer-events-none disabled:opacity-40")}
+                className={cn(
+                  compact ? COMPACT_ARROW : ICON_BUTTON,
+                  "disabled:pointer-events-none disabled:opacity-40"
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   onReorder?.(task.id, direction);
