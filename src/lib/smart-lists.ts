@@ -10,9 +10,9 @@ export interface SmartListDef {
 /** Ordered smart lists shown in the sidebar. */
 export const SMART_LISTS: SmartListDef[] = [
   { id: "today", label: "Today" },
+  { id: "all", label: "All tasks" },
   { id: "upcoming", label: "Upcoming" },
   { id: "overdue", label: "Overdue" },
-  { id: "all", label: "All tasks" },
   { id: "completed", label: "Completed" },
   { id: "canceled", label: "Canceled" },
 ];
