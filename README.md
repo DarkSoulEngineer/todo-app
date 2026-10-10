@@ -61,6 +61,11 @@ Aplicația permite gestionarea completă a activităților: adăugare, editare, 
 - Adăugarea de carduri **direct într-o secțiune**.
 - Secțiunile sunt **persistate** (în `localStorage`) și incluse în **export / import JSON**.
 
+### Mutarea activităților între secțiuni
+- **Vizualizarea Listă**: pe fiecare rând, butoane **sus / jos** (arrow up / arrow down) mută activitatea în **secțiunea precedentă / următoare**, respectând **ordinea secțiunilor** definite de utilizator.
+- Semantica este identică cu drag-and-drop-ul din Board: mutarea într-o secțiune de status setează statusul, iar într-o secțiune custom setează `sectionId`.
+- **Vizualizarea Calendar**: activitățile se pot muta pe altă zi prin drag.
+
 ### Experiență de utilizare (UX)
 - Persistență în **`localStorage`** (datele rămân după reîncărcarea paginii).
 - **Temă dark / light** comutabilă.

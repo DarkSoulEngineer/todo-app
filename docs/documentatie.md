@@ -73,6 +73,7 @@ Pe lângă **cerințele minimale** ale temei (adăugare/ștergere activități �
 - **R15. Confetti** – animație celebratorie când toate activitățile sunt finalizate.
 - **R16. Board cu secțiuni personalizabile** (Kanban): adăugare de secțiuni custom, **redenumire în linie**, **ștergere** a secțiunilor custom (cardurile revin în coloana stării lor), **afișare / ascundere** a secțiunilor de status ale sistemului și **reordonare** a secțiunilor prin drag. Mutarea cardurilor între coloane: într-o **secțiune de status** setează statusul (Completed / Canceled / Overdue / Upcoming), iar într-o **secțiune custom** cardul rămâne în acea secțiune; se pot adăuga carduri **direct într-o secțiune**. Secțiunile sunt **persistate** (`localStorage`) și incluse în **export / import JSON**.
 - **R17. Tooltip bogat pe carduri** – la hover/focus se afișează titlul complet, descrierea, statusul, prioritatea, categoria și data limită, cu afișare inteligentă și gestionarea focusului.
+- **R18. Mutarea activităților între secțiuni din vizualizarea Listă** – fiecare rând are butoane **sus / jos** care mută activitatea în secțiunea precedentă / următoare, respectând ordinea secțiunilor definite de utilizator; semantica este identică cu drag-and-drop-ul din Board (secțiune de status ⇒ status, secțiune custom ⇒ `sectionId`).
 
 ### 3.2 Cerințe non-funcționale
 - **R18. Temă dark / light** comutabilă, cu persistența preferinței.
