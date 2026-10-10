@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { TaskList } from "@/components/task-list";
 import { SelectionToolbar } from "@/components/selection-toolbar";
-import { groupForList } from "@/lib/smart-lists";
+import { groupForList, groupForListBySection } from "@/lib/smart-lists";
 import { useTasksContext } from "@/components/tasks-provider";
 import { isCustomSection } from "@/lib/sections";
 import { deriveStatus } from "@/lib/status";
@@ -42,7 +42,9 @@ export function ListView({
   const { sections: sectionsCtx, assignTaskToSection: assignTaskToSectionCtx } = useTasksContext();
   const sections = sectionsProp ?? sectionsCtx;
   const assignTaskToSection = assignTaskToSectionProp ?? assignTaskToSectionCtx;
-  const groups = groupForList(tasks, list, now);
+  const groups = list === "by-section" 
+    ? groupForListBySection(tasks, sections, now)
+    : groupForList(tasks, list, now);
 
   // Flatten all tasks for selection management
   const allTasks = useMemo(() => groups.flatMap((g) => g.tasks), [groups]);

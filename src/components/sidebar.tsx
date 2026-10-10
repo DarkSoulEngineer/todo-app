@@ -33,6 +33,7 @@ const LIST_ICONS: Record<SmartList, LucideIcon> = {
   all: ListChecks,
   completed: Check,
   canceled: Ban,
+  "by-section": Hash,
 };
 
 export interface SidebarCategory {

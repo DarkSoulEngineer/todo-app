@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, isSameDay, isValid, parseISO } from "date-fns";
 import { deriveStatus } from "@/lib/status";
-import type { SmartList, Task } from "@/lib/types";
+import { getTaskSectionId, isCustomSection } from "@/lib/sections";
+import type { SmartList, Task, BoardSection } from "@/lib/types";
 
 export interface SmartListDef {
   id: SmartList;
@@ -12,6 +13,7 @@ export const SMART_LISTS: SmartListDef[] = [
   { id: "today", label: "Today" },
   { id: "all", label: "All tasks" },
   { id: "completed", label: "Completed" },
+  { id: "by-section", label: "By section" },
   { id: "upcoming", label: "Upcoming" },
   { id: "overdue", label: "Overdue" },
   { id: "canceled", label: "Canceled" },
@@ -24,6 +26,7 @@ const SMART_LABELS: Record<SmartList, string> = {
   all: "All tasks",
   completed: "Completed",
   canceled: "Canceled",
+  "by-section": "By section",
 };
 
 export function smartListLabel(list: SmartList): string {
@@ -39,6 +42,7 @@ function dueOnDay(task: Task, day: Date): boolean {
 export function filterBySmartList(tasks: Task[], list: SmartList, now: Date): Task[] {
   switch (list) {
     case "all":
+    case "by-section":
       return tasks;
     case "today":
       return tasks.filter((task) => !task.completed && !task.canceled && dueOnDay(task, now));
@@ -65,6 +69,7 @@ export function countBySmartList(tasks: Task[], now: Date): SmartListCounts {
     all: tasks.length,
     completed: 0,
     canceled: 0,
+    "by-section": 0,
   };
 
   for (const task of tasks) {
@@ -80,6 +85,8 @@ export function countBySmartList(tasks: Task[], now: Date): SmartListCounts {
     const status = deriveStatus(task, now);
     if (status === "upcoming" || status === "overdue") counts[status] += 1;
   }
+
+  counts["by-section"] = tasks.length;
 
   return counts;
 }
@@ -102,6 +109,7 @@ const LIST_BUCKETS: Record<SmartList, string[]> = {
   all: ["overdue", "today", "tomorrow", "thisWeek", "later", "none", "completed", "canceled"],
   completed: ["completed"],
   canceled: ["canceled"],
+  "by-section": [],
 };
 
 function bucketOf(task: Task, now: Date): string {
@@ -142,6 +150,46 @@ export function groupForList(tasks: Task[], list: SmartList, now: Date): TaskGro
     const items = buckets.get(key);
     if (items && items.length > 0) {
       groups.push({ id: key, label: BUCKET_LABELS[key] ?? key, tasks: items });
+    }
+  }
+  return groups;
+}
+
+/** Groups tasks by their board section (custom or status). */
+export function groupForListBySection(
+  tasks: Task[],
+  sections: BoardSection[],
+  now: Date
+): TaskGroup[] {
+  const sectionMap = new Map<string, BoardSection>();
+  for (const section of sections) {
+    sectionMap.set(section.id, section);
+  }
+
+  const buckets = new Map<string, Task[]>();
+
+  for (const task of tasks) {
+    const sectionId = getTaskSectionId(task, sections, now);
+    const key = sectionId ?? "none";
+    const existing = buckets.get(key);
+    if (existing) existing.push(task);
+    else buckets.set(key, [task]);
+  }
+
+  // Order: custom sections first (in board order), then status sections in board order, then unassigned
+  const orderedSectionIds = [
+    ...sections.filter(isCustomSection).map((s) => s.id),
+    ...sections.filter((s) => s.status).map((s) => s.id),
+    "none",
+  ];
+
+  const groups: TaskGroup[] = [];
+  for (const key of orderedSectionIds) {
+    const items = buckets.get(key);
+    if (items && items.length > 0) {
+      const section = sectionMap.get(key);
+      const label = section?.title ?? "No section";
+      groups.push({ id: key, label, tasks: items });
     }
   }
   return groups;

@@ -66,7 +66,7 @@ export type SortKey = "manual" | "due" | "priority" | "created";
 export type StatusFilter = "all" | TaskStatus;
 
 /** Sidebar "smart list" — a saved view over tasks. */
-export type SmartList = "today" | "upcoming" | "overdue" | "all" | "completed" | "canceled";
+export type SmartList = "today" | "upcoming" | "overdue" | "all" | "completed" | "canceled" | "by-section";
 
 /** Which surface is showing in the main region. */
 export type ViewMode = "list" | "board" | "calendar" | "insights";

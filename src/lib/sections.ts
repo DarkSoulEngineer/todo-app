@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { STATUS_META } from "@/lib/status";
-import type { BoardSection, TaskStatus } from "@/lib/types";
+import { deriveStatus } from "@/lib/status";
+import type { BoardSection, Task, TaskStatus } from "@/lib/types";
 
 /** Order of the built-in, status-backed columns. */
 export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed", "canceled"];
@@ -76,4 +77,18 @@ export function reconcileSectionIds(tasks: { sectionId: string | null }[], secti
   for (const task of tasks) {
     if (task.sectionId && !customIds.has(task.sectionId)) task.sectionId = null;
   }
+}
+
+/**
+ * Determines which board section a task currently belongs to.
+ * Returns the section ID or undefined if not found.
+ */
+export function getTaskSectionId(task: Task, sections: BoardSection[], now: Date): string | undefined {
+  if (task.sectionId) {
+    const customSection = sections.find((s) => s.id === task.sectionId);
+    if (customSection && isCustomSection(customSection)) return customSection.id;
+  }
+  const status = deriveStatus(task, now);
+  const statusSection = sections.find((s) => s.status === status);
+  return statusSection?.id;
 }
