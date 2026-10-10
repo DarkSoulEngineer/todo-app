@@ -35,7 +35,7 @@ function MenuItem({ icon: Icon, label, onClick, danger }: MenuItemProps) {
 }
 
 export function DataMenu() {
-  const { tasks, sections, deletedCategories, snapshot, restore } = useTasksContext();
+  const { tasks, sections, boards, snapshot, restore } = useTasksContext();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,7 +66,7 @@ export function DataMenu() {
       exportedAt: new Date().toISOString(),
       tasks,
       sections,
-      deletedCategories,
+      boards,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -108,7 +108,7 @@ export function DataMenu() {
     setOpen(false);
     if (tasks.length === 0) return;
     const before = snapshot();
-    restore({ tasks: [], sections: before.sections, deletedCategories: before.deletedCategories });
+    restore({ tasks: [], sections: before.sections, boards: before.boards });
     toast(`Cleared ${before.tasks.length} task${before.tasks.length === 1 ? "" : "s"}`, {
       duration: 6000,
       action: { label: "Undo", onClick: () => restore(before) },

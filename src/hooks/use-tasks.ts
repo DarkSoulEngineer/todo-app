@@ -1,8 +1,14 @@
 "use client";
 
 import { nanoid } from "nanoid";
+import {
+  BUILT_IN_BOARDS,
+  defaultBoards,
+  missingBuiltInBoards,
+  type Board,
+  type BoardColorId,
+} from "@/lib/boards";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCategory } from "@/lib/categories";
 import { overdueAt, rescheduleToNextDay } from "@/lib/datetime";
 import { createSampleTasks } from "@/lib/sample";
 import { isCustomSection, isStatusSection } from "@/lib/sections";
@@ -13,8 +19,8 @@ import type { BoardSection, Task, TaskDraft, Workspace } from "@/lib/types";
 export interface TasksApi {
   tasks: Task[];
   sections: BoardSection[];
-  /** Ids of built-in categories the user deleted. */
-  deletedCategories: string[];
+  /** The user's boards, in display order. */
+  boards: Board[];
   isLoading: boolean;
   isEmpty: boolean;
   addTask: (draft: TaskDraft) => Task;
@@ -41,13 +47,22 @@ export interface TasksApi {
   reorderSections: (orderedIds: string[]) => void;
   reorderTasks: (orderedIds: string[]) => void;
   /**
-   * Deletes a built-in category: it stops being offered anywhere and every task
-   * tagged with it loses the tag. Null when the id is not a known category.
+   * Board management. Deleting a board also strips the tag from its tasks.
+   * `deleteBoard` reports the label and how many tasks lost the tag.
    */
+  createBoard: (input: { label: string; color: BoardColorId }) => Board;
+  renameBoard: (id: string, label: string) => void;
+  recolorBoard: (id: string, color: BoardColorId) => void;
+  deleteBoard: (id: string) => { label: string; affected: number } | null;
+  /** Puts the built-in boards that are missing back on offer. */
+  restoreBuiltInBoards: () => void;
+  /** @deprecated Board API wrapper — use the board actions above. */
+  deletedCategories: string[];
+  /** @deprecated Board API wrapper — use the board actions above. */
   deleteCategory: (id: string) => { label: string; affected: number } | null;
-  /** Puts a deleted category back on offer (its tasks stay untagged). */
+  /** @deprecated Board API wrapper — use the board actions above. */
   restoreCategory: (id: string) => void;
-  /** Puts every deleted category back on offer. */
+  /** @deprecated Board API wrapper — use the board actions above. */
   restoreCategories: () => void;
   clearCompleted: () => number;
   getCompletedIds: () => string[];
@@ -60,12 +75,12 @@ export interface TasksApi {
 export function useTasks(): TasksApi {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [sections, setSections] = useState<BoardSection[]>([]);
-  const [deletedCategories, setDeletedCategories] = useState<string[]>([]);
+  const [boards, setBoards] = useState<Board[]>(defaultBoards);
   const [isLoading, setIsLoading] = useState(true);
 
   const tasksRef = useRef<Task[]>([]);
   const sectionsRef = useRef<BoardSection[]>([]);
-  const deletedCategoriesRef = useRef<string[]>([]);
+  const boardsRef = useRef<Board[]>(defaultBoards());
 
   // Keep refs of the latest state for synchronous reads inside handlers.
   useEffect(() => {
@@ -77,8 +92,8 @@ export function useTasks(): TasksApi {
   }, [sections]);
 
   useEffect(() => {
-    deletedCategoriesRef.current = deletedCategories;
-  }, [deletedCategories]);
+    boardsRef.current = boards;
+  }, [boards]);
 
   // Hydrate from localStorage after mount. This is a deliberate external-store
   // read that must not run during SSR, so the server and first client render
@@ -88,7 +103,7 @@ export function useTasks(): TasksApi {
     /* eslint-disable react-hooks/set-state-in-effect */
     setTasks(workspace.tasks);
     setSections(workspace.sections);
-    setDeletedCategories(workspace.deletedCategories);
+    setBoards(workspace.boards);
     setIsLoading(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -96,8 +111,8 @@ export function useTasks(): TasksApi {
   // Persist after every change, once hydrated.
   useEffect(() => {
     if (isLoading) return;
-    saveWorkspace({ tasks, sections, deletedCategories });
-  }, [tasks, sections, deletedCategories, isLoading]);
+    saveWorkspace({ tasks, sections, boards });
+  }, [tasks, sections, boards, isLoading]);
 
   const updateById = useCallback(
     (id: string, updater: (task: Task) => Task) => {
@@ -392,38 +407,69 @@ export function useTasks(): TasksApi {
     [],
   );
 
-  const deleteCategory = useCallback(
-    (id: string): { label: string; affected: number } | null => {
-      const category = getCategory(id);
-      if (!category) return null;
+  const createBoard = useCallback((input: { label: string; color: BoardColorId }): Board => {
+    const label = input.label.trim() || "New board";
+    const board: Board = { id: `board-${nanoid(8)}`, label, color: input.color };
+    setBoards((prev) => [...prev, board]);
+    return board;
+  }, []);
 
-      const affected = tasksRef.current.filter((task) => task.category === id).length;
-      const stamp = new Date().toISOString();
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.category === id ? { ...task, category: null, updatedAt: stamp } : task,
-        ),
-      );
-      // Records the deletion, de-duplicated: deleting twice keeps one entry.
-      setDeletedCategories((prev) => (prev.includes(id) ? prev : [...prev, id]));
-      return { label: category.label, affected };
-    },
-    [],
+  const renameBoard = useCallback((id: string, label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    setBoards((prev) =>
+      prev.map((board) => (board.id === id ? { ...board, label: trimmed } : board)),
+    );
+  }, []);
+
+  const recolorBoard = useCallback((id: string, color: BoardColorId) => {
+    setBoards((prev) => prev.map((board) => (board.id === id ? { ...board, color } : board)));
+  }, []);
+
+  /** Removes a board and strips the tag from every task that carried it. */
+  const deleteBoard = useCallback((id: string): { label: string; affected: number } | null => {
+    const board = boardsRef.current.find((item) => item.id === id);
+    if (!board) return null;
+
+    const stamp = new Date().toISOString();
+    const affected = tasksRef.current.filter((task) => task.category === id).length;
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.category === id ? { ...task, category: null, updatedAt: stamp } : task,
+      ),
+    );
+    setBoards((prev) => prev.filter((item) => item.id !== id));
+    return { label: board.label, affected };
+  }, []);
+
+  const restoreBuiltInBoards = useCallback(() => {
+    setBoards((prev) => {
+      const missing = missingBuiltInBoards(prev);
+      return missing.length > 0 ? [...prev, ...missing] : prev;
+    });
+  }, []);
+
+  const restoreBoard = useCallback((id: string) => {
+    const builtIn = BUILT_IN_BOARDS.find((board) => board.id === id);
+    if (!builtIn) return;
+    setBoards((prev) => (prev.some((board) => board.id === id) ? prev : [...prev, { ...builtIn }]));
+  }, []);
+
+  // Deprecated wrappers around the board API, kept so the category-named
+  // consumers keep working until they migrate.
+  const deletedCategories = useMemo(
+    () => missingBuiltInBoards(boards).map((board) => board.id),
+    [boards],
   );
-
-  const restoreCategory = useCallback((id: string) => {
-    setDeletedCategories((prev) => prev.filter((item) => item !== id));
-  }, []);
-
-  const restoreCategories = useCallback(() => {
-    setDeletedCategories([]);
-  }, []);
+  const deleteCategory = useCallback((id: string) => deleteBoard(id), [deleteBoard]);
+  const restoreCategory = useCallback((id: string) => restoreBoard(id), [restoreBoard]);
+  const restoreCategories = useCallback(() => restoreBuiltInBoards(), [restoreBuiltInBoards]);
 
   const snapshot = useCallback(
     (): Workspace => ({
       tasks: tasksRef.current.map((task) => ({ ...task })),
       sections: sectionsRef.current.map((section) => ({ ...section })),
-      deletedCategories: [...deletedCategoriesRef.current],
+      boards: boardsRef.current.map((board) => ({ ...board })),
     }),
     [],
   );
@@ -431,7 +477,7 @@ export function useTasks(): TasksApi {
   const restore = useCallback((workspace: Workspace) => {
     setTasks(workspace.tasks);
     setSections(workspace.sections);
-    setDeletedCategories(workspace.deletedCategories);
+    setBoards(workspace.boards);
   }, []);
 
   const loadSample = useCallback(() => {
@@ -442,7 +488,7 @@ export function useTasks(): TasksApi {
     () => ({
       tasks,
       sections,
-      deletedCategories,
+      boards,
       isLoading,
       isEmpty: tasks.length === 0,
       addTask,
@@ -463,6 +509,12 @@ export function useTasks(): TasksApi {
       toggleSectionHidden,
       reorderSections,
       reorderTasks,
+      createBoard,
+      renameBoard,
+      recolorBoard,
+      deleteBoard,
+      restoreBuiltInBoards,
+      deletedCategories,
       deleteCategory,
       restoreCategory,
       restoreCategories,
@@ -475,7 +527,7 @@ export function useTasks(): TasksApi {
     [
       tasks,
       sections,
-      deletedCategories,
+      boards,
       isLoading,
       addTask,
       updateTask,
@@ -495,6 +547,12 @@ export function useTasks(): TasksApi {
       toggleSectionHidden,
       reorderSections,
       reorderTasks,
+      createBoard,
+      renameBoard,
+      recolorBoard,
+      deleteBoard,
+      restoreBuiltInBoards,
+      deletedCategories,
       deleteCategory,
       restoreCategory,
       restoreCategories,

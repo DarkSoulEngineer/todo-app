@@ -1,3 +1,5 @@
+import type { Board } from "@/lib/boards";
+
 export type Priority = "low" | "medium" | "high";
 
 /** Derived task status. Completed and Canceled are explicit; the rest come from the due date. */
@@ -41,16 +43,12 @@ export interface BoardSection {
   hidden?: boolean;
 }
 
-/** The full persisted workspace: tasks plus the user's board layout. */
+/** The full persisted workspace: tasks, the board layout and the boards. */
 export interface Workspace {
   tasks: Task[];
   sections: BoardSection[];
-  /**
-   * Ids of built-in categories the user deleted. Categories stay static
-   * constants; this records which of them are hidden from the app. Missing in
-   * older persisted data, which means "nothing deleted".
-   */
-  deletedCategories: string[];
+  /** The user's boards. */
+  boards: Board[];
 }
 
 /** Editable shape used by the create/edit form. */
