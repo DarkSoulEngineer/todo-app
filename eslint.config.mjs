@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Static service worker + assets are hand-authored and not app code.
+    "public/**",
   ]),
 ]);
 
