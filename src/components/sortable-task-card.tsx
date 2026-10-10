@@ -18,6 +18,14 @@ interface SortableTaskCardProps {
   sortable: boolean;
   sections: BoardSection[];
   assignTaskToSection: AssignTaskToSection;
+  /** Selection state */
+  selected?: boolean;
+  /** Highlighted for keyboard navigation */
+  highlighted?: boolean;
+  /** Click handler for selection */
+  onSelect?: (task: Task, shiftKey: boolean) => void;
+  /** Double-click handler for inline rename */
+  onRename?: (task: Task) => void;
 }
 
 export function SortableTaskCard({
@@ -27,6 +35,10 @@ export function SortableTaskCard({
   sortable,
   sections,
   assignTaskToSection,
+  selected,
+  highlighted,
+  onSelect,
+  onRename,
 }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, disabled: !sortable });
@@ -63,6 +75,10 @@ export function SortableTaskCard({
         dragging={isDragging}
         sections={sections}
         assignTaskToSection={assignTaskToSection}
+        selected={selected}
+        highlighted={highlighted}
+        onSelect={onSelect}
+        onRename={onRename}
       />
     </motion.li>
   );

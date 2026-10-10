@@ -9,11 +9,12 @@ interface CompleteToggleProps {
   completed: boolean;
   canceled: boolean;
   onToggle: () => void;
+  className?: string;
 }
 
 const PARTICLE_COUNT = 8;
 
-export function CompleteToggle({ completed, canceled, onToggle }: CompleteToggleProps) {
+export function CompleteToggle({ completed, canceled, onToggle, className }: CompleteToggleProps) {
   const reduceMotion = useReducedMotion();
   const [burst, setBurst] = useState(false);
   const wasCompleted = useRef(completed);
@@ -41,6 +42,7 @@ export function CompleteToggle({ completed, canceled, onToggle }: CompleteToggle
           : canceled
             ? "border-slate-400/60 text-slate-400 hover:border-slate-400"
             : "border-border text-transparent hover:border-primary hover:bg-primary/5",
+        className,
       )}
     >
       <AnimatePresence>

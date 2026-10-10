@@ -1,6 +1,6 @@
 import { isValid, parseISO } from "date-fns";
 import { nanoid } from "nanoid";
-import { STORAGE_KEY } from "@/lib/constants";
+import { PROBE_KEY, STORAGE_KEY } from "@/lib/constants";
 import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/sections";
 import type { BoardSection, Priority, Subtask, Task, Workspace } from "@/lib/types";
 
@@ -121,7 +121,38 @@ export function parseWorkspaceJson(raw: string): Workspace | null {
   }
 }
 
-/** Persists the workspace to localStorage. Fails silently when unavailable. */
+export type StorageState = "ready" | "unavailable" | "full";
+
+/**
+ * Distinguishes storage that is blocked entirely (private mode, cookies off)
+ * from a usable store. Used to explain save failures to the user.
+ */
+export function getStorageState(): StorageState {
+  if (typeof window === "undefined") return "unavailable";
+  try {
+    window.localStorage.setItem(PROBE_KEY, "1");
+    window.localStorage.removeItem(PROBE_KEY);
+    return "ready";
+  } catch {
+    return "unavailable";
+  }
+}
+
+/**
+ * True when localStorage still accepts writes even though saving the workspace
+ * failed — i.e. the write failed because the quota is exhausted.
+ */
+function isQuotaExceeded(): boolean {
+  try {
+    window.localStorage.setItem(PROBE_KEY, "1");
+    window.localStorage.removeItem(PROBE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Persists the workspace to localStorage. */
 export function saveWorkspace(workspace: Workspace): void {
   if (typeof window === "undefined") return;
   try {
@@ -132,6 +163,11 @@ export function saveWorkspace(workspace: Workspace): void {
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
-    // Storage full or blocked (private mode) — the app still works in-memory.
+    // Storage blocked or full — the app keeps working from memory. When the
+    // quota is the problem, announce it so the UI can warn the user instead
+    // of silently dropping every write.
+    if (isQuotaExceeded()) {
+      window.dispatchEvent(new CustomEvent("stride:storage-full"));
+    }
   }
 }

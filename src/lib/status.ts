@@ -1,4 +1,4 @@
-import { format, isValid, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, isValid, parseISO } from "date-fns";
 import { Ban, CalendarClock, Check, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { StatusFilter, Task, TaskStatus } from "@/lib/types";
 
@@ -98,27 +98,29 @@ export function describeDue(dueAt: string | null, now: Date): DueInfo | null {
   const overdue = diff < 0;
   const abs = Math.abs(diff);
 
-  if (overdue) {
-    const label =
-      abs < HOUR
-        ? `${Math.max(1, Math.round(abs / MINUTE))}m overdue`
-        : abs < DAY
-          ? `${Math.round(abs / HOUR)}h overdue`
-          : `${Math.round(abs / DAY)}d overdue`;
-    return { label, title, overdue: true, today: false };
-  }
+  // Compare calendar days, not raw milliseconds: "due Monday evening, seen
+  // Wednesday morning" is day-after-tomorrow, not "tomorrow".
+  const days = differenceInCalendarDays(due, now);
 
-  const sameDay = format(due, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
-  if (sameDay) {
+  if (days <= 0) {
+    if (overdue) {
+      const label =
+        abs < HOUR
+          ? `${Math.max(1, Math.round(abs / MINUTE))}m overdue`
+          : abs < DAY
+            ? `${Math.round(abs / HOUR)}h overdue`
+            : `${Math.round(abs / DAY)}d overdue`;
+      return { label, title, overdue: true, today: days === 0 };
+    }
     return { label: `Today, ${format(due, "h:mm a")}`, title, overdue: false, today: true };
   }
 
-  if (abs < 2 * DAY) {
+  if (days === 1) {
     return { label: `Tomorrow, ${format(due, "h:mm a")}`, title, overdue: false, today: false };
   }
 
-  if (abs < 7 * DAY) {
-    return { label: `Due ${format(due, "EEE")}`, title, overdue: false, today: false };
+  if (days <= 6) {
+    return { label: `Due ${format(due, "EEEE")}`, title, overdue: false, today: false };
   }
 
   return { label: `Due ${format(due, "MMM d")}`, title, overdue: false, today: false };

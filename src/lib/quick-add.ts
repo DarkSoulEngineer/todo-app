@@ -2,6 +2,7 @@ import {
   addDays,
   addHours,
   addMinutes,
+  addMonths,
   addWeeks,
   isValid,
   setHours,
@@ -105,7 +106,9 @@ function extractCategory(input: string): { rest: string; category: string | null
 }
 
 function extractDate(input: string, now: Date): { rest: string; match: DateMatch | null } {
-  const iso = input.match(/(?:^|\s)(\d{4})-(\d{1,2})-(\d{1,2})(?=\s|$)/);
+  // Dates may be introduced by a connector ("by", "due", "on"); it is consumed
+  // with the date so it never leaks into the task title.
+  const iso = input.match(/(?:^|\s)(?:by\s+|due\s+|on\s+)?(\d{4})-(\d{1,2})-(\d{1,2})(?=\s|$)/);
   if (iso) {
     const parsed = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
     if (isValid(parsed)) {
@@ -159,6 +162,28 @@ function extractDate(input: string, now: Date): { rest: string; match: DateMatch
     };
   }
 
+  // Weekdays, optionally qualified by "next" before the day or "next week"
+  // after it. Matched before the bare "next week" matcher so the "next week"
+  // that qualifies a weekday is never consumed on its own.
+  const weekday = input.match(
+    /(?:^|\s)(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:\s+next\s+week)?(?=\s|$)/i,
+  );
+  if (weekday) {
+    const target = WEEKDAYS[weekday[2].toLowerCase()];
+    if (target !== undefined) {
+      const base = startOfDay(now);
+      let delta = (target - base.getDay() + 7) % 7;
+      if (delta === 0) delta = 7;
+      // Each "next" (prefix or suffix) pushes the target another week out.
+      const nexts = weekday[0].match(/next/gi)?.length ?? 0;
+      if (nexts > 0) delta += 7 * nexts;
+      return {
+        rest: removeSlice(input, weekday),
+        match: { date: addDays(base, delta), exact: false, impliedTime: null },
+      };
+    }
+  }
+
   const nextWeek = input.match(/(?:^|\s)next week(?=\s|$)/i);
   if (nextWeek) {
     return {
@@ -167,20 +192,31 @@ function extractDate(input: string, now: Date): { rest: string; match: DateMatch
     };
   }
 
-  const weekday = input.match(
-    /(?:^|\s)(?:next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?=\s|$)/i,
-  );
-  if (weekday) {
-    const target = WEEKDAYS[weekday[1].toLowerCase()];
-    if (target !== undefined) {
-      const base = startOfDay(now);
-      let delta = (target - base.getDay() + 7) % 7;
-      if (delta === 0) delta = 7;
-      return {
-        rest: removeSlice(input, weekday),
-        match: { date: addDays(base, delta), exact: false, impliedTime: null },
-      };
-    }
+  const nextMonth = input.match(/(?:^|\s)next month(?=\s|$)/i);
+  if (nextMonth) {
+    return {
+      rest: removeSlice(input, nextMonth),
+      match: { date: addMonths(startOfDay(now), 1), exact: false, impliedTime: null },
+    };
+  }
+
+  const endOfWeek = input.match(/(?:^|\s)(?:end of week|eow)(?=\s|$)/i);
+  if (endOfWeek) {
+    const base = startOfDay(now);
+    // Friday of this week; past weekends roll to the coming Friday.
+    const delta = (5 - base.getDay() + 7) % 7;
+    return {
+      rest: removeSlice(input, endOfWeek),
+      match: { date: addDays(base, delta), exact: false, impliedTime: { hours: 17, minutes: 0 } },
+    };
+  }
+
+  const endOfDay = input.match(/(?:^|\s)(?:end of day|eod)(?=\s|$)/i);
+  if (endOfDay) {
+    return {
+      rest: removeSlice(input, endOfDay),
+      match: { date: startOfDay(now), exact: false, impliedTime: { hours: 17, minutes: 0 } },
+    };
   }
 
   return { rest: input, match: null };
@@ -208,6 +244,24 @@ function extractTime(input: string): { rest: string; time: { hours: number; minu
     if (hours >= 0 && hours <= 23) {
       return { rest: removeSlice(input, meridian), time: { hours, minutes: 0 } };
     }
+  }
+
+  const bare = input.match(/(?:^|\s)at\s+(\d{1,2})(?=\s|$)/i);
+  if (bare) {
+    const hours = Number(bare[1]);
+    if (hours >= 0 && hours <= 23) {
+      return { rest: removeSlice(input, bare), time: { hours, minutes: 0 } };
+    }
+  }
+
+  const noon = input.match(/(?:^|\s)noon(?=\s|$)/i);
+  if (noon) {
+    return { rest: removeSlice(input, noon), time: { hours: 12, minutes: 0 } };
+  }
+
+  const midnight = input.match(/(?:^|\s)midnight(?=\s|$)/i);
+  if (midnight) {
+    return { rest: removeSlice(input, midnight), time: { hours: 0, minutes: 0 } };
   }
 
   return { rest: input, time: null };

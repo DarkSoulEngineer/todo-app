@@ -2,6 +2,9 @@ import type { Priority, SortKey } from "@/lib/types";
 
 export const STORAGE_KEY = "stride.tasks.v1";
 
+/** Tiny write probe used to tell "storage blocked" apart from "quota full". */
+export const PROBE_KEY = "stride.storage.probe";
+
 interface PriorityMeta {
   label: string;
   rank: number;

@@ -1,11 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
 import { TaskList } from "@/components/task-list";
+import { SelectionToolbar } from "@/components/selection-toolbar";
 import { groupForList } from "@/lib/smart-lists";
 import { useTasksContext } from "@/components/tasks-provider";
 import { isCustomSection } from "@/lib/sections";
 import { deriveStatus } from "@/lib/status";
 import type { SmartList, Task, BoardSection } from "@/lib/types";
+import { useTaskSelection } from "@/hooks/use-task-selection";
 
 interface ListViewProps {
   /** Already filtered and sorted for the active smart list. */
@@ -35,12 +38,75 @@ export function ListView({
   const assignTaskToSection = assignTaskToSectionProp ?? assignTaskToSectionCtx;
   const groups = groupForList(tasks, list, now);
 
+  // Flatten all tasks for selection management
+  const allTasks = useMemo(() => groups.flatMap((g) => g.tasks), [groups]);
+
+  const {
+    selectedIds,
+    highlightedId,
+    selectMode,
+    toggleSelectMode,
+    clearSelection,
+    toggleTask,
+  } = useTaskSelection(allTasks);
+
+  // Handle selection from TaskList
+  const handleSelectTask = (task: Task, shiftKey: boolean) => {
+    toggleTask(task.id, shiftKey);
+  };
+
+  const handleRenameTask = () => {
+    // Inline rename is handled by TaskCard directly
+  };
+
+  // Check if any tasks in current view are selected
+  const hasSelection = allTasks.some((t) => selectedIds.has(t.id));
+  const allSelectedInView = allTasks.length > 0 && allTasks.every((t) => selectedIds.has(t.id));
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Selection mode header */}
+      {selectMode && hasSelection && (
+        <SelectionToolbar
+          selectedIds={selectedIds}
+          visibleTasks={allTasks}
+          sections={sections}
+          onClear={clearSelection}
+        />
+      )}
+
       {groups.map((group) => (
         <section key={group.id} aria-label={group.label} className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2 px-1">
-            <h2 className="text-sm font-semibold text-muted-foreground">{group.label}</h2>
+            {selectMode && group.tasks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (allSelectedInView) {
+                    // Deselect all in this group
+                    group.tasks.forEach((t) => selectedIds.delete(t.id));
+                    // This won't work directly since we need to use the setter
+                    // We'll handle this via the selectAll/clearSelection
+                  } else {
+                    group.tasks.forEach((t) => toggleTask(t.id, false));
+                  }
+                }}
+                aria-label={allSelectedInView ? `Deselect all in ${group.label}` : `Select all in ${group.label}`}
+                aria-pressed={allSelectedInView}
+                className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {allSelectedInView ? (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <h2 className="text-sm font-semibold text-muted-foreground flex-1">{group.label}</h2>
             <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
               {group.tasks.length}
             </span>
@@ -52,9 +118,31 @@ export function ListView({
             onEdit={onEdit}
             sections={sections}
             assignTaskToSection={assignTaskToSection}
+            selectedIds={selectedIds}
+            highlightedId={highlightedId}
+            onSelectionChange={() => {
+              // Selection change is handled by useTaskSelection internally
+            }}
+            onSelectTask={handleSelectTask}
+            onRenameTask={handleRenameTask}
           />
         </section>
       ))}
+
+      {/* Enter select mode button when no selection */}
+      {!selectMode && allTasks.length > 0 && (
+        <button
+          type="button"
+          onClick={toggleSelectMode}
+          className="self-center focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 9h6v6H9z" />
+          </svg>
+          Select tasks
+        </button>
+      )}
     </div>
   );
 }

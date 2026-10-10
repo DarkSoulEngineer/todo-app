@@ -1,8 +1,14 @@
 // Stride offline service worker.
 // Conservative strategy: cache the app shell and hashed static assets,
 // never cache RSC/data requests, and fall back to the cached shell offline.
-const SHELL_CACHE = "stride-shell-v1";
-const RUNTIME_CACHE = "stride-runtime-v1";
+//
+// Versioning: every cache key is prefixed. On activate, ANY cache that does not
+// carry the current prefix is deleted, so a redeploy never serves a stale shell
+// or stale hashed assets.
+const CACHE_VERSION = "v2";
+const CACHE_PREFIX = `stride-${CACHE_VERSION}-`;
+const SHELL_CACHE = `${CACHE_PREFIX}shell`;
+const RUNTIME_CACHE = `${CACHE_PREFIX}runtime`;
 const SHELL_URL = "/";
 
 self.addEventListener("install", (event) => {
@@ -22,12 +28,20 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+            .filter((key) => !key.startsWith(CACHE_PREFIX))
             .map((key) => caches.delete(key)),
         ),
       )
       .then(() => self.clients.claim()),
   );
+});
+
+// Lets the page ask a waiting worker to take over immediately.
+self.addEventListener("message", (event) => {
+  const data = event.data;
+  if (data && data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 function isCacheableAsset(url) {

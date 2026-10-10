@@ -1,7 +1,9 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
+import { useCallback } from "react";
 import { SortableTaskCard } from "@/components/sortable-task-card";
+import { useTaskSelection } from "@/hooks/use-task-selection";
 import type { Task, BoardSection } from "@/lib/types";
 import type { TasksApi } from "@/hooks/use-tasks";
 
@@ -14,11 +16,61 @@ interface TaskListProps {
   onEdit: (task: Task) => void;
   sections: BoardSection[];
   assignTaskToSection: AssignTaskToSection;
+  /** Selection state from parent */
+  selectedIds?: Set<string>;
+  highlightedId?: string | null;
+  onSelectionChange?: (selectedIds: Set<string>) => void;
+  onSelectTask?: (task: Task, shiftKey: boolean) => void;
+  onRenameTask?: (task: Task) => void;
 }
 
-export function TaskList({ tasks, now, sortable, onEdit, sections, assignTaskToSection }: TaskListProps) {
+export function TaskList({
+  tasks,
+  now,
+  sortable,
+  onEdit,
+  sections,
+  assignTaskToSection,
+  selectedIds,
+  highlightedId,
+  onSelectionChange,
+  onSelectTask,
+  onRenameTask,
+}: TaskListProps) {
+  const { moveHighlight, selectHighlighted } = useTaskSelection(tasks, onSelectionChange);
+
+  // Use parent selection state if provided, otherwise use local
+  const effectiveSelectedIds = selectedIds ?? new Set();
+  const effectiveHighlightedId = highlightedId ?? undefined;
+
+  const handleSelect = useCallback((task: Task, shiftKey: boolean) => {
+    // If parent provides onSelectTask, use it; otherwise use local toggle
+    if (onSelectTask) {
+      onSelectTask(task, shiftKey);
+    }
+  }, [onSelectTask]);
+
+  // Handle keyboard navigation for the list
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      moveHighlight("next");
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      moveHighlight("prev");
+    } else if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      selectHighlighted();
+    }
+  }, [moveHighlight, selectHighlighted]);
+
   return (
-    <ul className="flex flex-col gap-2.5">
+    <ul
+      className="flex flex-col gap-2.5"
+      onKeyDown={handleKeyDown}
+      role="listbox"
+      aria-label="Tasks"
+    >
       <AnimatePresence initial={false}>
         {tasks.map((task) => (
           <SortableTaskCard
@@ -29,6 +81,10 @@ export function TaskList({ tasks, now, sortable, onEdit, sections, assignTaskToS
             sortable={sortable}
             sections={sections}
             assignTaskToSection={assignTaskToSection}
+            selected={effectiveSelectedIds.has(task.id)}
+            highlighted={effectiveHighlightedId === task.id}
+            onSelect={handleSelect}
+            onRename={onRenameTask}
           />
         ))}
       </AnimatePresence>
