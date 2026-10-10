@@ -10,6 +10,12 @@ interface BoardCardProps {
   task: Task;
   now: Date;
   onEdit: (task: Task) => void;
+  /** Zero-based position inside the column, set only while reordering is on. */
+  reorderIndex?: number;
+  /** How many cards the column holds, set only while reordering is on. */
+  reorderTotal?: number;
+  /** Swaps this card with its neighbour (manual order). */
+  onReorder?: (taskId: string, direction: "up" | "down") => void;
 }
 
 /**
@@ -22,7 +28,14 @@ interface BoardCardProps {
  * activation constraint in `board-view.tsx` still lets a plain click through, so
  * the title opens the edit dialog and the card's own buttons still fire.
  */
-export function BoardCard({ task, now, onEdit }: BoardCardProps) {
+export function BoardCard({
+  task,
+  now,
+  onEdit,
+  reorderIndex,
+  reorderTotal,
+  onReorder,
+}: BoardCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { type: "card" },
@@ -46,6 +59,9 @@ export function BoardCard({ task, now, onEdit }: BoardCardProps) {
         compact
         sections={sections}
         assignTaskToSection={assignTaskToSection}
+        reorderIndex={reorderIndex}
+        reorderTotal={reorderTotal}
+        onReorder={onReorder}
       />
     </div>
   );

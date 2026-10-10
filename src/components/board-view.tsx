@@ -265,6 +265,9 @@ export function BoardView({
                   now={now}
                   editing={editingId === section.id}
                   isDropTarget={overId === section.id}
+                  // Rearranging a column only makes sense in manual sort mode;
+                  // every other sort derives its order from the task itself.
+                  reorderable={sort === "manual"}
                   onEdit={onEdit}
                   onStartRename={setEditingId}
                   onRename={renameSection}

@@ -57,7 +57,16 @@ interface TaskCardProps {
   onRename?: (task: Task) => void;
   /** Called after the card is moved to another section via the arrows. */
   onMovedToSection?: (sectionId: string) => void;
+  /** Zero-based position of the card inside its board column. */
+  reorderIndex?: number;
+  /** How many cards the card's board column holds. */
+  reorderTotal?: number;
+  /** Moves the card up or down inside its column (board cards only). */
+  onReorder?: (taskId: string, direction: "up" | "down") => void;
 }
+
+/** The two in-column reorder steps, up before down. */
+const REORDER_DIRECTIONS = ["up", "down"] as const;
 
 const ICON_BUTTON =
   "focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
@@ -260,6 +269,12 @@ interface CardActionsProps {
   onEdit: (task: Task) => void;
   onCancelTask: () => void;
   onDeleteTask: () => void;
+  /** Zero-based position of the card inside its board column. */
+  reorderIndex?: number;
+  /** How many cards the card's board column holds. */
+  reorderTotal?: number;
+  /** Moves the card up or down inside its column (compact/board cards only). */
+  onReorder?: (taskId: string, direction: "up" | "down") => void;
 }
 
 /** One primary action, rendered as an icon on sm+ and a labelled row in the menu. */
@@ -292,6 +307,9 @@ function CardActions({
   onEdit,
   onCancelTask,
   onDeleteTask,
+  reorderIndex,
+  reorderTotal,
+  onReorder,
 }: CardActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -306,6 +324,15 @@ function CardActions({
     // begin a card drag. A plain click still fires and moves the card.
     if (compact) e.stopPropagation();
   }
+
+  // In-column reordering only makes sense on board cards, so it shares the
+  // compact gate of the left/right arrows.
+  const reorderEnabled = Boolean(compact && onReorder);
+  const canMoveUp = reorderEnabled && reorderIndex !== 0;
+  const canMoveDown =
+    reorderEnabled && reorderTotal !== undefined && reorderIndex !== undefined
+      ? reorderIndex < reorderTotal - 1
+      : false;
 
   const moveTargets: MoveTarget[] = [];
   if (prevSection) {
@@ -386,6 +413,39 @@ function CardActions({
           {handle}
         </div>
       )}
+
+      {/* In-column reorder arrows - board only, before the left/right pair */}
+      {reorderEnabled
+        ? REORDER_DIRECTIONS.map((direction) => {
+            const isUp = direction === "up";
+            const enabled = isUp ? canMoveUp : canMoveDown;
+            const label = isUp
+              ? `Move “${task.title}” up`
+              : `Move “${task.title}” down`;
+            return (
+              <button
+                key={direction}
+                type="button"
+                disabled={!enabled}
+                className={cn(
+                  COMPACT_ARROW,
+                  "disabled:pointer-events-none disabled:opacity-40",
+                )}
+                onPointerDown={handleArrowPointerDown}
+                onClick={(e) => {
+                  // Same press isolation as the column arrows: the whole board
+                  // card is a drag surface, so an arrow press must stay local.
+                  e.stopPropagation();
+                  onReorder?.(task.id, direction);
+                }}
+                aria-label={label}
+                title={label}
+              >
+                {isUp ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+              </button>
+            );
+          })
+        : null}
 
       {/* Section navigation arrows - listed columns move up/down, board columns left/right */}
       {moveTargets.map((target) => {
@@ -527,6 +587,9 @@ export function TaskCard({
   onSelect,
   onRename,
   onMovedToSection,
+  reorderIndex,
+  reorderTotal,
+  onReorder,
 }: TaskCardProps) {
   const { toggleComplete, toggleCancel, deleteTask, snapshot, restore } = useTasksContext();
   const [expanded, setExpanded] = useState(false);
@@ -745,6 +808,9 @@ export function TaskCard({
               onEdit={onEdit}
               onCancelTask={handleCancelWithPulse}
               onDeleteTask={handleDelete}
+              reorderIndex={reorderIndex}
+              reorderTotal={reorderTotal}
+              onReorder={onReorder}
             />
           </div>
 

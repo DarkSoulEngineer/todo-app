@@ -1,6 +1,6 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
+import { arrayMove, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   EyeOff,
@@ -15,12 +15,14 @@ import {
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import { BoardCard } from "@/components/board-card";
+import { useTasksContext } from "@/components/tasks-provider";
 import { STATUS_META } from "@/lib/status";
 import type { BoardSection, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,8 @@ interface BoardSectionColumnProps {
   now: Date;
   editing: boolean;
   isDropTarget: boolean;
+  /** Manual sort mode: cards may be rearranged inside the column. */
+  reorderable: boolean;
   onEdit: (task: Task) => void;
   onStartRename: (id: string) => void;
   onRename: (id: string, title: string) => void;
@@ -46,6 +50,7 @@ export function BoardSectionColumn({
   now,
   editing,
   isDropTarget,
+  reorderable,
   onEdit,
   onStartRename,
   onRename,
@@ -56,6 +61,18 @@ export function BoardSectionColumn({
 }: BoardSectionColumnProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: section.id, data: { type: "section" } });
+  const { reorderTasks } = useTasksContext();
+
+  const orderedIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
+
+  /** Swaps a card with its neighbour inside this column (manual order only). */
+  function handleReorder(taskId: string, direction: "up" | "down"): void {
+    const from = orderedIds.indexOf(taskId);
+    if (from === -1) return;
+    const to = from + (direction === "up" ? -1 : 1);
+    if (to < 0 || to >= orderedIds.length) return;
+    reorderTasks(arrayMove(orderedIds, from, to));
+  }
 
   const meta = section.status ? STATUS_META[section.status] : null;
   const Icon = meta?.icon ?? Hash;
@@ -118,8 +135,16 @@ export function BoardSectionColumn({
             Drop cards here
           </p>
         ) : null}
-        {tasks.map((task) => (
-          <BoardCard key={task.id} task={task} now={now} onEdit={onEdit} />
+        {tasks.map((task, index) => (
+          <BoardCard
+            key={task.id}
+            task={task}
+            now={now}
+            onEdit={onEdit}
+            reorderIndex={reorderable ? index : undefined}
+            reorderTotal={reorderable ? tasks.length : undefined}
+            onReorder={reorderable ? handleReorder : undefined}
+          />
         ))}
       </div>
 
