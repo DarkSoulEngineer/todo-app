@@ -455,7 +455,7 @@ function CardActions({
         {/* 4. Section move — dropdown to move card to any section (list only, compact uses arrows) */}
         {!compact && sections && sections.length > 0 && (
           <select
-            className="focus-ring h-6 w-auto min-w-[80px] text-xs rounded-md border border-input bg-background px-1.5 py-0.5 text-foreground placeholder:text-muted-foreground appearance-none pr-6 cursor-pointer transition-colors hover:border-primary/50"
+            className="focus-ring h-5 w-auto min-w-\[70px\] text-\[10px\] rounded border border-input/50 bg-transparent px-1.5 py-0 text-foreground appearance-none pr-5 cursor-pointer transition-colors hover:border-primary\/50"
             aria-label={`Move "${task.title}" to section`}
             defaultValue={moveTargets[0]?.id ?? ""}
             onChange={(e) => {
