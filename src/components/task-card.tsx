@@ -75,12 +75,7 @@ const ICON_BUTTON =
 const COMPACT_ARROW =
   "focus-ring grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground/80 transition-[background-color,color,transform] duration-150 hover:bg-muted hover:text-foreground active:scale-90";
 
-/**
- * The selection checkbox. Same 32px footprint as the other cluster buttons so
- * the row keeps its rhythm, but a rounded *square* — the leading complete
- * control is a circle, so the two primary controls can never be mistaken for
- * one another.
- */
+/** Selection checkbox — rounded square (rounded-xl), 32px. */
 const SELECT_CONTROL =
   "focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-[background-color,color,transform] duration-150 active:scale-90";
 
@@ -93,10 +88,7 @@ const TITLE_SELECTOR = "[data-card-title]";
 /** Interactive descendants that own their own double-click behaviour. */
 const INTERACTIVE_TARGET = "button, input, textarea, a, select, [role='menu']";
 
-/**
- * Leading accent rail so overdue / completed / canceled read at a glance.
- * Upcoming cards stay clean — the rail is reserved for status that needs air.
- */
+/** Leading accent rail so overdue / completed / canceled read at a glance. */
 function statusRail(task: Task, status: TaskStatus): string | null {
   if (task.canceled) return "from-slate-400/70 via-slate-400/45 to-slate-400/10";
   if (task.completed) return "from-emerald-500/75 via-emerald-500/50 to-emerald-500/15";
@@ -104,10 +96,7 @@ function statusRail(task: Task, status: TaskStatus): string | null {
   return null;
 }
 
-/**
- * Determines which board section a task currently belongs to.
- * Returns the section ID or undefined if not found.
- */
+/** Determines which board section a task currently belongs to. */
 function getTaskSectionId(task: Task, sections: BoardSection[], now: Date): string | undefined {
   if (task.sectionId) {
     const customSection = sections.find((s) => s.id === task.sectionId);
@@ -118,10 +107,7 @@ function getTaskSectionId(task: Task, sections: BoardSection[], now: Date): stri
   return statusSection?.id;
 }
 
-/**
- * Gets the previous and next section IDs relative to the task's current section,
- * following the board's section order.
- */
+/** Gets the previous and next section IDs relative to the task's current section. */
 function getAdjacentSections(
   task: Task,
   sections: BoardSection[],
@@ -184,7 +170,6 @@ function TaskTitle({
           data-card-title
           className="min-w-0"
           onClick={(e) => {
-            // Don't trigger onEdit if we're selecting or renaming
             if (!hasSelectOrRename) return;
             e.stopPropagation();
           }}
@@ -205,7 +190,6 @@ function TaskTitle({
             <button
               type="button"
               onClick={(e) => {
-                // ctrl/cmd/shift clicks are selection gestures, not "open".
                 if (e.ctrlKey || e.metaKey || e.shiftKey) return;
                 onOpenEdit();
               }}
@@ -319,12 +303,8 @@ interface SelectToggleProps {
  * never hides behind a hover. It stays quiet when the task is not selected and
  * unmistakable when it is.
  *
- * Two rules keep it from competing with the rest of the card:
- * - Shape. The leading complete control is a circle, this one is a rounded
- *   square, so the two are told apart at a glance.
- * - Colour. A selected card already paints a primary ring and tint, so this
- *   control fills with solid ink instead of repeating that blue cue: one dark
- *   object with a white tick, which also survives the canceled/tinted cards.
+ * Shape: rounded square (rounded-xl), 32px — distinct from CompleteToggle's
+ * rounded-lg pill. Selected state fills solid with a white check.
  */
 function SelectToggle({ task, selected, onSelect }: SelectToggleProps) {
   return (
@@ -353,12 +333,13 @@ function SelectToggle({ task, selected, onSelect }: SelectToggleProps) {
 }
 
 /**
- * The actions cluster. Order is deliberate and stable: selection checkbox, drag
- * handle slot, section arrows, primary actions, overflow menu. Only the
- * secondary actions slide in on hover/focus — the selection checkbox sits
- * outside that group because selecting is now a deliberate, primary gesture.
- * On board cards the move arrows stay visible (they are the only way to change
- * column) and the rest reveals on hover.
+ * The actions cluster. Order is deliberate and stable:
+ * Select → Handle → Reorder↑↓ → Section←→ → Primary (in overflow) → Menu
+ *
+ * On list (non-compact): Select always visible. Handle on sm+. Reorder arrows always.
+ * Section arrows in overflow menu. Primary actions (edit/cancel/delete) in overflow menu.
+ * On board (compact): Select hidden. Handle hidden. Reorder arrows hidden (drag handles reorder).
+ * Section arrows always visible. Primary actions in overflow menu.
  */
 function CardActions({
   task,
@@ -379,19 +360,15 @@ function CardActions({
 }: CardActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   function closeMenu(): void {
     setMenuOpen(false);
   }
 
   function handleArrowPointerDown(e: React.PointerEvent<HTMLButtonElement>): void {
-    // The board card is one big drag surface; pressing an arrow must never
-    // begin a card drag. A plain click still fires and moves the card.
     if (compact) e.stopPropagation();
   }
 
-  // In-column reordering now works in both list and board when onReorder is supplied.
   const reorderEnabled = Boolean(onReorder);
   const canMoveUp = reorderEnabled && reorderIndex !== 0;
   const canMoveDown =
@@ -443,139 +420,107 @@ function CardActions({
     },
   ];
 
-  // List cards reveal everything on hover/focus (canceled cards stay pinned);
-  // board cards keep the arrows visible and reveal the rest.
+  // On list view (non-compact): reveal section arrows and primary actions on hover/focus
+  // On board (compact): section arrows always visible, primary actions in menu only
   const revealOnHover = !compact && !task.canceled;
 
-  // On list view (non-compact), primary actions should be always visible on sm+
-  // so users can see edit/cancel/delete without hunting. On board (compact),
-  // they stay hover-revealed to keep columns dense.
-  const primaryActionsHidden = compact ? "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" : "";
-
   return (
-    <div className="flex shrink-0 items-start gap-0.5">
+    <div className="flex shrink-0 items-start gap-1">
       <div
         className={cn(
-          "flex shrink-0 items-start gap-0.5",
+          "flex shrink-0 items-start gap-1",
           !compact && "transition-[opacity,transform] duration-200",
           revealOnHover &&
             "sm:translate-x-1 sm:opacity-0 sm:group-hover:translate-x-0 sm:group-hover:opacity-100 sm:group-focus-within:translate-x-0 sm:group-focus-within:opacity-100",
         )}
       >
-        {/* Selection checkbox — grouped with other actions, always visible on list */}
+        {/* 1. Selection checkbox — always visible on list, never on board */}
         {!compact && <SelectToggle task={task} selected={selected} onSelect={onSelect} />}
 
-        {/* Drag handle - hidden below sm and on pointer-coarse */}
+        {/* 2. Drag handle — hidden below sm and on pointer-coarse */}
         {handle && !compact && (
-          <div className="hidden sm:block">
-            {handle}
-          </div>
+          <div className="hidden sm:block">{handle}</div>
         )}
 
-        {/* In-column reorder arrows - up/down on list, up/down on board */}
-        {reorderEnabled
-          ? REORDER_DIRECTIONS.map((direction) => {
-              const isUp = direction === "up";
-              const enabled = isUp ? canMoveUp : canMoveDown;
-              const label = isUp
-                ? `Move “${task.title}” up`
-                : `Move “${task.title}” down`;
-              return (
-                <button
-                  key={direction}
-                  type="button"
-                  disabled={!enabled}
-                  className={cn(
-                    COMPACT_ARROW,
-                    "disabled:pointer-events-none disabled:opacity-40",
-                  )}
-                  onPointerDown={handleArrowPointerDown}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onReorder?.(task.id, direction);
-                  }}
-                  aria-label={label}
-                  title={label}
-                >
-                  {isUp ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                </button>
-              );
-            })
-          : null}
+        {/* 3. In-column reorder arrows (up/down) — always on list when enabled, hidden on board (drag handles reorder) */}
+        {!compact &&
+          reorderEnabled &&
+          REORDER_DIRECTIONS.map((direction) => {
+            const isUp = direction === "up";
+            const enabled = isUp ? canMoveUp : canMoveDown;
+            const label = isUp
+              ? `Move “${task.title}” up`
+              : `Move “${task.title}” down`;
+            return (
+              <button
+                key={direction}
+                type="button"
+                disabled={!enabled}
+                className={cn(ICON_BUTTON, "disabled:pointer-events-none disabled:opacity-40")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReorder?.(task.id, direction);
+                }}
+                aria-label={label}
+                title={label}
+              >
+                {isUp ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+              </button>
+            );
+          })}
 
-        {/* Section navigation arrows — left/right on both list and board */}
-        {moveTargets.map((target) => {
-          const Icon = target.direction === "prev" ? ArrowLeft : ArrowRight;
-          return (
-            <button
-              key={target.direction}
-              type="button"
-              className={compact ? COMPACT_ARROW : cn(ICON_BUTTON, "hidden sm:grid")}
-              onPointerDown={handleArrowPointerDown}
-              onClick={(e) => {
-                if (compact) e.stopPropagation();
-                onMove(target.id, target.title);
-              }}
-              aria-label={`Move "${task.title}" to ${target.title}`}
-              title={`Move to ${target.title}`}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
-          );
-        })}
+        {/* 4. Section navigation arrows (left/right) — on list: in overflow menu; on board: always visible */}
+        {compact &&
+          moveTargets.map((target) => {
+            const Icon = target.direction === "prev" ? ArrowLeft : ArrowRight;
+            return (
+              <button
+                key={target.direction}
+                type="button"
+                className={COMPACT_ARROW}
+                onPointerDown={handleArrowPointerDown}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMove(target.id, target.title);
+                }}
+                aria-label={`Move "${task.title}" to ${target.title}`}
+                title={`Move to ${target.title}`}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
 
-        {/* Primary actions - icon column on sm+, always visible on list, hover-revealed on board */}
-        <div
-          className={cn(
-            "hidden sm:flex sm:flex-col sm:gap-0.5 transition-opacity",
-            primaryActionsHidden,
-          )}
-        >
-          {primaryActions.map((action) => (
-            <button
-              key={action.key}
-              type="button"
-              onClick={action.onClick}
-              aria-label={action.ariaLabel}
-              title={action.title}
-              className={cn(ICON_BUTTON, action.tone)}
-            >
-              <action.icon className="h-4 w-4" />
-            </button>
-          ))}
-        </div>
+        {/* 5. Primary actions — always in overflow menu (both list and board) */}
+        {/* 6. Overflow menu button */}
+        <div className="relative">
+          <button
+            ref={menuButtonRef}
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="More actions"
+            className={cn(ICON_BUTTON, menuOpen && "bg-muted text-foreground")}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
 
-        {/* Overflow menu button - visible below sm */}
-        {!compact && (
-          <div className="relative sm:hidden">
-            <button
-              ref={menuButtonRef}
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              aria-label="More actions"
-              className={cn(ICON_BUTTON, menuOpen && "bg-muted text-foreground")}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-
-            {menuOpen && typeof document !== "undefined" ? (
-              <>
-                {/* Backdrop for closing */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={closeMenu}
-                  aria-hidden="true"
-                />
-                <div
-                  ref={menuRef}
-                  role="menu"
-                  aria-label={`Actions for "${task.title}"`}
-                  className="fixed right-0 z-50 mt-1.5 min-w-[11rem] origin-top-right rounded-xl border border-border bg-popover/95 p-1 shadow-2xl ring-1 ring-black/5 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150 dark:ring-white/10"
-                >
-                  {/* Section navigation in menu */}
-                  {moveTargets.map((target) => (
+          {menuOpen && typeof document !== "undefined" ? (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={closeMenu}
+                aria-hidden="true"
+              />
+              <div
+                role="menu"
+                aria-label={`Actions for "${task.title}"`}
+                className="fixed right-0 z-50 mt-1.5 min-w-[11rem] origin-top-right rounded-xl border border-border bg-popover/95 p-1 shadow-2xl ring-1 ring-black/5 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150 dark:ring-white/10"
+              >
+                {/* Section navigation in menu (list only) */}
+                {!compact &&
+                  moveTargets.map((target) => (
                     <button
                       key={target.direction}
                       type="button"
@@ -594,29 +539,30 @@ function CardActions({
                       Move to {target.title}
                     </button>
                   ))}
-                  {moveTargets.length > 0 && <div className="my-1 h-px bg-border" />}
-                  {primaryActions.map((action) => (
-                    <Fragment key={action.key}>
-                      {action.key === "delete" && <div className="my-1 h-px bg-border" />}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={action.onClick}
-                        className={cn(
-                          MENU_ITEM,
-                          action.key === "delete" && "text-destructive hover:bg-destructive/10",
-                        )}
-                      >
-                        <action.icon className="h-4 w-4" />
-                        {action.label}
-                      </button>
-                    </Fragment>
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </div>
-        )}
+                {!compact && moveTargets.length > 0 && <div className="my-1 h-px bg-border" />}
+
+                {/* Primary actions in menu */}
+                {primaryActions.map((action) => (
+                  <Fragment key={action.key}>
+                    {action.key === "delete" && <div className="my-1 h-px bg-border" />}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={action.onClick}
+                      className={cn(
+                        MENU_ITEM,
+                        action.key === "delete" && "text-destructive hover:bg-destructive/10",
+                      )}
+                    >
+                      <action.icon className="h-4 w-4" />
+                      {action.label}
+                    </button>
+                  </Fragment>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -687,14 +633,12 @@ export function TaskCard({
       duration: 3000,
       action: { label: "Undo", onClick: () => restore(before) },
     });
-    // Only navigate on a real move (assignFn is set whenever arrows render).
     if (assignFn) onMovedToSection?.(sectionId);
   }
 
   function handleRenameCommit() {
     const trimmed = renameValue.trim();
     if (trimmed && trimmed !== task.title) {
-      // The actual update will happen through the dialog
       setRenaming(false);
     } else {
       setRenaming(false);
@@ -717,7 +661,6 @@ export function TaskCard({
   }
 
   function handleRenameBlur() {
-    // Small delay to allow click on save button
     setTimeout(handleRenameCommit, 0);
   }
 
@@ -747,7 +690,6 @@ export function TaskCard({
       }
       return;
     }
-    // Buttons on the card (toggle, arrows, menu) own their own double-clicks.
     if (target.closest(INTERACTIVE_TARGET) !== null) return;
     onSelect?.(task, false);
   }
@@ -770,8 +712,6 @@ export function TaskCard({
   const rail = statusRail(task, status);
 
   // Section navigation (list and board surfaces; needs sections + assignment).
-  // Hidden columns are skipped entirely: an arrow must never move a card into
-  // a column the user cannot see, or the card would vanish from the board.
   const navigableSections = useMemo(
     () => (sections ? sections.filter((section) => !section.hidden) : sections),
     [sections],
@@ -795,8 +735,6 @@ export function TaskCard({
     dragging && "scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
     task.canceled && "border-dashed border-slate-400/45 bg-muted/40 hover:border-slate-400/70",
     selected && "border-primary/40 bg-primary/[0.04] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
-    // Keyboard cursor: a cue, never a second selection ring (the root's own
-    // focus-ring already marks keyboard focus).
     highlighted && "border-primary/40 bg-primary/[0.05]",
     pulse === "complete" && "animate-pulse ring-2 ring-emerald-500/50",
     pulse === "cancel" && "animate-pulse ring-2 ring-slate-500/50",

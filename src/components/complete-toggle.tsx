@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Ban, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -36,19 +36,14 @@ export function CompleteToggle({ completed, canceled, onToggle, className }: Com
       aria-pressed={completed}
       aria-label={completed ? "Mark as not completed" : "Mark as completed"}
       className={cn(
-        // 28px: a comfortable touch target that still sits easily inside the
-        // 17rem board columns. The circle shape is what tells this control
-        // apart from the card's square selection checkbox.
-        "focus-ring group/toggle relative grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-all duration-200 active:scale-90",
+        // 28px touch target, rounded square (distinct from SelectToggle's rounded-xl square).
+        // The pill-like rounded-lg + checkmark fill makes "complete" unmistakable.
+        "focus-ring group/toggle relative grid h-7 w-7 shrink-0 place-items-center rounded-lg border-2 transition-all duration-200 active:scale-95",
         completed
-          ? // The success token keeps the "done" glow in step with the card's
-            // status rail and the subtask checkboxes.
-            "border-success bg-success text-white ring-4 ring-success/15"
+          ? "border-success bg-success text-white ring-4 ring-success/15"
           : canceled
             ? "border-slate-400/60 text-slate-400 hover:border-slate-400"
-            : // A boundary you can actually see at rest, so the circle reads as
-              // "complete this task" before anyone touches it.
-              "border-muted-foreground/40 text-transparent hover:border-primary hover:bg-primary/5 hover:ring-4 hover:ring-primary/10",
+            : "border-muted-foreground/40 text-transparent hover:border-primary hover:bg-primary/5 hover:ring-4 hover:ring-primary/10",
         className,
       )}
     >
@@ -98,7 +93,18 @@ export function CompleteToggle({ completed, canceled, onToggle, className }: Com
           />
         </motion.svg>
       ) : canceled ? (
-        <Ban className="h-4 w-4" strokeWidth={2.6} />
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M4.93 4.93a10 10 0 0 1 14.14 14.14" />
+        </svg>
       ) : (
         <Check
           className="h-4 w-4 text-primary opacity-0 transition-opacity group-hover/toggle:opacity-60"
