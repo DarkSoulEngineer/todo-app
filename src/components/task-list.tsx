@@ -22,6 +22,8 @@ interface TaskListProps {
   onSelectionChange?: (selectedIds: Set<string>) => void;
   onSelectTask?: (task: Task, shiftKey: boolean) => void;
   onRenameTask?: (task: Task) => void;
+  /** Called after a card is moved to another section via the list arrows. */
+  onMovedToSection?: (sectionId: string) => void;
 }
 
 export function TaskList({
@@ -36,6 +38,7 @@ export function TaskList({
   onSelectionChange,
   onSelectTask,
   onRenameTask,
+  onMovedToSection,
 }: TaskListProps) {
   const { moveHighlight, selectHighlighted } = useTaskSelection(tasks, onSelectionChange);
 
@@ -85,6 +88,7 @@ export function TaskList({
             highlighted={effectiveHighlightedId === task.id}
             onSelect={handleSelect}
             onRename={onRenameTask}
+            onMovedToSection={onMovedToSection}
           />
         ))}
       </AnimatePresence>

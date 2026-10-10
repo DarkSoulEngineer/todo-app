@@ -18,13 +18,14 @@ import { TopBar } from "@/components/top-bar";
 import { useTasksContext } from "@/components/tasks-provider";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useNow } from "@/hooks/use-now";
-import { CATEGORIES, getCategory } from "@/lib/categories";
+import { getCategory, selectCategories } from "@/lib/categories";
 import {
   countBySmartList,
   filterBySmartList,
   smartListLabel,
 } from "@/lib/smart-lists";
 import { computeStats, matchesQuery, sortTasks } from "@/lib/tasks-selectors";
+import { isCustomSection } from "@/lib/sections";
 import type { SmartList, SortKey, Task, TaskDraft, ViewMode } from "@/lib/types";
 import { pluralize } from "@/lib/utils";
 
@@ -45,11 +46,14 @@ export function TodoApp() {
   const {
     tasks,
     sections,
+    deletedCategories,
     isLoading,
     isEmpty,
     addTask,
     updateTask,
     clearCompleted,
+    deleteCategory,
+    restoreCategories,
     snapshot,
     restore,
     loadSample,
@@ -91,15 +95,16 @@ export function TodoApp() {
     return map;
   }, [tasks]);
 
+  // Deleted categories drop out of the filter list along with their counts.
   const categoryCounts = useMemo<SidebarCategory[]>(() => {
     const map = new Map<string, number>();
     for (const task of tasks) {
       if (task.category) map.set(task.category, (map.get(task.category) ?? 0) + 1);
     }
-    return CATEGORIES.map((item) => ({ id: item.id, count: map.get(item.id) ?? 0 })).filter(
-      (item) => item.count > 0,
-    );
-  }, [tasks]);
+    return selectCategories(deletedCategories)
+      .map((item) => ({ id: item.id, count: map.get(item.id) ?? 0 }))
+      .filter((item) => item.count > 0);
+  }, [tasks, deletedCategories]);
 
   // Tasks for the current smart list (search + category applied, then sorted).
   const listTasks = useMemo(() => {
@@ -182,6 +187,24 @@ export function TodoApp() {
     setMobileNavOpen(false);
   }, []);
 
+  // Follow a task moved via the list's section arrows to where it now lives.
+  const handleMovedToSection = useCallback(
+    (sectionId: string) => {
+      const section = sections.find((item) => item.id === sectionId);
+      if (!section) return;
+      setMobileNavOpen(false);
+      if (section.status) {
+        // Status sections feed a smart list (completed, canceled, overdue, upcoming).
+        setSmartList(section.status);
+      } else {
+        // Custom sections live on the board — focus that section.
+        setFocusedSection(sectionId);
+        setViewMode("board");
+      }
+    },
+    [sections],
+  );
+
   useKeyboardShortcuts({
     onNew: () => {
       if (!dialogOpen && !helpOpen) openNew();
@@ -205,11 +228,16 @@ export function TodoApp() {
         updateTask(editing.id, draft);
         toast.success("Task updated", { duration: 2200 });
       } else {
-        addTask(draft);
+        const task = addTask(draft);
+        // A card created while a custom section is focused belongs to it,
+        // instead of falling into the status column its due date implies.
+        if (activeSection && isCustomSection(activeSection)) {
+          assignTaskToSection(task.id, activeSection.id);
+        }
         toast.success("Task added", { description: draft.title, duration: 2200 });
       }
     },
-    [editing, addTask, updateTask],
+    [editing, addTask, updateTask, activeSection, assignTaskToSection],
   );
 
   const handleClearCompleted = useCallback(() => {
@@ -230,6 +258,23 @@ export function TodoApp() {
       action: { label: "Undo", onClick: () => restore(before) },
     });
   }, [loadSample, snapshot, restore]);
+
+  const handleDeleteCategory = useCallback(
+    (id: string) => {
+      const before = snapshot();
+      const info = deleteCategory(id);
+      if (!info) return;
+      // Never leave a filter pointing at a category that no longer exists.
+      if (category === id) setCategory("all");
+      toast(`Deleted “${info.label}”`, {
+        description:
+          info.affected > 0 ? `${pluralize(info.affected, "task")} no longer tagged` : undefined,
+        duration: 6000,
+        action: { label: "Undo", onClick: () => restore(before) },
+      });
+    },
+    [category, deleteCategory, snapshot, restore],
+  );
 
   const resetFilters = useCallback(() => {
     setQuery("");
@@ -312,10 +357,12 @@ export function TodoApp() {
           tasks={listTasks}
           list={smartList}
           now={now}
-          sortable={sort === "manual"}
+          // The list has no drag and drop: reordering happens on the board.
+          sortable={false}
           onEdit={openEdit}
           sections={sections}
           assignTaskToSection={assignTaskToSection}
+          onMovedToSection={handleMovedToSection}
         />
       </div>
     );
@@ -325,7 +372,7 @@ export function TodoApp() {
     ) : filteredAll.length === 0 ? (
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">{noResultsState}</div>
     ) : (
-      <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+      <div className="flex h-full min-h-0 w-full flex-col px-3 py-3 sm:px-4 sm:py-4">
         <BoardView
           tasks={filteredAll}
           now={now}
@@ -359,6 +406,7 @@ export function TodoApp() {
     stats,
     category,
     categoryCounts,
+    deletedCategories,
     sections,
     sectionCounts,
     focusedSection: activeSection?.id ?? null,
@@ -366,6 +414,8 @@ export function TodoApp() {
     onSelectView: selectView,
     onSelectCategory: selectCategory,
     onSelectSection: selectSection,
+    onDeleteCategory: handleDeleteCategory,
+    onRestoreCategories: restoreCategories,
     onShowHelp: () => setHelpOpen(true),
     onToggleCollapse: () => setSidebarCollapsed((value) => !value),
   };

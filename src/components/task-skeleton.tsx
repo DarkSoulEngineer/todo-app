@@ -5,7 +5,7 @@ export function TaskSkeleton() {
   return (
     <ul className="flex flex-col gap-2.5" aria-hidden="true">
       {ROWS.map((row) => (
-        <li key={row} className="flex gap-3 rounded-2xl border border-border bg-card p-3.5">
+        <li key={row} className="flex gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-xs">
           <div className="skeleton h-6 w-6 shrink-0 rounded-full" />
           <div className="flex-1 space-y-2.5 py-0.5">
             <div className="skeleton h-4 w-1/2 rounded-md" />

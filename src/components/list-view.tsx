@@ -21,6 +21,8 @@ interface ListViewProps {
   sections?: BoardSection[];
   /** Function to move task to a section. */
   assignTaskToSection?: (taskId: string, sectionId: string) => void;
+  /** Called after a card is moved to another section via the list arrows. */
+  onMovedToSection?: (sectionId: string) => void;
 }
 
 /** Sectioned task rows grouped by due-date bucket. */
@@ -32,6 +34,7 @@ export function ListView({
   onEdit,
   sections: sectionsProp,
   assignTaskToSection: assignTaskToSectionProp,
+  onMovedToSection,
 }: ListViewProps) {
   const { sections: sectionsCtx, assignTaskToSection: assignTaskToSectionCtx } = useTasksContext();
   const sections = sectionsProp ?? sectionsCtx;
@@ -125,6 +128,7 @@ export function ListView({
             }}
             onSelectTask={handleSelectTask}
             onRenameTask={handleRenameTask}
+            onMovedToSection={onMovedToSection}
           />
         </section>
       ))}

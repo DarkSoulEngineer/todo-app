@@ -38,10 +38,12 @@ export function CompleteToggle({ completed, canceled, onToggle, className }: Com
       className={cn(
         "focus-ring group/toggle relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-all duration-200 active:scale-90",
         completed
-          ? "border-emerald-500 bg-emerald-500 text-white"
+          ? // The success token keeps the "done" glow in step with the card's
+            // status rail and the subtask checkboxes.
+            "border-success bg-success text-white ring-4 ring-success/15"
           : canceled
             ? "border-slate-400/60 text-slate-400 hover:border-slate-400"
-            : "border-border text-transparent hover:border-primary hover:bg-primary/5",
+            : "border-border text-transparent hover:border-primary hover:bg-primary/5 hover:ring-4 hover:ring-primary/10",
         className,
       )}
     >
@@ -53,7 +55,7 @@ export function CompleteToggle({ completed, canceled, onToggle, className }: Com
               return (
                 <motion.span
                   key={index}
-                  className="absolute h-1 w-1 rounded-full bg-emerald-500"
+                  className="absolute h-1 w-1 rounded-full bg-success"
                   initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
                   animate={{
                     opacity: 0,

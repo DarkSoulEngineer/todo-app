@@ -60,3 +60,15 @@ export function getCategory(id: string | null | undefined): Category | null {
   if (!id) return null;
   return CATEGORY_MAP.get(id) ?? null;
 }
+
+/** True when the value is the id of a known built-in category. */
+export function isCategoryId(value: unknown): value is string {
+  return typeof value === "string" && CATEGORY_MAP.has(value);
+}
+
+/** The categories still available to the user, in their original order. */
+export function selectCategories(deleted: readonly string[]): Category[] {
+  if (deleted.length === 0) return [...CATEGORIES];
+  const removed = new Set(deleted);
+  return CATEGORIES.filter((category) => !removed.has(category.id));
+}

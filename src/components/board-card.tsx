@@ -1,8 +1,8 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { GripVertical } from "lucide-react";
 import { TaskCard } from "@/components/task-card";
+import { useTasksContext } from "@/components/tasks-provider";
 import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -12,29 +12,41 @@ interface BoardCardProps {
   onEdit: (task: Task) => void;
 }
 
-/** A task card that can be dragged between board columns. */
+/**
+ * A task card that can be dragged between board columns.
+ *
+ * The whole card is the drag surface: `TaskCard` only renders a slot for a grip
+ * handle in its non-compact (list) layout, so a grip here would never show. The
+ * dnd listeners therefore live on the wrapper that also carries `setNodeRef`,
+ * which is dnd-kit's standard whole-node-as-activator pattern. The 6px pointer
+ * activation constraint in `board-view.tsx` still lets a plain click through, so
+ * the title opens the edit dialog and the card's own buttons still fire.
+ */
 export function BoardCard({ task, now, onEdit }: BoardCardProps) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { type: "card" },
   });
-
-  const handle = (
-    <button
-      ref={setActivatorNodeRef}
-      {...attributes}
-      {...listeners}
-      aria-label={`Move "${task.title}"`}
-      title="Drag between columns"
-      className="focus-ring grid h-8 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing"
-    >
-      <GripVertical className="h-4 w-4" />
-    </button>
-  );
+  const { sections, assignTaskToSection } = useTasksContext();
 
   return (
-    <div ref={setNodeRef} className={cn("min-w-0 transition-opacity", isDragging && "opacity-40")}>
-      <TaskCard task={task} now={now} onEdit={onEdit} handle={handle} compact />
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "min-w-0 cursor-grab touch-none transition-opacity active:cursor-grabbing",
+        isDragging && "opacity-40",
+      )}
+    >
+      <TaskCard
+        task={task}
+        now={now}
+        onEdit={onEdit}
+        compact
+        sections={sections}
+        assignTaskToSection={assignTaskToSection}
+      />
     </div>
   );
 }

@@ -6,7 +6,8 @@ import { useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
-import { CATEGORIES } from "@/lib/categories";
+import { useTasksContext } from "@/components/tasks-provider";
+import { selectCategories } from "@/lib/categories";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/constants";
 import { fromDateTimeLocal, toDateTimeLocal } from "@/lib/datetime";
 import type { Priority, Subtask, Task, TaskDraft } from "@/lib/types";
@@ -50,6 +51,7 @@ interface TaskFormProps {
 }
 
 function TaskForm({ task, initialDueAt, onClose, onSubmit }: TaskFormProps) {
+  const { deletedCategories } = useTasksContext();
   const titleFieldId = useId();
   const notesFieldId = useId();
   const dueFieldId = useId();
@@ -65,6 +67,8 @@ function TaskForm({ task, initialDueAt, onClose, onSubmit }: TaskFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const editing = task !== null;
+  // A deleted category must never be selectable again.
+  const categoryOptions = selectCategories(deletedCategories);
 
   function addLocalSubtask(): void {
     const trimmed = draftSubtask.trim();
@@ -180,7 +184,7 @@ function TaskForm({ task, initialDueAt, onClose, onSubmit }: TaskFormProps) {
         <FieldLabel htmlFor="task-category">Category</FieldLabel>
         <Select id="task-category" value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="">No category</option>
-          {CATEGORIES.map((item) => (
+          {categoryOptions.map((item) => (
             <option key={item.id} value={item.id}>
               {item.label}
             </option>

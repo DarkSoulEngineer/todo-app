@@ -16,6 +16,7 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy } from "@dnd-
 import { Eye, LayoutGrid, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { BoardCanvas } from "@/components/board-canvas";
 import { BoardSectionColumn } from "@/components/board-section";
 import { CategoryPill, DueBadge, PriorityPill } from "@/components/task-badges";
 import { dismissTooltips } from "@/components/ui/tooltip";
@@ -213,7 +214,7 @@ export function BoardView({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       {focusedSectionId || hiddenSections.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {focusedSectionId ? (
@@ -254,36 +255,38 @@ export function BoardView({
         onDragCancel={resetDrag}
       >
         <SortableContext items={visibleIds} strategy={horizontalListSortingStrategy}>
-          <div className="-mx-1 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto px-1 pb-2">
-            {visibleSections.map((section) => (
-              <BoardSectionColumn
-                key={section.id}
-                section={section}
-                tasks={tasksBySection.get(section.id) ?? []}
-                now={now}
-                editing={editingId === section.id}
-                isDropTarget={overId === section.id}
-                onEdit={onEdit}
-                onStartRename={setEditingId}
-                onRename={renameSection}
-                onCancelRename={() => setEditingId(null)}
-                onDelete={handleDeleteSection}
-                onHide={handleHideSection}
-                onAddCard={handleAddCard}
-              />
-            ))}
+          <BoardCanvas>
+            <div className="-mx-1 flex items-start gap-3 px-1 pb-2">
+              {visibleSections.map((section) => (
+                <BoardSectionColumn
+                  key={section.id}
+                  section={section}
+                  tasks={tasksBySection.get(section.id) ?? []}
+                  now={now}
+                  editing={editingId === section.id}
+                  isDropTarget={overId === section.id}
+                  onEdit={onEdit}
+                  onStartRename={setEditingId}
+                  onRename={renameSection}
+                  onCancelRename={() => setEditingId(null)}
+                  onDelete={handleDeleteSection}
+                  onHide={handleHideSection}
+                  onAddCard={handleAddCard}
+                />
+              ))}
 
-            {!focusedSectionId ? (
-              <button
-                type="button"
-                onClick={handleAddSection}
-                className="focus-ring flex w-[17rem] shrink-0 snap-start items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 px-4 py-8 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-card hover:text-foreground sm:w-72"
-              >
-                <Plus className="h-4 w-4" strokeWidth={2.4} />
-                Add section
-              </button>
-            ) : null}
-          </div>
+              {!focusedSectionId ? (
+                <button
+                  type="button"
+                  onClick={handleAddSection}
+                  className="focus-ring flex w-[17rem] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 px-4 py-8 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-card hover:text-foreground sm:w-72"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2.4} />
+                  Add section
+                </button>
+              ) : null}
+            </div>
+          </BoardCanvas>
         </SortableContext>
 
         <DragOverlay dropAnimation={null}>

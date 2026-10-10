@@ -4,22 +4,23 @@ import { useMemo } from "react";
 import { InsightsPanel } from "@/components/insights-panel";
 import { StatsDashboard } from "@/components/stats-dashboard";
 import { useTasksContext } from "@/components/tasks-provider";
-import { CATEGORIES } from "@/lib/categories";
+import { selectCategories } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 
 /** Dedicated dashboard: headline stats, the 7-day trend and a category breakdown. */
 export function InsightsView({ now }: { now: Date }) {
-  const { tasks } = useTasksContext();
+  const { tasks, deletedCategories } = useTasksContext();
 
   const rows = useMemo(() => {
     const total = tasks.length || 1;
-    return CATEGORIES.map((category) => {
-      const count = tasks.filter((task) => task.category === category.id).length;
-      return { category, count, ratio: count / total };
-    })
+    return selectCategories(deletedCategories)
+      .map((category) => {
+        const count = tasks.filter((task) => task.category === category.id).length;
+        return { category, count, ratio: count / total };
+      })
       .filter((row) => row.count > 0)
       .sort((a, b) => b.count - a.count);
-  }, [tasks]);
+  }, [tasks, deletedCategories]);
 
   return (
     <div className="flex flex-col gap-4">

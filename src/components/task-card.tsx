@@ -1,8 +1,23 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowUp, ArrowDown, Ban, Check, Circle, ChevronDown, ListChecks, MoreHorizontal, Pencil, RotateCcw, Trash2 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Ban,
+  Check,
+  ChevronDown,
+  Circle,
+  ListChecks,
+  MoreHorizontal,
+  Pencil,
+  RotateCcw,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
+import { useMemo, useRef, useState, Fragment, type ReactNode, type RefObject } from "react";
 import { toast } from "sonner";
 import { CompleteToggle } from "@/components/complete-toggle";
 import { SubtaskList } from "@/components/subtask-list";
@@ -11,10 +26,13 @@ import { TaskTooltip } from "@/components/task-tooltip";
 import { useTasksContext } from "@/components/tasks-provider";
 import { deriveStatus } from "@/lib/status";
 import { isCustomSection } from "@/lib/sections";
-import type { Task, BoardSection } from "@/lib/types";
+import type { Task, BoardSection, TaskStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type AssignTaskToSection = (taskId: string, sectionId: string) => void;
+
+/** Optimistic pulse on the card right after complete/cancel is fired. */
+type Pulse = "complete" | "cancel" | null;
 
 interface TaskCardProps {
   task: Task;
@@ -37,10 +55,30 @@ interface TaskCardProps {
   onSelect?: (task: Task, shiftKey: boolean) => void;
   /** Double-click handler for inline rename */
   onRename?: (task: Task) => void;
+  /** Called after the card is moved to another section via the arrows. */
+  onMovedToSection?: (sectionId: string) => void;
 }
 
 const ICON_BUTTON =
   "focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+
+/** Ghost button for the board arrows — present on every card, so it stays quiet. */
+const COMPACT_ARROW =
+  "focus-ring grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground/80 transition-[background-color,color,transform] duration-150 hover:bg-muted hover:text-foreground active:scale-90";
+
+const MENU_ITEM =
+  "focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted";
+
+/**
+ * Leading accent rail so overdue / completed / canceled read at a glance.
+ * Upcoming cards stay clean — the rail is reserved for status that needs air.
+ */
+function statusRail(task: Task, status: TaskStatus): string | null {
+  if (task.canceled) return "from-slate-400/70 via-slate-400/45 to-slate-400/10";
+  if (task.completed) return "from-emerald-500/75 via-emerald-500/50 to-emerald-500/15";
+  if (status === "overdue") return "from-red-500/80 via-red-500/55 to-red-500/15";
+  return null;
+}
 
 /**
  * Determines which board section a task currently belongs to.
@@ -77,6 +115,404 @@ function getAdjacentSections(
   return { prev, next };
 }
 
+/** A neighbouring column a card can be moved to through the arrows. */
+interface MoveTarget {
+  id: string;
+  title: string;
+  direction: "prev" | "next";
+}
+
+interface TaskTitleProps {
+  task: Task;
+  now: Date;
+  compact?: boolean;
+  settled: boolean;
+  renaming: boolean;
+  renameValue: string;
+  renameInputRef: RefObject<HTMLInputElement | null>;
+  /** True when selection or rename is wired, so title presses must not select. */
+  hasSelectOrRename: boolean;
+  onRenameValueChange: (value: string) => void;
+  onRenameKeyDown: (event: React.KeyboardEvent) => void;
+  onRenameBlur: () => void;
+  onOpenEdit: () => void;
+}
+
+function TaskTitle({
+  task,
+  now,
+  compact,
+  settled,
+  renaming,
+  renameValue,
+  renameInputRef,
+  hasSelectOrRename,
+  onRenameValueChange,
+  onRenameKeyDown,
+  onRenameBlur,
+  onOpenEdit,
+}: TaskTitleProps) {
+  return (
+    <TaskTooltip task={task} now={now}>
+      {(triggerProps) => (
+        <div
+          {...triggerProps}
+          className="min-w-0"
+          onClick={(e) => {
+            // Don't trigger onEdit if we're selecting or renaming
+            if (!hasSelectOrRename) return;
+            e.stopPropagation();
+          }}
+        >
+          {renaming ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={(e) => onRenameValueChange(e.target.value)}
+              onKeyDown={onRenameKeyDown}
+              onBlur={onRenameBlur}
+              onClick={(e) => e.stopPropagation()}
+              className="focus-ring min-w-0 w-full rounded-md border border-input bg-card px-2 py-1 text-sm font-semibold tracking-tight text-foreground"
+              autoFocus
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenEdit}
+              className="focus-ring -m-1 min-w-0 w-full rounded-md p-1 text-left"
+            >
+              <h3
+                className={cn(
+                  "font-semibold tracking-tight leading-snug",
+                  compact ? "truncate text-sm" : "break-words text-[0.95rem]",
+                  settled ? "text-muted-foreground line-through decoration-muted-foreground/50" : "text-foreground",
+                )}
+              >
+                {task.title}
+              </h3>
+            </button>
+          )}
+        </div>
+      )}
+    </TaskTooltip>
+  );
+}
+
+interface TaskMetaProps {
+  task: Task;
+  now: Date;
+  compact?: boolean;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+}
+
+/** Meta row: due, priority, category, subtask progress and settled status. */
+function TaskMeta({ task, now, compact, expanded, onToggleExpanded }: TaskMetaProps) {
+  const doneSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
+  const totalSubtasks = task.subtasks.length;
+  const allSubtasksDone = totalSubtasks > 0 && doneSubtasks === totalSubtasks;
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5",
+        compact ? "mt-2" : "mt-3",
+      )}
+    >
+      <DueBadge task={task} now={now} />
+      <PriorityPill priority={task.priority} />
+      {task.category ? <CategoryPill categoryId={task.category} /> : null}
+      {totalSubtasks > 0 ? (
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          aria-expanded={expanded}
+          className={cn(
+            "focus-ring inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset transition-colors",
+            allSubtasksDone
+              ? "bg-emerald-500/12 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300"
+              : "text-muted-foreground ring-border hover:bg-muted hover:text-foreground",
+          )}
+        >
+          <ListChecks className="h-3.5 w-3.5" />
+          <span className="tabular-nums">
+            {doneSubtasks}/{totalSubtasks}
+          </span>
+          <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
+        </button>
+      ) : null}
+      {task.completed || task.canceled ? <StatusPill task={task} now={now} /> : null}
+    </div>
+  );
+}
+
+interface CardActionsProps {
+  task: Task;
+  compact?: boolean;
+  selected: boolean;
+  pulse: Pulse;
+  handle?: ReactNode;
+  prevSection: BoardSection | null;
+  nextSection: BoardSection | null;
+  onSelect?: (task: Task, shiftKey: boolean) => void;
+  onMove: (sectionId: string, sectionTitle: string) => void;
+  onEdit: (task: Task) => void;
+  onCancelTask: () => void;
+  onDeleteTask: () => void;
+}
+
+/** One primary action, rendered as an icon on sm+ and a labelled row in the menu. */
+interface CardAction {
+  key: string;
+  label: string;
+  ariaLabel: string;
+  title?: string;
+  icon: LucideIcon;
+  tone?: string;
+  onClick: () => void;
+}
+
+/**
+ * The actions cluster. Order is deliberate and stable: selection checkbox, drag
+ * handle slot, section arrows, primary actions, overflow menu. On list cards the
+ * whole cluster slides in on hover/focus; on board cards the move arrows stay
+ * visible (they are the only way to change column) and the rest reveals on hover.
+ */
+function CardActions({
+  task,
+  compact,
+  selected,
+  pulse,
+  handle,
+  prevSection,
+  nextSection,
+  onSelect,
+  onMove,
+  onEdit,
+  onCancelTask,
+  onDeleteTask,
+}: CardActionsProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  function closeMenu(): void {
+    setMenuOpen(false);
+  }
+
+  function handleArrowPointerDown(e: React.PointerEvent<HTMLButtonElement>): void {
+    // The board card is one big drag surface; pressing an arrow must never
+    // begin a card drag. A plain click still fires and moves the card.
+    if (compact) e.stopPropagation();
+  }
+
+  const moveTargets: MoveTarget[] = [];
+  if (prevSection) {
+    moveTargets.push({ id: prevSection.id, title: prevSection.title, direction: "prev" });
+  }
+  if (nextSection) {
+    moveTargets.push({ id: nextSection.id, title: nextSection.title, direction: "next" });
+  }
+
+  const primaryActions: CardAction[] = [
+    {
+      key: "edit",
+      label: "Edit",
+      ariaLabel: `Edit "${task.title}"`,
+      icon: Pencil,
+      onClick: () => {
+        onEdit(task);
+        closeMenu();
+      },
+    },
+    {
+      key: "cancel",
+      label: task.canceled ? "Restore" : "Cancel",
+      ariaLabel: task.canceled ? `Restore "${task.title}"` : `Cancel "${task.title}"`,
+      title: task.canceled ? "Restore task" : "Cancel task",
+      icon: task.canceled ? RotateCcw : Ban,
+      tone: pulse === "cancel" ? "animate-pulse" : undefined,
+      onClick: () => {
+        onCancelTask();
+        closeMenu();
+      },
+    },
+    {
+      key: "delete",
+      label: "Delete",
+      ariaLabel: `Delete "${task.title}"`,
+      icon: Trash2,
+      tone: "hover:text-destructive",
+      onClick: () => {
+        onDeleteTask();
+        closeMenu();
+      },
+    },
+  ];
+
+  // List cards reveal everything on hover/focus (canceled cards stay pinned);
+  // board cards keep the arrows visible and reveal the rest.
+  const revealOnHover = !compact && !task.canceled;
+
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-start gap-0.5",
+        !compact && "transition-[opacity,transform] duration-200",
+        revealOnHover &&
+          "sm:translate-x-1 sm:opacity-0 sm:group-hover:translate-x-0 sm:group-hover:opacity-100 sm:group-focus-within:translate-x-0 sm:group-focus-within:opacity-100",
+      )}
+    >
+      {/* Selection checkbox - appears on hover/focus or when selected */}
+      {!compact && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect?.(task, e.shiftKey);
+          }}
+          aria-label={selected ? `Deselect "${task.title}"` : `Select "${task.title}"`}
+          aria-pressed={selected}
+          className={cn(ICON_BUTTON, selected && "bg-primary/10 text-primary")}
+        >
+          {selected ? <Check className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+        </button>
+      )}
+
+      {/* Drag handle - hidden below sm and on pointer-coarse */}
+      {handle && !compact && (
+        <div className="hidden sm:block">
+          {handle}
+        </div>
+      )}
+
+      {/* Section navigation arrows - listed columns move up/down, board columns left/right */}
+      {moveTargets.map((target) => {
+        const Icon = compact
+          ? target.direction === "prev"
+            ? ArrowLeft
+            : ArrowRight
+          : target.direction === "prev"
+            ? ArrowUp
+            : ArrowDown;
+        return (
+          <button
+            key={target.direction}
+            type="button"
+            className={compact ? COMPACT_ARROW : cn(ICON_BUTTON, "hidden sm:grid")}
+            onPointerDown={handleArrowPointerDown}
+            onClick={(e) => {
+              // Board cards sit on a whole-card drag/click surface: keep the
+              // arrow press to itself so it never drags or selects the card.
+              if (compact) e.stopPropagation();
+              onMove(target.id, target.title);
+            }}
+            aria-label={`Move "${task.title}" to ${target.title}`}
+            title={`Move to ${target.title}`}
+          >
+            <Icon className="h-4 w-4" />
+          </button>
+        );
+      })}
+
+      {/* Primary actions - icon column on sm+, labelled rows in the menu below sm */}
+      <div
+        className={cn(
+          "hidden sm:flex sm:flex-col sm:gap-0.5 transition-opacity",
+          compact && !task.canceled && "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
+        )}
+      >
+        {primaryActions.map((action) => (
+          <button
+            key={action.key}
+            type="button"
+            onClick={action.onClick}
+            aria-label={action.ariaLabel}
+            title={action.title}
+            className={cn(ICON_BUTTON, action.tone)}
+          >
+            <action.icon className="h-4 w-4" />
+          </button>
+        ))}
+      </div>
+
+      {/* Overflow menu button - visible below sm */}
+      {!compact && (
+        <div className="relative sm:hidden">
+          <button
+            ref={menuButtonRef}
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="More actions"
+            className={cn(ICON_BUTTON, menuOpen && "bg-muted text-foreground")}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+
+          {menuOpen && typeof document !== "undefined" ? (
+            <>
+              {/* Backdrop for closing */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={closeMenu}
+                aria-hidden="true"
+              />
+              <div
+                ref={menuRef}
+                role="menu"
+                aria-label={`Actions for "${task.title}"`}
+                className="fixed right-0 z-50 mt-1.5 min-w-[11rem] origin-top-right rounded-xl border border-border bg-popover/95 p-1 shadow-2xl ring-1 ring-black/5 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150 dark:ring-white/10"
+              >
+                {/* Section navigation in menu */}
+                {moveTargets.map((target) => (
+                  <button
+                    key={target.direction}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onMove(target.id, target.title);
+                      closeMenu();
+                    }}
+                    className={MENU_ITEM}
+                  >
+                    {target.direction === "prev" ? (
+                      <ArrowUp className="h-4 w-4" />
+                    ) : (
+                      <ArrowDown className="h-4 w-4" />
+                    )}
+                    Move to {target.title}
+                  </button>
+                ))}
+                {moveTargets.length > 0 && <div className="my-1 h-px bg-border" />}
+                {primaryActions.map((action) => (
+                  <Fragment key={action.key}>
+                    {action.key === "delete" && <div className="my-1 h-px bg-border" />}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={action.onClick}
+                      className={cn(
+                        MENU_ITEM,
+                        action.key === "delete" && "text-destructive hover:bg-destructive/10",
+                      )}
+                    >
+                      <action.icon className="h-4 w-4" />
+                      {action.label}
+                    </button>
+                  </Fragment>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TaskCard({
   task,
   now,
@@ -90,29 +526,17 @@ export function TaskCard({
   highlighted = false,
   onSelect,
   onRename,
+  onMovedToSection,
 }: TaskCardProps) {
   const { toggleComplete, toggleCancel, deleteTask, snapshot, restore } = useTasksContext();
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(task.title);
-  const [menuOpen, setMenuOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
-  const status = deriveStatus(task, now);
-  const settled = task.completed || task.canceled;
-  const doneSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
-  const totalSubtasks = task.subtasks.length;
-
-  // Section navigation (only in list view, not compact/board)
-  const showSectionArrows = !compact && sections && sections.length > 0 && assignTaskToSection;
-  const prevSectionId = showSectionArrows ? getAdjacentSections(task, sections!, now).prev : null;
-  const nextSectionId = showSectionArrows ? getAdjacentSections(task, sections!, now).next : null;
-  const prevSection = prevSectionId ? sections!.find((s) => s.id === prevSectionId) : null;
-  const nextSection = nextSectionId ? sections!.find((s) => s.id === nextSectionId) : null;
-  const assignFn = showSectionArrows ? assignTaskToSection! : null;
+  // Optimistic feedback for complete/cancel - pulse animation
+  const [pulse, setPulse] = useState<Pulse>(null);
 
   function handleDelete(): void {
     const before = snapshot();
@@ -122,7 +546,6 @@ export function TaskCard({
       duration: 6000,
       action: { label: "Undo", onClick: () => restore(before) },
     });
-    setMenuOpen(false);
   }
 
   function handleComplete(): void {
@@ -134,7 +557,6 @@ export function TaskCard({
         action: { label: "Undo", onClick: () => toggleComplete(task.id) },
       });
     }
-    setMenuOpen(false);
   }
 
   function handleCancel(): void {
@@ -144,7 +566,6 @@ export function TaskCard({
       duration: 3000,
       action: { label: "Undo", onClick: () => toggleCancel(task.id) },
     });
-    setMenuOpen(false);
   }
 
   function handleMoveToSection(sectionId: string, sectionTitle: string): void {
@@ -154,7 +575,8 @@ export function TaskCard({
       duration: 3000,
       action: { label: "Undo", onClick: () => restore(before) },
     });
-    setMenuOpen(false);
+    // Only navigate on a real move (assignFn is set whenever arrows render).
+    if (assignFn) onMovedToSection?.(sectionId);
   }
 
   function handleRenameCommit() {
@@ -203,9 +625,6 @@ export function TaskCard({
     }
   }
 
-  // Optimistic feedback for complete/cancel - pulse animation
-  const [pulse, setPulse] = useState<"complete" | "cancel" | null>(null);
-
   function handleCompleteWithPulse() {
     setPulse("complete");
     handleComplete();
@@ -218,26 +637,47 @@ export function TaskCard({
     setTimeout(() => setPulse(null), 300);
   }
 
+  const status = deriveStatus(task, now);
+  const settled = task.completed || task.canceled;
+  const totalSubtasks = task.subtasks.length;
+  const rail = statusRail(task, status);
+
+  // Section navigation (list and board surfaces; needs sections + assignment).
+  // Hidden columns are skipped entirely: an arrow must never move a card into
+  // a column the user cannot see, or the card would vanish from the board.
+  const navigableSections = useMemo(
+    () => (sections ? sections.filter((section) => !section.hidden) : sections),
+    [sections],
+  );
+  const showSectionArrows = Boolean(
+    navigableSections && navigableSections.length > 0 && assignTaskToSection,
+  );
+  const adjacent = showSectionArrows
+    ? getAdjacentSections(task, navigableSections!, now)
+    : { prev: null, next: null };
+  const prevSection = adjacent.prev ? (navigableSections!.find((s) => s.id === adjacent.prev) ?? null) : null;
+  const nextSection = adjacent.next ? (navigableSections!.find((s) => s.id === adjacent.next) ?? null) : null;
+  const assignFn = showSectionArrows ? assignTaskToSection! : null;
+
   const cardClassName = cn(
-    "group relative flex min-w-0 gap-3 overflow-hidden rounded-2xl border border-border bg-card p-3.5 shadow-xs transition-shadow duration-200 hover:shadow-md",
-    status === "overdue" && !settled && "border-red-500/30",
-    dragging && "shadow-xl ring-2 ring-primary/40",
-    task.canceled && "border-dashed",
-    selected && "ring-2 ring-primary ring-offset-2 ring-offset-card",
-    highlighted && "ring-2 ring-primary ring-offset-2 ring-offset-card bg-primary/5",
+    "group relative flex min-w-0 overflow-hidden rounded-2xl border bg-card shadow-xs transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out",
+    compact
+      ? "gap-2.5 p-2.5 hover:border-primary/25 hover:shadow-md"
+      : "gap-3.5 p-4 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
+    status === "overdue" && !settled && "border-red-500/35 hover:border-red-500/50",
+    dragging && "scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
+    task.canceled && "border-dashed border-slate-400/45 bg-muted/40 hover:border-slate-400/70",
+    selected && "border-primary/40 bg-primary/[0.04] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
+    highlighted && "border-primary/50 bg-primary/[0.07] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
     pulse === "complete" && "animate-pulse ring-2 ring-emerald-500/50",
     pulse === "cancel" && "animate-pulse ring-2 ring-slate-500/50",
     !compact && "cursor-pointer",
   );
 
-  // Build the list of actions for the overflow menu (below sm)
-  const hasArrows = showSectionArrows && (prevSectionId || nextSectionId);
-  const showOverflowMenu = !compact && (hasArrows || true); // always show menu for edit/cancel/delete
-
   return (
-    <motion.li
+    <motion.div
       layout
-      className="list-none"
+      className="focus-ring list-none rounded-2xl"
       tabIndex={highlighted ? 0 : -1}
       onClick={handleSelectionClick}
       onDoubleClick={handleTitleClick}
@@ -249,7 +689,19 @@ export function TaskCard({
       }}
     >
       <div className={cardClassName}>
-        <div className="pt-0.5">
+        {/* Ambient depth: a soft primary wash anchored to the top-left corner. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(115%_95%_at_0%_0%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_62%)]"
+        />
+        {rail ? (
+          <span
+            aria-hidden="true"
+            className={cn("pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b", rail)}
+          />
+        ) : null}
+
+        <div className={cn("shrink-0", compact ? "pt-0" : "pt-0.5")}>
           <CompleteToggle
             completed={task.completed}
             canceled={task.canceled}
@@ -263,254 +715,57 @@ export function TaskCard({
           <div className="flex items-start gap-2">
             {/* Title column - gets all remaining space, never shares with actions */}
             <div className="min-w-0 flex-1">
-              <TaskTooltip task={task} now={now}>
-                {(triggerProps) => (
-                  <div
-                    {...triggerProps}
-                    className="min-w-0"
-                    onClick={(e) => {
-                      // Don't trigger onEdit if we're selecting or renaming
-                      if (!onSelect && !onRename) return;
-                      e.stopPropagation();
-                    }}
-                  >
-                    {renaming ? (
-                      <input
-                        ref={renameInputRef}
-                        type="text"
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={handleRenameKeyDown}
-                        onBlur={handleRenameBlur}
-                        onClick={(e) => e.stopPropagation()}
-                        className="focus-ring min-w-0 w-full rounded-md border border-input bg-card px-2 py-1 text-sm font-semibold text-foreground"
-                        autoFocus
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onEdit(task)}
-                        className="focus-ring -m-1 min-w-0 w-full rounded-md p-1 text-left"
-                      >
-                        <h3
-                          className={cn(
-                            "text-[0.95rem] leading-snug font-semibold",
-                            compact ? "truncate" : "break-words",
-                            settled ? "text-muted-foreground line-through" : "text-foreground",
-                          )}
-                        >
-                          {task.title}
-                        </h3>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </TaskTooltip>
+              <TaskTitle
+                task={task}
+                now={now}
+                compact={compact}
+                settled={settled}
+                renaming={renaming}
+                renameValue={renameValue}
+                renameInputRef={renameInputRef}
+                hasSelectOrRename={Boolean(onSelect || onRename)}
+                onRenameValueChange={setRenameValue}
+                onRenameKeyDown={handleRenameKeyDown}
+                onRenameBlur={handleRenameBlur}
+                onOpenEdit={() => onEdit(task)}
+              />
             </div>
 
             {/* Actions column - never shrinks, always on the right */}
-            <div
-              className={cn(
-                "flex shrink-0 items-start gap-0.5 transition-opacity",
-                task.canceled
-                  ? "opacity-100"
-                  : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
-              )}
-            >
-              {/* Selection checkbox - appears on hover/focus or when selected */}
-              {!compact && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelect?.(task, e.shiftKey);
-                  }}
-                  aria-label={selected ? `Deselect "${task.title}"` : `Select "${task.title}"`}
-                  aria-pressed={selected}
-                  className={cn(
-                    "focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    selected && "text-primary",
-                  )}
-                >
-                  {selected ? <Check className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-                </button>
-              )}
-
-              {/* Drag handle - hidden below sm and on pointer-coarse */}
-              {handle && !compact && (
-                <div className="hidden sm:block">
-                  {handle}
-                </div>
-              )}
-
-              {/* Section navigation arrows - only in list view, hidden below sm */}
-              {!compact && showSectionArrows && prevSectionId && (
-                <button
-                  type="button"
-                  className="hidden sm:grid"
-                  onClick={() => handleMoveToSection(prevSectionId, prevSection!.title)}
-                  aria-label={`Move "${task.title}" to ${prevSection!.title}`}
-                  title={`Move to ${prevSection!.title}`}
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </button>
-              )}
-              {!compact && showSectionArrows && nextSectionId && (
-                <button
-                  type="button"
-                  className="hidden sm:grid"
-                  onClick={() => handleMoveToSection(nextSectionId, nextSection!.title)}
-                  aria-label={`Move "${task.title}" to ${nextSection!.title}`}
-                  title={`Move to ${nextSection!.title}`}
-                >
-                  <ArrowDown className="h-4 w-4" />
-                </button>
-              )}
-
-              {/* Primary actions - visible on sm+, collapsed into menu below sm */}
-              <div className="hidden sm:flex sm:flex-col sm:gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => onEdit(task)}
-                  aria-label={`Edit "${task.title}"`}
-                  className={ICON_BUTTON}
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelWithPulse}
-                  aria-label={task.canceled ? `Restore "${task.title}"` : `Cancel "${task.title}"`}
-                  title={task.canceled ? "Restore task" : "Cancel task"}
-                  className={cn(ICON_BUTTON, pulse === "cancel" && "animate-pulse")}
-                >
-                  {task.canceled ? <RotateCcw className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  aria-label={`Delete "${task.title}"`}
-                  className={cn(ICON_BUTTON, "hover:text-destructive")}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Overflow menu button - visible below sm */}
-              {!compact && showOverflowMenu && (
-                <div className="relative sm:hidden">
-                  <button
-                    ref={menuButtonRef}
-                    type="button"
-                    onClick={() => setMenuOpen((v) => !v)}
-                    aria-haspopup="menu"
-                    aria-expanded={menuOpen}
-                    aria-label="More actions"
-                    className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-
-                  {menuOpen && typeof document !== "undefined" ? (
-                    <>
-                      {/* Backdrop for closing */}
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setMenuOpen(false)}
-                        aria-hidden="true"
-                      />
-                      <div
-                        ref={menuRef}
-                        role="menu"
-                        aria-label={`Actions for "${task.title}"`}
-                        className="fixed z-50 right-0 mt-1 min-w-[160px] rounded-xl border border-border bg-popover p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-150"
-                      >
-                        {/* Section navigation in menu */}
-                        {showSectionArrows && prevSectionId && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => handleMoveToSection(prevSectionId, prevSection!.title)}
-                            className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
-                          >
-                            <ArrowUp className="h-4 w-4" />
-                            Move to {prevSection!.title}
-                          </button>
-                        )}
-                        {showSectionArrows && nextSectionId && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => handleMoveToSection(nextSectionId, nextSection!.title)}
-                            className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                            Move to {nextSection!.title}
-                          </button>
-                        )}
-                        {(showSectionArrows && (prevSectionId || nextSectionId)) && (
-                          <div className="my-1 h-px bg-border" />
-                        )}
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => { onEdit(task); setMenuOpen(false); }}
-                          className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => { handleCancelWithPulse(); setMenuOpen(false); }}
-                          className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
-                        >
-                          {task.canceled ? <RotateCcw className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-                          {task.canceled ? "Restore" : "Cancel"}
-                        </button>
-                        <div className="my-1 h-px bg-border" />
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => { handleDelete(); }}
-                          className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              )}
-            </div>
+            <CardActions
+              task={task}
+              compact={compact}
+              selected={selected}
+              pulse={pulse}
+              handle={handle}
+              prevSection={prevSection}
+              nextSection={nextSection}
+              onSelect={onSelect}
+              onMove={handleMoveToSection}
+              onEdit={onEdit}
+              onCancelTask={handleCancelWithPulse}
+              onDeleteTask={handleDelete}
+            />
           </div>
 
           {task.description ? (
-            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{task.description}</p>
+            <p
+              className={cn(
+                "line-clamp-2 leading-relaxed text-muted-foreground",
+                compact ? "mt-1 text-[0.8125rem]" : "mt-1.5 text-sm",
+              )}
+            >
+              {task.description}
+            </p>
           ) : null}
 
-          <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 overflow-hidden">
-            <DueBadge task={task} now={now} />
-            <PriorityPill priority={task.priority} />
-            {task.category ? <CategoryPill categoryId={task.category} /> : null}
-            {totalSubtasks > 0 ? (
-              <button
-                type="button"
-                onClick={() => setExpanded((value) => !value)}
-                aria-expanded={expanded}
-                className="focus-ring inline-flex items-center gap-1 rounded-full text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ListChecks className="h-3.5 w-3.5" />
-                <span className="tabular-nums">
-                  {doneSubtasks}/{totalSubtasks}
-                </span>
-                <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
-              </button>
-            ) : null}
-            {settled ? <StatusPill task={task} now={now} /> : null}
-          </div>
+          <TaskMeta
+            task={task}
+            now={now}
+            compact={compact}
+            expanded={expanded}
+            onToggleExpanded={() => setExpanded((value) => !value)}
+          />
 
           <AnimatePresence initial={false}>
             {expanded && totalSubtasks > 0 ? (
@@ -527,6 +782,6 @@ export function TaskCard({
           </AnimatePresence>
         </div>
       </div>
-    </motion.li>
+    </motion.div>
   );
 }

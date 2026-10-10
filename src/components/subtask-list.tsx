@@ -22,9 +22,9 @@ export function SubtaskList({ task }: { task: Task }) {
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-border/70 bg-muted/30 p-3">
+    <div className="mt-3 rounded-xl border border-border/60 bg-muted/40 p-3">
       {total > 0 ? (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-2.5 flex items-center gap-2">
           <Progress
             value={rate}
             tone={rate === 1 ? "bg-emerald-500" : "bg-primary"}
@@ -46,8 +46,9 @@ export function SubtaskList({ task }: { task: Task }) {
               aria-label={subtask.done ? `Mark "${subtask.title}" as not done` : `Mark "${subtask.title}" as done`}
               className={cn(
                 "focus-ring grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border-2 transition-colors",
+                // Matches the card's complete toggle: success green when done.
                 subtask.done
-                  ? "border-primary bg-primary text-primary-foreground"
+                  ? "border-success bg-success text-white"
                   : "border-border hover:border-primary",
               )}
             >
@@ -56,7 +57,7 @@ export function SubtaskList({ task }: { task: Task }) {
             <span
               className={cn(
                 "flex-1 text-sm",
-                subtask.done ? "text-muted-foreground line-through" : "text-foreground",
+                subtask.done ? "text-muted-foreground line-through decoration-muted-foreground/50" : "text-foreground",
               )}
             >
               {subtask.title}
@@ -65,7 +66,7 @@ export function SubtaskList({ task }: { task: Task }) {
               type="button"
               onClick={() => removeSubtask(task.id, subtask.id)}
               aria-label={`Remove subtask "${subtask.title}"`}
-              className="focus-ring grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted-foreground/60 opacity-0 transition-opacity group-hover/sub:opacity-100 focus-visible:opacity-100 hover:text-destructive"
+              className="focus-ring grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted-foreground/60 opacity-0 transition-[opacity,background-color,color] group-hover/sub:opacity-100 focus-visible:opacity-100 hover:bg-destructive/10 hover:text-destructive"
             >
               <X className="h-3.5 w-3.5" />
             </button>

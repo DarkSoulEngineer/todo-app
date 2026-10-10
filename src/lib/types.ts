@@ -45,6 +45,12 @@ export interface BoardSection {
 export interface Workspace {
   tasks: Task[];
   sections: BoardSection[];
+  /**
+   * Ids of built-in categories the user deleted. Categories stay static
+   * constants; this records which of them are hidden from the app. Missing in
+   * older persisted data, which means "nothing deleted".
+   */
+  deletedCategories: string[];
 }
 
 /** Editable shape used by the create/edit form. */

@@ -27,16 +27,16 @@ export function TaskTooltipPanel({ task, now }: { task: Task; now: Date }) {
   const doneSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <p className="text-sm font-semibold break-words text-foreground">{task.title}</p>
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-semibold tracking-tight break-words text-foreground">{task.title}</p>
 
       {task.description ? (
-        <p className="text-xs break-words whitespace-pre-wrap text-muted-foreground">
+        <p className="text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
           {task.description}
         </p>
       ) : null}
 
-      <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <StatusPill task={task} now={now} />
         <PriorityPill priority={task.priority} />
         {task.category ? <CategoryPill categoryId={task.category} /> : null}
@@ -44,7 +44,7 @@ export function TaskTooltipPanel({ task, now }: { task: Task; now: Date }) {
       </div>
 
       {totalSubtasks > 0 ? (
-        <p className="text-[11px] font-medium text-muted-foreground tabular-nums">
+        <p className="font-mono text-[11px] font-medium text-muted-foreground tabular-nums">
           {doneSubtasks}/{totalSubtasks} checklist items done
         </p>
       ) : null}

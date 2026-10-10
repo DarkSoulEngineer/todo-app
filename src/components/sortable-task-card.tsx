@@ -26,6 +26,8 @@ interface SortableTaskCardProps {
   onSelect?: (task: Task, shiftKey: boolean) => void;
   /** Double-click handler for inline rename */
   onRename?: (task: Task) => void;
+  /** Called after the card is moved to another section via the arrows. */
+  onMovedToSection?: (sectionId: string) => void;
 }
 
 export function SortableTaskCard({
@@ -39,6 +41,7 @@ export function SortableTaskCard({
   highlighted,
   onSelect,
   onRename,
+  onMovedToSection,
 }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, disabled: !sortable });
@@ -79,6 +82,7 @@ export function SortableTaskCard({
         highlighted={highlighted}
         onSelect={onSelect}
         onRename={onRename}
+        onMovedToSection={onMovedToSection}
       />
     </motion.li>
   );

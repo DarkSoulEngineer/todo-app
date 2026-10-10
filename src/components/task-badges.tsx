@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 export function PriorityPill({ priority }: { priority: Priority }) {
   const meta = PRIORITY_META[priority];
   return (
-    <Chip className={cn("ring-inset", meta.pill)}>
-      <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+    <Chip className={cn("gap-1.5 ring-inset", meta.pill)}>
+      <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
       {meta.label}
     </Chip>
   );
@@ -22,8 +22,8 @@ export function CategoryPill({ categoryId }: { categoryId: string }) {
   const category = getCategory(categoryId);
   if (!category) return null;
   return (
-    <Chip className={cn("ring-inset", category.pill)}>
-      <span className={cn("h-1.5 w-1.5 rounded-full", category.dot)} />
+    <Chip className={cn("gap-1.5 ring-inset", category.pill)}>
+      <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", category.dot)} />
       {category.label}
     </Chip>
   );
@@ -34,7 +34,7 @@ export function StatusPill({ task, now }: { task: Task; now: Date }) {
   const meta = STATUS_META[status];
   const Icon = meta.icon;
   return (
-    <Chip className={cn("ring-inset", meta.chip)}>
+    <Chip className={cn("gap-1 ring-inset", meta.chip)}>
       <Icon className="h-3 w-3" strokeWidth={2.6} />
       {meta.label}
     </Chip>
@@ -46,21 +46,20 @@ export function DueBadge({ task, now }: { task: Task; now: Date }) {
   if (!info) return null;
 
   const settled = task.completed || task.canceled;
+  // Same tint recipe as the status/priority pills so the meta row reads as one
+  // language: neutral by default, amber when due today, red once overdue.
   const tone = settled
-    ? "text-muted-foreground"
+    ? "bg-muted text-muted-foreground ring-border"
     : info.overdue
-      ? "text-red-600 dark:text-red-400"
+      ? "bg-red-500/12 text-red-700 ring-red-500/25 dark:text-red-300"
       : info.today
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-muted-foreground";
+        ? "bg-amber-500/12 text-amber-700 ring-amber-500/25 dark:text-amber-300"
+        : "bg-muted text-muted-foreground ring-border";
 
   return (
-    <span
-      className={cn("inline-flex items-center gap-1 text-xs font-medium", tone)}
-      title={info.title}
-    >
-      <Clock className="h-3.5 w-3.5" strokeWidth={2.2} />
+    <Chip className={cn("gap-1 ring-inset", tone)} title={info.title}>
+      <Clock className="h-3 w-3" strokeWidth={2.4} />
       <span className="tabular-nums">{info.label}</span>
-    </span>
+    </Chip>
   );
 }

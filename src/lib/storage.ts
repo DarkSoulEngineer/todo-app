@@ -1,5 +1,6 @@
 import { isValid, parseISO } from "date-fns";
 import { nanoid } from "nanoid";
+import { isCategoryId } from "@/lib/categories";
 import { PROBE_KEY, STORAGE_KEY } from "@/lib/constants";
 import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/sections";
 import type { BoardSection, Priority, Subtask, Task, Workspace } from "@/lib/types";
@@ -8,6 +9,7 @@ interface PersistedState {
   version: number;
   tasks: Task[];
   sections: BoardSection[];
+  deletedCategories?: string[];
 }
 
 const CURRENT_VERSION = 2;
@@ -75,26 +77,50 @@ function normalizeTask(value: unknown): Task | null {
 }
 
 /** Splits a parsed payload into a raw task array and a raw section value. */
-function extractParts(parsed: unknown): { tasks: unknown; sections: unknown } {
-  if (Array.isArray(parsed)) return { tasks: parsed, sections: undefined };
+function extractParts(parsed: unknown): {
+  tasks: unknown;
+  sections: unknown;
+  deletedCategories: unknown;
+} {
+  if (Array.isArray(parsed)) {
+    return { tasks: parsed, sections: undefined, deletedCategories: undefined };
+  }
   const record = (parsed ?? {}) as Record<string, unknown>;
-  return { tasks: record.tasks, sections: record.sections };
+  return {
+    tasks: record.tasks,
+    sections: record.sections,
+    deletedCategories: record.deletedCategories,
+  };
+}
+
+/** Keeps known category ids only, de-duplicated, in the order they appear. */
+function normalizeDeletedCategories(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of value) {
+    if (!isCategoryId(item) || seen.has(item)) continue;
+    seen.add(item);
+    result.push(item);
+  }
+  return result;
 }
 
 /** Builds a validated workspace from unknown persisted/imported data. */
 function buildWorkspace(parsed: unknown): Workspace | null {
-  const { tasks: rawTasks, sections: rawSections } = extractParts(parsed);
+  const { tasks: rawTasks, sections: rawSections, deletedCategories: rawDeleted } =
+    extractParts(parsed);
   if (!Array.isArray(rawTasks)) return null;
 
   const tasks = rawTasks.map(normalizeTask).filter((task): task is Task => task !== null);
   const sections = normalizeSections(rawSections);
   reconcileSectionIds(tasks, sections);
-  return { tasks, sections };
+  return { tasks, sections, deletedCategories: normalizeDeletedCategories(rawDeleted) };
 }
 
 /** Reads the workspace from localStorage. Always safe to call, even on the server. */
 export function loadWorkspace(): { workspace: Workspace; hadData: boolean } {
-  const empty: Workspace = { tasks: [], sections: defaultSections() };
+  const empty: Workspace = { tasks: [], sections: defaultSections(), deletedCategories: [] };
   if (typeof window === "undefined") return { workspace: empty, hadData: false };
 
   try {
@@ -160,6 +186,7 @@ export function saveWorkspace(workspace: Workspace): void {
       version: CURRENT_VERSION,
       tasks: workspace.tasks,
       sections: workspace.sections,
+      deletedCategories: workspace.deletedCategories,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
