@@ -420,8 +420,8 @@ function CardActions({
     },
   ];
 
-  // On list view (non-compact): reveal section arrows and primary actions on hover/focus
-  // On board (compact): section arrows always visible, primary actions in menu only
+  // On list view (non-compact): reveal section arrows on hover/focus
+  // On board (compact): section arrows always visible
   const revealOnHover = !compact && !task.canceled;
 
   return (
@@ -491,8 +491,24 @@ function CardActions({
             );
           })}
 
-        {/* 5. Primary actions — always in overflow menu (both list and board) */}
-        {/* 6. Overflow menu button */}
+        {/* 5. Edit button — visible in action column on list (non-compact), in menu on board (compact) */}
+        {!compact && (
+          <button
+            type="button"
+            onClick={() => {
+              onEdit(task);
+              closeMenu();
+            }}
+            aria-label={`Edit "${task.title}"`}
+            title="Edit"
+            className={cn(ICON_BUTTON, "hidden sm:grid")}
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* 6. Primary actions (Cancel, Delete) — in overflow menu */}
+        {/* 7. Overflow menu button */}
         <div className="relative">
           <button
             ref={menuButtonRef}
@@ -541,24 +557,26 @@ function CardActions({
                   ))}
                 {!compact && moveTargets.length > 0 && <div className="my-1 h-px bg-border" />}
 
-                {/* Primary actions in menu */}
-                {primaryActions.map((action) => (
-                  <Fragment key={action.key}>
-                    {action.key === "delete" && <div className="my-1 h-px bg-border" />}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={action.onClick}
-                      className={cn(
-                        MENU_ITEM,
-                        action.key === "delete" && "text-destructive hover:bg-destructive/10",
-                      )}
-                    >
-                      <action.icon className="h-4 w-4" />
-                      {action.label}
-                    </button>
-                  </Fragment>
-                ))}
+                {/* Primary actions in menu (on list, Edit is already in column, so skip it) */}
+                {primaryActions
+                  .filter((action) => compact || action.key !== "edit")
+                  .map((action) => (
+                    <Fragment key={action.key}>
+                      {action.key === "delete" && <div className="my-1 h-px bg-border" />}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={action.onClick}
+                        className={cn(
+                          MENU_ITEM,
+                          action.key === "delete" && "text-destructive hover:bg-destructive/10",
+                        )}
+                      >
+                        <action.icon className="h-4 w-4" />
+                        {action.label}
+                      </button>
+                    </Fragment>
+                  ))}
               </div>
             </>
           ) : null}
