@@ -36,14 +36,19 @@ export function CompleteToggle({ completed, canceled, onToggle, className }: Com
       aria-pressed={completed}
       aria-label={completed ? "Mark as not completed" : "Mark as completed"}
       className={cn(
-        "focus-ring group/toggle relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-all duration-200 active:scale-90",
+        // 28px: a comfortable touch target that still sits easily inside the
+        // 17rem board columns. The circle shape is what tells this control
+        // apart from the card's square selection checkbox.
+        "focus-ring group/toggle relative grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-all duration-200 active:scale-90",
         completed
           ? // The success token keeps the "done" glow in step with the card's
             // status rail and the subtask checkboxes.
             "border-success bg-success text-white ring-4 ring-success/15"
           : canceled
             ? "border-slate-400/60 text-slate-400 hover:border-slate-400"
-            : "border-border text-transparent hover:border-primary hover:bg-primary/5 hover:ring-4 hover:ring-primary/10",
+            : // A boundary you can actually see at rest, so the circle reads as
+              // "complete this task" before anyone touches it.
+              "border-muted-foreground/40 text-transparent hover:border-primary hover:bg-primary/5 hover:ring-4 hover:ring-primary/10",
         className,
       )}
     >
@@ -75,7 +80,7 @@ export function CompleteToggle({ completed, canceled, onToggle, className }: Com
       {completed ? (
         <motion.svg
           viewBox="0 0 24 24"
-          className="h-3.5 w-3.5"
+          className="h-4 w-4"
           fill="none"
           stroke="currentColor"
           strokeWidth={3.2}
@@ -93,10 +98,10 @@ export function CompleteToggle({ completed, canceled, onToggle, className }: Com
           />
         </motion.svg>
       ) : canceled ? (
-        <Ban className="h-3.5 w-3.5" strokeWidth={2.6} />
+        <Ban className="h-4 w-4" strokeWidth={2.6} />
       ) : (
         <Check
-          className="h-3.5 w-3.5 text-primary opacity-0 transition-opacity group-hover/toggle:opacity-60"
+          className="h-4 w-4 text-primary opacity-0 transition-opacity group-hover/toggle:opacity-60"
           strokeWidth={3.2}
         />
       )}
