@@ -7,13 +7,11 @@ import {
   ArrowRight,
   ArrowUp,
   Ban,
-  Check,
   ChevronDown,
   ListChecks,
   MoreHorizontal,
   Pencil,
   RotateCcw,
-  Square,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -74,10 +72,6 @@ const ICON_BUTTON =
 /** Ghost button for the board arrows — present on every card, so it stays quiet. */
 const COMPACT_ARROW =
   "focus-ring grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground/80 transition-[background-color,color,transform] duration-150 hover:bg-muted hover:text-foreground active:scale-90";
-
-/** Selection checkbox — rounded square (rounded-xl), 32px. */
-const SELECT_CONTROL =
-  "focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-[background-color,color,transform] duration-150 active:scale-90";
 
 const MENU_ITEM =
   "focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted";
@@ -263,12 +257,11 @@ function TaskMeta({ task, now, compact, expanded, onToggleExpanded }: TaskMetaPr
 interface CardActionsProps {
   task: Task;
   compact?: boolean;
-  selected: boolean;
   pulse: Pulse;
   handle?: ReactNode;
   prevSection: BoardSection | null;
   nextSection: BoardSection | null;
-  onSelect?: (task: Task, shiftKey: boolean) => void;
+  sections: BoardSection[];
   onMove: (sectionId: string, sectionTitle: string) => void;
   onEdit: (task: Task) => void;
   onCancelTask: () => void;
@@ -292,21 +285,18 @@ interface CardAction {
   onClick: () => void;
 }
 
-interface SelectToggleProps {
+interface SelectionIndicatorProps {
   task: Task;
   selected: boolean;
   onSelect?: (task: Task, shiftKey: boolean) => void;
 }
 
 /**
- * The row's selection checkbox — a primary affordance, not a shortcut, so it
- * never hides behind a hover. It stays quiet when the task is not selected and
- * unmistakable when it is.
- *
- * Shape: rounded square (rounded-xl), 32px — distinct from CompleteToggle's
- * rounded-lg pill. Selected state fills solid with a white check.
+ * Subtle selection indicator — a thin left-edge bar that fills when selected.
+ * Clicking it toggles selection. Much quieter than a checkbox button.
+ * The card's ring/tint is the primary selection state; this is just an affordance.
  */
-function SelectToggle({ task, selected, onSelect }: SelectToggleProps) {
+function SelectionIndicator({ task, selected, onSelect }: SelectionIndicatorProps) {
   return (
     <button
       type="button"
@@ -317,17 +307,14 @@ function SelectToggle({ task, selected, onSelect }: SelectToggleProps) {
       aria-label={selected ? `Deselect "${task.title}"` : `Select "${task.title}"`}
       aria-pressed={selected}
       className={cn(
-        SELECT_CONTROL,
+        "focus-ring absolute inset-y-0 left-0 w-1.5 rounded-l-xl transition-all duration-200",
         selected
-          ? "bg-foreground text-background"
-          : "text-muted-foreground/70 hover:bg-primary/10 hover:text-primary",
+          ? "bg-primary scale-y-100"
+          : "bg-transparent hover:bg-primary/20 scale-y-50",
       )}
+      style={{ transformOrigin: "bottom" }}
     >
-      {selected ? (
-        <Check className="h-4 w-4" strokeWidth={3} />
-      ) : (
-        <Square className="h-4 w-4" strokeWidth={2.25} />
-      )}
+      <span className="sr-only">{selected ? "Selected" : "Not selected"}</span>
     </button>
   );
 }
@@ -344,12 +331,11 @@ function SelectToggle({ task, selected, onSelect }: SelectToggleProps) {
 function CardActions({
   task,
   compact,
-  selected,
   pulse,
   handle,
   prevSection,
   nextSection,
-  onSelect,
+  sections,
   onMove,
   onEdit,
   onCancelTask,
@@ -434,9 +420,6 @@ function CardActions({
             "sm:translate-x-1 sm:opacity-0 sm:group-hover:translate-x-0 sm:group-hover:opacity-100 sm:group-focus-within:translate-x-0 sm:group-focus-within:opacity-100",
         )}
       >
-        {/* 1. Selection checkbox — always visible on list, never on board */}
-        {!compact && <SelectToggle task={task} selected={selected} onSelect={onSelect} />}
-
         {/* 2. Drag handle — hidden below sm and on pointer-coarse */}
         {handle && !compact && (
           <div className="hidden sm:block">{handle}</div>
@@ -469,14 +452,33 @@ function CardActions({
             );
           })}
 
-        {/* 4. Section navigation arrows (left/right) — always visible on both list and board */}
-        {moveTargets.map((target) => {
+        {/* 4. Section move — dropdown to move card to any section (list only, compact uses arrows) */}
+        {!compact && sections && sections.length > 0 && (
+          <select
+            className="focus-ring h-6 w-auto min-w-[80px] text-xs rounded-md border border-input bg-background px-1.5 py-0.5 text-foreground placeholder:text-muted-foreground appearance-none pr-6 cursor-pointer transition-colors hover:border-primary/50"
+            aria-label={`Move "${task.title}" to section`}
+            defaultValue={moveTargets[0]?.id ?? ""}
+            onChange={(e) => {
+              e.stopPropagation();
+              const targetId = e.target.value;
+              const targetSection = sections.find((s) => s.id === targetId);
+              if (targetSection) onMove(targetId, targetSection.title);
+            }}
+          >
+            {sections.map((section) => (
+              <option key={section.id} value={section.id}>
+                {section.title}
+              </option>
+            ))}
+          </select>
+        )}
+        {compact && moveTargets.map((target) => {
           const Icon = target.direction === "prev" ? ArrowLeft : ArrowRight;
           return (
             <button
               key={target.direction}
               type="button"
-              className={compact ? COMPACT_ARROW : cn(ICON_BUTTON, "hidden sm:grid")}
+              className={COMPACT_ARROW}
               onPointerDown={handleArrowPointerDown}
               onClick={(e) => {
                 e.stopPropagation();
@@ -748,6 +750,10 @@ export function TaskCard({
         }
       }}
     >
+      {/* Subtle selection indicator on left edge — fills when selected, click to toggle */}
+      {!compact && (
+        <SelectionIndicator task={task} selected={selected} onSelect={onSelect} />
+      )}
       <div className={cardClassName}>
         {/* Ambient depth: a soft primary wash anchored to the top-left corner. */}
         <span
@@ -795,12 +801,11 @@ export function TaskCard({
             <CardActions
               task={task}
               compact={compact}
-              selected={selected}
               pulse={pulse}
               handle={handle}
               prevSection={prevSection}
               nextSection={nextSection}
-              onSelect={onSelect}
+              sections={sections ?? []}
               onMove={handleMoveToSection}
               onEdit={onEdit}
               onCancelTask={handleCancelWithPulse}
