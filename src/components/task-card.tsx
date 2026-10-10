@@ -427,7 +427,34 @@ function CardActions({
           <div className="hidden sm:block">{handle}</div>
         )}
 
-        {/* 3. In-column reorder arrows (up/down) — on list and board when enabled */}
+        {/* 3. Section move — dropdown to move card to any section (list only, compact uses arrows) */}
+        {!compact && sections && sections.length > 0 && (
+          <select
+            className="focus-ring h-6 w-auto min-w-[80px] max-w-[140px] text-xs rounded-md border border-input/50 bg-card px-2 py-0.5 pr-7 text-foreground appearance-none cursor-pointer transition-[border-color,background-color] duration-150 hover:border-primary/50 hover:bg-muted/30"
+            aria-label={`Move "${task.title}" to section`}
+            value={currentSectionId ?? ""}
+            onChange={(e) => {
+              e.stopPropagation();
+              const targetId = e.target.value;
+              const targetSection = sections.find((s) => s.id === targetId);
+              if (targetSection) onMove(targetId, targetSection.title);
+            }}
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 6px center",
+              backgroundSize: "12px 12px",
+            }}
+          >
+            {sections.map((section) => (
+              <option key={section.id} value={section.id} className="py-1.5 px-2">
+                {section.title}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* 4. In-column reorder arrows (up/down) — on list and board when enabled */}
         {reorderEnabled &&
           REORDER_DIRECTIONS.map((direction) => {
             const isUp = direction === "up";
@@ -456,32 +483,7 @@ function CardActions({
             );
           })}
 
-        {/* 4. Section move — dropdown to move card to any section (list only, compact uses arrows) */}
-        {!compact && sections && sections.length > 0 && (
-          <select
-            className="focus-ring h-6 w-auto min-w-[80px] max-w-[140px] text-xs rounded-md border border-input/50 bg-card px-2 py-0.5 pr-7 text-foreground appearance-none cursor-pointer transition-[border-color,background-color] duration-150 hover:border-primary/50 hover:bg-muted/30"
-            aria-label={`Move "${task.title}" to section`}
-            value={currentSectionId ?? ""}
-            onChange={(e) => {
-              e.stopPropagation();
-              const targetId = e.target.value;
-              const targetSection = sections.find((s) => s.id === targetId);
-              if (targetSection) onMove(targetId, targetSection.title);
-            }}
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 6px center",
-              backgroundSize: "12px 12px",
-            }}
-          >
-            {sections.map((section) => (
-              <option key={section.id} value={section.id} className="py-1.5 px-2">
-                {section.title}
-              </option>
-            ))}
-          </select>
-        )}
+        {/* 5. Section navigation arrows (left/right) — always visible on both list and board */}
         {compact && moveTargets.map((target) => {
           const Icon = target.direction === "prev" ? ArrowLeft : ArrowRight;
           return (
