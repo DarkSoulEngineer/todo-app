@@ -469,27 +469,26 @@ function CardActions({
             );
           })}
 
-        {/* 4. Section navigation arrows (left/right) — on list: in overflow menu; on board: always visible */}
-        {compact &&
-          moveTargets.map((target) => {
-            const Icon = target.direction === "prev" ? ArrowLeft : ArrowRight;
-            return (
-              <button
-                key={target.direction}
-                type="button"
-                className={COMPACT_ARROW}
-                onPointerDown={handleArrowPointerDown}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMove(target.id, target.title);
-                }}
-                aria-label={`Move "${task.title}" to ${target.title}`}
-                title={`Move to ${target.title}`}
-              >
-                <Icon className="h-4 w-4" />
-              </button>
-            );
-          })}
+        {/* 4. Section navigation arrows (left/right) — always visible on both list and board */}
+        {moveTargets.map((target) => {
+          const Icon = target.direction === "prev" ? ArrowLeft : ArrowRight;
+          return (
+            <button
+              key={target.direction}
+              type="button"
+              className={compact ? COMPACT_ARROW : cn(ICON_BUTTON, "hidden sm:grid")}
+              onPointerDown={handleArrowPointerDown}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(target.id, target.title);
+              }}
+              aria-label={`Move "${task.title}" to ${target.title}`}
+              title={`Move to ${target.title}`}
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          );
+        })}
 
         {/* 5. Edit button — visible in action column on list (non-compact), in menu on board (compact) */}
         {!compact && (
@@ -534,29 +533,6 @@ function CardActions({
                 aria-label={`Actions for "${task.title}"`}
                 className="fixed right-0 z-50 mt-1.5 min-w-[11rem] origin-top-right rounded-xl border border-border bg-popover/95 p-1 shadow-2xl ring-1 ring-black/5 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150 dark:ring-white/10"
               >
-                {/* Section navigation in menu (list only) */}
-                {!compact &&
-                  moveTargets.map((target) => (
-                    <button
-                      key={target.direction}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        onMove(target.id, target.title);
-                        closeMenu();
-                      }}
-                      className={MENU_ITEM}
-                    >
-                      {target.direction === "prev" ? (
-                        <ArrowUp className="h-4 w-4" />
-                      ) : (
-                        <ArrowDown className="h-4 w-4" />
-                      )}
-                      Move to {target.title}
-                    </button>
-                  ))}
-                {!compact && moveTargets.length > 0 && <div className="my-1 h-px bg-border" />}
-
                 {/* Primary actions in menu (on list, Edit is already in column, so skip it) */}
                 {primaryActions
                   .filter((action) => compact || action.key !== "edit")
