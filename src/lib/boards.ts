@@ -113,6 +113,19 @@ export function missingBuiltInBoards(boards: Board[]): Board[] {
   return BUILT_IN_BOARDS.filter((board) => !present.has(board.id));
 }
 
+/** Gets the board color by label (e.g., "Work" -> "cyan"). */
+export function getBoardColorByLabel(label: string): BoardColor | null {
+  const normalized = label.toLowerCase().trim();
+  const board = BUILT_IN_BOARDS.find((b) => b.label.toLowerCase() === normalized);
+  return board ? boardColor(board.color) : null;
+}
+
+/** Gets the board color by id (e.g., "work" -> "cyan"). */
+export function getBoardColorById(id: string): BoardColor | null {
+  const board = BUILT_IN_BOARDS.find((b) => b.id === id.toLowerCase());
+  return board ? boardColor(board.color) : null;
+}
+
 /** Turns one unknown persisted entry into a Board, or null when unusable. */
 function normalizeBoard(value: unknown): Board | null {
   if (typeof value !== "object" || value === null) return null;

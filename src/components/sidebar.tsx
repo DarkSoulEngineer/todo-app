@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getBoardColorByLabel } from "@/lib/boards";
 import { getCategory } from "@/lib/categories";
 import { SMART_LISTS, type SmartListCounts } from "@/lib/smart-lists";
 import type { TaskStats } from "@/lib/tasks-selectors";
@@ -179,18 +180,29 @@ export function Sidebar({
             ) : null}
             {sections
               .filter((section) => section.status === undefined)
-              .map((section) => (
-                <NavItem
-                  key={section.id}
-                  icon={Hash}
-                  label={section.title}
-                  count={sectionCounts[section.id] ?? 0}
-                  active={focusedSection === section.id}
-                  collapsed={collapsed}
-                  layoutId={`${idPrefix}-section-pill`}
-                  onClick={() => onSelectSection(section.id)}
-                />
-              ))}
+              .map((section) => {
+                const color = getBoardColorByLabel(section.title);
+                const Icon = color ? (
+                  <span
+                    className={cn("h-4 w-4 rounded-full", color.dot)}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Hash className="h-4 w-4" strokeWidth={2.2} />
+                );
+                return (
+                  <NavItem
+                    key={section.id}
+                    icon={Icon}
+                    label={section.title}
+                    count={sectionCounts[section.id] ?? 0}
+                    active={focusedSection === section.id}
+                    collapsed={collapsed}
+                    layoutId={`${idPrefix}-section-pill`}
+                    onClick={() => onSelectSection(section.id)}
+                  />
+                );
+              })}
           </div>
         ) : null}
 
@@ -281,7 +293,7 @@ export function Sidebar({
 }
 
 interface NavItemProps {
-  icon: LucideIcon;
+  icon: LucideIcon | React.ReactNode;
   label: string;
   count?: number;
   active: boolean;
@@ -312,10 +324,16 @@ function NavItem({ icon: Icon, label, count, active, collapsed, layoutId, onClic
           transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
         />
       ) : null}
-      <Icon
-        className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}
-        strokeWidth={2.2}
-      />
+      {typeof Icon === "function" ? (
+        <Icon
+          className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}
+          strokeWidth={2.2}
+        />
+      ) : (
+        <span className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}>
+          {Icon}
+        </span>
+      )}
       {!collapsed ? <span className="relative flex-1 truncate text-left">{label}</span> : null}
       {!collapsed && count !== undefined && count > 0 ? (
         <span className="relative text-xs text-muted-foreground tabular-nums">{count}</span>

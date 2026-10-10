@@ -24,6 +24,7 @@ import { createPortal } from "react-dom";
 import { BoardCard } from "@/components/board-card";
 import { useTasksContext } from "@/components/tasks-provider";
 import { STATUS_META } from "@/lib/status";
+import { getBoardColorByLabel } from "@/lib/boards";
 import type { BoardSection, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -75,8 +76,9 @@ export function BoardSectionColumn({
   }
 
   const meta = section.status ? STATUS_META[section.status] : null;
-  const Icon = meta?.icon ?? Hash;
-  const chip = meta?.chip ?? "bg-muted text-muted-foreground ring-border";
+  const categoryColor = meta ? null : getBoardColorByLabel(section.title);
+  const Icon = meta?.icon ?? (categoryColor ? null : Hash);
+  const chip = meta?.chip ?? (categoryColor ? categoryColor.pill : "bg-muted text-muted-foreground ring-border");
 
   return (
     <section
@@ -102,7 +104,7 @@ export function BoardSectionColumn({
         </button>
 
         <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg ring-1 ring-inset", chip)}>
-          <Icon className="h-4 w-4" strokeWidth={2.4} />
+          {Icon ? <Icon className="h-4 w-4" strokeWidth={2.4} /> : null}
         </span>
 
         {editing ? (
@@ -345,7 +347,7 @@ function SectionMenu({
                 right: pos?.right ?? -9999,
                 visibility: pos ? "visible" : "hidden",
               }}
-              className="z-[110] w-44 rounded-xl border border-border bg-popover p-1 shadow-xl"
+              className="z-[110] w-44 rounded-xl border border-border bg-popover p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-150"
             >
               {section.status === undefined ? (
                 <MenuButton icon={Pencil} label="Rename" onClick={onRename} close={setOpen} />

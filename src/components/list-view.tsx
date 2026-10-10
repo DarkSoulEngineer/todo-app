@@ -7,8 +7,10 @@ import { groupForList, groupForListBySection } from "@/lib/smart-lists";
 import { useTasksContext } from "@/components/tasks-provider";
 import { isCustomSection } from "@/lib/sections";
 import { deriveStatus } from "@/lib/status";
+import { getBoardColorByLabel } from "@/lib/boards";
 import type { SmartList, Task, BoardSection } from "@/lib/types";
 import { useTaskSelection } from "@/hooks/use-task-selection";
+import { cn } from "@/lib/utils";
 
 interface ListViewProps {
   /** Already filtered and sorted for the active smart list. */
@@ -121,7 +123,18 @@ export function ListView({
                   )}
                 </button>
               )}
-              <h2 className="text-sm font-semibold text-muted-foreground flex-1">{group.label}</h2>
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const color = getBoardColorByLabel(group.label);
+                  return color ? (
+                    <span
+                      className={cn("flex-shrink-0 w-2 h-2 rounded-full", color.dot)}
+                      aria-hidden="true"
+                    />
+                  ) : null;
+                })()}
+                <h2 className="text-sm font-semibold text-muted-foreground flex-1">{group.label}</h2>
+              </div>
               <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
                 {group.tasks.length}
               </span>
