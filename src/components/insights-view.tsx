@@ -1,60 +1,66 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState } from "react";
 import { InsightsPanel } from "@/components/insights-panel";
 import { StatsDashboard } from "@/components/stats-dashboard";
+import { InsightsFiltersView } from "@/components/insights-filters";
+import { ProductivityCharts } from "@/components/productivity-charts";
+import { QuickActions } from "@/components/insights-quick-actions";
 import { useTasksContext } from "@/components/tasks-provider";
-import { selectCategories } from "@/lib/categories";
-import { cn } from "@/lib/utils";
+import { DEFAULT_FILTERS, hasActiveFilters, resetFilters, type InsightsFilters } from "@/lib/insights-filters";
 
 /** Dedicated dashboard: headline stats, the 7-day trend and a category breakdown. */
 export function InsightsView({ now }: { now: Date }) {
-  const { tasks, deletedCategories } = useTasksContext();
+  const { tasks, boards } = useTasksContext();
+  const [filters, setFilters] = useState<InsightsFilters>(DEFAULT_FILTERS);
 
-  const rows = useMemo(() => {
-    const total = tasks.length || 1;
-    return selectCategories(deletedCategories)
-      .map((category) => {
-        const count = tasks.filter((task) => task.category === category.id).length;
-        return { category, count, ratio: count / total };
-      })
-      .filter((row) => row.count > 0)
-      .sort((a, b) => b.count - a.count);
-  }, [tasks, deletedCategories]);
+  const activeFilters = hasActiveFilters(filters);
+
+  const handleFilterChange = (newFilters: InsightsFilters) => {
+    setFilters(newFilters);
+  };
+
+  const handleReset = () => {
+    setFilters(resetFilters());
+  };
+
+  // Check if there's any data to show
+  const hasData = tasks.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Sticky Filter Bar */}
+      <InsightsFiltersView
+        filters={filters}
+        boards={boards}
+        onChange={handleFilterChange}
+        onReset={handleReset}
+        hasActiveFilters={activeFilters}
+      />
+
+      {/* Main Grid */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <StatsDashboard now={now} />
-        <InsightsPanel now={now} />
+        <StatsDashboard now={now} filters={filters} />
+        <InsightsPanel now={now} filters={filters} />
       </div>
 
-      {rows.length > 0 ? (
-        <section
-          aria-label="Tasks by category"
-          className="rounded-2xl border border-border/70 bg-card/70 p-5"
-        >
-          <h2 className="font-display text-lg tracking-tight">By category</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">Where your tasks live right now.</p>
-          <ul className="mt-4 space-y-3">
-            {rows.map(({ category, count, ratio }) => (
-              <li key={category.id} className="flex items-center gap-3">
-                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", category.dot)} />
-                <span className="w-24 shrink-0 truncate text-sm font-medium">{category.label}</span>
-                <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <span
-                    className={cn("block h-full rounded-full", category.dot)}
-                    style={{ width: `${Math.max(ratio * 100, 4)}%` }}
-                  />
-                </span>
-                <span className="w-6 shrink-0 text-right text-xs font-semibold text-muted-foreground tabular-nums">
-                  {count}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      {/* Productivity Charts (replaces "By category" section) */}
+      {hasData ? (
+        <ProductivityCharts tasks={tasks} filters={filters} boards={boards} now={now} />
+      ) : (
+        <div className="rounded-2xl border border-border/70 bg-card/70 p-5 text-center">
+          <p className="text-muted-foreground">No tasks yet. Create your first task to see insights.</p>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <QuickActions
+        tasks={tasks}
+        filters={filters}
+        boards={boards}
+        hasActiveFilters={activeFilters}
+        onReset={handleReset}
+      />
     </div>
   );
 }

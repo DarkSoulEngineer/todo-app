@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Database, Download, Trash2, Upload, type LucideIcon } from "lucide-react";
+import { Database, Download, Sparkles, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { useTasksContext } from "@/components/tasks-provider";
+import { SAMPLE_BOARDS, createSampleTasks } from "@/lib/sample";
 import { parseWorkspaceJson } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
@@ -104,6 +105,18 @@ export function DataMenu() {
     );
   }
 
+  function handleLoadSamples(): void {
+    setOpen(false);
+    const sampleTasks = createSampleTasks();
+    const before = snapshot();
+    restore({ tasks: sampleTasks, sections: before.sections, boards: SAMPLE_BOARDS });
+    toast.success(`Loaded ${sampleTasks.length} sample tasks`, {
+      description: "Example tasks with custom categories to explore boards and views.",
+      duration: 6000,
+      action: { label: "Undo", onClick: () => restore(before) },
+    });
+  }
+
   function handleClearAll(): void {
     setOpen(false);
     if (tasks.length === 0) return;
@@ -156,6 +169,7 @@ export function DataMenu() {
             }}
           />
           <div className="my-1 h-px bg-border" />
+          <MenuItem icon={Sparkles} label="Load sample tasks" onClick={handleLoadSamples} />
           <MenuItem icon={Trash2} label="Clear all tasks" onClick={handleClearAll} danger />
         </motion.div>
       ) : null}

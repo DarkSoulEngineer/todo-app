@@ -11,6 +11,8 @@ export interface SmartListDef {
 /** Ordered smart lists shown in the sidebar. */
 export const SMART_LISTS: SmartListDef[] = [
   { id: "today", label: "Today" },
+  { id: "tomorrow", label: "Tomorrow" },
+  { id: "thisWeek", label: "This week" },
   { id: "all", label: "All tasks" },
   { id: "completed", label: "Completed" },
   { id: "by-section", label: "By section" },
@@ -19,8 +21,27 @@ export const SMART_LISTS: SmartListDef[] = [
   { id: "canceled", label: "Canceled" },
 ];
 
+/**
+ * The time-based smart lists the sidebar collapses under one "Upcoming" group,
+ * in display order. Every other list stays a flat top-level row.
+ */
+export const TIME_GROUP_LISTS: readonly SmartList[] = [
+  "today",
+  "tomorrow",
+  "thisWeek",
+  "upcoming",
+  "overdue",
+];
+
+/** Aggregate badge count for the time group (today + tomorrow + this week + upcoming + overdue). */
+export function aggregateTimeCount(counts: SmartListCounts): number {
+  return TIME_GROUP_LISTS.reduce((total, id) => total + counts[id], 0);
+}
+
 const SMART_LABELS: Record<SmartList, string> = {
   today: "Today",
+  tomorrow: "Tomorrow",
+  thisWeek: "This week",
   upcoming: "Upcoming",
   overdue: "Overdue",
   all: "All tasks",
@@ -46,6 +67,10 @@ export function filterBySmartList(tasks: Task[], list: SmartList, now: Date): Ta
       return tasks;
     case "today":
       return tasks.filter((task) => !task.completed && !task.canceled && dueOnDay(task, now));
+    case "tomorrow":
+      return tasks.filter((task) => !task.completed && !task.canceled && bucketOf(task, now) === "tomorrow");
+    case "thisWeek":
+      return tasks.filter((task) => !task.completed && !task.canceled && bucketOf(task, now) === "thisWeek");
     case "upcoming":
       return tasks.filter((task) => deriveStatus(task, now) === "upcoming");
     case "overdue":
@@ -64,6 +89,8 @@ export type SmartListCounts = Record<SmartList, number>;
 export function countBySmartList(tasks: Task[], now: Date): SmartListCounts {
   const counts: SmartListCounts = {
     today: 0,
+    tomorrow: 0,
+    thisWeek: 0,
     upcoming: 0,
     overdue: 0,
     all: tasks.length,
@@ -82,6 +109,9 @@ export function countBySmartList(tasks: Task[], now: Date): SmartListCounts {
       continue;
     }
     if (dueOnDay(task, now)) counts.today += 1;
+    const bucket = bucketOf(task, now);
+    if (bucket === "tomorrow") counts.tomorrow += 1;
+    else if (bucket === "thisWeek") counts.thisWeek += 1;
     const status = deriveStatus(task, now);
     if (status === "upcoming" || status === "overdue") counts[status] += 1;
   }
@@ -104,6 +134,8 @@ const BUCKET_LABELS: Record<string, string> = {
 
 const LIST_BUCKETS: Record<SmartList, string[]> = {
   today: ["overdue", "today"],
+  tomorrow: ["tomorrow"],
+  thisWeek: ["thisWeek"],
   upcoming: ["today", "tomorrow", "thisWeek", "later", "none"],
   overdue: ["overdue"],
   all: ["overdue", "today", "tomorrow", "thisWeek", "later", "none", "completed", "canceled"],

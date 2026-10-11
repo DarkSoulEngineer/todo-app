@@ -1,25 +1,30 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { CalendarClock, Check, ListTodo, TriangleAlert, type LucideIcon } from "lucide-react";
+import { CalendarClock, Check, ListTodo, TriangleAlert, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
 import { Progress } from "@/components/ui/progress";
 import { useTasksContext } from "@/components/tasks-provider";
 import { computeStats } from "@/lib/tasks-selectors";
+import { deriveStatus } from "@/lib/status";
 import { cn } from "@/lib/utils";
+import type { Task } from "@/lib/types";
+import type { InsightsFilters } from "@/lib/insights-filters";
 
 interface StatsDashboardProps {
   now: Date;
+  filters: InsightsFilters;
 }
 
 interface TileProps {
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   label: string;
   value: number;
   tone: string;
+  change?: number | null;
 }
 
-function StatTile({ icon: Icon, label, value, tone }: TileProps) {
+function StatTile({ icon: Icon, label, value, tone, change }: TileProps) {
   return (
     <div className="rounded-2xl border border-border/70 bg-muted/40 p-3">
       <div className={cn("mb-2 inline-flex h-7 w-7 items-center justify-center rounded-lg", tone)}>
@@ -27,19 +32,108 @@ function StatTile({ icon: Icon, label, value, tone }: TileProps) {
       </div>
       <p className="font-display text-2xl leading-none tabular-nums">{value}</p>
       <p className="mt-1 text-xs font-medium text-muted-foreground">{label}</p>
+      {change !== null && change !== undefined && (
+        <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          <TrendingUp className="h-3 w-3" strokeWidth={2.8} />
+          <span className="tabular-nums">{change > 0 ? "+" : ""}{change}%</span>
+          <span className="text-muted-foreground">vs prev</span>
+        </p>
+      )}
     </div>
   );
 }
 
-export function StatsDashboard({ now }: StatsDashboardProps) {
+function computeFilteredStats(tasks: Task[], filters: InsightsFilters, now: Date) {
+  const filtered = tasks.filter((task) => {
+    // Board filter
+    if (filters.boardId !== "all" && task.category !== filters.boardId) return false;
+    // Status filter
+    if (filters.status !== "all") {
+      const status = deriveStatus(task, now);
+      if (filters.status !== status) return false;
+    }
+    // Priority filter
+    if (filters.priority !== "all" && task.priority !== filters.priority) return false;
+    return true;
+  });
+
+  return computeStats(filtered, now);
+}
+
+function computePreviousPeriodStats(tasks: Task[], filters: InsightsFilters, now: Date, days: number) {
+  const currentStart = new Date(now);
+  currentStart.setDate(currentStart.getDate() - (days - 1));
+  const currentEnd = new Date(now);
+  currentEnd.setHours(23, 59, 59, 999);
+
+  const prevEnd = new Date(currentStart);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  prevEnd.setHours(23, 59, 59, 999);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - (days - 1));
+  prevStart.setHours(0, 0, 0, 0);
+
+  // Filter tasks completed in previous window
+  const prevTasks = tasks.filter((task) => {
+    if (!task.completed || !task.completedAt) return false;
+    const completedDate = new Date(task.completedAt);
+    return completedDate >= prevStart && completedDate <= prevEnd;
+  });
+
+  // Also apply board/priority filters
+  const filtered = prevTasks.filter((task) => {
+    if (filters.boardId !== "all" && task.category !== filters.boardId) return false;
+    if (filters.priority !== "all" && task.priority !== filters.priority) return false;
+    return true;
+  });
+
+  return computeStats(filtered, new Date(prevEnd));
+}
+
+export function StatsDashboard({ now, filters }: StatsDashboardProps) {
   const { tasks } = useTasksContext();
   const reduceMotion = useReducedMotion();
-  const stats = useMemo(() => computeStats(tasks, now), [tasks, now]);
 
-  const percent = Math.round(stats.completionRate * 100);
+  const days = useMemo(() => {
+    switch (filters.dateRange) {
+      case "7d":
+        return 7;
+      case "30d":
+        return 30;
+      case "90d":
+        return 90;
+      case "custom":
+        if (filters.customStart && filters.customEnd) {
+          const diff = filters.customEnd.getTime() - filters.customStart.getTime();
+          return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
+        }
+        return 7;
+      default:
+        return 7;
+    }
+  }, [filters]);
+
+  const currentStats = useMemo(() => computeFilteredStats(tasks, filters, now), [tasks, filters, now]);
+  const previousStats = useMemo(() => computePreviousPeriodStats(tasks, filters, now, days), [tasks, filters, now, days]);
+
+  const percent = Math.round(currentStats.completionRate * 100);
+  const prevPercent = Math.round(previousStats.completionRate * 100);
+  const completionChange = prevPercent === 0 ? (percent > 0 ? 100 : null) : Math.round(((percent - prevPercent) / prevPercent) * 100);
+
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - stats.completionRate);
+  const dashOffset = circumference * (1 - currentStats.completionRate);
+
+  // Compute tile values with period comparison
+  const overdueChange = previousStats.overdue === 0 ? (currentStats.overdue > 0 ? 100 : null) : Math.round(((currentStats.overdue - previousStats.overdue) / previousStats.overdue) * 100);
+  const upcomingChange = previousStats.upcoming === 0 ? (currentStats.upcoming > 0 ? 100 : null) : Math.round(((currentStats.upcoming - previousStats.upcoming) / previousStats.upcoming) * 100);
+  const completedChange = previousStats.completed === 0 ? (currentStats.completed > 0 ? 100 : null) : Math.round(((currentStats.completed - previousStats.completed) / previousStats.completed) * 100);
+  const totalChange = previousStats.total === 0 ? (currentStats.total > 0 ? 100 : null) : Math.round(((currentStats.total - previousStats.total) / previousStats.total) * 100);
+
+  // Average per day
+  const avgPerDay = days > 0 ? Math.round(currentStats.completed / days) : 0;
+  const prevAvgPerDay = days > 0 ? Math.round(previousStats.completed / days) : 0;
+  const avgChange = prevAvgPerDay === 0 ? (avgPerDay > 0 ? 100 : null) : Math.round(((avgPerDay - prevAvgPerDay) / prevAvgPerDay) * 100);
 
   return (
     <section
@@ -82,10 +176,16 @@ export function StatsDashboard({ now }: StatsDashboardProps) {
               Completion
             </p>
             <p className="mt-1 font-display text-2xl leading-tight">
-              {stats.completed}/{stats.total} done
+              {currentStats.completed}/{currentStats.total} done
+              {completionChange !== null && (
+                <span className="ml-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="h-3.5 w-3.5" strokeWidth={2.8} />
+                  {completionChange > 0 ? "+" : ""}{completionChange}%
+                </span>
+              )}
             </p>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {stats.active} open · {stats.canceled} canceled
+              {currentStats.active} open · {currentStats.canceled} canceled
             </p>
           </div>
         </div>
@@ -94,26 +194,37 @@ export function StatsDashboard({ now }: StatsDashboardProps) {
           <StatTile
             icon={TriangleAlert}
             label="Overdue"
-            value={stats.overdue}
+            value={currentStats.overdue}
             tone="bg-red-500/12 text-red-600 dark:text-red-400"
+            change={overdueChange}
           />
           <StatTile
             icon={CalendarClock}
             label="Upcoming"
-            value={stats.upcoming}
+            value={currentStats.upcoming}
             tone="bg-sky-500/12 text-sky-600 dark:text-sky-400"
+            change={upcomingChange}
           />
           <StatTile
             icon={Check}
             label="Completed"
-            value={stats.completed}
+            value={currentStats.completed}
             tone="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+            change={completedChange}
           />
           <StatTile
             icon={ListTodo}
             label="Total tasks"
-            value={stats.total}
+            value={currentStats.total}
             tone="bg-primary/12 text-primary"
+            change={totalChange}
+          />
+          <StatTile
+            icon={CalendarClock}
+            label="Avg/day"
+            value={avgPerDay}
+            tone="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+            change={avgChange}
           />
         </div>
       </div>
@@ -123,7 +234,7 @@ export function StatsDashboard({ now }: StatsDashboardProps) {
           <span>Overall progress</span>
           <span className="tabular-nums">{percent}% complete</span>
         </div>
-        <Progress value={stats.completionRate} label="Overall completion" />
+        <Progress value={currentStats.completionRate} label="Overall completion" />
       </div>
     </section>
   );

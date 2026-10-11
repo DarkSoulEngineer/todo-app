@@ -10,7 +10,7 @@ import {
 } from "@/lib/boards";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overdueAt, rescheduleToNextDay } from "@/lib/datetime";
-import { createSampleTasks } from "@/lib/sample";
+import { createSampleTasks, SAMPLE_BOARDS } from "@/lib/sample";
 import { isCustomSection, isStatusSection } from "@/lib/sections";
 import { loadWorkspace, saveWorkspace } from "@/lib/storage";
 import { applyDraft, createTask } from "@/lib/task-factory";
@@ -481,7 +481,11 @@ export function useTasks(): TasksApi {
   }, []);
 
   const loadSample = useCallback(() => {
-    setTasks(createSampleTasks());
+    const samples = createSampleTasks();
+    setTasks(samples);
+    // Install the sample boards too (built-ins + custom demo categories), so
+    // custom categories are visible on the loaded example tasks.
+    setBoards(SAMPLE_BOARDS);
   }, []);
 
   return useMemo(

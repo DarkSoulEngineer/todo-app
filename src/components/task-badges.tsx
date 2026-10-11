@@ -3,6 +3,8 @@
 import { Clock } from "lucide-react";
 import { Chip } from "@/components/ui/chip";
 import { getCategory } from "@/lib/categories";
+import { boardColor } from "@/lib/boards";
+import { useTasksContext } from "@/components/tasks-provider";
 import { PRIORITY_META } from "@/lib/constants";
 import { deriveStatus, describeDue, STATUS_META } from "@/lib/status";
 import type { Priority, Task } from "@/lib/types";
@@ -19,12 +21,19 @@ export function PriorityPill({ priority }: { priority: Priority }) {
 }
 
 export function CategoryPill({ categoryId }: { categoryId: string }) {
-  const category = getCategory(categoryId);
-  if (!category) return null;
+  const { boards } = useTasksContext();
+  // Resolve from the user's boards first (includes custom boards); fall back
+  // to the built-in category map for safety when a board is missing.
+  const board = boards.find((entry) => entry.id === categoryId) ?? null;
+  const builtIn = board ? null : getCategory(categoryId);
+  const pill = board ? boardColor(board.color).pill : builtIn?.pill;
+  const dot = board ? boardColor(board.color).dot : builtIn?.dot;
+  const label = board?.label ?? builtIn?.label;
+  if (!pill || !dot || !label) return null;
   return (
-    <Chip className={cn("gap-1.5 ring-inset", category.pill)}>
-      <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", category.dot)} />
-      {category.label}
+    <Chip className={cn("gap-1.5 ring-inset", pill)}>
+      <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", dot)} />
+      {label}
     </Chip>
   );
 }

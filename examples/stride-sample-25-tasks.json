@@ -1,0 +1,542 @@
+{
+  "app": "Stride",
+  "version": 2,
+  "exportedAt": "2026-10-11T10:00:00.000Z",
+  "tasks": [
+    {
+      "id": "sample-01",
+      "title": "Ship the quarterly report",
+      "description": "Pull the final numbers, proof the narrative, and send it to the team.",
+      "dueAt": "2026-10-10T04:00:00.000Z",
+      "priority": "high",
+      "category": "work",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [
+        {
+          "id": "sample-01-sub-01",
+          "title": "Collect metrics from the dashboard",
+          "done": true
+        },
+        {
+          "id": "sample-01-sub-02",
+          "title": "Write the summary",
+          "done": true
+        },
+        {
+          "id": "sample-01-sub-03",
+          "title": "Share for review",
+          "done": false
+        }
+      ],
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "updatedAt": "2026-10-08T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-02",
+      "title": "Renew the gym membership",
+      "description": "",
+      "dueAt": "2026-10-11T05:00:00.000Z",
+      "priority": "medium",
+      "category": "health",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "updatedAt": "2026-10-08T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-03",
+      "title": "Draft the design review notes",
+      "description": "Summarize feedback from the usability session.",
+      "dueAt": "2026-10-11T16:00:00.000Z",
+      "priority": "medium",
+      "category": "design",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [
+        {
+          "id": "sample-03-sub-01",
+          "title": "Re-read the session recording",
+          "done": false
+        },
+        {
+          "id": "sample-03-sub-02",
+          "title": "Group findings by theme",
+          "done": false
+        }
+      ],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-04",
+      "title": "Order groceries for the week",
+      "description": "Focus on produce and a couple of easy dinners.",
+      "dueAt": "2026-10-12T14:00:00.000Z",
+      "priority": "low",
+      "category": "errands",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-05",
+      "title": "Finish the Next.js course module",
+      "description": "",
+      "dueAt": "2026-10-14T14:00:00.000Z",
+      "priority": "low",
+      "category": "learning",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-06",
+      "title": "Book the dentist appointment",
+      "description": "Every six months — it has been a while.",
+      "dueAt": "2026-10-03T02:00:00.000Z",
+      "priority": "medium",
+      "category": "family",
+      "completed": true,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "updatedAt": "2026-10-08T10:00:00.000Z",
+      "completedAt": "2026-10-09T10:00:00.000Z"
+    },
+    {
+      "id": "sample-07",
+      "title": "Plan the weekend trip",
+      "description": "Decided to stay local this month instead.",
+      "dueAt": "2026-10-11T10:00:00.000Z",
+      "priority": "low",
+      "category": "family",
+      "completed": false,
+      "canceled": true,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-08",
+      "title": "Urgent: fix the login bug before the demo",
+      "description": "Auth fails on Safari after the last deploy.",
+      "dueAt": "2026-10-11T13:00:00.000Z",
+      "priority": "high",
+      "category": "side-project",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [
+        {
+          "id": "sample-08-sub-01",
+          "title": "Reproduce on Safari",
+          "done": true
+        },
+        {
+          "id": "sample-08-sub-02",
+          "title": "Patch the session handler",
+          "done": false
+        },
+        {
+          "id": "sample-08-sub-03",
+          "title": "Smoke-test the demo flow",
+          "done": false
+        }
+      ],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-09",
+      "title": "Team standup — prep the agenda",
+      "description": "Keep it to five talking points.",
+      "dueAt": "2026-10-12T06:00:00.000Z",
+      "priority": "medium",
+      "category": "work",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-10",
+      "title": "Pay the electricity bill",
+      "description": "Due in two days, avoid the service fee.",
+      "dueAt": "2026-10-09T08:00:00.000Z",
+      "priority": "high",
+      "category": null,
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "updatedAt": "2026-10-08T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-11",
+      "title": "Send follow-up email to the professor",
+      "description": "Thanks for the feedback on the proposal.",
+      "dueAt": "2026-10-11T18:00:00.000Z",
+      "priority": "medium",
+      "category": "learning",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-12",
+      "title": "Buy a birthday gift for Ana",
+      "description": "She loves coffee — a nice mug, maybe.",
+      "dueAt": "2026-10-13T12:00:00.000Z",
+      "priority": "medium",
+      "category": "errands",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-13",
+      "title": "Book flights and hotel for Prague",
+      "description": "Check visa requirements before paying.",
+      "dueAt": "2026-10-17T16:00:00.000Z",
+      "priority": "high",
+      "category": null,
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [
+        {
+          "id": "sample-13-sub-01",
+          "title": "Compare flight prices",
+          "done": true
+        },
+        {
+          "id": "sample-13-sub-02",
+          "title": "Reserve the hotel",
+          "done": false
+        },
+        {
+          "id": "sample-13-sub-03",
+          "title": "Check visa requirements",
+          "done": false
+        }
+      ],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-14",
+      "title": "Clean the apartment and do laundry",
+      "description": "Tenant inspection at the end of the month.",
+      "dueAt": "2026-10-11T22:00:00.000Z",
+      "priority": "low",
+      "category": "home",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-15",
+      "title": "Gym workout — leg day",
+      "description": "Squats, lunges and a light run.",
+      "dueAt": "2026-10-12T16:00:00.000Z",
+      "priority": "medium",
+      "category": "health",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-16",
+      "title": "Study for the final exam",
+      "description": "Focus on chapters 4–7 and past papers.",
+      "dueAt": "2026-10-15T10:00:00.000Z",
+      "priority": "high",
+      "category": "learning",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [
+        {
+          "id": "sample-16-sub-01",
+          "title": "Review lecture notes",
+          "done": false
+        },
+        {
+          "id": "sample-16-sub-02",
+          "title": "Solve the practice set",
+          "done": false
+        }
+      ],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-17",
+      "title": "Call the client about the contract",
+      "description": "Confirm the delivery schedule for Q4.",
+      "dueAt": "2026-10-11T15:00:00.000Z",
+      "priority": "medium",
+      "category": "work",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-18",
+      "title": "Submit the thesis draft to the advisor",
+      "description": "Include the updated bibliography.",
+      "dueAt": "2026-10-08T07:00:00.000Z",
+      "priority": "high",
+      "category": "learning",
+      "completed": true,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "updatedAt": "2026-10-08T10:00:00.000Z",
+      "completedAt": "2026-10-09T10:00:00.000Z"
+    },
+    {
+      "id": "sample-19",
+      "title": "Pay the credit card — avoid the late fee",
+      "description": "",
+      "dueAt": "2026-10-13T02:00:00.000Z",
+      "priority": "high",
+      "category": null,
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-20",
+      "title": "Read two chapters of the book",
+      "description": "The chapter on distributed systems.",
+      "dueAt": "2026-10-13T22:00:00.000Z",
+      "priority": "low",
+      "category": "learning",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-21",
+      "title": "Renew passport for the summer trip",
+      "description": "Processing takes up to six weeks.",
+      "dueAt": "2026-10-19T18:00:00.000Z",
+      "priority": "low",
+      "category": "errands",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-22",
+      "title": "Fix the leaky kitchen faucet",
+      "description": "Replace the cartridge and the seals.",
+      "dueAt": "2026-10-08T12:00:00.000Z",
+      "priority": "medium",
+      "category": "home",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "updatedAt": "2026-10-08T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-23",
+      "title": "Prepare the slides for the presentation",
+      "description": "Nine slides: context, findings, next steps.",
+      "dueAt": "2026-10-12T10:00:00.000Z",
+      "priority": "high",
+      "category": "design",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [
+        {
+          "id": "sample-23-sub-01",
+          "title": "Sketch the outline",
+          "done": true
+        },
+        {
+          "id": "sample-23-sub-02",
+          "title": "Add the charts",
+          "done": false
+        },
+        {
+          "id": "sample-23-sub-03",
+          "title": "Rehearse the talk",
+          "done": false
+        }
+      ],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-24",
+      "title": "Refill the prescription at the pharmacy",
+      "description": "",
+      "dueAt": "2026-10-11T17:00:00.000Z",
+      "priority": "medium",
+      "category": "health",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    },
+    {
+      "id": "sample-25",
+      "title": "Balance the monthly budget",
+      "description": "Compare spending against the plan.",
+      "dueAt": "2026-10-15T04:00:00.000Z",
+      "priority": "medium",
+      "category": "personal",
+      "completed": false,
+      "canceled": false,
+      "sectionId": null,
+      "subtasks": [],
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "updatedAt": "2026-10-10T10:00:00.000Z",
+      "completedAt": null
+    }
+  ],
+  "sections": [
+    {
+      "id": "status-upcoming",
+      "title": "Upcoming",
+      "status": "upcoming"
+    },
+    {
+      "id": "status-overdue",
+      "title": "Overdue",
+      "status": "overdue"
+    },
+    {
+      "id": "status-completed",
+      "title": "Completed",
+      "status": "completed"
+    },
+    {
+      "id": "status-canceled",
+      "title": "Canceled",
+      "status": "canceled"
+    }
+  ],
+  "boards": [
+    {
+      "id": "work",
+      "label": "Work",
+      "color": "cyan"
+    },
+    {
+      "id": "personal",
+      "label": "Personal",
+      "color": "pink"
+    },
+    {
+      "id": "shopping",
+      "label": "Shopping",
+      "color": "orange"
+    },
+    {
+      "id": "health",
+      "label": "Health",
+      "color": "teal"
+    },
+    {
+      "id": "learning",
+      "label": "Learning",
+      "color": "lime"
+    },
+    {
+      "id": "home",
+      "label": "Home",
+      "color": "indigo"
+    },
+    {
+      "id": "design",
+      "label": "Design",
+      "color": "violet"
+    },
+    {
+      "id": "errands",
+      "label": "Errands",
+      "color": "amber"
+    },
+    {
+      "id": "side-project",
+      "label": "Side project",
+      "color": "cyan"
+    },
+    {
+      "id": "family",
+      "label": "Family",
+      "color": "pink"
+    }
+  ]
+}

@@ -22,6 +22,7 @@ import { SubtaskList } from "@/components/subtask-list";
 import { CategoryPill, DueBadge, PriorityPill, StatusPill } from "@/components/task-badges";
 import { TaskTooltip } from "@/components/task-tooltip";
 import { useTasksContext } from "@/components/tasks-provider";
+import { CARD_COLOR_WASHES, detectCardTheme, UPCOMING_WASH } from "@/lib/card-themes";
 import { deriveStatus } from "@/lib/status";
 import { isCustomSection } from "@/lib/sections";
 import type { Task, BoardSection, TaskStatus } from "@/lib/types";
@@ -82,11 +83,17 @@ const TITLE_SELECTOR = "[data-card-title]";
 /** Interactive descendants that own their own double-click behaviour. */
 const INTERACTIVE_TARGET = "button, input, textarea, a, select, [role='menu']";
 
-/** Leading accent rail so overdue / completed / canceled read at a glance. */
+/**
+ * Leading accent rail so overdue / completed / canceled read at a glance.
+ *
+ * CANONICAL RAIL: every rail — status here, theme rails in `card-themes.ts` —
+ * uses the same alpha ladder `from-{hue}-500/70 via-{hue}-500/45 to-{hue}-500/10`.
+ * Canceled sits on slate-500 so the whole system shares the 500 hue scale.
+ */
 function statusRail(task: Task, status: TaskStatus): string | null {
-  if (task.canceled) return "from-slate-400/70 via-slate-400/45 to-slate-400/10";
-  if (task.completed) return "from-emerald-500/75 via-emerald-500/50 to-emerald-500/15";
-  if (status === "overdue") return "from-red-500/80 via-red-500/55 to-red-500/15";
+  if (task.canceled) return "from-slate-500/70 via-slate-500/45 to-slate-500/10";
+  if (task.completed) return "from-emerald-500/70 via-emerald-500/45 to-emerald-500/10";
+  if (status === "overdue") return "from-red-500/70 via-red-500/45 to-red-500/10";
   return null;
 }
 
@@ -594,7 +601,7 @@ export function TaskCard({
   reorderTotal,
   onReorder,
 }: TaskCardProps) {
-  const { toggleComplete, toggleCancel, deleteTask, snapshot, restore } = useTasksContext();
+  const { toggleComplete, toggleCancel, deleteTask, snapshot, restore, boards } = useTasksContext();
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(task.title);
@@ -717,7 +724,32 @@ export function TaskCard({
   const status = deriveStatus(task, now);
   const settled = task.completed || task.canceled;
   const totalSubtasks = task.subtasks.length;
-  const rail = statusRail(task, status);
+
+  // Keyword theme (additive, secondary to status). Memoized so the cheap scan
+  // only reruns when the text it reads actually changes.
+  const theme = useMemo(
+    () => detectCardTheme(task.title, task.description),
+    [task.title, task.description],
+  );
+
+  // The board behind task.category, when that board still exists.
+  const board = boards?.find((entry) => entry.id === task.category) ?? null;
+
+  // Wash precedence (the gradient source only — the accent rail and themed
+  // border below stay keyword-driven):
+  //   canceled            → neutral ambient wash (set aside never reads as happy)
+  //   board category      → that board's wash, even when a theme also matched
+  //   no category + theme → keyword theme wash
+  //   none of the above   → UPCOMING_WASH (subtle blue, the plain-card default)
+  const wash = task.canceled
+    ? null
+    : board
+      ? CARD_COLOR_WASHES[board.color]
+      : (theme?.wash ?? UPCOMING_WASH);
+
+  // Precedence: a status rail (overdue/completed/canceled) always wins; the
+  // theme rail only shows on otherwise-plain cards.
+  const rail = statusRail(task, status) ?? theme?.accent ?? null;
 
   // Section navigation (list and board surfaces; needs sections + assignment).
   const navigableSections = useMemo(
@@ -742,10 +774,13 @@ export function TaskCard({
     compact
       ? "gap-2.5 p-2.5 hover:border-primary/25 hover:shadow-md"
       : "gap-3.5 p-4 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
+    // Theme border is secondary: it only tints plain (upcoming) cards, and sits
+    // before the status / selection / drag states so those still win in cn().
+    theme && !settled && status !== "overdue" && theme.border,
     status === "overdue" && !settled && "border-red-500/35 hover:border-red-500/50",
     task.completed && "border-emerald-500/35 hover:border-emerald-500/50",
     dragging && "scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
-    task.canceled && "border-dashed border-slate-400/45 bg-muted/40 hover:border-slate-400/70",
+    task.canceled && "border-dashed border-slate-500/35 bg-muted/40 hover:border-slate-500/50",
     selected && "border-primary/40 bg-primary/[0.04] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
     highlighted && "border-primary/40 bg-primary/[0.05]",
     pulse === "complete" && "animate-pulse ring-2 ring-emerald-500/50",
@@ -771,11 +806,21 @@ export function TaskCard({
         <SelectionIndicator task={task} selected={selected} onSelect={onSelect} />
       )}
       <div className={cardClassName}>
-        {/* Ambient depth: a soft primary wash anchored to the top-left corner. */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(115%_95%_at_0%_0%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_62%)]"
-        />
+        {/* Ambient depth: a soft wash layer under the content. The source follows
+            the wash precedence — a board category outranks the keyword theme;
+            plain cards get UPCOMING_WASH; only canceled cards keep the neutral
+            ambient wash. */}
+        {wash ? (
+          <span
+            aria-hidden="true"
+            className={cn("pointer-events-none absolute inset-0 rounded-2xl", wash)}
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(115%_95%_at_0%_0%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_62%)]"
+          />
+        )}
         {rail ? (
           <span
             aria-hidden="true"

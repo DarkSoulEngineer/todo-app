@@ -1,13 +1,15 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
-import React from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import React, { useEffect, useState } from "react";
 import {
   Ban,
   BarChart3,
   CalendarClock,
   CalendarDays,
+  CalendarRange,
   Check,
+  ChevronRight,
   Hash,
   Keyboard,
   ListChecks,
@@ -23,13 +25,15 @@ import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getBoardColorByLabel } from "@/lib/boards";
 import { getCategory } from "@/lib/categories";
-import { SMART_LISTS, type SmartListCounts } from "@/lib/smart-lists";
+import { aggregateTimeCount, SMART_LISTS, TIME_GROUP_LISTS, type SmartListCounts } from "@/lib/smart-lists";
 import type { TaskStats } from "@/lib/tasks-selectors";
 import type { BoardSection, SmartList, ViewMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const LIST_ICONS: Record<SmartList, LucideIcon> = {
   today: Sun,
+  tomorrow: CalendarDays,
+  thisWeek: CalendarRange,
   upcoming: CalendarClock,
   overdue: TriangleAlert,
   all: ListChecks,
@@ -96,6 +100,21 @@ export function Sidebar({
 }: SidebarProps) {
   const onLists = viewMode === "list" || viewMode === "board";
 
+  // The five time-based lists collapse under one "Upcoming" group; the other
+  // four stay flat. Both orderings follow SMART_LISTS.
+  const timeLists = SMART_LISTS.filter((def) => TIME_GROUP_LISTS.includes(def.id));
+  const flatLists = SMART_LISTS.filter((def) => !TIME_GROUP_LISTS.includes(def.id));
+  const timeCount = aggregateTimeCount(counts);
+  const timeActive = onLists && TIME_GROUP_LISTS.includes(smartList);
+  const [timeOpen, setTimeOpen] = useState(timeActive);
+  const reduceMotion = useReducedMotion();
+
+  // Auto-open when the active list enters the group. A manual collapse on the
+  // chevron is respected until the active list leaves the group and returns.
+  useEffect(() => {
+    if (timeActive) setTimeOpen(true);
+  }, [timeActive]);
+
   return (
     <aside
       className={cn(
@@ -134,7 +153,63 @@ export function Sidebar({
               Lists
             </p>
           ) : null}
-          {SMART_LISTS.map((def) => (
+
+          {/* Time group — one collapsible parent over the five date lists. */}
+          {collapsed ? (
+            <NavItem
+              icon={CalendarClock}
+              label="Upcoming"
+              count={counts.upcoming}
+              active={onLists && smartList === "upcoming"}
+              collapsed
+              layoutId={`${idPrefix}-smart-pill`}
+              onClick={() => onSelectList("upcoming")}
+            />
+          ) : (
+            <>
+              <TimeGroupRow
+                label="Upcoming"
+                icon={CalendarClock}
+                count={timeCount}
+                active={timeActive}
+                open={timeOpen}
+                layoutId={`${idPrefix}-time-pill`}
+                controlsId={`${idPrefix}-time-children`}
+                onToggle={() => setTimeOpen((open) => !open)}
+              />
+              <AnimatePresence initial={false}>
+                {timeOpen ? (
+                  <motion.div
+                    key="time-children"
+                    id={`${idPrefix}-time-children`}
+                    initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: "easeOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-0.5 pl-3">
+                      {timeLists.map((def) => (
+                        <NavItem
+                          key={def.id}
+                          icon={LIST_ICONS[def.id]}
+                          label={def.label}
+                          count={counts[def.id]}
+                          active={onLists && smartList === def.id}
+                          collapsed={false}
+                          layoutId={`${idPrefix}-smart-pill`}
+                          onClick={() => onSelectList(def.id)}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </>
+          )}
+
+          {/* Flat lists — always a single click away. */}
+          {flatLists.map((def) => (
             <NavItem
               key={def.id}
               icon={LIST_ICONS[def.id]}
@@ -325,14 +400,18 @@ function NavItem({ icon: Icon, label, count, active, collapsed, layoutId, onClic
           transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
         />
       ) : null}
-      {typeof Icon === "function" ? (
+      {React.isValidElement(Icon) ? (
+        <span className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}>
+          {Icon}
+        </span>
+      ) : typeof Icon === "function" || (Icon && typeof Icon === "object" && "$$typeof" in Icon) ? (
         <Icon
           className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}
           strokeWidth={2.2}
         />
       ) : (
         <span className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}>
-          {React.isValidElement(Icon) ? Icon : <span>{Icon}</span>}
+          <span>{Icon}</span>
         </span>
       )}
       {!collapsed ? <span className="relative flex-1 truncate text-left">{label}</span> : null}
@@ -342,6 +421,70 @@ function NavItem({ icon: Icon, label, count, active, collapsed, layoutId, onClic
       {collapsed && count !== undefined && count > 0 ? (
         <span className="absolute top-1.5 right-2 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
       ) : null}
+    </button>
+  );
+}
+
+interface TimeGroupRowProps {
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  /** True when the current smart list lives inside the group. */
+  active: boolean;
+  open: boolean;
+  layoutId: string;
+  controlsId: string;
+  onToggle: () => void;
+}
+
+/**
+ * Collapsible parent row for the time group. Unlike `NavItem` it navigates
+ * nowhere — it toggles its child rows and lights up while one of them is the
+ * active list. It carries its own pill `layoutId` so it never cross-animates
+ * with the child pills.
+ */
+function TimeGroupRow({
+  icon: Icon,
+  label,
+  count,
+  active,
+  open,
+  layoutId,
+  controlsId,
+  onToggle,
+}: TimeGroupRowProps) {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={controlsId}
+      className={cn(
+        "focus-ring relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
+        active ? "text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      {active ? (
+        <motion.span
+          layoutId={layoutId}
+          className="absolute inset-0 rounded-xl bg-primary/10 ring-1 ring-inset ring-primary/20"
+          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
+        />
+      ) : null}
+      <Icon className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")} strokeWidth={2.2} />
+      <span className="relative flex-1 truncate text-left">{label}</span>
+      {count > 0 ? (
+        <span className="relative text-xs text-muted-foreground tabular-nums">{count}</span>
+      ) : null}
+      <ChevronRight
+        className={cn(
+          "relative h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+          open && "rotate-90",
+        )}
+        strokeWidth={2.2}
+      />
     </button>
   );
 }

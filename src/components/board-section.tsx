@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -23,6 +24,7 @@ import {
 import { createPortal } from "react-dom";
 import { BoardCard } from "@/components/board-card";
 import { useTasksContext } from "@/components/tasks-provider";
+import { groupForList } from "@/lib/smart-lists";
 import { STATUS_META } from "@/lib/status";
 import { getBoardColorByLabel } from "@/lib/boards";
 import type { BoardSection, Task } from "@/lib/types";
@@ -66,6 +68,31 @@ export function BoardSectionColumn({
 
   const orderedIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
 
+  /**
+   * Upcoming column only: partition the flat card list into date buckets
+   * (Today / Tomorrow / This week / Later / No due date). `groupForList` keeps
+   * the list order inside each bucket, so the buckets never reorder or drop
+   * cards — the grouped count always equals tasks.length. Other columns stay
+   * flat, exactly as before.
+   */
+  const groups = useMemo(
+    () => (section.status === "upcoming" ? groupForList(tasks, "upcoming", now) : null),
+    [tasks, now, section.status],
+  );
+
+  /** One card with its FLAT column index, as the manual reorder arrows expect. */
+  const renderCard = (task: Task, index: number) => (
+    <BoardCard
+      key={task.id}
+      task={task}
+      now={now}
+      onEdit={onEdit}
+      reorderIndex={reorderable ? index : undefined}
+      reorderTotal={reorderable ? tasks.length : undefined}
+      onReorder={reorderable ? handleReorder : undefined}
+    />
+  );
+
   /** Swaps a card with its neighbour inside this column (manual order only). */
   function handleReorder(taskId: string, direction: "up" | "down"): void {
     const from = orderedIds.indexOf(taskId);
@@ -91,22 +118,38 @@ export function BoardSectionColumn({
         isDragging && "opacity-50",
       )}
     >
-      <header className="flex items-center gap-1.5 px-0.5">
-        <button
-          ref={setActivatorNodeRef}
-          {...attributes}
-          {...listeners}
-          aria-label={`Reorder ${section.title}`}
-          title="Drag to reorder"
-          className="focus-ring grid h-7 w-7 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+      <header className="flex flex-col gap-1.5 px-0.5">
+        {/* Row 1 — column controls: drag grip, icon chip, count badge, menu. */}
+        <div className="flex items-center gap-1.5">
+          <button
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            aria-label={`Reorder ${section.title}`}
+            title="Drag to reorder"
+            className="focus-ring grid h-7 w-7 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
 
-        <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg ring-1 ring-inset", chip)}>
-          {Icon ? <Icon className="h-4 w-4" strokeWidth={2.4} /> : null}
-        </span>
+          <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg ring-1 ring-inset", chip)}>
+            {Icon ? <Icon className="h-4 w-4" strokeWidth={2.4} /> : null}
+          </span>
 
+          <span className="ml-auto shrink-0 rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums ring-1 ring-inset ring-border">
+            {tasks.length}
+          </span>
+
+          <SectionMenu
+            section={section}
+            onRename={() => onStartRename(section.id)}
+            onDelete={() => onDelete(section.id)}
+            onHide={() => onHide(section.id)}
+          />
+        </div>
+
+        {/* Row 2 — the title spans the full column width, so it keeps many more
+            letters before truncating; the rename editor takes the same slot. */}
         {editing ? (
           <SectionTitleEditor
             title={section.title}
@@ -114,21 +157,10 @@ export function BoardSectionColumn({
             onCancel={onCancelRename}
           />
         ) : (
-          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={section.title}>
+          <h2 className="w-full min-w-0 truncate text-sm font-semibold" title={section.title}>
             {section.title}
           </h2>
         )}
-
-        <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums ring-1 ring-inset ring-border">
-          {tasks.length}
-        </span>
-
-        <SectionMenu
-          section={section}
-          onRename={() => onStartRename(section.id)}
-          onDelete={() => onDelete(section.id)}
-          onHide={() => onHide(section.id)}
-        />
       </header>
 
       <div className="flex min-w-0 flex-col gap-2.5">
@@ -137,17 +169,24 @@ export function BoardSectionColumn({
             Drop cards here
           </p>
         ) : null}
-        {tasks.map((task, index) => (
-          <BoardCard
-            key={task.id}
-            task={task}
-            now={now}
-            onEdit={onEdit}
-            reorderIndex={reorderable ? index : undefined}
-            reorderTotal={reorderable ? tasks.length : undefined}
-            onReorder={reorderable ? handleReorder : undefined}
-          />
-        ))}
+        {groups ? (
+          groups.map((group) => (
+            <Fragment key={group.id}>
+              {/* Passive date-bucket divider — quieter than the column title. */}
+              <div className="mt-1 flex items-center gap-1.5 border-b border-border/70 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                <span>{group.label}</span>
+                <span className="shrink-0 rounded-full bg-card px-1.5 text-[10px] font-semibold tabular-nums text-muted-foreground ring-1 ring-inset ring-border">
+                  {group.tasks.length}
+                </span>
+              </div>
+              {/* Buckets preserve flat column order, so an identity lookup
+                  yields each card's exact index for the reorder arrows. */}
+              {group.tasks.map((task) => renderCard(task, tasks.indexOf(task)))}
+            </Fragment>
+          ))
+        ) : (
+          tasks.map((task, index) => renderCard(task, index))
+        )}
       </div>
 
       <SectionComposer title={section.title} onAdd={(title) => onAddCard(section.id, title)} />
@@ -175,7 +214,7 @@ function SectionTitleEditor({
 
   return (
     <form
-      className="min-w-0 flex-1"
+      className="w-full min-w-0"
       onSubmit={(event: FormEvent) => {
         event.preventDefault();
         skipBlur.current = true;
