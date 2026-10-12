@@ -1,8 +1,24 @@
 "use client";
 
 import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import {
   Check,
   FileSearch,
+  GripVertical,
   LayoutGrid,
   ListChecks,
   Plus,
@@ -38,6 +54,9 @@ type ManagerDialog = "create" | "remove" | null;
 
 /** Private pin list: a JSON array of board ids, remembered across sessions. */
 const PINS_STORAGE_KEY = "stride.board-pins.v1";
+
+/** Saved grid order: a JSON array of board ids, first = top of the grid. */
+const ORDER_STORAGE_KEY = "stride.board-order.v1";
 
 /** True while the user is typing somewhere, so page-level shortcuts stand down. */
 function isEditable(element: Element | null): boolean {
@@ -92,10 +111,34 @@ export function BoardManager(): JSX.Element {
     return new Set();
   });
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  // The grid sequence, read once at mount — same hydration-safe pattern as
+  // pins: no storage on the server, and a failure never breaks the page.
+  const [orderIds, setOrderIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(ORDER_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((id): id is string => typeof id === "string");
+      }
+    } catch {
+      // Unreadable order — fall back to creation order rather than breaking.
+    }
+    return [];
+  });
+  const [editMode, setEditMode] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cardEls = useRef(new Map<string, HTMLElement>());
+
+  // Same sensors as the board view: a 6px pointer constraint lets plain clicks
+  // through, and arrow-key drags drive the grid from a focused grip.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // A single "now" snapshot keeps every card and the overview strip consistent.
   // The server has no clock: stay null there so the prerender output stays
@@ -113,13 +156,24 @@ export function BoardManager(): JSX.Element {
     return () => window.clearInterval(interval);
   }, []);
 
-  // Boards keep their creation order — oldest first, newest last — so the grid
-  // is stable and predictable. Pins only split the list into two groups; they
-  // never reorder within a group.
-  const sorted = useMemo(
-    () => [...projects].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
-    [projects],
-  );
+  // The flat grid sequence: boards follow the saved order, with anything missing
+  // from it (newly created, imported or from another device) appended in
+  // creation order — every board appears and nothing is ever dropped. Pins
+  // only split the list into two groups; they never reorder within a group.
+  const sorted = useMemo(() => {
+    const byId = new Map(projects.map((project) => [project.id, project]));
+    const kept = orderIds
+      .map((id) => byId.get(id))
+      .filter((project): project is StrideProject => project !== undefined);
+    const seen = new Set(kept.map((project) => project.id));
+    const fresh = projects
+      .filter((project) => !seen.has(project.id))
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+    return [...kept, ...fresh];
+  }, [orderIds, projects]);
+
+  // The drag sequence — edit mode renders one flat grid over exactly this.
+  const sortableIds = useMemo(() => sorted.map((project) => project.id), [sorted]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -160,15 +214,16 @@ export function BoardManager(): JSX.Element {
   const lastBoard = projects.length <= 1;
   const removeTarget = projects.find((project) => project.id === removeId) ?? null;
 
-  // Keyboard nav must not hijack typing: dialogs and any input/textarea/select
-  // keep their own key handling.
+  // Keyboard nav must not hijack typing: dialogs, edit mode and any
+  // input/textarea/select keep their own key handling. While editing, cards
+  // are moved with the grip (and its arrow-key drag), never the card-nav keys.
   const canNavigate = useCallback(
     (element: Element | null): boolean => {
-      if (dialog !== null) return false;
+      if (dialog !== null || editMode) return false;
       if (!element) return false;
       return !isEditable(element);
     },
-    [dialog],
+    [dialog, editMode],
   );
 
   const loadBoard = useCallback(
@@ -180,17 +235,53 @@ export function BoardManager(): JSX.Element {
     [router, switchProject],
   );
 
-  function togglePin(id: string): void {
-    const next = new Set(pinnedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setPinnedIds(next);
+  function writePins(next: Set<string>): void {
     try {
       window.localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify([...next]));
     } catch {
       // Storage blocked — pins keep working for this session.
     }
   }
+
+  const persistOrder = useCallback((ids: string[]): void => {
+    try {
+      window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(ids));
+    } catch {
+      // Storage blocked — the in-memory order still applies this session.
+    }
+  }, []);
+
+  function togglePin(id: string): void {
+    const next = new Set(pinnedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setPinnedIds(next);
+    writePins(next);
+  }
+
+  /** Drop: commit the new sequence and re-derive pins from the boundary. */
+  function handleDragEnd(event: DragEndEvent): void {
+    const { active, over } = event;
+    if (!over) return;
+    const from = sortableIds.indexOf(String(active.id));
+    const to = sortableIds.indexOf(String(over.id));
+    if (from === -1 || to === -1 || from === to) return;
+    const next = arrayMove(sortableIds, from, to);
+    // Position implies pin state: the leading segment stays pinned, so pulling
+    // a board into it pins it and pushing a pinned board below the line
+    // unpins it.
+    const nextPins = new Set(next.slice(0, pinnedIds.size));
+    setOrderIds(next);
+    setPinnedIds(nextPins);
+    persistOrder(next);
+    writePins(nextPins);
+  }
+
+  /** Leaves edit mode; the sequence is already persisted on every drop. */
+  const finishEditing = useCallback((): void => {
+    setEditMode(false);
+    persistOrder(sortableIds);
+  }, [sortableIds, persistOrder]);
 
   const closeDialog = useCallback((): void => {
     setDialog(null);
@@ -203,16 +294,17 @@ export function BoardManager(): JSX.Element {
     // close quietly, there is nothing worth reporting.
     closeDialog();
     if (!removed) return;
-    // A gone board has no business staying pinned.
+    // A gone board has no business staying pinned or keeping a grid slot.
     if (pinnedIds.has(project.id)) {
       const next = new Set(pinnedIds);
       next.delete(project.id);
       setPinnedIds(next);
-      try {
-        window.localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify([...next]));
-      } catch {
-        // Ignore — the in-memory set already dropped the id.
-      }
+      writePins(next);
+    }
+    if (orderIds.includes(project.id)) {
+      const nextOrder = orderIds.filter((id) => id !== project.id);
+      setOrderIds(nextOrder);
+      persistOrder(nextOrder);
     }
     toast.success(`Deleted “${project.name}”`, { duration: 2500 });
   }
@@ -307,11 +399,17 @@ export function BoardManager(): JSX.Element {
         return;
       }
 
-      // Escape closes an open dialog; otherwise it clears the search first.
-      // The search box and the inline title editor cancel/clear on their own.
+      // Escape closes an open dialog, then exits edit mode, then clears the
+      // search. The search box and the inline title editor cancel/clear on
+      // their own.
       if (event.key === "Escape") {
         if (dialog !== null) {
           closeDialog();
+          event.preventDefault();
+          return;
+        }
+        if (editMode) {
+          finishEditing();
           event.preventDefault();
           return;
         }
@@ -355,7 +453,7 @@ export function BoardManager(): JSX.Element {
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [canNavigate, dialog, query, visible, focusedId, loadBoard, closeDialog]);
+  }, [canNavigate, dialog, query, visible, focusedId, loadBoard, closeDialog, editMode, finishEditing]);
 
   // Keep the roving focus on a card that still exists; otherwise settle on the
   // first visible card. Re-anchoring happens during render, guarded by the
@@ -380,6 +478,7 @@ export function BoardManager(): JSX.Element {
       removable={!lastBoard}
       focused={project.id === focusedId}
       isPinned={pinnedIds.has(project.id)}
+      editMode={editMode}
       now={now}
       onLoad={loadBoard}
       onRename={(id, name) => {
@@ -472,52 +571,77 @@ export function BoardManager(): JSX.Element {
         />
       </div>
 
-      {/* Search toolbar. */}
-      <div className="mt-4 flex items-center gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            strokeWidth={2.2}
-          />
-          <Input
-            ref={searchRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                if (query) setQuery("");
-                else event.currentTarget.blur();
-              }
-            }}
-            aria-label="Search boards"
-            placeholder="Search boards"
-            className="h-10 pl-9 pr-9"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                searchRef.current?.focus();
+      {/* Search + grid-editing toggle. */}
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="relative w-full sm:w-80">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              strokeWidth={2.2}
+            />
+            <Input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                // A query while arranging is incoherent (the toggle hides while
+                // searching anyway), so typing one leaves edit mode.
+                if (editMode && event.target.value.trim() !== "") finishEditing();
               }}
-              aria-label="Clear search"
-              title="Clear search"
-              className="focus-ring absolute top-1/2 right-1.5 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <X className="h-4 w-4" strokeWidth={2.2} />
-            </button>
-          ) : (
-            <kbd
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground"
-            >
-              /
-            </kbd>
-          )}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  if (query) setQuery("");
+                  else event.currentTarget.blur();
+                }
+              }}
+              aria-label="Search boards"
+              placeholder="Search boards"
+              className="h-10 pl-9 pr-9"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  searchRef.current?.focus();
+                }}
+                aria-label="Clear search"
+                title="Clear search"
+                className="focus-ring absolute top-1/2 right-1.5 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" strokeWidth={2.2} />
+              </button>
+            ) : (
+              <kbd
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground"
+              >
+                /
+              </kbd>
+            )}
+          </div>
+          <p role="status" className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            {visible.length} of {pluralize(projects.length, "board")}
+          </p>
         </div>
-        <p role="status" className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {visible.length} of {pluralize(projects.length, "board")}
-        </p>
+        {!isLoading && query.trim() === "" && projects.length > 0 ? (
+          <Button
+            variant={editMode ? "primary" : "secondary"}
+            aria-pressed={editMode}
+            title={editMode ? "Save the board order" : "Rearrange boards by dragging"}
+            onClick={() => {
+              if (editMode) finishEditing();
+              else setEditMode(true);
+            }}
+          >
+            {editMode ? (
+              <Check className="h-4 w-4" strokeWidth={2.5} />
+            ) : (
+              <GripVertical className="h-4 w-4" strokeWidth={2.5} />
+            )}
+            {editMode ? "Done" : "Edit grid"}
+          </Button>
+        ) : null}
       </div>
 
       <input
@@ -531,7 +655,24 @@ export function BoardManager(): JSX.Element {
       <section aria-label="Boards" className="mt-6 sm:mt-8">
         {/* SSR and the first client render both have no registry yet, so show
             placeholders instead of flashing an empty grid on the landing page. */}
-        {isLoading ? (
+        {editMode ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Drag boards to rearrange — the top section stays Pinned.
+            </p>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {sorted.map((project) => renderCard(project))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        ) : isLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
             {[0, 1, 2].map((card) => (
               <div

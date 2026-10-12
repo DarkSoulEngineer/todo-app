@@ -1,5 +1,7 @@
 "use client";
 
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { format, parseISO } from "date-fns";
 import {
   CheckCircle2,
@@ -8,6 +10,7 @@ import {
   Columns3,
   Copy,
   Download,
+  GripVertical,
   Pencil,
   Star,
   Trash2,
@@ -131,6 +134,8 @@ interface ManagerBoardCardProps {
   /** Only the focused card is in the roving tab order (arrow-key nav). */
   focused: boolean;
   isPinned: boolean;
+  /** Edit mode: a drag grip appears and the card surface never opens. */
+  editMode: boolean;
   /** Shared "now" snapshot so every card reads the same moment. */
   now: Date | null;
   onLoad: (project: StrideProject) => void;
@@ -143,16 +148,17 @@ interface ManagerBoardCardProps {
 }
 
 /**
- * One tile on the Board manager landing page. Clicking the card opens the
- * board and hands off to /tasks; every inner control stops propagation and
- * carries `data-no-load` as a second guard so star, rename and the footer
- * actions never trigger the navigation themselves.
+ * One tile on the Board manager landing page. In browse mode clicking the card
+ * opens the board and hands off to /tasks; in edit mode a grip drags it to a
+ * new grid slot and the surface never loads. Inner controls stop propagation
+ * and carry `data-no-load` as a second guard.
  */
 export function ManagerBoardCard({
   project,
   removable,
   focused,
   isPinned,
+  editMode,
   now,
   onLoad,
   onRename,
@@ -168,6 +174,21 @@ export function ManagerBoardCard({
   const [draft, setDraft] = useState("");
   const exitViaKeyRef = useRef(false);
   const titleRef = useRef<HTMLButtonElement>(null);
+
+  // Sortable only while arranging, inert otherwise — the same hook (and
+  // grip-activator pattern) the board view uses for its cards.
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: project.id,
+      disabled: !editMode,
+      data: { type: "board" },
+    });
+
+  // The dnd-kit node ref and the manager's roving-focus ref share the card.
+  function setRefs(element: HTMLElement | null): void {
+    setNodeRef(element);
+    cardRef(element);
+  }
 
   /** Opens the board: click is an instant hand-off to /tasks. */
   function handleOpen(): void {
@@ -214,20 +235,26 @@ export function ManagerBoardCard({
 
   return (
     <article
-      ref={cardRef}
+      ref={setRefs}
       tabIndex={focused ? 0 : -1}
       data-card="true"
       data-board-id={project.id}
-      aria-label={`Open ${project.name}`}
-      title={`Open ${project.name}`}
+      aria-label={editMode ? `Arrange ${project.name}` : `Open ${project.name}`}
+      title={editMode ? undefined : `Open ${project.name}`}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={(event) => {
-        // Only the bare surface opens the board; the controls below stop their
-        // own clicks, and the title keeps the inline-rename intent.
+        // Edit mode is for arranging, not loading. Otherwise only the bare
+        // surface opens the board — the controls below stop their own clicks,
+        // and the title keeps the inline-rename intent.
+        if (editMode) return;
         const target = event.target as HTMLElement;
         if (target.closest("button, a, input, textarea, [data-no-load]")) return;
         handleOpen();
       }}
-      className="group relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg"
+      className={cn(
+        "group relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
+        isDragging && "z-10 scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
+      )}
     >
       {/* Faint accent wash echoing the board's dominant category hue. */}
       <span
@@ -298,6 +325,20 @@ export function ManagerBoardCard({
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
+            {editMode ? (
+              <button
+                ref={setActivatorNodeRef}
+                {...attributes}
+                {...listeners}
+                type="button"
+                data-no-load
+                aria-label={`Drag to rearrange ${project.name}`}
+                title="Drag to rearrange"
+                className="focus-ring grid h-8 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing"
+              >
+                <GripVertical className="h-4 w-4" strokeWidth={2.2} />
+              </button>
+            ) : null}
             <button
               type="button"
               data-no-load
