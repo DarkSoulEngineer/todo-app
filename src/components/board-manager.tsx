@@ -1,10 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowDownWideNarrow,
   Check,
-  ChevronDown,
   FileSearch,
   LayoutGrid,
   ListChecks,
@@ -25,7 +22,6 @@ import {
   useState,
   type ChangeEvent,
   type JSX,
-  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { toast } from "sonner";
 import { ManagerBoardCard } from "@/components/board-manager-card";
@@ -39,15 +35,6 @@ import { cn, pluralize } from "@/lib/utils";
 
 /** Which board dialog is open, so only one can ever show at a time. */
 type ManagerDialog = "create" | "remove" | null;
-
-type SortId = "recent" | "newest" | "name" | "tasks";
-
-const SORT_OPTIONS: { id: SortId; label: string }[] = [
-  { id: "recent", label: "Most recent" },
-  { id: "newest", label: "Newest" },
-  { id: "name", label: "Name (A–Z)" },
-  { id: "tasks", label: "Most tasks" },
-];
 
 /** Private pin list: a JSON array of board ids, remembered across sessions. */
 const PINS_STORAGE_KEY = "stride.board-pins.v1";
@@ -64,19 +51,6 @@ function isEditable(element: Element | null): boolean {
   );
 }
 
-function compareProjects(a: StrideProject, b: StrideProject, sort: SortId): number {
-  switch (sort) {
-    case "recent":
-      return (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0);
-    case "newest":
-      return (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0);
-    case "name":
-      return a.name.localeCompare(b.name);
-    case "tasks":
-      return b.workspace.tasks.length - a.workspace.tasks.length;
-  }
-}
-
 /**
  * Landing page: every board the user owns, in one place. It has no shell of its
  * own (the sidebar and top bar belong to the task view), so it carries the
@@ -85,7 +59,6 @@ function compareProjects(a: StrideProject, b: StrideProject, sort: SortId): numb
  */
 export function BoardManager(): JSX.Element {
   const router = useRouter();
-  const reduceMotion = useReducedMotion();
   const {
     projects,
     isLoading,
@@ -100,8 +73,6 @@ export function BoardManager(): JSX.Element {
   const [dialog, setDialog] = useState<ManagerDialog>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SortId>("recent");
-  const [sortOpen, setSortOpen] = useState(false);
   // Pins live in their own key, read once at mount. There is no localStorage
   // on the server, and a storage failure must never break the landing page.
   // Safe to read here: the skeleton still covers the very first client render,
@@ -142,12 +113,12 @@ export function BoardManager(): JSX.Element {
     return () => window.clearInterval(interval);
   }, []);
 
-  // Sorting is honest: every board sits in its active-sort place — nothing is
-  // anchored to the top. Pins only split the list into two groups, each still
-  // fully sorted by the active sort.
+  // Boards keep their creation order — oldest first, newest last — so the grid
+  // is stable and predictable. Pins only split the list into two groups; they
+  // never reorder within a group.
   const sorted = useMemo(
-    () => [...projects].sort((a, b) => compareProjects(a, b, sort)),
-    [projects, sort],
+    () => [...projects].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+    [projects],
   );
 
   const visible = useMemo(() => {
@@ -156,7 +127,7 @@ export function BoardManager(): JSX.Element {
   }, [sorted, query]);
 
   // The grid renders two transparent groups — pinned first, then the rest —
-  // and the combined list drives keyboard nav and the entrance stagger.
+  // and the combined list drives keyboard nav.
   const pinnedBoards = useMemo(
     () => visible.filter((project) => pinnedIds.has(project.id)),
     [visible, pinnedIds],
@@ -164,10 +135,6 @@ export function BoardManager(): JSX.Element {
   const restBoards = useMemo(
     () => visible.filter((project) => !pinnedIds.has(project.id)),
     [visible, pinnedIds],
-  );
-  const indexOfVisible = useMemo(
-    () => new Map(visible.map((project, index) => [project.id, index])),
-    [visible],
   );
 
   // Overview strip: totals across every board, so the landing page still reads
@@ -193,15 +160,15 @@ export function BoardManager(): JSX.Element {
   const lastBoard = projects.length <= 1;
   const removeTarget = projects.find((project) => project.id === removeId) ?? null;
 
-  // Keyboard nav must not hijack typing: dialogs, the sort menu and any
-  // input/textarea/select keep their own key handling.
+  // Keyboard nav must not hijack typing: dialogs and any input/textarea/select
+  // keep their own key handling.
   const canNavigate = useCallback(
     (element: Element | null): boolean => {
-      if (dialog !== null || sortOpen) return false;
+      if (dialog !== null) return false;
       if (!element) return false;
-      return !isEditable(element) && !element.closest("[data-sort-menu]");
+      return !isEditable(element);
     },
-    [dialog, sortOpen],
+    [dialog],
   );
 
   const loadBoard = useCallback(
@@ -341,21 +308,10 @@ export function BoardManager(): JSX.Element {
       }
 
       // Escape closes an open dialog; otherwise it clears the search first.
-      // The sort menu closes here too — its own handler covers the case where
-      // focus is inside the panel, this one covers mouse-opened menus — and
-      // focus returns to its trigger. The search box and the inline title
-      // editor cancel/clear on their own.
+      // The search box and the inline title editor cancel/clear on their own.
       if (event.key === "Escape") {
         if (dialog !== null) {
           closeDialog();
-          event.preventDefault();
-          return;
-        }
-        if (sortOpen) {
-          setSortOpen(false);
-          document
-            .querySelector<HTMLElement>("[data-sort-menu] [data-sort-trigger]")
-            ?.focus();
           event.preventDefault();
           return;
         }
@@ -399,7 +355,7 @@ export function BoardManager(): JSX.Element {
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [canNavigate, dialog, sortOpen, query, visible, focusedId, loadBoard, closeDialog]);
+  }, [canNavigate, dialog, query, visible, focusedId, loadBoard, closeDialog]);
 
   // Keep the roving focus on a card that still exists; otherwise settle on the
   // first visible card. Re-anchoring happens during render, guarded by the
@@ -416,13 +372,11 @@ export function BoardManager(): JSX.Element {
     }
   }
 
-  // One card renderer shared by both groups; the stagger index comes from the
-  // combined visible order so the cascade flows across section boundaries.
+  // One card renderer shared by both groups, so they can never drift apart.
   const renderCard = (project: StrideProject) => (
     <ManagerBoardCard
       key={project.id}
       project={project}
-      index={indexOfVisible.get(project.id) ?? 0}
       removable={!lastBoard}
       focused={project.id === focusedId}
       isPinned={pinnedIds.has(project.id)}
@@ -462,11 +416,7 @@ export function BoardManager(): JSX.Element {
     <div className="mx-auto min-h-dvh w-full max-w-6xl px-3 py-8 sm:px-4 sm:py-10 lg:py-14">
       {/* Wayfinding: the sidebar's wordmark, so a bare landing page still reads
           as Stride's front door rather than a loose card on a blank canvas. */}
-      <motion.header
-        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: "easeOut" }}
-      >
+      <header>
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
             <Check className="h-[18px] w-[18px]" strokeWidth={3} />
@@ -500,15 +450,10 @@ export function BoardManager(): JSX.Element {
             </Button>
           </div>
         </div>
-      </motion.header>
+      </header>
 
       {/* Slim overview strip: the landing page's pulse. */}
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: "easeOut", delay: 0.06 }}
-        className="mt-5 flex overflow-hidden divide-x divide-border rounded-2xl border border-border bg-card/70 shadow-xs"
-      >
+      <div className="mt-5 flex overflow-hidden divide-x divide-border rounded-2xl border border-border bg-card/70 shadow-xs">
         <OverviewStat
           icon={LayoutGrid}
           value={overview.boards}
@@ -525,63 +470,55 @@ export function BoardManager(): JSX.Element {
           label={pluralize(overview.overdue, "overdue task")}
           danger={overview.overdue > 0}
         />
-      </motion.div>
+      </div>
 
-      {/* Search + sort, reading as one toolbar. */}
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: "easeOut", delay: 0.1 }}
-        className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div className="flex items-center gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              strokeWidth={2.2}
-            />
-            <Input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  if (query) setQuery("");
-                  else event.currentTarget.blur();
-                }
+      {/* Search toolbar. */}
+      <div className="mt-4 flex items-center gap-3">
+        <div className="relative w-full sm:w-80">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            strokeWidth={2.2}
+          />
+          <Input
+            ref={searchRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                if (query) setQuery("");
+                else event.currentTarget.blur();
+              }
+            }}
+            aria-label="Search boards"
+            placeholder="Search boards"
+            className="h-10 pl-9 pr-9"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                searchRef.current?.focus();
               }}
-              aria-label="Search boards"
-              placeholder="Search boards"
-              className="h-10 pl-9 pr-9"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery("");
-                  searchRef.current?.focus();
-                }}
-                aria-label="Clear search"
-                title="Clear search"
-                className="focus-ring absolute top-1/2 right-1.5 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-4 w-4" strokeWidth={2.2} />
-              </button>
-            ) : (
-              <kbd
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground"
-              >
-                /
-              </kbd>
-            )}
-          </div>
-          <p role="status" className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {visible.length} of {pluralize(projects.length, "board")}
-          </p>
+              aria-label="Clear search"
+              title="Clear search"
+              className="focus-ring absolute top-1/2 right-1.5 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-4 w-4" strokeWidth={2.2} />
+            </button>
+          ) : (
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground"
+            >
+              /
+            </kbd>
+          )}
         </div>
-        <SortMenu value={sort} onChange={setSort} open={sortOpen} onOpenChange={setSortOpen} />
-      </motion.div>
+        <p role="status" className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {visible.length} of {pluralize(projects.length, "board")}
+        </p>
+      </div>
 
       <input
         ref={fileInputRef}
@@ -642,7 +579,7 @@ export function BoardManager(): JSX.Element {
                   Pinned
                 </h2>
                 <div className="mt-2.5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  <AnimatePresence>{pinnedBoards.map(renderCard)}</AnimatePresence>
+                  {pinnedBoards.map(renderCard)}
                 </div>
               </section>
             ) : null}
@@ -656,12 +593,12 @@ export function BoardManager(): JSX.Element {
                     All boards
                   </h2>
                   <div className="mt-2.5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    <AnimatePresence>{restBoards.map(renderCard)}</AnimatePresence>
+                    {restBoards.map(renderCard)}
                   </div>
                 </section>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  <AnimatePresence>{restBoards.map(renderCard)}</AnimatePresence>
+                  {restBoards.map(renderCard)}
                 </div>
               )
             ) : null}
@@ -693,117 +630,6 @@ export function BoardManager(): JSX.Element {
         onClose={closeDialog}
         onConfirm={handleRemove}
       />
-    </div>
-  );
-}
-
-interface SortMenuProps {
-  value: SortId;
-  onChange: (sort: SortId) => void;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-/** Compact sort control: a labelled trigger and a lightweight menu. */
-function SortMenu({ value, onChange, open, onOpenChange }: SortMenuProps): JSX.Element {
-  const reduceMotion = useReducedMotion();
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const label = SORT_OPTIONS.find((option) => option.id === value)?.label ?? SORT_OPTIONS[0].label;
-
-  // Keyboard-open menus hand focus to the selected item.
-  useEffect(() => {
-    if (!open) return;
-    const selected = itemRefs.current.find((el) => el?.dataset.value === value);
-    (selected ?? itemRefs.current[0])?.focus();
-  }, [open, value]);
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onOpenChange(false);
-      triggerRef.current?.focus();
-      return;
-    }
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const items = itemRefs.current.filter((el): el is HTMLButtonElement => el !== null);
-    if (items.length === 0) return;
-    const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    const delta = event.key === "ArrowDown" ? 1 : -1;
-    const start = current === -1 ? (delta === 1 ? 0 : items.length - 1) : current;
-    const next = Math.min(items.length - 1, Math.max(0, start + delta));
-    items[next].focus();
-  }
-
-  return (
-    <div data-sort-menu className="relative">
-      {open ? (
-        <div className="fixed inset-0 z-40" aria-hidden="true" onClick={() => onOpenChange(false)} />
-      ) : null}
-      <Button
-        ref={triggerRef}
-        variant="ghost"
-        size="sm"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`Sort boards: ${label}`}
-        data-sort-trigger
-        onClick={() => onOpenChange(!open)}
-        // Above the click-catcher backdrop so the trigger keeps its toggle;
-        // the backdrop only closes on outside clicks.
-        className="relative z-50 gap-1.5"
-      >
-        <ArrowDownWideNarrow className="h-4 w-4" strokeWidth={2.2} />
-        {label}
-        <ChevronDown
-          className={cn(
-            "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
-      </Button>
-      <AnimatePresence>
-        {open ? (
-          <motion.div
-            key="sort-menu"
-            role="menu"
-            onKeyDown={handleKeyDown}
-            initial={reduceMotion ? false : { opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.15, ease: "easeOut" }}
-            className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
-          >
-            {SORT_OPTIONS.map((option, index) => (
-              <button
-                key={option.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={value === option.id}
-                ref={(el) => {
-                  itemRefs.current[index] = el;
-                }}
-                data-value={option.id}
-                onClick={() => {
-                  onChange(option.id);
-                  onOpenChange(false);
-                  triggerRef.current?.focus();
-                }}
-                className={cn(
-                  "focus-ring flex w-full items-center justify-between gap-6 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                  value === option.id ? "font-medium text-foreground" : "text-muted-foreground",
-                )}
-              >
-                {option.label}
-                {value === option.id ? (
-                  <Check className="h-3.5 w-3.5 text-primary" strokeWidth={2.5} />
-                ) : null}
-              </button>
-            ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   );
 }
@@ -845,14 +671,8 @@ interface NoBoardsPanelProps {
 
 /** Friendly landing spot for an empty search (or an empty registry). */
 function NoBoardsPanel({ hasQuery, onClearSearch, onCreate }: NoBoardsPanelProps): JSX.Element {
-  const reduceMotion = useReducedMotion();
   return (
-    <motion.div
-      initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.99 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: "easeOut" }}
-      className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-14 text-center"
-    >
+    <div className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-14 text-center">
       <div className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-muted text-muted-foreground shadow-xs">
         <FileSearch className="h-5 w-5" strokeWidth={2} />
       </div>
@@ -876,7 +696,7 @@ function NoBoardsPanel({ hasQuery, onClearSearch, onCreate }: NoBoardsPanelProps
           </Button>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 

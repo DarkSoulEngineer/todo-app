@@ -1,6 +1,5 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import {
   CheckCircle2,
@@ -14,7 +13,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useMemo, useRef, useState, type JSX } from "react";
 import { boardColor, type BoardColorId } from "@/lib/boards";
 import type { StrideProject } from "@/lib/projects";
 import type { Workspace } from "@/lib/types";
@@ -127,8 +126,6 @@ function summarizeWorkspace(workspace: Workspace, now: Date | null): BoardStats 
 
 interface ManagerBoardCardProps {
   project: StrideProject;
-  /** Position in the visible order, used only for the staggered entrance. */
-  index: number;
   /** False on the one remaining board, which can no longer be removed. */
   removable: boolean;
   /** Only the focused card is in the roving tab order (arrow-key nav). */
@@ -146,14 +143,13 @@ interface ManagerBoardCardProps {
 }
 
 /**
- * One tile on the Board manager landing page. The whole card opens the board
- * with a brief pop; every inner control stops propagation and carries
- * `data-no-load` as a second guard so star, rename and the footer actions
- * never trigger the navigation themselves.
+ * One tile on the Board manager landing page. Clicking the card opens the
+ * board and hands off to /tasks; every inner control stops propagation and
+ * carries `data-no-load` as a second guard so star, rename and the footer
+ * actions never trigger the navigation themselves.
  */
 export function ManagerBoardCard({
   project,
-  index,
   removable,
   focused,
   isPinned,
@@ -166,54 +162,16 @@ export function ManagerBoardCard({
   onTogglePin,
   cardRef,
 }: ManagerBoardCardProps): JSX.Element {
-  const reduceMotion = useReducedMotion();
   const { workspace } = project;
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const [popping, setPopping] = useState(false);
   const exitViaKeyRef = useRef(false);
-  // The accepted-open flag: armed the moment a pop starts, cleared when the
-  // hand-off happens. It makes the pop's onAnimationComplete (and the safety
-  // timer) fire-once, and it survives unmount so a card removed mid-pop still
-  // opens the board the user clicked.
-  const popPendingRef = useRef(false);
-  const openTimerRef = useRef<number | null>(null);
   const titleRef = useRef<HTMLButtonElement>(null);
 
-  // A timer never handed to a real click is cancelled on unmount; an accepted
-  // open is not — navigation must survive the card leaving the grid mid-pop
-  // (filter, sort, removal).
-  useEffect(() => {
-    return () => {
-      if (popPendingRef.current) return;
-      if (openTimerRef.current !== null) {
-        window.clearTimeout(openTimerRef.current);
-        openTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  /**
-   * Opens the board with a finished press: the card swells slightly and dims a
-   * touch, then `onAnimationComplete` hands off to /tasks. Reduced-motion
-   * users skip the pop and navigate immediately.
-   */
+  /** Opens the board: click is an instant hand-off to /tasks. */
   function handleOpen(): void {
-    if (popping) return;
-    if (reduceMotion) {
-      onLoad(project);
-      return;
-    }
-    setPopping(true);
-    popPendingRef.current = true;
-    // Safety net: if onAnimationComplete never fires (rare), navigate anyway.
-    // Both paths share popPendingRef, so the hand-off runs exactly once.
-    openTimerRef.current = window.setTimeout(() => {
-      if (!popPendingRef.current) return;
-      popPendingRef.current = false;
-      onLoad(project);
-    }, 440);
+    onLoad(project);
   }
 
   const stats = useMemo(() => summarizeWorkspace(workspace, now), [workspace, now]);
@@ -255,8 +213,7 @@ export function ManagerBoardCard({
   }
 
   return (
-    <motion.article
-      layout
+    <article
       ref={cardRef}
       tabIndex={focused ? 0 : -1}
       data-card="true"
@@ -270,50 +227,7 @@ export function ManagerBoardCard({
         if (target.closest("button, a, input, textarea, [data-no-load]")) return;
         handleOpen();
       }}
-      // The hand-off happens when the pop VISIBLY completes — not on a timer.
-      // popPendingRef is only armed while a pop is in flight, so entrance,
-      // hover, exit and layout completions can never trigger navigation.
-      onAnimationComplete={() => {
-        if (!popPendingRef.current) return;
-        popPendingRef.current = false;
-        if (openTimerRef.current !== null) {
-          window.clearTimeout(openTimerRef.current);
-          openTimerRef.current = null;
-        }
-        onLoad(project);
-      }}
-      initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-      animate={
-        popping
-          ? {
-              opacity: 0.85,
-              y: 0,
-              scale: 1.03,
-              // One-off pop timing: no entrance stagger of its own, quick so
-              // the press visibly completes before the route change (~0.17s).
-              transition: {
-                opacity: { duration: 0.17, ease: "easeOut", delay: 0 },
-                scale: { duration: 0.17, ease: "easeOut", delay: 0 },
-                y: { duration: 0.17, ease: "easeOut", delay: 0 },
-              },
-            }
-          : { opacity: 1, y: 0 }
-      }
-      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
-      transition={
-        reduceMotion
-          ? { duration: 0 }
-          : {
-              default: { duration: 0.3, ease: "easeOut", delay: Math.min(index * 0.04, 0.24) },
-              // Exit snap only — the pop carries its own one-off timing above.
-              scale: { duration: 0.15, ease: "easeOut", delay: 0 },
-              layout: { type: "spring", stiffness: 420, damping: 34 },
-            }
-      }
-      whileHover={
-        reduceMotion ? undefined : { y: -3, transition: { duration: 0.18, ease: "easeOut", delay: 0 } }
-      }
-      className="group relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow] duration-200 hover:border-primary/25 hover:shadow-lg"
+      className="group relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg"
     >
       {/* Faint accent wash echoing the board's dominant category hue. */}
       <span
@@ -505,7 +419,7 @@ export function ManagerBoardCard({
           )}
         </div>
       </div>
-    </motion.article>
+    </article>
   );
 }
 
