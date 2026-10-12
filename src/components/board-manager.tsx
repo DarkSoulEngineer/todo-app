@@ -52,8 +52,6 @@ const SORT_OPTIONS: { id: SortId; label: string }[] = [
 /** Private pin list: a JSON array of board ids, remembered across sessions. */
 const PINS_STORAGE_KEY = "stride.board-pins.v1";
 
-const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-
 /** True while the user is typing somewhere, so page-level shortcuts stand down. */
 function isEditable(element: Element | null): boolean {
   if (!element) return false;
@@ -90,7 +88,6 @@ export function BoardManager(): JSX.Element {
   const reduceMotion = useReducedMotion();
   const {
     projects,
-    currentProjectId,
     isLoading,
     createProject,
     duplicateProject,
@@ -134,12 +131,20 @@ export function BoardManager(): JSX.Element {
   // deterministic. The client reads it once at first render — safe because the
   // skeleton still covers that render, so server and hydration output agree
   // and cards/tallies paint only once the snapshot is real.
-  const [now] = useState<Date | null>(() =>
+  const [now, setNow] = useState<Date | null>(() =>
     typeof window === "undefined" ? null : new Date(),
   );
 
-  // The loaded board anchors the grid; pins float to the front, the rest keep
-  // the active sort order.
+  // Deadline stats go stale while the tab stays open, so refresh the snapshot
+  // every minute. (setState from an interval callback is lint-safe.)
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  // Sorting is honest: every board sits in its active-sort place — nothing is
+  // anchored to the top. Pins only split the list into two groups, each still
+  // fully sorted by the active sort.
   const sorted = useMemo(
     () => [...projects].sort((a, b) => compareProjects(a, b, sort)),
     [projects, sort],
@@ -147,22 +152,29 @@ export function BoardManager(): JSX.Element {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const matches = q ? sorted.filter((project) => project.name.toLowerCase().includes(q)) : sorted;
-    const current = matches.find((project) => project.id === currentProjectId) ?? null;
-    const pinned: StrideProject[] = [];
-    const rest: StrideProject[] = [];
-    for (const project of matches) {
-      if (project === current) continue;
-      (pinnedIds.has(project.id) ? pinned : rest).push(project);
-    }
-    return [...(current ? [current] : []), ...pinned, ...rest];
-  }, [sorted, query, pinnedIds, currentProjectId]);
+    return q ? sorted.filter((project) => project.name.toLowerCase().includes(q)) : sorted;
+  }, [sorted, query]);
+
+  // The grid renders two transparent groups — pinned first, then the rest —
+  // and the combined list drives keyboard nav and the entrance stagger.
+  const pinnedBoards = useMemo(
+    () => visible.filter((project) => pinnedIds.has(project.id)),
+    [visible, pinnedIds],
+  );
+  const restBoards = useMemo(
+    () => visible.filter((project) => !pinnedIds.has(project.id)),
+    [visible, pinnedIds],
+  );
+  const indexOfVisible = useMemo(
+    () => new Map(visible.map((project, index) => [project.id, index])),
+    [visible],
+  );
 
   // Overview strip: totals across every board, so the landing page still reads
   // as a dashboard rather than a bare file list.
   const overview = useMemo(() => {
     let open = 0;
-    let attention = 0;
+    let overdue = 0;
     for (const project of projects) {
       for (const task of project.workspace.tasks) {
         if (task.completed || task.canceled) continue;
@@ -172,10 +184,10 @@ export function BoardManager(): JSX.Element {
         if (!task.dueAt) continue;
         const due = Date.parse(task.dueAt);
         if (Number.isNaN(due)) continue;
-        if (due - now.getTime() <= SEVEN_DAYS) attention += 1;
+        if (due - now.getTime() < 0) overdue += 1;
       }
     }
-    return { boards: projects.length, open, attention };
+    return { boards: projects.length, open, overdue };
   }, [projects, now]);
 
   const lastBoard = projects.length <= 1;
@@ -329,15 +341,24 @@ export function BoardManager(): JSX.Element {
       }
 
       // Escape closes an open dialog; otherwise it clears the search first.
-      // Menus and inputs keep their own handling (the sort menu refocuses its
-      // trigger, the search box and the inline title editor cancel/clear).
+      // The sort menu closes here too — its own handler covers the case where
+      // focus is inside the panel, this one covers mouse-opened menus — and
+      // focus returns to its trigger. The search box and the inline title
+      // editor cancel/clear on their own.
       if (event.key === "Escape") {
         if (dialog !== null) {
           closeDialog();
           event.preventDefault();
           return;
         }
-        if (sortOpen) return;
+        if (sortOpen) {
+          setSortOpen(false);
+          document
+            .querySelector<HTMLElement>("[data-sort-menu] [data-sort-trigger]")
+            ?.focus();
+          event.preventDefault();
+          return;
+        }
         if (isEditable(document.activeElement)) return;
         if (query !== "") setQuery("");
         return;
@@ -381,9 +402,9 @@ export function BoardManager(): JSX.Element {
   }, [canNavigate, dialog, sortOpen, query, visible, focusedId, loadBoard, closeDialog]);
 
   // Keep the roving focus on a card that still exists; otherwise settle on the
-  // current board (the grid's anchor) or the first visible card. Re-anchoring
-  // happens during render, guarded by the last-seen list key — the documented
-  // alternative to a setState-in-effect, and the same commit either way.
+  // first visible card. Re-anchoring happens during render, guarded by the
+  // last-seen list key — the documented alternative to a setState-in-effect,
+  // and the same commit either way.
   const visibleKey = visible.map((project) => project.id).join("|");
   const [knownVisibleKey, setKnownVisibleKey] = useState(visibleKey);
   if (visibleKey !== knownVisibleKey) {
@@ -391,13 +412,49 @@ export function BoardManager(): JSX.Element {
     if (visible.length === 0) {
       setFocusedId(null);
     } else if (focusedId === null || !visible.some((project) => project.id === focusedId)) {
-      setFocusedId(
-        currentProjectId && visible.some((project) => project.id === currentProjectId)
-          ? currentProjectId
-          : visible[0].id,
-      );
+      setFocusedId(visible[0].id);
     }
   }
+
+  // One card renderer shared by both groups; the stagger index comes from the
+  // combined visible order so the cascade flows across section boundaries.
+  const renderCard = (project: StrideProject) => (
+    <ManagerBoardCard
+      key={project.id}
+      project={project}
+      index={indexOfVisible.get(project.id) ?? 0}
+      removable={!lastBoard}
+      focused={project.id === focusedId}
+      isPinned={pinnedIds.has(project.id)}
+      now={now}
+      onLoad={loadBoard}
+      onRename={(id, name) => {
+        renameProject(id, name);
+        toast.success("Board renamed", { description: name, duration: 2500 });
+      }}
+      onDuplicate={(target) => {
+        const copy = duplicateProject(target.id);
+        if (!copy) return;
+        // Duplicating activates the copy, so follow it in — the same hand-off
+        // as New board, Import and opening a board.
+        toast.success(`Duplicated “${target.name}”`, {
+          description: "Working in the copy",
+          duration: 2500,
+        });
+        router.push("/tasks");
+      }}
+      onRemove={(target) => {
+        setRemoveId(target.id);
+        setDialog("remove");
+      }}
+      onSave={handleSaveBoard}
+      onTogglePin={togglePin}
+      cardRef={(element) => {
+        if (element) cardEls.current.set(project.id, element);
+        else cardEls.current.delete(project.id);
+      }}
+    />
+  );
 
   return (
     // The manager is now the root route with nothing around it, so it fills the
@@ -462,7 +519,12 @@ export function BoardManager(): JSX.Element {
           value={overview.open}
           label={pluralize(overview.open, "open task")}
         />
-        <OverviewStat icon={TriangleAlert} value={overview.attention} label="need attention" />
+        <OverviewStat
+          icon={TriangleAlert}
+          value={overview.overdue}
+          label={pluralize(overview.overdue, "overdue task")}
+          danger={overview.overdue > 0}
+        />
       </motion.div>
 
       {/* Search + sort, reading as one toolbar. */}
@@ -570,40 +632,39 @@ export function BoardManager(): JSX.Element {
             ))}
           </div>
         ) : visible.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <AnimatePresence>
-              {visible.map((project, index) => (
-                <ManagerBoardCard
-                  key={project.id}
-                  project={project}
-                  index={index}
-                  isCurrent={project.id === currentProjectId}
-                  removable={!lastBoard}
-                  focused={project.id === focusedId}
-                  isPinned={pinnedIds.has(project.id)}
-                  now={now}
-                  onLoad={loadBoard}
-                  onRename={(id, name) => {
-                    renameProject(id, name);
-                    toast.success("Board renamed", { description: name, duration: 2500 });
-                  }}
-                  onDuplicate={(target) => {
-                    const copy = duplicateProject(target.id);
-                    if (copy) toast.success(`Duplicated “${target.name}”`, { duration: 2500 });
-                  }}
-                  onRemove={(target) => {
-                    setRemoveId(target.id);
-                    setDialog("remove");
-                  }}
-                  onSave={handleSaveBoard}
-                  onTogglePin={togglePin}
-                  cardRef={(element) => {
-                    if (element) cardEls.current.set(project.id, element);
-                    else cardEls.current.delete(project.id);
-                  }}
-                />
-              ))}
-            </AnimatePresence>
+          <div className="space-y-8">
+            {pinnedBoards.length > 0 ? (
+              <section aria-labelledby="boards-pinned-heading">
+                <h2
+                  id="boards-pinned-heading"
+                  className="px-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+                >
+                  Pinned
+                </h2>
+                <div className="mt-2.5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <AnimatePresence>{pinnedBoards.map(renderCard)}</AnimatePresence>
+                </div>
+              </section>
+            ) : null}
+            {restBoards.length > 0 ? (
+              pinnedBoards.length > 0 ? (
+                <section aria-labelledby="boards-all-heading">
+                  <h2
+                    id="boards-all-heading"
+                    className="px-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+                  >
+                    All boards
+                  </h2>
+                  <div className="mt-2.5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <AnimatePresence>{restBoards.map(renderCard)}</AnimatePresence>
+                  </div>
+                </section>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <AnimatePresence>{restBoards.map(renderCard)}</AnimatePresence>
+                </div>
+              )
+            ) : null}
           </div>
         ) : (
           <NoBoardsPanel
@@ -687,8 +748,11 @@ function SortMenu({ value, onChange, open, onOpenChange }: SortMenuProps): JSX.E
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Sort boards: ${label}`}
+        data-sort-trigger
         onClick={() => onOpenChange(!open)}
-        className="gap-1.5"
+        // Above the click-catcher backdrop so the trigger keeps its toggle;
+        // the backdrop only closes on outside clicks.
+        className="relative z-50 gap-1.5"
       >
         <ArrowDownWideNarrow className="h-4 w-4" strokeWidth={2.2} />
         {label}
@@ -749,16 +813,24 @@ function OverviewStat({
   icon: Icon,
   value,
   label,
+  danger = false,
 }: {
   icon: LucideIcon;
   value: number;
   label: string;
+  /** Critical stat (overdue): tints the number and icon like the card rows. */
+  danger?: boolean;
 }): JSX.Element {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2.5 px-4 py-3">
-      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2.2} />
+      <Icon
+        className={cn("h-4 w-4 shrink-0", danger ? "text-destructive" : "text-muted-foreground")}
+        strokeWidth={2.2}
+      />
       <div className="min-w-0 leading-tight">
-        <p className="text-sm font-semibold tabular-nums">{value}</p>
+        <p className={cn("text-sm font-semibold tabular-nums", danger && "text-destructive")}>
+          {value}
+        </p>
         <p className="truncate text-[11px] text-muted-foreground">{label}</p>
       </div>
     </div>

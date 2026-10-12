@@ -20,7 +20,6 @@ import type { StrideProject } from "@/lib/projects";
 import type { Workspace } from "@/lib/types";
 import { cn, pluralize } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
 
 /** A deadline inside the next seven days counts as "due soon". */
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
@@ -130,7 +129,6 @@ interface ManagerBoardCardProps {
   project: StrideProject;
   /** Position in the visible order, used only for the staggered entrance. */
   index: number;
-  isCurrent: boolean;
   /** False on the one remaining board, which can no longer be removed. */
   removable: boolean;
   /** Only the focused card is in the roving tab order (arrow-key nav). */
@@ -156,7 +154,6 @@ interface ManagerBoardCardProps {
 export function ManagerBoardCard({
   project,
   index,
-  isCurrent,
   removable,
   focused,
   isPinned,
@@ -198,8 +195,8 @@ export function ManagerBoardCard({
   }, []);
 
   /**
-   * Opens the board with a finished gesture: the pop swells the card and fades
-   * it softly, then `onAnimationComplete` hands off to /tasks. Reduced-motion
+   * Opens the board with a finished press: the card swells slightly and dims a
+   * touch, then `onAnimationComplete` hands off to /tasks. Reduced-motion
    * users skip the pop and navigate immediately.
    */
   function handleOpen(): void {
@@ -264,8 +261,7 @@ export function ManagerBoardCard({
       tabIndex={focused ? 0 : -1}
       data-card="true"
       data-board-id={project.id}
-      aria-current={isCurrent ? "true" : undefined}
-      aria-label={isCurrent ? `${project.name}, current board` : `Open ${project.name}`}
+      aria-label={`Open ${project.name}`}
       title={`Open ${project.name}`}
       onClick={(event) => {
         // Only the bare surface opens the board; the controls below stop their
@@ -290,15 +286,15 @@ export function ManagerBoardCard({
       animate={
         popping
           ? {
-              opacity: 0.65,
+              opacity: 0.85,
               y: 0,
-              scale: 1.04,
-              // One-off pop timing: no entrance stagger of its own, crisp and
-              // quick so the gesture visibly completes before the route change.
+              scale: 1.03,
+              // One-off pop timing: no entrance stagger of its own, quick so
+              // the press visibly completes before the route change (~0.17s).
               transition: {
-                opacity: { duration: 0.26, ease: "easeIn", delay: 0 },
-                scale: { duration: 0.26, ease: "easeOut", delay: 0 },
-                y: { duration: 0.26, ease: "easeOut", delay: 0 },
+                opacity: { duration: 0.17, ease: "easeOut", delay: 0 },
+                scale: { duration: 0.17, ease: "easeOut", delay: 0 },
+                y: { duration: 0.17, ease: "easeOut", delay: 0 },
               },
             }
           : { opacity: 1, y: 0 }
@@ -317,12 +313,7 @@ export function ManagerBoardCard({
       whileHover={
         reduceMotion ? undefined : { y: -3, transition: { duration: 0.18, ease: "easeOut", delay: 0 } }
       }
-      className={cn(
-        "group relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border p-4 shadow-xs transition-[border-color,box-shadow] duration-200",
-        isCurrent
-          ? "border-primary/30 bg-primary/[0.04] ring-1 ring-primary/20 ring-inset"
-          : "border-border bg-card hover:border-primary/25 hover:shadow-lg",
-      )}
+      className="group relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow] duration-200 hover:border-primary/25 hover:shadow-lg"
     >
       {/* Faint accent wash echoing the board's dominant category hue. */}
       <span
@@ -393,9 +384,6 @@ export function ManagerBoardCard({
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
-            {isCurrent ? (
-              <Chip className="bg-primary/10 text-primary ring-primary/20">Current</Chip>
-            ) : null}
             <button
               type="button"
               data-no-load
@@ -460,9 +448,6 @@ export function ManagerBoardCard({
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          {isCurrent ? (
-            <span className="text-xs font-medium text-muted-foreground">Loaded</span>
-          ) : null}
           <Button
             variant="ghost"
             size="sm"
