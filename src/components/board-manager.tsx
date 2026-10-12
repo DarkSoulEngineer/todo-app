@@ -2,9 +2,11 @@
 
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  useDndContext,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -40,7 +42,7 @@ import {
   type JSX,
 } from "react";
 import { toast } from "sonner";
-import { ManagerBoardCard } from "@/components/board-manager-card";
+import { BoardDragPreview, ManagerBoardCard } from "@/components/board-manager-card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FieldLabel, Input } from "@/components/ui/field";
@@ -670,6 +672,7 @@ export function BoardManager(): JSX.Element {
                   {sorted.map((project) => renderCard(project))}
                 </div>
               </SortableContext>
+              <GridDragOverlay projects={sorted} now={now} pinnedIds={pinnedIds} />
             </DndContext>
           </div>
         ) : isLoading ? (
@@ -772,6 +775,38 @@ export function BoardManager(): JSX.Element {
         onConfirm={handleRemove}
       />
     </div>
+  );
+}
+
+/**
+ * The floating ghost that follows the pointer during an edit-mode drag: a
+ * lightweight material copy of the dragged board, sized to the source card and
+ * lifted/rotated so it reads as "in hand" above the gliding grid.
+ */
+function GridDragOverlay({
+  projects,
+  now,
+  pinnedIds,
+}: {
+  projects: StrideProject[];
+  now: Date | null;
+  pinnedIds: Set<string>;
+}): JSX.Element {
+  const { active } = useDndContext();
+  if (!active) return <></>;
+  const project = projects.find((candidate) => candidate.id === String(active.id));
+  if (!project) return <></>;
+  return (
+    <DragOverlay dropAnimation={null} style={{ width: active.rect.current.initial?.width }}>
+      <div
+        className="pointer-events-none"
+        // A second wrapper keeps the scale/rotate from fighting DragOverlay's
+        // own positioning transform — one inline transform, nothing stacked.
+        style={{ transform: "scale(1.03) rotate(1.5deg)" }}
+      >
+        <BoardDragPreview project={project} now={now} pinned={pinnedIds.has(project.id)} />
+      </div>
+    </DragOverlay>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
+import { defaultAnimateLayoutChanges, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { format, parseISO } from "date-fns";
 import {
@@ -25,6 +25,9 @@ import { Button } from "@/components/ui/button";
 
 /** A deadline inside the next seven days counts as "due soon". */
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+/** Shared easing for grid glides — the same curve dnd-kit uses internally. */
+const GRID_EASE = "cubic-bezier(0.2, 0, 0, 1)";
 
 /** Reason surfaced on the disabled Remove control of the last board. */
 const KEEP_ONE_BOARD = "At least one board must remain";
@@ -149,9 +152,10 @@ interface ManagerBoardCardProps {
 
 /**
  * One tile on the Board manager landing page. In browse mode clicking the card
- * opens the board and hands off to /tasks; in edit mode a grip drags it to a
- * new grid slot and the surface never loads. Inner controls stop propagation
- * and carry `data-no-load` as a second guard.
+ * opens the board and hands off to /tasks; in edit mode the whole card is the
+ * drag surface (the grip is a visual cue only) and the surface never loads.
+ * Inner controls stop propagation, carry `data-no-load`, and stay clickable
+ * because dnd-kit skips pointerdowns that land on interactive elements.
  */
 export function ManagerBoardCard({
   project,
@@ -175,14 +179,24 @@ export function ManagerBoardCard({
   const exitViaKeyRef = useRef(false);
   const titleRef = useRef<HTMLButtonElement>(null);
 
-  // Sortable only while arranging, inert otherwise — the same hook (and
-  // grip-activator pattern) the board view uses for its cards.
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: project.id,
-      disabled: !editMode,
-      data: { type: "board" },
-    });
+  // Sortable only while arranging, inert otherwise. Following board-card.tsx's
+  // convention, the whole card is the drag surface: dnd-kit ignores pointerdowns
+  // on interactive elements (buttons, the rename input), so they all stay
+  // clickable while a 6px move from anywhere else starts a drag.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: project.id,
+    disabled: !editMode,
+    data: { type: "board" },
+    // Explicit default: neighbours glide into place while the overlay floats.
+    animateLayoutChanges: defaultAnimateLayoutChanges,
+  });
+
+  // Trust dnd-kit's per-frame transition when it has an opinion (it briefly
+  // disables transitions for a setup frame); otherwise a shared 220ms glide
+  // carries hover, drag and settle motion on one buttery curve.
+  const cardTransition =
+    transition ??
+    `transform 220ms ${GRID_EASE}, border-color 200ms ease, box-shadow 200ms ease, opacity 200ms ease`;
 
   // The dnd-kit node ref and the manager's roving-focus ref share the card.
   function setRefs(element: HTMLElement | null): void {
@@ -236,12 +250,14 @@ export function ManagerBoardCard({
   return (
     <article
       ref={setRefs}
-      tabIndex={focused ? 0 : -1}
       data-card="true"
       data-board-id={project.id}
+      {...(editMode ? attributes : {})}
+      {...(editMode ? listeners : {})}
+      tabIndex={editMode || focused ? 0 : -1}
       aria-label={editMode ? `Arrange ${project.name}` : `Open ${project.name}`}
-      title={editMode ? undefined : `Open ${project.name}`}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      title={editMode ? "Drag to rearrange" : `Open ${project.name}`}
+      style={{ transform: CSS.Transform.toString(transform), transition: cardTransition }}
       onClick={(event) => {
         // Edit mode is for arranging, not loading. Otherwise only the bare
         // surface opens the board — the controls below stop their own clicks,
@@ -252,8 +268,9 @@ export function ManagerBoardCard({
         handleOpen();
       }}
       className={cn(
-        "group relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
-        isDragging && "z-10 scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
+        "group relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
+        editMode ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer",
+        isDragging && "opacity-40",
       )}
     >
       {/* Faint accent wash echoing the board's dominant category hue. */}
@@ -326,18 +343,13 @@ export function ManagerBoardCard({
 
           <div className="flex shrink-0 items-center gap-1.5">
             {editMode ? (
-              <button
-                ref={setActivatorNodeRef}
-                {...attributes}
-                {...listeners}
-                type="button"
-                data-no-load
-                aria-label={`Drag to rearrange ${project.name}`}
+              <span
+                aria-hidden="true"
                 title="Drag to rearrange"
-                className="focus-ring grid h-8 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground/50"
               >
                 <GripVertical className="h-4 w-4" strokeWidth={2.2} />
-              </button>
+              </span>
             ) : null}
             <button
               type="button"
@@ -461,6 +473,101 @@ export function ManagerBoardCard({
         </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * The floating ghost shown in the DragOverlay while a board is being dragged:
+ * the same visual identity as the live card — accent wash, icon tile, title,
+ * created line, stats, progress and category dots — with no interactivity.
+ */
+export function BoardDragPreview({
+  project,
+  now,
+  pinned,
+}: {
+  project: StrideProject;
+  now: Date | null;
+  pinned: boolean;
+}): JSX.Element {
+  const { workspace } = project;
+  const stats = useMemo(() => summarizeWorkspace(workspace, now), [workspace, now]);
+  const accentTile = stats.dominant ? TILE_WASH[stats.dominant] : DEFAULT_TILE_WASH;
+  const accentIcon = stats.dominant ? TILE_ICON[stats.dominant] : DEFAULT_TILE_ICON;
+  const accentWash = stats.dominant ? CARD_WASH[stats.dominant] : DEFAULT_CARD_WASH;
+  const fillClass = stats.dominant ? boardColor(stats.dominant).dot : "bg-primary";
+
+  return (
+    <div className="relative flex w-full flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-primary/20">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b to-transparent",
+          accentWash,
+        )}
+      />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={cn(
+              "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-black/5 dark:ring-white/10",
+              accentTile,
+            )}
+          >
+            <Columns3 className={cn("h-4 w-4", accentIcon)} strokeWidth={2.2} />
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="truncate text-[15px] font-semibold tracking-tight text-foreground">
+              {project.name}
+            </p>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              Created {formatCreated(project.createdAt)}
+            </p>
+          </div>
+        </div>
+        <span className="flex shrink-0 items-center">
+          <Star className={cn("h-4 w-4 text-amber-500", pinned && "fill-current")} strokeWidth={2.2} />
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="flex items-center gap-3 font-medium text-foreground tabular-nums">
+          <span className="flex items-center gap-1.5">
+            <Circle className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2.2} />
+            {stats.openCount} open
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-success" strokeWidth={2.2} />
+            {stats.doneCount} done
+          </span>
+        </span>
+        {stats.total > 0 ? (
+          <span className="text-muted-foreground tabular-nums">{stats.pct}%</span>
+        ) : null}
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div className={cn("h-full rounded-full", fillClass)} style={{ width: `${stats.pct}%` }} />
+      </div>
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-3">
+          {stats.overdue > 0 ? (
+            <span className="flex items-center gap-1 font-medium text-destructive">
+              <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2.2} />
+              {stats.overdue} overdue
+            </span>
+          ) : null}
+          {stats.soon > 0 ? (
+            <span className="flex items-center gap-1 font-medium text-info">
+              <Clock3 className="h-3.5 w-3.5" strokeWidth={2.2} />
+              {stats.soon} due soon
+            </span>
+          ) : null}
+          {stats.overdue === 0 && stats.soon === 0 ? (
+            <span className="text-muted-foreground/80">No deadlines coming up</span>
+          ) : null}
+        </span>
+        <CategoryDots boards={workspace.boards} />
+      </div>
+    </div>
   );
 }
 
