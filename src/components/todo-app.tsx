@@ -58,6 +58,7 @@ export function TodoApp() {
     restore,
     loadSample,
     assignTaskToSection,
+    currentProjectName,
   } = useTasksContext();
   const now = useNow();
 
@@ -412,6 +413,7 @@ export function TodoApp() {
     sections,
     sectionCounts,
     focusedSection: activeSection?.id ?? null,
+    currentBoardName: currentProjectName,
     onSelectList: selectList,
     onSelectView: selectView,
     onSelectCategory: selectCategory,

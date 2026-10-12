@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { AppToaster } from "@/components/app-toaster";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { TasksProvider } from "@/components/tasks-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -59,7 +60,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="app-canvas min-h-[100dvh]">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
+          <TasksProvider>{children}</TasksProvider>
           <AppToaster />
         </ThemeProvider>
         <ServiceWorkerRegister />

@@ -1,7 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import React, { useState, type ReactElement } from "react";
 import {
   Ban,
   BarChart3,
@@ -12,6 +14,7 @@ import {
   ChevronRight,
   Hash,
   Keyboard,
+  Layers,
   ListChecks,
   PanelLeftClose,
   PanelLeftOpen,
@@ -64,6 +67,8 @@ interface SidebarProps {
   sectionCounts: Record<string, number>;
   /** Id of the custom section currently focused on the board, if any. */
   focusedSection: string | null;
+  /** Name of the board selected in the board manager, shown as the home row's secondary line. */
+  currentBoardName?: string;
   onSelectList: (list: SmartList) => void;
   onSelectView: (view: ViewMode) => void;
   onSelectCategory: (category: string | "all") => void;
@@ -88,6 +93,7 @@ export function Sidebar({
   sections,
   sectionCounts,
   focusedSection,
+  currentBoardName,
   onSelectList,
   onSelectView,
   onSelectCategory,
@@ -100,6 +106,12 @@ export function Sidebar({
 }: SidebarProps) {
   const onLists = viewMode === "list" || viewMode === "board";
 
+  // The board manager is its own route (the app's landing page), so its active
+  // state comes from the pathname rather than from the in-page view mode.
+  const pathname = usePathname();
+  const onBoardManager = pathname === "/";
+  const boardName = currentBoardName?.trim();
+
   // The five time-based lists collapse under one "Upcoming" group; the other
   // four stay flat. Both orderings follow SMART_LISTS.
   const timeLists = SMART_LISTS.filter((def) => TIME_GROUP_LISTS.includes(def.id));
@@ -110,10 +122,15 @@ export function Sidebar({
   const reduceMotion = useReducedMotion();
 
   // Auto-open when the active list enters the group. A manual collapse on the
-  // chevron is respected until the active list leaves the group and returns.
-  useEffect(() => {
-    if (timeActive) setTimeOpen(true);
-  }, [timeActive]);
+  // chevron is respected until the active list leaves the group and returns —
+  // adjusted during render so React never cascades an effect-driven render.
+  const [wasTimeActive, setWasTimeActive] = useState(timeActive);
+  if (timeActive && !wasTimeActive) {
+    setWasTimeActive(true);
+    setTimeOpen(true);
+  } else if (!timeActive && wasTimeActive) {
+    setWasTimeActive(false);
+  }
 
   return (
     <aside
@@ -147,6 +164,19 @@ export function Sidebar({
       </div>
 
       <nav aria-label="Primary" className="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
+        {/* Home row — the board manager is its own route, not an in-page view. */}
+        <div className="space-y-0.5">
+          <NavItem
+            icon={Layers}
+            label="Board manager"
+            secondary={boardName}
+            href="/"
+            active={onBoardManager}
+            collapsed={collapsed}
+            layoutId={`${idPrefix}-home-pill`}
+          />
+        </div>
+
         <div className="space-y-0.5">
           {!collapsed ? (
             <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -369,30 +399,35 @@ export function Sidebar({
 }
 
 interface NavItemProps {
-  icon: LucideIcon | React.ReactNode;
+  /** A lucide icon component, or a ready-made element such as a colour dot. */
+  icon: LucideIcon | ReactElement;
   label: string;
+  /** Optional secondary line under the label (expanded state only). */
+  secondary?: string;
   count?: number;
   active: boolean;
   collapsed: boolean;
   layoutId?: string;
-  onClick: () => void;
+  /** When set the row navigates instead of acting in place, so `onClick` is unnecessary. */
+  href?: string;
+  onClick?: () => void;
 }
 
-function NavItem({ icon: Icon, label, count, active, collapsed, layoutId, onClick }: NavItemProps) {
+function NavItem({ icon: Icon, label, secondary, count, active, collapsed, layoutId, href, onClick }: NavItemProps) {
   const reduceMotion = useReducedMotion();
+  const shared = {
+    "aria-current": active ? ("page" as const) : undefined,
+    title: collapsed ? label : undefined,
+    className: cn(
+      "focus-ring relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
+      collapsed && "justify-center px-0 py-2.5",
+      secondary && "items-start",
+      active ? "text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+    ),
+  };
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      title={collapsed ? label : undefined}
-      className={cn(
-        "focus-ring relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
-        collapsed && "justify-center px-0 py-2.5",
-        active ? "text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
+  const row = (
+    <>
       {active && layoutId ? (
         <motion.span
           layoutId={layoutId}
@@ -404,23 +439,38 @@ function NavItem({ icon: Icon, label, count, active, collapsed, layoutId, onClic
         <span className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}>
           {Icon}
         </span>
-      ) : typeof Icon === "function" || (Icon && typeof Icon === "object" && "$$typeof" in Icon) ? (
+      ) : (
         <Icon
           className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}
           strokeWidth={2.2}
         />
-      ) : (
-        <span className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}>
-          <span>{Icon}</span>
-        </span>
       )}
-      {!collapsed ? <span className="relative flex-1 truncate text-left">{label}</span> : null}
+      {!collapsed ? (
+        <span className="relative flex-1 text-left">
+          <span className="block truncate">{label}</span>
+          {secondary ? <span className="block truncate text-xs font-normal text-muted-foreground">{secondary}</span> : null}
+        </span>
+      ) : null}
       {!collapsed && count !== undefined && count > 0 ? (
         <span className="relative text-xs text-muted-foreground tabular-nums">{count}</span>
       ) : null}
       {collapsed && count !== undefined && count > 0 ? (
         <span className="absolute top-1.5 right-2 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
       ) : null}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} {...shared}>
+        {row}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} {...shared}>
+      {row}
     </button>
   );
 }

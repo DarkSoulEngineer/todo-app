@@ -12,7 +12,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overdueAt, rescheduleToNextDay } from "@/lib/datetime";
 import { createSampleTasks, SAMPLE_BOARDS } from "@/lib/sample";
 import { isCustomSection, isStatusSection } from "@/lib/sections";
-import { loadWorkspace, saveWorkspace } from "@/lib/storage";
+import {
+  activeProject,
+  cloneProject,
+  loadProjects,
+  newProject,
+  projectFromWorkspace,
+  saveProjects,
+  withWorkspace,
+  type ProjectsState,
+  type StrideProject,
+} from "@/lib/projects";
 import { applyDraft, createTask } from "@/lib/task-factory";
 import type { BoardSection, Task, TaskDraft, Workspace } from "@/lib/types";
 
@@ -70,17 +80,37 @@ export interface TasksApi {
   snapshot: () => Workspace;
   restore: (workspace: Workspace) => void;
   loadSample: () => void;
+  // Boards as project tenants: each board owns a full workspace.
+  /** All boards (projects) in registry order. */
+  projects: StrideProject[];
+  /** Id of the currently loaded board. */
+  currentProjectId: string;
+  /** Name of the currently loaded board. */
+  currentProjectName: string;
+  /** Creates a new empty board and switches to it. Returns the new id. */
+  createProject: (name?: string) => string;
+  /** Creates a board from an imported workspace and switches to it. Returns the new id, or "" when unavailable. */
+  importProject: (name: string, workspace: Workspace) => string;
+  /** Duplicates a board (tasks/sections/categories included) and switches to it. */
+  duplicateProject: (id: string) => string | null;
+  renameProject: (id: string, name: string) => void;
+  switchProject: (id: string) => void;
+  /** Removes a board with its data. False when it is the last remaining board. */
+  removeProject: (id: string) => boolean;
 }
 
 export function useTasks(): TasksApi {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [sections, setSections] = useState<BoardSection[]>([]);
   const [boards, setBoards] = useState<Board[]>(defaultBoards);
+  const [projectsState, setProjectsState] = useState<ProjectsState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const tasksRef = useRef<Task[]>([]);
   const sectionsRef = useRef<BoardSection[]>([]);
   const boardsRef = useRef<Board[]>(defaultBoards());
+  const projectsRef = useRef<ProjectsState | null>(null);
+  const activeIdRef = useRef<string | null>(null);
 
   // Keep refs of the latest state for synchronous reads inside handlers.
   useEffect(() => {
@@ -95,23 +125,38 @@ export function useTasks(): TasksApi {
     boardsRef.current = boards;
   }, [boards]);
 
-  // Hydrate from localStorage after mount. This is a deliberate external-store
-  // read that must not run during SSR, so the server and first client render
-  // agree and there is no hydration mismatch.
+  // Hydrate from the project registry after mount. This is a deliberate
+  // external-store read that must not run during SSR, so the server and first
+  // client render agree and there is no hydration mismatch. The registry
+  // holds every board; its current project's workspace becomes live state.
   useEffect(() => {
-    const { workspace } = loadWorkspace();
+    const registry = loadProjects();
+    const active = activeProject(registry);
+    projectsRef.current = registry;
+    activeIdRef.current = active.id;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setTasks(workspace.tasks);
-    setSections(workspace.sections);
-    setBoards(workspace.boards);
+    setProjectsState(registry);
+    setTasks(active.workspace.tasks);
+    setSections(active.workspace.sections);
+    setBoards(active.workspace.boards);
     setIsLoading(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  // Persist after every change, once hydrated.
+  // Persist after every change, once hydrated: writes the current workspace
+  // into the ACTIVE project slot. Switch handlers below update ids and
+  // workspace state in one batched commit, so this effect can never write
+  // one project's data into another's slot.
   useEffect(() => {
     if (isLoading) return;
-    saveWorkspace({ tasks, sections, boards });
+    const registry = projectsRef.current;
+    const activeId = activeIdRef.current;
+    if (!registry || !activeId) return;
+    const next = withWorkspace(registry, activeId, { tasks, sections, boards });
+    if (next === registry) return;
+    projectsRef.current = next;
+    setProjectsState(next);
+    saveProjects(next);
   }, [tasks, sections, boards, isLoading]);
 
   const updateById = useCallback(
@@ -488,6 +533,120 @@ export function useTasks(): TasksApi {
     setBoards(SAMPLE_BOARDS);
   }, []);
 
+  // ---- Boards as project tenants -------------------------------------------
+
+  /**
+   * Applies a new registry snapshot. With `activate`, the registry's current
+   * project also replaces the live workspace state (switch/create/duplicate);
+   * without it only metadata changes (rename) keep the current workspace.
+   */
+  const applyRegistry = useCallback((next: ProjectsState, activate: boolean) => {
+    projectsRef.current = next;
+    setProjectsState(next);
+    saveProjects(next);
+    if (!activate) return;
+    const active = activeProject(next);
+    activeIdRef.current = active.id;
+    setTasks(active.workspace.tasks);
+    setSections(active.workspace.sections);
+    setBoards(active.workspace.boards);
+  }, []);
+
+  const switchProject = useCallback(
+    (id: string) => {
+      const registry = projectsRef.current;
+      if (!registry || registry.currentId === id) return;
+      if (!registry.projects.some((project) => project.id === id)) return;
+      applyRegistry({ ...registry, currentId: id }, true);
+    },
+    [applyRegistry]
+  );
+
+  const createProject = useCallback(
+    (name?: string) => {
+      const registry = projectsRef.current;
+      if (!registry) return "";
+      const project = newProject(name);
+      applyRegistry(
+        { ...registry, currentId: project.id, projects: [...registry.projects, project] },
+        true
+      );
+      return project.id;
+    },
+    [applyRegistry]
+  );
+
+  const importProject = useCallback(
+    (name: string, workspace: Workspace) => {
+      const registry = projectsRef.current;
+      if (!registry) return "";
+      const project = projectFromWorkspace(name, workspace);
+      applyRegistry(
+        { ...registry, currentId: project.id, projects: [...registry.projects, project] },
+        true
+      );
+      return project.id;
+    },
+    [applyRegistry]
+  );
+
+  const duplicateProject = useCallback(
+    (id: string) => {
+      const registry = projectsRef.current;
+      if (!registry) return null;
+      const source = registry.projects.find((project) => project.id === id);
+      if (!source) return null;
+      const copy = cloneProject(source);
+      applyRegistry(
+        { ...registry, currentId: copy.id, projects: [...registry.projects, copy] },
+        true
+      );
+      return copy.id;
+    },
+    [applyRegistry]
+  );
+
+  const renameProject = useCallback(
+    (id: string, name: string) => {
+      const registry = projectsRef.current;
+      const trimmed = name.trim();
+      if (!registry || !trimmed) return;
+      applyRegistry(
+        {
+          ...registry,
+          projects: registry.projects.map((project) =>
+            project.id === id
+              ? { ...project, name: trimmed, updatedAt: new Date().toISOString() }
+              : project
+          ),
+        },
+        false
+      );
+    },
+    [applyRegistry]
+  );
+
+  /** Removes a board and its data; refuses to remove the last remaining board. */
+  const removeProject = useCallback(
+    (id: string) => {
+      const registry = projectsRef.current;
+      if (!registry || registry.projects.length <= 1) return false;
+      if (!registry.projects.some((project) => project.id === id)) return false;
+      const projects = registry.projects.filter((project) => project.id !== id);
+      const wasCurrent = registry.currentId === id;
+      applyRegistry(
+        {
+          ...registry,
+          projects,
+          currentId: wasCurrent ? (projects[0]?.id ?? "") : registry.currentId,
+        },
+        wasCurrent
+      );
+      return true;
+    },
+    [applyRegistry]
+  );
+
   return useMemo(
     () => ({
       tasks,
@@ -527,6 +686,15 @@ export function useTasks(): TasksApi {
       snapshot,
       restore,
       loadSample,
+      projects: projectsState?.projects ?? [],
+      currentProjectId: projectsState?.currentId ?? "",
+      currentProjectName: projectsState ? activeProject(projectsState).name : "",
+      createProject,
+      importProject,
+      duplicateProject,
+      renameProject,
+      switchProject,
+      removeProject,
     }),
     [
       tasks,
@@ -565,6 +733,13 @@ export function useTasks(): TasksApi {
       snapshot,
       restore,
       loadSample,
+      projectsState,
+      createProject,
+      importProject,
+      duplicateProject,
+      renameProject,
+      switchProject,
+      removeProject,
     ],
   );
 }

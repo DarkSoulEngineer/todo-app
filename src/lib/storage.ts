@@ -112,7 +112,7 @@ function normalizeDeletedCategories(value: unknown): string[] {
 }
 
 /** Builds a validated workspace from unknown persisted/imported data. */
-function buildWorkspace(parsed: unknown): Workspace | null {
+export function buildWorkspace(parsed: unknown): Workspace | null {
   const { tasks: rawTasks, sections: rawSections, boards: rawBoards, deletedCategories: rawDeleted } =
     extractParts(parsed);
   if (!Array.isArray(rawTasks)) return null;

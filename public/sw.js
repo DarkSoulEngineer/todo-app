@@ -1,21 +1,22 @@
 // Stride offline service worker.
-// Conservative strategy: cache the app shell and hashed static assets,
-// never cache RSC/data requests, and fall back to the cached shell offline.
+// Conservative strategy: precache both shell routes ("/" and "/tasks") plus
+// hashed static assets, never cache RSC/data requests, and fall back to the
+// cached shell offline.
 //
 // Versioning: every cache key is prefixed. On activate, ANY cache that does not
 // carry the current prefix is deleted, so a redeploy never serves a stale shell
 // or stale hashed assets.
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_PREFIX = `stride-${CACHE_VERSION}-`;
 const SHELL_CACHE = `${CACHE_PREFIX}shell`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime`;
-const SHELL_URL = "/";
+const SHELL_URLS = ["/", "/tasks"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((cache) => cache.addAll([SHELL_URL, "/manifest.webmanifest"]))
+      .then((cache) => cache.addAll([...SHELL_URLS, "/manifest.webmanifest"]))
       .catch(() => undefined)
       .then(() => self.skipWaiting()),
   );
@@ -69,17 +70,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Navigations: network first, fall back to the cached shell.
+  // Navigations: network first, fall back to the cached shell for the same
+  // pathname, then to the cached "/" shell.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(SHELL_CACHE).then((cache) => cache.put(SHELL_URL, copy)).catch(() => undefined);
+          caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined);
           return response;
         })
         .catch(() =>
-          caches.match(SHELL_URL).then((cached) => cached || Response.error()),
+          caches
+            .match(request)
+            .then((cached) => cached || caches.match("/"))
+            .then((cached) => cached || Response.error()),
         ),
     );
     return;
