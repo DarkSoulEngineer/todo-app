@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/utils";
 import type { InsightsFilters } from "@/lib/features/insights-filters";
 import type { Task } from "@/lib/domain/types";
 import type { Board } from "@/lib/domain/boards";
-import { exportTasksToCSV } from "@/lib/features/insights-filters";
+import { exportTasksToCSV, filterTasksByFilters } from "@/lib/features/insights-filters";
 
 interface QuickActionsProps {
   tasks: Task[];
@@ -16,30 +16,8 @@ interface QuickActionsProps {
   onReset: () => void;
 }
 
-function getFilteredTasksForExport(tasks: Task[], filters: InsightsFilters, now: Date): Task[] {
-  return tasks.filter((task) => {
-    // Board filter
-    if (filters.boardId !== "all" && task.category !== filters.boardId) return false;
-
-    // Status filter
-    if (filters.status !== "all") {
-      const isCompleted = task.completed;
-      const isCanceled = task.canceled;
-      const isOverdue = !isCompleted && !isCanceled && task.dueAt && Date.parse(task.dueAt) < now.getTime();
-      if (filters.status === "completed" && !isCompleted) return false;
-      if (filters.status === "canceled" && !isCanceled) return false;
-      if (filters.status === "overdue" && !isOverdue) return false;
-    }
-
-    // Priority filter
-    if (filters.priority !== "all" && task.priority !== filters.priority) return false;
-
-    return true;
-  });
-}
-
 export function QuickActions({ tasks, filters, boards, hasActiveFilters, onReset }: QuickActionsProps) {
-  const filteredTasks = useMemo(() => getFilteredTasksForExport(tasks, filters, new Date()), [tasks, filters]);
+  const filteredTasks = useMemo(() => filterTasksByFilters(tasks, filters, new Date()), [tasks, filters]);
 
   const handleExportCSV = () => {
     const csv = exportTasksToCSV(filteredTasks, boards);

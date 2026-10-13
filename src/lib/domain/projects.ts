@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { makeId } from "@/lib/utils/id";
 import { defaultBoards } from "@/lib/domain/boards";
 import { PROBE_KEY, STORAGE_KEY } from "@/lib/domain/constants";
 import { defaultSections } from "@/lib/domain/sections";
@@ -59,7 +59,7 @@ export function emptyWorkspace(): Workspace {
 export function newProject(name?: string): StrideProject {
   const timestamp = nowIso();
   return {
-    id: nanoid(),
+    id: makeId(),
     name: name?.trim() || NEW_BOARD_NAME,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -71,7 +71,7 @@ export function newProject(name?: string): StrideProject {
 export function cloneProject(source: StrideProject): StrideProject {
   const timestamp = nowIso();
   return {
-    id: nanoid(),
+    id: makeId(),
     name: `${source.name} (copy)`,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -83,7 +83,7 @@ export function cloneProject(source: StrideProject): StrideProject {
 export function projectFromWorkspace(name: string, workspace: Workspace): StrideProject {
   const timestamp = nowIso();
   return {
-    id: nanoid(),
+    id: makeId(),
     name: name.trim() || NEW_BOARD_NAME,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -170,7 +170,7 @@ export function loadProjects(): ProjectsState {
 
   const { workspace, hadData } = loadWorkspace();
   const migrated: StrideProject = {
-    id: nanoid(),
+    id: makeId(),
     name: DEFAULT_PROJECT_NAME,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -209,9 +209,9 @@ export function loadProjects(): ProjectsState {
 }
 
 /**
- * Persists the registry, mirroring `saveWorkspace`' quota reporting. Returns
- * false when the write failed, so a caller can tell whether it is safe to drop
- * the data the registry was migrated from.
+ * Persists the registry and reports quota exhaustion the same way the rest of
+ * storage does. Returns false when the write failed, so a caller can tell
+ * whether it is safe to drop the data the registry was migrated from.
  */
 export function saveProjects(state: ProjectsState): boolean {
   if (typeof window === "undefined") return true;

@@ -1,6 +1,5 @@
-import { nanoid } from "nanoid";
-import { STATUS_META } from "@/lib/domain/status";
-import { deriveStatus } from "@/lib/domain/status";
+import { makeId } from "@/lib/utils/id";
+import { deriveStatus, STATUS_LABELS } from "@/lib/domain/status";
 import type { BoardSection, Task, TaskStatus } from "@/lib/domain/types";
 
 /** Order of the built-in, status-backed columns. */
@@ -10,7 +9,7 @@ export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed"
 export function defaultSections(): BoardSection[] {
   return STATUS_SECTIONS.map((status) => ({
     id: `status-${status}`,
-    title: STATUS_META[status].label,
+    title: STATUS_LABELS[status],
     status,
   }));
 }
@@ -51,8 +50,8 @@ export function normalizeSections(value: unknown): BoardSection[] {
       status !== undefined && result.some((section) => section.status === status);
     const effectiveStatus = duplicateStatus ? undefined : status;
 
-    let id = typeof record.id === "string" && record.id ? record.id : nanoid(10);
-    if (seenIds.has(id)) id = `${id}-${nanoid(4)}`;
+    let id = typeof record.id === "string" && record.id ? record.id : makeId(10);
+    if (seenIds.has(id)) id = `${id}-${makeId(4)}`;
     seenIds.add(id);
 
     const section: BoardSection = { id, title };
@@ -64,7 +63,7 @@ export function normalizeSections(value: unknown): BoardSection[] {
   // Guarantee every status has a column, appending any that are missing.
   for (const status of STATUS_SECTIONS) {
     if (!result.some((section) => section.status === status)) {
-      result.push({ id: `status-${status}`, title: STATUS_META[status].label, status });
+      result.push({ id: `status-${status}`, title: STATUS_LABELS[status], status });
     }
   }
 

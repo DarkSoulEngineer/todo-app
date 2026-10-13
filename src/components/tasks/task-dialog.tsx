@@ -1,7 +1,6 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { nanoid } from "nanoid";
 import { useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -10,6 +9,7 @@ import { useTasksContext } from "@/components/providers/tasks-provider";
 import { selectCategories } from "@/lib/domain/categories";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
 import { fromDateTimeLocal, toDateTimeLocal } from "@/lib/utils/datetime";
+import { makeId } from "@/lib/utils/id";
 import type { Priority, Subtask, Task, TaskDraft } from "@/lib/domain/types";
 
 interface TaskDialogProps {
@@ -73,7 +73,7 @@ function TaskForm({ task, initialDueAt, onClose, onSubmit }: TaskFormProps) {
   function addLocalSubtask(): void {
     const trimmed = draftSubtask.trim();
     if (!trimmed) return;
-    setSubtasks((prev) => [...prev, { id: nanoid(8), title: trimmed, done: false }]);
+    setSubtasks((prev) => [...prev, { id: makeId(8), title: trimmed, done: false }]);
     setDraftSubtask("");
   }
 

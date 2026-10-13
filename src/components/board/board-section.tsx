@@ -23,7 +23,7 @@ import {
 import { createPortal } from "react-dom";
 import { BoardCard } from "@/components/board/board-card";
 import { useTasksContext } from "@/components/providers/tasks-provider";
-import { STATUS_META } from "@/lib/domain/status";
+import { STATUS_META } from "@/components/common/status-meta";
 import { getBoardColorByLabel } from "@/lib/domain/boards";
 import type { BoardSection, Task } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/utils";

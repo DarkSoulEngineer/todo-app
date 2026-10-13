@@ -181,15 +181,6 @@ export function normalizeBoardColor(value: unknown): BoardColorId {
   return DEFAULT_BOARD_COLOR;
 }
 
-export function isBuiltInBoardId(value: unknown): value is string {
-  return typeof value === "string" && BUILT_IN_BOARDS.some((board) => board.id === value);
-}
-
-export function getBoard(boards: Board[], id: string | null | undefined): Board | null {
-  if (!id) return null;
-  return boards.find((board) => board.id === id) ?? null;
-}
-
 /** The built-in boards missing from `boards`, in their original order. */
 export function missingBuiltInBoards(boards: Board[]): Board[] {
   const present = new Set(boards.map((board) => board.id));
@@ -200,12 +191,6 @@ export function missingBuiltInBoards(boards: Board[]): Board[] {
 export function getBoardColorByLabel(label: string): BoardColor | null {
   const normalized = label.toLowerCase().trim();
   const board = BUILT_IN_BOARDS.find((b) => b.label.toLowerCase() === normalized);
-  return board ? boardColor(board.color) : null;
-}
-
-/** Gets the board color by id (e.g., "work" -> a palette entry). */
-export function getBoardColorById(id: string): BoardColor | null {
-  const board = BUILT_IN_BOARDS.find((b) => b.id === id.toLowerCase());
   return board ? boardColor(board.color) : null;
 }
 

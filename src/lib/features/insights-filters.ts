@@ -77,11 +77,8 @@ export function windowEndFromPreset(now: Date, preset: DateRangePreset, customEn
   }
 }
 
-/** Filter tasks based on the current insights filters. */
-export function filterTasksForInsights(tasks: Task[], filters: InsightsFilters, now: Date): Task[] {
-  const windowStart = windowStartFromPreset(now, filters.dateRange, filters.customStart);
-  const windowEnd = windowEndFromPreset(now, filters.dateRange, filters.customEnd);
-
+/** Applies the board, status and priority filters (no date-range window). */
+export function filterTasksByFilters(tasks: Task[], filters: InsightsFilters, now: Date): Task[] {
   return tasks.filter((task) => {
     // Board filter
     if (filters.boardId !== "all" && task.category !== filters.boardId) {
@@ -102,18 +99,6 @@ export function filterTasksForInsights(tasks: Task[], filters: InsightsFilters, 
     // Priority filter
     if (filters.priority !== "all" && task.priority !== filters.priority) {
       return false;
-    }
-
-    // Date range filter - only applies to completed tasks for completion charts
-    // For stats, we might want different behavior, but let's filter by completedAt for now
-    if (task.completed && task.completedAt) {
-      const completedDate = parseISO(task.completedAt);
-      if (isValid(completedDate)) {
-        const dayStart = startOfDay(completedDate);
-        if (dayStart < windowStart || dayStart > windowEnd) {
-          return false;
-        }
-      }
     }
 
     return true;

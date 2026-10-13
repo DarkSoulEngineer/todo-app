@@ -140,17 +140,6 @@ export const CARD_COLOR_WASHES: Record<BoardColorId, string> = {
 };
 
 /**
- * UPCOMING_WASH: the default wash for plain, untagged, open cards.
- *
- * A subtle blue (blue-500 hue, same RGB as the BLUE keyword theme) so the
- * default card reads calmer than the old violet neutral. Same recipe as the
- * category and theme washes: right-anchored top-right, light 0.05 / dark 0.09,
- * `transparent_65%` end stop, complete static Tailwind literal.
- */
-export const UPCOMING_WASH =
-  "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(59,130,246,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(59,130,246,0.09),transparent_65%)]";
-
-/**
  * NEUTRAL_WASH: the same canonical wash tinted with the `primary` hue.
  *
  * The fallback for a surface that has no dominant board colour (e.g. a manager

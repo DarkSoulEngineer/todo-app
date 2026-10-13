@@ -1,21 +1,10 @@
 import { isValid, parseISO } from "date-fns";
-import { nanoid } from "nanoid";
-import { defaultBoards, normalizeBoards, type Board } from "@/lib/domain/boards";
+import { defaultBoards, normalizeBoards } from "@/lib/domain/boards";
 import { isCategoryId } from "@/lib/domain/categories";
-import { PROBE_KEY, STORAGE_KEY } from "@/lib/domain/constants";
+import { STORAGE_KEY } from "@/lib/domain/constants";
 import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/domain/sections";
-import type { BoardSection, Priority, Subtask, Task, Workspace } from "@/lib/domain/types";
-
-interface PersistedState {
-  version: number;
-  tasks: Task[];
-  sections: BoardSection[];
-  boards?: Board[];
-  /** Pre-boards releases recorded category deletions here; migrated on load. */
-  deletedCategories?: string[];
-}
-
-const CURRENT_VERSION = 2;
+import type { Priority, Subtask, Task, Workspace } from "@/lib/domain/types";
+import { makeId } from "@/lib/utils/id";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
 
@@ -40,7 +29,7 @@ function normalizeSubtask(value: unknown): Subtask | null {
   const title = asString(record.title).trim();
   if (!title) return null;
   return {
-    id: asString(record.id) || nanoid(8),
+    id: asString(record.id) || makeId(8),
     title,
     done: record.done === true,
   };
@@ -63,7 +52,7 @@ function normalizeTask(value: unknown): Task | null {
     : [];
 
   return {
-    id: asString(record.id) || nanoid(10),
+    id: asString(record.id) || makeId(10),
     title,
     description: asString(record.description),
     dueAt: normalizeDate(record.dueAt),
@@ -152,57 +141,5 @@ export function parseWorkspaceJson(raw: string): Workspace | null {
     return buildWorkspace(JSON.parse(raw));
   } catch {
     return null;
-  }
-}
-
-export type StorageState = "ready" | "unavailable" | "full";
-
-/**
- * Distinguishes storage that is blocked entirely (private mode, cookies off)
- * from a usable store. Used to explain save failures to the user.
- */
-export function getStorageState(): StorageState {
-  if (typeof window === "undefined") return "unavailable";
-  try {
-    window.localStorage.setItem(PROBE_KEY, "1");
-    window.localStorage.removeItem(PROBE_KEY);
-    return "ready";
-  } catch {
-    return "unavailable";
-  }
-}
-
-/**
- * True when localStorage still accepts writes even though saving the workspace
- * failed — i.e. the write failed because the quota is exhausted.
- */
-function isQuotaExceeded(): boolean {
-  try {
-    window.localStorage.setItem(PROBE_KEY, "1");
-    window.localStorage.removeItem(PROBE_KEY);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Persists the workspace to localStorage. */
-export function saveWorkspace(workspace: Workspace): void {
-  if (typeof window === "undefined") return;
-  try {
-    const payload: PersistedState = {
-      version: CURRENT_VERSION,
-      tasks: workspace.tasks,
-      sections: workspace.sections,
-      boards: workspace.boards,
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // Storage blocked or full — the app keeps working from memory. When the
-    // quota is the problem, announce it so the UI can warn the user instead
-    // of silently dropping every write.
-    if (isQuotaExceeded()) {
-      window.dispatchEvent(new CustomEvent("stride:storage-full"));
-    }
   }
 }

@@ -42,12 +42,6 @@ function completionDates(tasks: Task[]): Date[] {
   return dates;
 }
 
-function getWindowBounds(now: Date, days: number): { start: Date; end: Date } {
-  const end = startOfDay(now);
-  const start = subDays(end, days - 1);
-  return { start, end };
-}
-
 function getPreviousWindowBounds(currentStart: Date, currentEnd: Date): { start: Date; end: Date } {
   const length = Math.ceil((currentEnd.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   const prevEnd = subDays(currentStart, 1);
@@ -72,40 +66,6 @@ function computeStreak(completed: Date[], windowEnd: Date): number {
     cursor = subDays(cursor, 1);
   }
   return streak;
-}
-
-/** Completion trend (default: last 7 days) plus an active-day streak. */
-export function computeInsights(tasks: Task[], now: Date, days = 7): Insights {
-  const completed = completionDates(tasks);
-
-  const { start: windowStart, end: windowEnd } = getWindowBounds(now, days);
-  const { start: previousWindowStart, end: previousWindowEnd } = getPreviousWindowBounds(windowStart, windowEnd);
-
-  const points: DailyPoint[] = [];
-  for (let index = days - 1; index >= 0; index -= 1) {
-    const day = subDays(now, index);
-    const count = completed.filter((date) => isSameDay(date, day)).length;
-    points.push({ key: format(day, "yyyy-MM-dd"), label: format(day, "EEEEE"), count });
-  }
-
-  const windowTotal = computeWindowTotal(completed, windowStart, windowEnd);
-  const previousWindowTotal = computeWindowTotal(completed, previousWindowStart, previousWindowEnd);
-  const periodChange = previousWindowTotal === 0 ? (windowTotal > 0 ? 100 : null) : Math.round(((windowTotal - previousWindowTotal) / previousWindowTotal) * 100);
-  const best = points.reduce((max, point) => Math.max(max, point.count), 0);
-  const streak = computeStreak(completed, windowEnd);
-
-  return {
-    points,
-    streak,
-    windowTotal,
-    best,
-    previousWindowTotal,
-    periodChange,
-    windowStart,
-    windowEnd,
-    previousWindowStart,
-    previousWindowEnd,
-  };
 }
 
 /** Compute insights for a custom window (used for filtered views). */

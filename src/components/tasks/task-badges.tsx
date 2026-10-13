@@ -6,7 +6,8 @@ import { getCategory } from "@/lib/domain/categories";
 import { boardColor } from "@/lib/domain/boards";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { PRIORITY_META } from "@/lib/domain/constants";
-import { deriveStatus, describeDue, STATUS_META } from "@/lib/domain/status";
+import { STATUS_META } from "@/components/common/status-meta";
+import { deriveStatus, describeDue } from "@/lib/domain/status";
 import type { Priority, Task } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/utils";
 

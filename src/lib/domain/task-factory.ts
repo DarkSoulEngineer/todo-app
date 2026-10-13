@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { makeId } from "@/lib/utils/id";
 import type { Task, TaskDraft } from "@/lib/domain/types";
 import { detectStatusFromText } from "@/lib/domain/status-keywords";
 
@@ -11,7 +11,7 @@ export function createTask(draft: TaskDraft): Task {
   const detectedStatus = detectStatusFromText(draft.title, draft.description);
   
   return {
-    id: nanoid(10),
+    id: makeId(10),
     title: draft.title.trim(),
     description: draft.description.trim(),
     dueAt: draft.dueAt,
@@ -21,7 +21,7 @@ export function createTask(draft: TaskDraft): Task {
     canceled: detectedStatus === "canceled",
     sectionId: null,
     subtasks: draft.subtasks.map((subtask) => ({
-      id: subtask.id || nanoid(8),
+      id: subtask.id || makeId(8),
       title: subtask.title.trim(),
       done: subtask.done,
     })),
@@ -47,7 +47,7 @@ export function applyDraft(task: Task, draft: TaskDraft): Task {
     priority: draft.priority,
     category: draft.category,
     subtasks: draft.subtasks.map((subtask) => ({
-      id: subtask.id || nanoid(8),
+      id: subtask.id || makeId(8),
       title: subtask.title.trim(),
       done: subtask.done,
     })),

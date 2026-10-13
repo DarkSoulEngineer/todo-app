@@ -1,6 +1,6 @@
 "use client";
 
-import { nanoid } from "nanoid";
+import { makeId } from "@/lib/utils/id";
 import {
   BUILT_IN_BOARDS,
   defaultBoards,
@@ -247,7 +247,7 @@ export function useTasks(): TasksApi {
       if (!trimmed) return;
       updateById(taskId, (task) => ({
         ...task,
-        subtasks: [...task.subtasks, { id: nanoid(8), title: trimmed, done: false }],
+        subtasks: [...task.subtasks, { id: makeId(8), title: trimmed, done: false }],
         updatedAt: new Date().toISOString(),
       }));
     },
@@ -378,7 +378,7 @@ export function useTasks(): TasksApi {
 
   const addSection = useCallback((title: string): BoardSection => {
     const section: BoardSection = {
-      id: `custom-${nanoid(8)}`,
+      id: `custom-${makeId(8)}`,
       title: title.trim() || "New section",
     };
     setSections((prev) => [...prev, section]);
@@ -467,7 +467,7 @@ export function useTasks(): TasksApi {
 
   const createBoard = useCallback((input: { label: string; color: BoardColorId }): Board => {
     const label = input.label.trim() || "New board";
-    const board: Board = { id: `board-${nanoid(8)}`, label, color: input.color };
+    const board: Board = { id: `board-${makeId(8)}`, label, color: input.color };
     setBoards((prev) => [...prev, board]);
     return board;
   }, []);

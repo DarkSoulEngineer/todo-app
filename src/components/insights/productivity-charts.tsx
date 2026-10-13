@@ -4,10 +4,11 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, useState, useRef } from "react";
 import { cn } from "@/lib/utils/utils";
 import type { InsightsFilters } from "@/lib/features/insights-filters";
-import type { Task } from "@/lib/domain/types";
+import type { Priority, Task } from "@/lib/domain/types";
 import { boardColor, DEFAULT_BOARD_COLOR, type Board } from "@/lib/domain/boards";
+import { PRIORITY_META } from "@/lib/domain/constants";
 import { getPriorityCounts, getWeekdayCompletionCounts, getCompletionDatesInWindow } from "@/lib/features/insights-filters";
-import { windowStartFromPreset, windowEndFromPreset } from "@/lib/features/insights-filters";
+import { windowStartFromPreset, windowEndFromPreset, filterTasksByFilters } from "@/lib/features/insights-filters";
 
 type ChartTab = "categories" | "trends" | "priorities" | "weekdays";
 
@@ -37,22 +38,11 @@ export function ProductivityCharts({ tasks, filters, boards, now }: Productivity
   const windowEnd = windowEndFromPreset(now, filters.dateRange, filters.customEnd);
   const days = Math.ceil((windowEnd.getTime() - windowStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-  // Filter tasks based on current filters
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((task) => {
-      if (filters.boardId !== "all" && task.category !== filters.boardId) return false;
-      if (filters.status !== "all") {
-        const isCompleted = task.completed;
-        const isCanceled = task.canceled;
-        const isOverdue = !isCompleted && !isCanceled && task.dueAt && Date.parse(task.dueAt) < now.getTime();
-        if (filters.status === "completed" && !isCompleted) return false;
-        if (filters.status === "canceled" && !isCanceled) return false;
-        if (filters.status === "overdue" && !isOverdue) return false;
-      }
-      if (filters.priority !== "all" && task.priority !== filters.priority) return false;
-      return true;
-    });
-  }, [tasks, filters, now]);
+  // Filter tasks based on current filters (shared insights filter logic).
+  const filteredTasks = useMemo(
+    () => filterTasksByFilters(tasks, filters, now),
+    [tasks, filters, now],
+  );
 
   // Categories data
   const categoryData = useMemo(() => {
@@ -256,10 +246,10 @@ export function ProductivityCharts({ tasks, filters, boards, now }: Productivity
   };
 
   const renderPriorities = () => {
-    const priorities: { key: "high" | "medium" | "low"; label: string; color: string; count: number }[] = [
-      { key: "high", label: "High", color: "red", count: priorityData.high },
-      { key: "medium", label: "Medium", color: "amber", count: priorityData.medium },
-      { key: "low", label: "Low", color: "green", count: priorityData.low },
+    const priorities: { key: Priority; label: string; count: number }[] = [
+      { key: "high", label: PRIORITY_META.high.label, count: priorityData.high },
+      { key: "medium", label: PRIORITY_META.medium.label, count: priorityData.medium },
+      { key: "low", label: PRIORITY_META.low.label, count: priorityData.low },
     ];
 
     return (
@@ -267,7 +257,7 @@ export function ProductivityCharts({ tasks, filters, boards, now }: Productivity
         {priorities.every((p) => p.count === 0) ? (
           <p className="text-center text-sm text-muted-foreground py-8">No priority data for current filters</p>
         ) : (
-          priorities.map(({ key, label, color, count }, index) => {
+          priorities.map(({ key, label, count }, index) => {
             const ratio = count / maxPriority;
             return (
               <motion.li
@@ -280,8 +270,7 @@ export function ProductivityCharts({ tasks, filters, boards, now }: Productivity
                 <span className="w-20 shrink-0 text-sm font-medium text-muted-foreground">{label}</span>
                 <span className="h-8 flex-1 overflow-hidden rounded-full bg-muted relative">
                   <motion.span
-                    className="absolute inset-0 rounded-full"
-                    style={{ backgroundColor: `var(--${color})` }}
+                    className={cn("absolute inset-0 rounded-full", PRIORITY_META[key].dot)}
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.max(ratio * 100, count > 0 ? 8 : 0)}%` }}
                     transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 200, damping: 28, delay: index * 0.1 }}

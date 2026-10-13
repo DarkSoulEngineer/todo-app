@@ -14,11 +14,6 @@ export function fromDateTimeLocal(value: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-/** ISO string -> a native <input type="datetime-local"> default attr, kept local. */
-export function dateTimeLocalNow(): string {
-  return format(new Date(), "yyyy-MM-dd'T'HH:mm");
-}
-
 /**
  * Reschedules a task by dropping it on a calendar day: keeps the original
  * clock time when the task already had a due date, otherwise defaults to 09:00.

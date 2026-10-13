@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useTasksContext } from "@/components/providers/tasks-provider";
+import { PRIORITY_META } from "@/lib/domain/constants";
 import type { BoardSection, Task } from "@/lib/domain/types";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/utils";
@@ -284,12 +285,7 @@ export function SelectionToolbar({
                         className="focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
                       >
                         <span
-                          className={cn(
-                            "h-3.5 w-3.5 rounded-full",
-                            p === "high" && "bg-orange-500",
-                            p === "medium" && "bg-amber-500",
-                            p === "low" && "bg-sky-500"
-                          )}
+                          className={cn("h-3.5 w-3.5 rounded-full", PRIORITY_META[p].dot)}
                         />
                         {p.charAt(0).toUpperCase() + p.slice(1)}
                       </button>

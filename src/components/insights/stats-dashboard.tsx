@@ -6,10 +6,10 @@ import { useMemo } from "react";
 import { Progress } from "@/components/ui/progress";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { computeStats } from "@/lib/domain/tasks-selectors";
-import { deriveStatus } from "@/lib/domain/status";
 import { cn } from "@/lib/utils/utils";
 import type { Task } from "@/lib/domain/types";
 import type { InsightsFilters } from "@/lib/features/insights-filters";
+import { filterTasksByFilters } from "@/lib/features/insights-filters";
 
 interface StatsDashboardProps {
   now: Date;
@@ -44,20 +44,7 @@ function StatTile({ icon: Icon, label, value, tone, change }: TileProps) {
 }
 
 function computeFilteredStats(tasks: Task[], filters: InsightsFilters, now: Date) {
-  const filtered = tasks.filter((task) => {
-    // Board filter
-    if (filters.boardId !== "all" && task.category !== filters.boardId) return false;
-    // Status filter
-    if (filters.status !== "all") {
-      const status = deriveStatus(task, now);
-      if (filters.status !== status) return false;
-    }
-    // Priority filter
-    if (filters.priority !== "all" && task.priority !== filters.priority) return false;
-    return true;
-  });
-
-  return computeStats(filtered, now);
+  return computeStats(filterTasksByFilters(tasks, filters, now), now);
 }
 
 function computePreviousPeriodStats(tasks: Task[], filters: InsightsFilters, now: Date, days: number) {

@@ -1,5 +1,5 @@
 import { subDays, subHours, addHours, addDays } from "date-fns";
-import { nanoid } from "nanoid";
+import { makeId } from "@/lib/utils/id";
 import { BUILT_IN_BOARDS, type Board } from "@/lib/domain/boards";
 import type { Task, TaskDraft } from "@/lib/domain/types";
 import { createTask } from "@/lib/domain/task-factory";
@@ -242,7 +242,7 @@ export function createSampleTasks(now: Date = new Date()): Task[] {
       priority: draft.priority,
       category: draft.category,
       subtasks: (subtasks ?? []).map((item) => ({
-        id: nanoid(8),
+        id: makeId(8),
         title: item.title,
         done: item.done,
       })),

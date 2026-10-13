@@ -1,6 +1,6 @@
 import { PRIORITY_META } from "@/lib/domain/constants";
 import { deriveStatus } from "@/lib/domain/status";
-import type { SortKey, StatusFilter, Task, TaskStatus } from "@/lib/domain/types";
+import type { SortKey, StatusFilter, Task } from "@/lib/domain/types";
 
 export type StatusCounts = Record<StatusFilter, number>;
 
@@ -44,12 +44,6 @@ export function computeStats(tasks: Task[], now: Date): TaskStats {
     active: counts.upcoming + counts.overdue,
     completionRate: total === 0 ? 0 : counts.completed / total,
   };
-}
-
-export interface TaskQuery {
-  status: StatusFilter;
-  query: string;
-  category: string | "all";
 }
 
 export function matchesQuery(task: Task, needle: string): boolean {
@@ -96,18 +90,4 @@ export function sortTasks(tasks: Task[], sort: SortKey): Task[] {
   }
 
   return list;
-}
-
-export function selectVisibleTasks(tasks: Task[], query: TaskQuery, sort: SortKey, now: Date): Task[] {
-  const needle = query.query.trim().toLowerCase();
-
-  const filtered = tasks.filter((task) => {
-    if (query.status !== "all" && deriveStatus(task, now) !== (query.status as TaskStatus)) {
-      return false;
-    }
-    if (query.category !== "all" && task.category !== query.category) return false;
-    return matchesQuery(task, needle);
-  });
-
-  return sortTasks(filtered, sort);
 }
