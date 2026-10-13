@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/lib/domain/types";
 
 export interface TaskSelectionState {
   selectedIds: Set<string>;

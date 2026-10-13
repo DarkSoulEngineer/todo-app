@@ -7,11 +7,11 @@ import {
   missingBuiltInBoards,
   type Board,
   type BoardColorId,
-} from "@/lib/boards";
+} from "@/lib/domain/boards";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { overdueAt, rescheduleToNextDay } from "@/lib/datetime";
-import { createSampleTasks, SAMPLE_BOARDS } from "@/lib/sample";
-import { isCustomSection, isStatusSection } from "@/lib/sections";
+import { overdueAt, rescheduleToNextDay } from "@/lib/utils/datetime";
+import { createSampleTasks, SAMPLE_BOARDS } from "@/lib/data/sample";
+import { isCustomSection, isStatusSection } from "@/lib/domain/sections";
 import {
   activeProject,
   cloneProject,
@@ -22,9 +22,9 @@ import {
   withWorkspace,
   type ProjectsState,
   type StrideProject,
-} from "@/lib/projects";
-import { applyDraft, createTask } from "@/lib/task-factory";
-import type { BoardSection, Task, TaskDraft, Workspace } from "@/lib/types";
+} from "@/lib/domain/projects";
+import { applyDraft, createTask } from "@/lib/domain/task-factory";
+import type { BoardSection, Task, TaskDraft, Workspace } from "@/lib/domain/types";
 
 export interface TasksApi {
   tasks: Task[];

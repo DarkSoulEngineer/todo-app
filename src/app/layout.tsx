@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
-import { AppToaster } from "@/components/app-toaster";
-import { ServiceWorkerRegister } from "@/components/service-worker-register";
-import { TasksProvider } from "@/components/tasks-provider";
-import { ThemeProvider } from "@/components/theme-provider";
+import { AppToaster } from "@/components/providers/app-toaster";
+import { ServiceWorkerRegister } from "@/components/providers/service-worker-register";
+import { TasksProvider } from "@/components/providers/tasks-provider";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import "./globals.css";
 
 const sans = Plus_Jakarta_Sans({

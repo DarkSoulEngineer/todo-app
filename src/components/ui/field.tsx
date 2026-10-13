@@ -6,7 +6,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 
 const CONTROL =
   "focus-ring w-full rounded-xl border border-input bg-card/70 text-foreground shadow-xs transition-colors placeholder:text-muted-foreground/70 hover:border-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
