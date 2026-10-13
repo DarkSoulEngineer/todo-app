@@ -8,10 +8,11 @@ import { BoardView } from "@/components/board/board-view";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { Celebration } from "@/components/common/celebration";
 import { EmptyState } from "@/components/common/empty-state";
+import { FilterMenu, type CategoryCount } from "@/components/common/filter-menu";
 import { InsightsView } from "@/components/insights/insights-view";
 import { ListView } from "@/components/list/list-view";
 import { ShortcutsHelp } from "@/components/common/shortcuts-help";
-import { Sidebar, type SidebarCategory } from "@/components/layout/sidebar";
+import { Sidebar } from "@/components/layout/sidebar";
 import { TaskDialog } from "@/components/tasks/task-dialog";
 import { TaskSkeleton } from "@/components/tasks/task-skeleton";
 import { TopBar } from "@/components/layout/top-bar";
@@ -25,7 +26,7 @@ import {
   smartListLabel,
 } from "@/lib/domain/smart-lists";
 import { computeStats, matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
-import { isCustomSection } from "@/lib/domain/sections";
+import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
 import type { SmartList, SortKey, Task, TaskDraft, ViewMode } from "@/lib/domain/types";
 import { pluralize } from "@/lib/utils/utils";
 
@@ -88,16 +89,18 @@ export function TodoApp() {
     [focusedSection, sections],
   );
 
+  // Task count per board column (custom and status alike), for the filter menu.
   const sectionCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const task of tasks) {
-      if (task.sectionId) map[task.sectionId] = (map[task.sectionId] ?? 0) + 1;
+      const id = getTaskSectionId(task, sections, now);
+      if (id) map[id] = (map[id] ?? 0) + 1;
     }
     return map;
-  }, [tasks]);
+  }, [tasks, sections, now]);
 
   // Deleted categories drop out of the filter list along with their counts.
-  const categoryCounts = useMemo<SidebarCategory[]>(() => {
+  const categoryCounts = useMemo<CategoryCount[]>(() => {
     const map = new Map<string, number>();
     for (const task of tasks) {
       if (task.category) map.set(task.category, (map.get(task.category) ?? 0) + 1);
@@ -179,12 +182,6 @@ export function TodoApp() {
 
   const selectCategory = useCallback((next: string | "all") => {
     setCategory(next);
-    setMobileNavOpen(false);
-  }, []);
-
-  const selectSection = useCallback((id: string) => {
-    setFocusedSection((current) => (current === id ? null : id));
-    setViewMode("board");
     setMobileNavOpen(false);
   }, []);
 
@@ -284,6 +281,27 @@ export function TodoApp() {
 
   const hasFilters = query.trim() !== "" || category !== "all";
 
+  // On-screen filter menu inputs. The board gets sections + categories; the
+  // list and calendar get categories only.
+  const nonHiddenSections = useMemo(() => sections.filter((section) => !section.hidden), [sections]);
+  const filterSections = {
+    activeId: activeSection?.id ?? null,
+    items: nonHiddenSections,
+    counts: sectionCounts,
+    onSelect: (id: string | null) => setFocusedSection(id),
+  };
+  const showCategoryFilter = categoryCounts.length > 0 || deletedCategories.length > 0;
+  const filterCategories = showCategoryFilter
+    ? {
+        activeId: category,
+        counts: categoryCounts,
+        deleted: deletedCategories,
+        onSelect: selectCategory,
+        onDelete: handleDeleteCategory,
+        onRestore: restoreCategories,
+      }
+    : undefined;
+
   let welcomeState: ReactNode = null;
   let noResultsState: ReactNode = null;
   if (!isLoading) {
@@ -339,6 +357,9 @@ export function TodoApp() {
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">{noResultsState}</div>
     ) : (
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <FilterMenu categories={filterCategories} />
+        </div>
         {smartList === "completed" ? (
           <div className="mb-4 flex items-center justify-between gap-3 px-1">
             <p className="text-sm text-muted-foreground">
@@ -383,6 +404,7 @@ export function TodoApp() {
           focusedSectionId={activeSection?.id ?? null}
           onClearFocus={() => setFocusedSection(null)}
           onSortChange={setSort}
+          toolbar={<FilterMenu sections={filterSections} categories={filterCategories} />}
           onEdit={openEdit}
         />
       </div>
@@ -392,6 +414,9 @@ export function TodoApp() {
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">{welcomeState}</div>
     ) : (
       <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <FilterMenu categories={filterCategories} />
+        </div>
         <CalendarView tasks={filteredAll} now={now} onEdit={openEdit} onCreateOn={openCreateOn} />
       </div>
     );
@@ -408,19 +433,9 @@ export function TodoApp() {
     smartList,
     counts,
     stats,
-    category,
-    categoryCounts,
-    deletedCategories,
-    sections,
-    sectionCounts,
-    focusedSection: activeSection?.id ?? null,
     currentBoardName: currentProjectName,
     onSelectList: selectList,
     onSelectView: selectView,
-    onSelectCategory: selectCategory,
-    onSelectSection: selectSection,
-    onDeleteCategory: handleDeleteCategory,
-    onRestoreCategories: restoreCategories,
     onShowHelp: () => setHelpOpen(true),
     onToggleCollapse: () => setSidebarCollapsed((value) => !value),
   };

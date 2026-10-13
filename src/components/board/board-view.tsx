@@ -20,7 +20,7 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { Eye, LayoutGrid, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardSectionColumn } from "@/components/board/board-section";
@@ -38,9 +38,11 @@ interface BoardViewProps {
   tasks: Task[];
   now: Date;
   sort: SortKey;
-  /** When set, only that section is shown (driven by the sidebar). */
+  /** When set, only that section is shown (driven by the filter menu). */
   focusedSectionId?: string | null;
   onClearFocus?: () => void;
+  /** Extra controls rendered at the start of the toolbar row (e.g. the filter menu). */
+  toolbar?: ReactNode;
   /**
    * Called when a positional drop forces the board into manual order (only
    * meaningful when another sort was active, whose derived order would
@@ -132,6 +134,7 @@ export function BoardView({
   focusedSectionId = null,
   onClearFocus,
   onSortChange,
+  toolbar,
   onEdit,
 }: BoardViewProps) {
   const {
@@ -512,36 +515,35 @@ export function BoardView({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {focusedSectionId || hiddenSections.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {focusedSectionId ? (
-            <button
-              type="button"
-              onClick={onClearFocus}
-              className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 font-medium text-foreground transition-colors hover:bg-muted"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Show all sections
-            </button>
-          ) : null}
-          {hiddenSections.length > 0 ? (
-            <>
-              <span className="text-muted-foreground">Hidden sections:</span>
-              {hiddenSections.map((section) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => toggleSectionHidden(section.id)}
-                  className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  {section.title}
-                </button>
-              ))}
-            </>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {toolbar}
+        {focusedSectionId ? (
+          <button
+            type="button"
+            onClick={onClearFocus}
+            className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Show all sections
+          </button>
+        ) : null}
+        {hiddenSections.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Hidden sections:</span>
+            {hiddenSections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => toggleSectionHidden(section.id)}
+                className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {section.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
       <DndContext
         sensors={sensors}

@@ -19,18 +19,15 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sun,
-  Trash2,
   TriangleAlert,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/common/theme-toggle";
-import { getBoardColorByLabel } from "@/lib/domain/boards";
-import { getCategory } from "@/lib/domain/categories";
 import { aggregateTimeCount, SMART_LISTS, TIME_GROUP_LISTS, type SmartListCounts } from "@/lib/domain/smart-lists";
 import type { TaskStats } from "@/lib/domain/tasks-selectors";
-import type { BoardSection, SmartList, ViewMode } from "@/lib/domain/types";
+import type { SmartList, ViewMode } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/utils";
 
 const LIST_ICONS: Record<SmartList, LucideIcon> = {
@@ -45,11 +42,6 @@ const LIST_ICONS: Record<SmartList, LucideIcon> = {
   "by-section": Hash,
 };
 
-export interface SidebarCategory {
-  id: string;
-  count: number;
-}
-
 interface SidebarProps {
   /** Keeps layout animations unique between the desktop and mobile instances. */
   idPrefix: string;
@@ -58,23 +50,10 @@ interface SidebarProps {
   smartList: SmartList;
   counts: SmartListCounts;
   stats: TaskStats;
-  category: string | "all";
-  categoryCounts: SidebarCategory[];
-  /** Ids of built-in categories the user deleted. */
-  deletedCategories: string[];
-  /** User-defined board sections (custom ones are surfaced here). */
-  sections: BoardSection[];
-  sectionCounts: Record<string, number>;
-  /** Id of the custom section currently focused on the board, if any. */
-  focusedSection: string | null;
   /** Name of the board selected in the board manager, shown as the home row's secondary line. */
   currentBoardName?: string;
   onSelectList: (list: SmartList) => void;
   onSelectView: (view: ViewMode) => void;
-  onSelectCategory: (category: string | "all") => void;
-  onSelectSection: (id: string) => void;
-  onDeleteCategory: (id: string) => void;
-  onRestoreCategories: () => void;
   onShowHelp: () => void;
   onToggleCollapse: () => void;
   onClose?: () => void;
@@ -87,19 +66,9 @@ export function Sidebar({
   smartList,
   counts,
   stats,
-  category,
-  categoryCounts,
-  deletedCategories,
-  sections,
-  sectionCounts,
-  focusedSection,
   currentBoardName,
   onSelectList,
   onSelectView,
-  onSelectCategory,
-  onSelectSection,
-  onDeleteCategory,
-  onRestoreCategories,
   onShowHelp,
   onToggleCollapse,
   onClose,
@@ -277,71 +246,6 @@ export function Sidebar({
           />
         </div>
 
-        {sections.some((section) => section.status === undefined) ? (
-          <div className="space-y-0.5">
-            {!collapsed ? (
-              <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                Sections
-              </p>
-            ) : null}
-            {sections
-              .filter((section) => section.status === undefined)
-              .map((section) => {
-                const color = getBoardColorByLabel(section.title);
-                const Icon = color ? (
-                  <span
-                    className={cn("h-4 w-4 rounded-full", color.dot)}
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Hash className="h-4 w-4" strokeWidth={2.2} />
-                );
-                return (
-                  <NavItem
-                    key={section.id}
-                    icon={Icon}
-                    label={section.title}
-                    count={sectionCounts[section.id] ?? 0}
-                    active={focusedSection === section.id}
-                    collapsed={collapsed}
-                    layoutId={`${idPrefix}-section-pill`}
-                    onClick={() => onSelectSection(section.id)}
-                  />
-                );
-              })}
-          </div>
-        ) : null}
-
-        {viewMode !== "insights" && (categoryCounts.length > 0 || deletedCategories.length > 0) ? (
-          <div className="space-y-0.5">
-            {!collapsed && categoryCounts.length > 0 ? (
-              <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                Categories
-              </p>
-            ) : null}
-            {categoryCounts.map((item) => (
-              <CategoryItem
-                key={item.id}
-                id={item.id}
-                count={item.count}
-                active={category === item.id}
-                collapsed={collapsed}
-                layoutId={`${idPrefix}-category-pill`}
-                onClick={() => onSelectCategory(category === item.id ? "all" : item.id)}
-                onDelete={() => onDeleteCategory(item.id)}
-              />
-            ))}
-            {!collapsed && deletedCategories.length > 0 ? (
-              <button
-                type="button"
-                onClick={onRestoreCategories}
-                className="focus-ring block w-full rounded-lg px-2.5 py-1 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Restore deleted categories
-              </button>
-            ) : null}
-          </div>
-        ) : null}
       </nav>
 
       <div className="border-t border-border px-3 py-3">
@@ -536,79 +440,5 @@ function TimeGroupRow({
         strokeWidth={2.2}
       />
     </button>
-  );
-}
-
-interface CategoryItemProps {
-  id: string;
-  count: number;
-  active: boolean;
-  collapsed: boolean;
-  layoutId?: string;
-  onClick: () => void;
-  /** Delete affordance; omitted when there is nowhere sensible to put it. */
-  onDelete?: () => void;
-}
-
-function CategoryItem({
-  id,
-  count,
-  active,
-  collapsed,
-  layoutId,
-  onClick,
-  onDelete,
-}: CategoryItemProps) {
-  const category = getCategory(id);
-  const reduceMotion = useReducedMotion();
-  if (!category) return null;
-
-  // The delete button needs room to sit beside the row, so it only exists
-  // while the sidebar is expanded.
-  const showDelete = !collapsed && onDelete !== undefined;
-
-  return (
-    // A wrapper keeps the two buttons siblings: no nested interactive elements.
-    <div className="group relative">
-      <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={active}
-        title={collapsed ? category.label : undefined}
-        className={cn(
-          "focus-ring relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
-          collapsed && "justify-center px-0 py-2.5",
-          active ? "text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-        )}
-      >
-        {active && layoutId ? (
-          <motion.span
-            layoutId={layoutId}
-            className={cn("absolute inset-0 rounded-xl bg-muted ring-1 ring-inset", category.ring)}
-            transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
-          />
-        ) : null}
-        <span className={cn("relative h-2.5 w-2.5 shrink-0 rounded-full", category.dot)} />
-        {!collapsed ? <span className="relative flex-1 truncate text-left">{category.label}</span> : null}
-        {/* The count yields its slot to the delete button. */}
-        {!collapsed && !showDelete ? (
-          <span className="relative text-xs text-muted-foreground tabular-nums">{count}</span>
-        ) : null}
-      </button>
-      {showDelete ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete?.();
-          }}
-          aria-label={`Delete ${category.label}`}
-          title="Delete category"
-          className="focus-ring absolute top-1/2 right-1 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground opacity-70 transition-colors hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      ) : null}
-    </div>
   );
 }
