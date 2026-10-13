@@ -20,7 +20,7 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { Eye, LayoutGrid, Plus } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardSectionColumn } from "@/components/board/board-section";
@@ -62,6 +62,63 @@ function findContainer(items: Record<string, string[]>, id: string): string | nu
   return null;
 }
 
+/** Shallow equality for two id lists (used to keep array identities stable). */
+function arrayEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+/**
+ * Pure reorder of the working columns for one drag-over sample. Returns the
+ * SAME `prev` reference when the move would not change any column, so callers
+ * never commit a no-op state update (which would otherwise churn dnd-kit's
+ * `SortableContext.items` and re-trigger measuring on every pointer move).
+ */
+function computeDragOrder(
+  prev: Record<string, string[]>,
+  activeId: string,
+  overId: string,
+  overIsSection: boolean,
+  isBelow: boolean,
+): Record<string, string[]> {
+  const from = findContainer(prev, activeId);
+  const to = overIsSection ? overId : findContainer(prev, overId);
+  if (!from || !to || !(to in prev)) return prev;
+
+  // Working list WITHOUT the dragged card: the exact post-drop column, so the
+  // live gap and the drop position always agree (no snap on release).
+  const targetWithout = (prev[to] ?? []).filter((id) => id !== activeId);
+  const anchorIndex = targetWithout.indexOf(overId);
+  const insertAt =
+    overIsSection || anchorIndex < 0
+      ? targetWithout.length
+      : Math.min(anchorIndex + (isBelow ? 1 : 0), targetWithout.length);
+  const targetNext = [
+    ...targetWithout.slice(0, insertAt),
+    activeId,
+    ...targetWithout.slice(insertAt),
+  ];
+
+  const sourceNext = (prev[from] ?? []).filter((id) => id !== activeId);
+  const targetUnchanged = arrayEqual(prev[to] ?? [], targetNext);
+  const sourceUnchanged = from === to || arrayEqual(prev[from] ?? [], sourceNext);
+  if (targetUnchanged && sourceUnchanged) return prev;
+
+  const next = { ...prev };
+  if (from !== to) next[from] = sourceNext;
+  next[to] = targetNext;
+  return next;
+}
+
+/** Idle time after the last pointer sample before the preview is committed. */
+const PREVIEW_SETTLE_MS = 120;
+/** Upper bound so a long, continuous drag still updates the preview now and then. */
+const PREVIEW_MAX_WAIT_MS = 450;
+
 /**
  * Fully user-controlled Kanban board. Sections are stored in order and can be
  * added, renamed, hidden, deleted and reordered; dragging a card reorders it
@@ -102,6 +159,18 @@ export function BoardView({
    * outside a card drag.
    */
   const [boardItems, setBoardItems] = useState<Record<string, string[]> | null>(null);
+
+  /**
+   * The preview shown while a card is dragged is committed on a "settle"
+   * schedule instead of on every pointer move. Fast, chaotic movement keeps
+   * resetting the timer, so the columns hold still; once the pointer slows and
+   * stabilizes the pending order is flushed in a single render. A short
+   * max-wait keeps a long, continuous drag from feeling frozen.
+   */
+  const boardItemsRef = useRef<Record<string, string[]> | null>(null);
+  const overIdRef = useRef<string | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewSinceRef = useRef<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -193,6 +262,31 @@ export function BoardView({
     ? (sections.find((section) => section.id === activeSectionId) ?? null)
     : null;
 
+  /** Commits the pending preview (order + drop target) in one render. */
+  function flushPreview(): void {
+    previewTimerRef.current = null;
+    previewSinceRef.current = null;
+    // Setters bail out when the reference/value is unchanged, so a flush that
+    // resolves to the same columns costs nothing.
+    setBoardItems(boardItemsRef.current);
+    setOverId(overIdRef.current);
+  }
+
+  /**
+   * Schedules the preview commit after the pointer settles. Every move resets
+   * the idle timer, so a fast, chaotic drag produces no board re-render; the
+   * first commit lands once movement slows. `PREVIEW_MAX_WAIT_MS` bounds the
+   * lag of a slow, continuous drag.
+   */
+  function schedulePreview(): void {
+    const nowMs = performance.now();
+    if (previewSinceRef.current === null) previewSinceRef.current = nowMs;
+    const elapsed = nowMs - previewSinceRef.current;
+    const wait = elapsed >= PREVIEW_MAX_WAIT_MS ? 0 : PREVIEW_SETTLE_MS;
+    if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(flushPreview, wait);
+  }
+
   function handleDragStart(event: DragStartEvent): void {
     dismissTooltips();
     if (event.active.data.current?.type === "section") {
@@ -206,55 +300,65 @@ export function BoardView({
     for (const section of sections) {
       seeded[section.id] = (tasksBySection.get(section.id) ?? []).map((task) => task.id);
     }
+    boardItemsRef.current = seeded;
+    overIdRef.current = null;
+    previewSinceRef.current = null;
     setBoardItems(seeded);
+    setOverId(null);
   }
 
   function handleDragOver(event: DragOverEvent): void {
     if (event.active.data.current?.type === "section") return;
     const { active, over } = event;
     if (!over) return;
-    setOverId(String(over.id));
 
     const activeId = String(active.id);
     const overId = String(over.id);
-    if (activeId === overId) return;
+    // The ref is the source of truth for the drop; the state preview is only
+    // published on the settle schedule below.
+    overIdRef.current = overId;
 
-    setBoardItems((prev) => {
-      if (!prev) return prev;
-      const activeIdOf = String(active.id);
-      const from = findContainer(prev, activeIdOf);
-      const overIsSection = over.data.current?.type === "section" || sectionIds.has(overId);
-      const to = overIsSection ? overId : findContainer(prev, overId);
-      if (!from || !to || !(to in prev)) return prev;
+    if (activeId !== overId) {
+      const prev = boardItemsRef.current;
+      if (prev) {
+        const translated = active.rect.current.translated;
+        const isBelow = Boolean(translated && translated.top > over.rect.top + over.rect.height);
+        const overIsSection = over.data.current?.type === "section" || sectionIds.has(overId);
+        boardItemsRef.current = computeDragOrder(prev, activeId, overId, overIsSection, isBelow);
+      }
+    }
 
-      // Working list WITHOUT the dragged card: the exact post-drop column, so
-      // the live gap and the drop position always agree (no snap on release).
-      const list = (prev[to] ?? []).filter((id) => id !== activeIdOf);
-      const anchorIndex = list.indexOf(overId);
-      const translated = active.rect.current.translated;
-      const isBelow = Boolean(translated && translated.top > over.rect.top + over.rect.height);
-      const insertAt =
-        overIsSection || anchorIndex < 0
-          ? list.length
-          : Math.min(anchorIndex + (isBelow ? 1 : 0), list.length);
-
-      const next = { ...prev };
-      next[from] = (prev[from] ?? []).filter((id) => id !== activeIdOf);
-      next[to] = [...list.slice(0, insertAt), activeIdOf, ...list.slice(insertAt)];
-      return next;
-    });
+    schedulePreview();
   }
 
   function resetDrag(): void {
+    if (previewTimerRef.current !== null) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    previewSinceRef.current = null;
+    boardItemsRef.current = null;
+    overIdRef.current = null;
     setActiveTaskId(null);
     setActiveSectionId(null);
     setOverId(null);
     setBoardItems(null);
   }
 
+  // A drag that unmounts mid-flight (view switch, navigation) must not fire a
+  // stale preview commit.
+  useEffect(
+    () => () => {
+      if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
+    },
+    [],
+  );
+
   function handleDragEnd(event: DragEndEvent): void {
     const { active, over } = event;
-    const workingItems = boardItems;
+    // The ref always holds the exact drop position, even if the settle timer
+    // never got a chance to publish it before release.
+    const workingItems = boardItemsRef.current;
     resetDrag();
     if (!over) return;
 
