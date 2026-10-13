@@ -23,9 +23,10 @@ export function SelectionToolbar({
   sections,
   onClear,
 }: SelectionToolbarProps) {
-  const { toggleComplete, toggleCancel, deleteTask, updateTask, assignTaskToSection, snapshot, restore } = useTasksContext();
+  const { toggleComplete, toggleCancel, deleteTask, patchTask, assignTaskToSection, snapshot, restore } = useTasksContext();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const menuAnchorRef = useRef<HTMLElement | null>(null);
+  const moveAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const priorityAnchorRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const count = selectedIds.size;
@@ -92,8 +93,10 @@ export function SelectionToolbar({
 
   function handleBulkPriority(priority: "low" | "medium" | "high") {
     const before = snapshot();
+    // patchTask merges just `priority` and never re-runs keyword/status
+    // detection, so a task like "Cancel subscription" keeps its status.
     selectedTasks.forEach((t) => {
-      updateTask(t.id, { ...t, priority });
+      patchTask(t.id, { priority });
     });
     toast.success(`Priority set to ${priority} (${count})`, {
       duration: 3000,
@@ -125,10 +128,12 @@ export function SelectionToolbar({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [openMenu]);
 
-  // Position menu
+  // Position menu, anchored to whichever trigger opened it.
   useEffect(() => {
-    if (!openMenu || !menuAnchorRef.current) return;
-    const rect = menuAnchorRef.current.getBoundingClientRect();
+    if (!openMenu) return;
+    const anchor = openMenu === "move" ? moveAnchorRef.current : priorityAnchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
     const menu = menuRef.current;
     if (!menu) return;
     const { width, height } = menu.getBoundingClientRect();
@@ -197,7 +202,7 @@ export function SelectionToolbar({
             {applicableSections.length > 0 && (
               <div className="relative">
                 <button
-                  ref={(el) => { menuAnchorRef.current = el; }}
+                  ref={moveAnchorRef}
                   type="button"
                   onClick={() => setOpenMenu(openMenu === "move" ? null : "move")}
                   aria-haspopup="menu"
@@ -245,7 +250,7 @@ export function SelectionToolbar({
             {/* Set priority dropdown */}
             <div className="relative">
               <button
-                ref={(el) => { menuAnchorRef.current = el; }}
+                ref={priorityAnchorRef}
                 type="button"
                 onClick={() => setOpenMenu(openMenu === "priority" ? null : "priority")}
                 aria-haspopup="menu"

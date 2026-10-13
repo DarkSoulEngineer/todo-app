@@ -24,8 +24,6 @@ interface SortableTaskCardProps {
   highlighted?: boolean;
   /** Click handler for selection */
   onSelect?: (task: Task, shiftKey: boolean) => void;
-  /** Double-click handler for inline rename */
-  onRename?: (task: Task) => void;
   /** Called after the card is moved to another section via the arrows. */
   onMovedToSection?: (sectionId: string) => void;
   /** Zero-based position inside the list group / board column. */
@@ -46,7 +44,6 @@ export function SortableTaskCard({
   selected,
   highlighted,
   onSelect,
-  onRename,
   onMovedToSection,
   reorderIndex,
   reorderTotal,
@@ -72,6 +69,8 @@ export function SortableTaskCard({
   return (
     <motion.li
       ref={setNodeRef}
+      role="option"
+      aria-selected={Boolean(selected)}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -90,7 +89,6 @@ export function SortableTaskCard({
         selected={selected}
         highlighted={highlighted}
         onSelect={onSelect}
-        onRename={onRename}
         onMovedToSection={onMovedToSection}
         reorderIndex={reorderIndex}
         reorderTotal={reorderTotal}

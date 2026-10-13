@@ -45,9 +45,15 @@ interface CalendarViewProps {
 
 export function CalendarView({ tasks, now, onEdit, onCreateOn }: CalendarViewProps) {
   const { setTaskDueAt } = useTasksContext();
-  const [cursor, setCursor] = useState<Date>(() => new Date(now));
+  // The cursor follows the live clock until the user navigates away from today.
+  // `now` is the epoch until the client clock hydrates (see useNow), so we only
+  // trust it once it is a real timestamp; otherwise fall back to the first of
+  // the current month so the calendar can never render January 1970 (and can
+  // never stay stuck there, because it keeps tracking `now`).
+  const [navCursor, setNavCursor] = useState<Date | null>(null);
   const [mode, setMode] = useState<CalendarMode>("month");
   const [dayDialogDate, setDayDialogDate] = useState<Date | null>(null);
+  const cursor = navCursor ?? (now.getTime() > 0 ? now : startOfMonth(new Date()));
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -85,7 +91,10 @@ export function CalendarView({ tasks, now, onEdit, onCreateOn }: CalendarViewPro
       : format(cursor, "MMMM yyyy");
 
   const shift = (delta: number): void => {
-    setCursor((prev) => (mode === "week" ? addWeeks(prev, delta) : addMonths(prev, delta)));
+    setNavCursor((prev) => {
+      const base = prev ?? (now.getTime() > 0 ? now : startOfMonth(new Date()));
+      return mode === "week" ? addWeeks(base, delta) : addMonths(base, delta);
+    });
   };
 
   function handleDragEnd(event: DragEndEvent): void {
@@ -138,7 +147,7 @@ export function CalendarView({ tasks, now, onEdit, onCreateOn }: CalendarViewPro
           >
             <ChevronRight className="h-4 w-4" />
           </button>
-          <Button variant="outline" size="sm" onClick={() => setCursor(new Date(now))}>
+          <Button variant="outline" size="sm" onClick={() => setNavCursor(null)}>
             Today
           </Button>
           <h2 className="ml-1.5 inline-flex items-center gap-2 font-display text-lg tracking-tight">

@@ -5,7 +5,6 @@ import { AnimatePresence } from "framer-motion";
 import { useCallback, useMemo } from "react";
 import { SortableTaskCard } from "@/components/tasks/sortable-task-card";
 import { useTasksContext } from "@/components/providers/tasks-provider";
-import { useTaskSelection } from "@/hooks/use-task-selection";
 import type { Task, BoardSection } from "@/lib/domain/types";
 import type { TasksApi } from "@/hooks/use-tasks";
 
@@ -18,12 +17,13 @@ interface TaskListProps {
   onEdit: (task: Task) => void;
   sections: BoardSection[];
   assignTaskToSection: AssignTaskToSection;
-  /** Selection state from parent */
+  /** Selection state, owned by the parent (single source of truth). */
   selectedIds?: Set<string>;
   highlightedId?: string | null;
-  onSelectionChange?: (selectedIds: Set<string>) => void;
   onSelectTask?: (task: Task, shiftKey: boolean) => void;
-  onRenameTask?: (task: Task) => void;
+  /** Keyboard navigation callbacks, owned by the parent's selection hook. */
+  moveHighlight: (direction: "next" | "prev") => void;
+  selectHighlighted: () => void;
   /** Manual order: cards may be rearranged inside the group with up/down. */
   reorderable: boolean;
   /** Called after a card is moved to another section via the list arrows. */
@@ -39,14 +39,13 @@ export function TaskList({
   assignTaskToSection,
   selectedIds,
   highlightedId,
-  onSelectionChange,
   onSelectTask,
-  onRenameTask,
+  moveHighlight,
+  selectHighlighted,
   reorderable,
   onMovedToSection,
 }: TaskListProps) {
   const { reorderTasks } = useTasksContext();
-  const { moveHighlight, selectHighlighted } = useTaskSelection(tasks, onSelectionChange);
 
   const orderedIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
 
@@ -62,15 +61,12 @@ export function TaskList({
     [orderedIds, reorderTasks],
   );
 
-  // Use parent selection state if provided, otherwise use local
+  // Selection is owned by the parent; read it from props only.
   const effectiveSelectedIds = selectedIds ?? new Set();
   const effectiveHighlightedId = highlightedId ?? undefined;
 
   const handleSelect = useCallback((task: Task, shiftKey: boolean) => {
-    // If parent provides onSelectTask, use it; otherwise use local toggle
-    if (onSelectTask) {
-      onSelectTask(task, shiftKey);
-    }
+    onSelectTask?.(task, shiftKey);
   }, [onSelectTask]);
 
   // Handle keyboard navigation for the list
@@ -107,7 +103,6 @@ export function TaskList({
             selected={effectiveSelectedIds.has(task.id)}
             highlighted={effectiveHighlightedId === task.id}
             onSelect={handleSelect}
-            onRename={onRenameTask}
             onMovedToSection={onMovedToSection}
             reorderIndex={reorderable ? index : undefined}
             reorderTotal={reorderable ? tasks.length : undefined}

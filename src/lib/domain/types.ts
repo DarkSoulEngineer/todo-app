@@ -51,6 +51,15 @@ export interface Workspace {
   boards: Board[];
 }
 
+/**
+ * Fields that may be patched directly onto a task without any status
+ * re-derivation (see `patchTask`). Deliberately excludes `completed`,
+ * `canceled` and `completedAt`, which are owned by the status APIs.
+ */
+export type TaskPatch = Partial<
+  Pick<Task, "title" | "description" | "dueAt" | "priority" | "category" | "subtasks" | "sectionId">
+>;
+
 /** Editable shape used by the create/edit form. */
 export interface TaskDraft {
   title: string;

@@ -13,8 +13,8 @@ export interface StatusKeywords {
 export const DEFAULT_STATUS_KEYWORDS: StatusKeywords = {
   completed: [
     "done", "finished", "complete", "completed", "✓", "✅", "✔",
-    "ready", "delivered", "shipped", "published", "closed",
-    "resolved", "fixed", "accomplished", "achieved", "finalized",
+    "delivered", "shipped", "published",
+    "resolved", "accomplished", "achieved", "finalized",
     "wrapped up", "wrapped-up", "signed off", "signed-off"
   ],
   overdue: [
@@ -29,14 +29,49 @@ export const DEFAULT_STATUS_KEYWORDS: StatusKeywords = {
     "to do", "todo", "to-do", "awaiting", "waiting for"
   ],
   canceled: [
-    "cancelled", "canceled", "cancel", "cancelled", "aborted",
-    "dropped", "discarded", "rejected", "declined", "void",
+    "cancelled", "canceled", "cancel", "aborted",
+    "dropped", "discarded", "rejected", "declined",
     "withdrawn", "scrapped", "terminated", "stopped", "halted",
     "no longer needed", "not doing", "wont do", "won't do"
   ]
 };
 
 export type DetectedStatus = "completed" | "overdue" | "upcoming" | "canceled" | null;
+
+/** Escapes regex metacharacters so a literal keyword is matched verbatim. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const keywordPatternCache = new Map<string, RegExp>();
+
+/**
+ * Compiles a keyword into a case-insensitive, whole-word matcher.
+ *
+ * - Whitespace between words is collapsed to `\s+` so "next week" also matches
+ *   "next   week".
+ * - `\b` anchors are only added next to word characters, so symbol keywords
+ *   such as "✓" (which have no word boundary) still match.
+ * - Whole-word matching stops substrings from firing, e.g. "done" in "abdone",
+ *   "ready" in "already", "fixed" in "prefixed" or "closed" in "enclosed".
+ */
+function keywordToRegExp(keyword: string): RegExp {
+  const trimmed = keyword.trim();
+  const cached = keywordPatternCache.get(trimmed);
+  if (cached) return cached;
+
+  const body = escapeRegExp(trimmed).replace(/\s+/g, "\\s+");
+  const prefix = /^\w/.test(trimmed) ? "\\b" : "";
+  const suffix = /\w$/.test(trimmed) ? "\\b" : "";
+  const pattern = new RegExp(`${prefix}${body}${suffix}`, "i");
+
+  keywordPatternCache.set(trimmed, pattern);
+  return pattern;
+}
+
+function matchesAny(text: string, keywords: string[]): boolean {
+  return keywords.some((keyword) => keywordToRegExp(keyword).test(text));
+}
 
 /**
  * Detects status from task title and description based on keywords.
@@ -47,26 +82,15 @@ export function detectStatusFromText(
   description: string,
   keywords: StatusKeywords = DEFAULT_STATUS_KEYWORDS
 ): DetectedStatus {
-  const text = `${title} ${description}`.toLowerCase();
-  
+  const text = `${title} ${description}`;
+
   // Priority order: completed > canceled > overdue > upcoming
   // This ensures explicit completion/cancellation takes precedence
-  
-  for (const keyword of keywords.completed) {
-    if (text.includes(keyword.toLowerCase())) return "completed";
-  }
-  
-  for (const keyword of keywords.canceled) {
-    if (text.includes(keyword.toLowerCase())) return "canceled";
-  }
-  
-  for (const keyword of keywords.overdue) {
-    if (text.includes(keyword.toLowerCase())) return "overdue";
-  }
-  
-  for (const keyword of keywords.upcoming) {
-    if (text.includes(keyword.toLowerCase())) return "upcoming";
-  }
-  
+
+  if (matchesAny(text, keywords.completed)) return "completed";
+  if (matchesAny(text, keywords.canceled)) return "canceled";
+  if (matchesAny(text, keywords.overdue)) return "overdue";
+  if (matchesAny(text, keywords.upcoming)) return "upcoming";
+
   return null;
 }

@@ -32,10 +32,13 @@ export function createTask(draft: TaskDraft): Task {
 }
 
 /** Applies editable fields from a draft onto an existing task.
- * Also re-evaluates auto-detected status from title/description. */
+ *
+ * Status is NOT re-derived from keywords here: editing any field (title,
+ * description, due date, …) must never silently set or clear `completed`,
+ * `canceled` or `completedAt`. Those only change through explicit user
+ * actions elsewhere. Keyword auto-detection remains a create-time feature.
+ */
 export function applyDraft(task: Task, draft: TaskDraft): Task {
-  const detectedStatus = detectStatusFromText(draft.title, draft.description);
-  
   return {
     ...task,
     title: draft.title.trim(),
@@ -43,9 +46,6 @@ export function applyDraft(task: Task, draft: TaskDraft): Task {
     dueAt: draft.dueAt,
     priority: draft.priority,
     category: draft.category,
-    completed: detectedStatus === "completed" ? true : task.completed,
-    canceled: detectedStatus === "canceled" ? true : task.canceled,
-    completedAt: detectedStatus === "completed" && !task.completed ? new Date().toISOString() : task.completedAt,
     subtasks: draft.subtasks.map((subtask) => ({
       id: subtask.id || nanoid(8),
       title: subtask.title.trim(),

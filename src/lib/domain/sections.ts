@@ -92,3 +92,24 @@ export function getTaskSectionId(task: Task, sections: BoardSection[], now: Date
   const statusSection = sections.find((s) => s.status === status);
   return statusSection?.id;
 }
+
+/**
+ * Gets the previous and next section IDs relative to the task's current
+ * section, following the board's section order.
+ */
+export function getAdjacentSections(
+  task: Task,
+  sections: BoardSection[],
+  now: Date,
+): { prev: string | null; next: string | null } {
+  const currentSectionId = getTaskSectionId(task, sections, now);
+  if (!currentSectionId) return { prev: null, next: null };
+
+  const currentIndex = sections.findIndex((s) => s.id === currentSectionId);
+  if (currentIndex === -1) return { prev: null, next: null };
+
+  const prev = currentIndex > 0 ? sections[currentIndex - 1].id : null;
+  const next = currentIndex < sections.length - 1 ? sections[currentIndex + 1].id : null;
+
+  return { prev, next };
+}

@@ -5,8 +5,6 @@ import { TaskList } from "@/components/tasks/task-list";
 import { SelectionToolbar } from "@/components/tasks/selection-toolbar";
 import { groupForList, groupForListBySection } from "@/lib/domain/smart-lists";
 import { useTasksContext } from "@/components/providers/tasks-provider";
-import { isCustomSection } from "@/lib/domain/sections";
-import { deriveStatus } from "@/lib/domain/status";
 import { getBoardColorByLabel } from "@/lib/domain/boards";
 import type { SmartList, Task, BoardSection } from "@/lib/domain/types";
 import { useTaskSelection } from "@/hooks/use-task-selection";
@@ -57,15 +55,13 @@ export function ListView({
     selectMode,
     clearSelection,
     toggleTask,
+    moveHighlight,
+    selectHighlighted,
   } = useTaskSelection(allTasks);
 
   // Handle selection from TaskList
   const handleSelectTask = (task: Task, shiftKey: boolean) => {
     toggleTask(task.id, shiftKey);
-  };
-
-  const handleRenameTask = () => {
-    // Inline rename is handled by TaskCard directly
   };
 
   // Check if any tasks in current view are selected
@@ -151,11 +147,9 @@ export function ListView({
               assignTaskToSection={assignTaskToSection}
               selectedIds={selectedIds}
               highlightedId={highlightedId}
-              onSelectionChange={() => {
-                // Selection change is handled by useTaskSelection internally
-              }}
               onSelectTask={handleSelectTask}
-              onRenameTask={handleRenameTask}
+              moveHighlight={moveHighlight}
+              selectHighlighted={selectHighlighted}
               onMovedToSection={onMovedToSection}
               reorderable={reorderable}
             />
@@ -164,41 +158,4 @@ export function ListView({
       })}
     </div>
   );
-}
-
-/**
- * Determines which board section a task currently belongs to.
- * Returns the section ID or undefined if not found.
- */
-export function getTaskSectionId(task: Task, sections: BoardSection[], now: Date): string | undefined {
-  // If task has a custom sectionId, use that
-  if (task.sectionId) {
-    const customSection = sections.find((s) => s.id === task.sectionId);
-    if (customSection && isCustomSection(customSection)) return customSection.id;
-  }
-  // Otherwise, find the status section matching the task's derived status
-  const status = deriveStatus(task, now);
-  const statusSection = sections.find((s) => s.status === status);
-  return statusSection?.id;
-}
-
-/**
- * Gets the previous and next section IDs relative to the task's current section,
- * following the board's section order.
- */
-export function getAdjacentSections(
-  task: Task,
-  sections: BoardSection[],
-  now: Date
-): { prev: string | null; next: string | null } {
-  const currentSectionId = getTaskSectionId(task, sections, now);
-  if (!currentSectionId) return { prev: null, next: null };
-
-  const currentIndex = sections.findIndex((s) => s.id === currentSectionId);
-  if (currentIndex === -1) return { prev: null, next: null };
-
-  const prev = currentIndex > 0 ? sections[currentIndex - 1].id : null;
-  const next = currentIndex < sections.length - 1 ? sections[currentIndex + 1].id : null;
-
-  return { prev, next };
 }

@@ -24,7 +24,7 @@ import { TaskTooltip } from "@/components/tasks/task-tooltip";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { CARD_COLOR_WASHES, detectCardTheme, PRIORITY_WASHES } from "@/lib/features/card-themes";
 import { deriveStatus } from "@/lib/domain/status";
-import { isCustomSection } from "@/lib/domain/sections";
+import { getAdjacentSections, getTaskSectionId } from "@/lib/domain/sections";
 import type { Task, BoardSection, TaskStatus } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/utils";
 
@@ -52,8 +52,6 @@ interface TaskCardProps {
   highlighted?: boolean;
   /** Click handler for selection */
   onSelect?: (task: Task, shiftKey: boolean) => void;
-  /** Double-click handler for inline rename */
-  onRename?: (task: Task) => void;
   /** Called after the card is moved to another section via the arrows. */
   onMovedToSection?: (sectionId: string) => void;
   /** Zero-based position of the card inside its board column. */
@@ -95,35 +93,6 @@ function statusRail(task: Task, status: TaskStatus): string | null {
   if (task.completed) return "from-emerald-500/70 via-emerald-500/45 to-emerald-500/10";
   if (status === "overdue") return "from-red-500/70 via-red-500/45 to-red-500/10";
   return null;
-}
-
-/** Determines which board section a task currently belongs to. */
-function getTaskSectionId(task: Task, sections: BoardSection[], now: Date): string | undefined {
-  if (task.sectionId) {
-    const customSection = sections.find((s) => s.id === task.sectionId);
-    if (customSection && isCustomSection(customSection)) return customSection.id;
-  }
-  const status = deriveStatus(task, now);
-  const statusSection = sections.find((s) => s.status === status);
-  return statusSection?.id;
-}
-
-/** Gets the previous and next section IDs relative to the task's current section. */
-function getAdjacentSections(
-  task: Task,
-  sections: BoardSection[],
-  now: Date
-): { prev: string | null; next: string | null } {
-  const currentSectionId = getTaskSectionId(task, sections, now);
-  if (!currentSectionId) return { prev: null, next: null };
-
-  const currentIndex = sections.findIndex((s) => s.id === currentSectionId);
-  if (currentIndex === -1) return { prev: null, next: null };
-
-  const prev = currentIndex > 0 ? sections[currentIndex - 1].id : null;
-  const next = currentIndex < sections.length - 1 ? sections[currentIndex + 1].id : null;
-
-  return { prev, next };
 }
 
 /** A neighbouring column a card can be moved to through the arrows. */
@@ -595,13 +564,13 @@ export function TaskCard({
   selected = false,
   highlighted = false,
   onSelect,
-  onRename,
   onMovedToSection,
   reorderIndex,
   reorderTotal,
   onReorder,
 }: TaskCardProps) {
-  const { toggleComplete, toggleCancel, deleteTask, snapshot, restore, boards } = useTasksContext();
+  const { toggleComplete, toggleCancel, deleteTask, snapshot, restore, boards, patchTask } =
+    useTasksContext();
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(task.title);
@@ -654,10 +623,11 @@ export function TaskCard({
   function handleRenameCommit() {
     const trimmed = renameValue.trim();
     if (trimmed && trimmed !== task.title) {
-      setRenaming(false);
+      patchTask(task.id, { title: trimmed });
     } else {
-      setRenaming(false);
+      setRenameValue(task.title);
     }
+    setRenaming(false);
   }
 
   function handleRenameCancel() {
@@ -697,7 +667,10 @@ export function TaskCard({
     const target = e.target;
     if (!(target instanceof Element)) return;
     if (target.closest(TITLE_SELECTOR) !== null) {
-      if (onRename && !compact) {
+      // Inline rename is a self-contained, non-compact list feature: the card
+      // commits it itself through `patchTask`. The select handler is the
+      // signal that this card lives on the selectable list surface.
+      if (onSelect && !compact) {
         e.preventDefault();
         setRenameValue(task.title);
         setRenaming(true);
@@ -865,7 +838,7 @@ export function TaskCard({
                 renaming={renaming}
                 renameValue={renameValue}
                 renameInputRef={renameInputRef}
-                hasSelectOrRename={Boolean(onSelect || onRename)}
+                hasSelectOrRename={Boolean(onSelect)}
                 onRenameValueChange={setRenameValue}
                 onRenameKeyDown={handleRenameKeyDown}
                 onRenameBlur={handleRenameBlur}

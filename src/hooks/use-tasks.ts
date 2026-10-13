@@ -24,7 +24,7 @@ import {
   type StrideProject,
 } from "@/lib/domain/projects";
 import { applyDraft, createTask } from "@/lib/domain/task-factory";
-import type { BoardSection, Task, TaskDraft, Workspace } from "@/lib/domain/types";
+import type { BoardSection, Task, TaskDraft, TaskPatch, Workspace } from "@/lib/domain/types";
 
 export interface TasksApi {
   tasks: Task[];
@@ -35,6 +35,12 @@ export interface TasksApi {
   isEmpty: boolean;
   addTask: (draft: TaskDraft) => Task;
   updateTask: (id: string, draft: TaskDraft) => void;
+  /**
+   * Merges only the provided fields into a task and bumps `updatedAt`. Unlike
+   * `updateTask`, it never re-runs keyword/status derivation and never touches
+   * `completed`/`canceled`/`completedAt`.
+   */
+  patchTask: (id: string, patch: TaskPatch) => void;
   deleteTask: (id: string) => void;
   toggleComplete: (id: string) => void;
   toggleCancel: (id: string) => void;
@@ -175,6 +181,13 @@ export function useTasks(): TasksApi {
   const updateTask = useCallback(
     (id: string, draft: TaskDraft) => {
       updateById(id, (task) => applyDraft(task, draft));
+    },
+    [updateById],
+  );
+
+  const patchTask = useCallback(
+    (id: string, patch: TaskPatch) => {
+      updateById(id, (task) => ({ ...task, ...patch, updatedAt: new Date().toISOString() }));
     },
     [updateById],
   );
@@ -656,6 +669,7 @@ export function useTasks(): TasksApi {
       isEmpty: tasks.length === 0,
       addTask,
       updateTask,
+      patchTask,
       deleteTask,
       toggleComplete,
       toggleCancel,
@@ -703,6 +717,7 @@ export function useTasks(): TasksApi {
       isLoading,
       addTask,
       updateTask,
+      patchTask,
       deleteTask,
       toggleComplete,
       toggleCancel,
