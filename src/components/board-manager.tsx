@@ -797,7 +797,14 @@ function GridDragOverlay({
   const project = projects.find((candidate) => candidate.id === String(active.id));
   if (!project) return <></>;
   return (
-    <DragOverlay dropAnimation={null} style={{ width: active.rect.current.initial?.width }}>
+    // Size the overlay from the source card's own rect (dnd-kit's default). Do
+    // NOT set an explicit width from `active.rect.current.initial`: while the
+    // overlay is mounted that value is `draggingNodeRect`, which dnd-kit derives
+    // from the overlay's *measured* child (`dragOverlay.rect`). The preview here
+    // is `w-full`, so sizing the wrapper from that measurement fed straight back
+    // into the observer and grew the ghost's width forever. Letting dnd-kit use
+    // the draggable node's initial rect keeps the ghost at the card's size.
+    <DragOverlay dropAnimation={null}>
       <div
         className="pointer-events-none"
         // A second wrapper keeps the scale/rotate from fighting DragOverlay's

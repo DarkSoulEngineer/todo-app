@@ -14,7 +14,7 @@ export function PriorityPill({ priority }: { priority: Priority }) {
   const meta = PRIORITY_META[priority];
   return (
     <Chip className={cn("gap-1.5 ring-inset", meta.pill)}>
-      <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+      <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", meta.dot)} />
       {meta.label}
     </Chip>
   );
@@ -32,7 +32,7 @@ export function CategoryPill({ categoryId }: { categoryId: string }) {
   if (!pill || !dot || !label) return null;
   return (
     <Chip className={cn("gap-1.5 ring-inset", pill)}>
-      <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", dot)} />
+      <span aria-hidden="true" className={cn("h-2 w-2 shrink-0 rounded-full", dot)} />
       {label}
     </Chip>
   );

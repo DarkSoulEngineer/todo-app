@@ -382,6 +382,7 @@ export function TodoApp() {
           sort={sort}
           focusedSectionId={activeSection?.id ?? null}
           onClearFocus={() => setFocusedSection(null)}
+          onSortChange={setSort}
           onEdit={openEdit}
         />
       </div>

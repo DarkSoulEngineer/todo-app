@@ -22,7 +22,7 @@ import { SubtaskList } from "@/components/subtask-list";
 import { CategoryPill, DueBadge, PriorityPill, StatusPill } from "@/components/task-badges";
 import { TaskTooltip } from "@/components/task-tooltip";
 import { useTasksContext } from "@/components/tasks-provider";
-import { CARD_COLOR_WASHES, detectCardTheme, UPCOMING_WASH } from "@/lib/card-themes";
+import { CARD_COLOR_WASHES, detectCardTheme, PRIORITY_WASHES } from "@/lib/card-themes";
 import { deriveStatus } from "@/lib/status";
 import { isCustomSection } from "@/lib/sections";
 import type { Task, BoardSection, TaskStatus } from "@/lib/types";
@@ -231,7 +231,7 @@ function TaskMeta({ task, now, compact, expanded, onToggleExpanded }: TaskMetaPr
     <div
       className={cn(
         "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5",
-        compact ? "mt-2" : "mt-3",
+        compact ? "mt-2.5" : "mt-3",
       )}
     >
       <DueBadge task={task} now={now} />
@@ -735,21 +735,25 @@ export function TaskCard({
   // The board behind task.category, when that board still exists.
   const board = boards?.find((entry) => entry.id === task.category) ?? null;
 
-  // Wash precedence (the gradient source only — the accent rail and themed
-  // border below stay keyword-driven):
-  //   canceled            → neutral ambient wash (set aside never reads as happy)
-  //   board category      → that board's wash, even when a theme also matched
-  //   no category + theme → keyword theme wash
-  //   none of the above   → UPCOMING_WASH (subtle blue, the plain-card default)
-  const wash = task.canceled
-    ? null
-    : board
-      ? CARD_COLOR_WASHES[board.color]
-      : (theme?.wash ?? UPCOMING_WASH);
+  // Wash precedence — a card is tinted ONLY by its board category:
+  //   board category → that board's wash
+  //   no category    → no tint at all; an uncategorized card stays neutral
+  //                    (no board, keyword-theme or default blue wash)
+  //   canceled       → neutral ambient wash (set aside never reads as happy)
+  const wash = !task.canceled && board ? CARD_COLOR_WASHES[board.color] : null;
 
-  // Precedence: a status rail (overdue/completed/canceled) always wins; the
-  // theme rail only shows on otherwise-plain cards.
-  const rail = statusRail(task, status) ?? theme?.accent ?? null;
+  // Precedence: a status rail (overdue/completed/canceled) always wins. The
+  // keyword-theme rail is secondary AND category-gated — it only decorates a
+  // categorized card, so an uncategorized card is never colorized.
+  const rail = statusRail(task, status) ?? (board ? theme?.accent : null) ?? null;
+
+  // Priority cue: a calm bottom-right corner glow in the priority hue. It is
+  // additive and independent of category and status colour, so it shows on
+  // EVERY card — categorized or not. Canceled cards are the one exception: they
+  // read as set aside, so the warm priority glow is muted rather than inviting
+  // attention back to a discarded task (completed cards keep it — the alphas
+  // are quiet enough to sit beside the emerald completion cue).
+  const priorityWash = task.canceled ? null : PRIORITY_WASHES[task.priority];
 
   // Section navigation (list and board surfaces; needs sections + assignment).
   const navigableSections = useMemo(
@@ -772,11 +776,11 @@ export function TaskCard({
   const cardClassName = cn(
     "group relative flex min-w-0 overflow-hidden rounded-2xl border bg-card shadow-xs transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out",
     compact
-      ? "gap-2.5 p-2.5 hover:border-primary/25 hover:shadow-md"
+      ? "gap-3 p-3 hover:border-primary/25 hover:shadow-md"
       : "gap-3.5 p-4 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
     // Theme border is secondary: it only tints plain (upcoming) cards, and sits
     // before the status / selection / drag states so those still win in cn().
-    theme && !settled && status !== "overdue" && theme.border,
+    board && theme && !settled && status !== "overdue" && theme.border,
     status === "overdue" && !settled && "border-red-500/35 hover:border-red-500/50",
     task.completed && "border-emerald-500/35 hover:border-emerald-500/50",
     dragging && "scale-[1.02] border-primary/40 shadow-2xl ring-2 ring-primary/45",
@@ -789,7 +793,7 @@ export function TaskCard({
 
   return (
     <motion.div
-      layout
+      layout={!compact}
       className="focus-ring list-none rounded-2xl"
       tabIndex={highlighted ? 0 : -1}
       onClick={handleSelectionClick}
@@ -806,21 +810,32 @@ export function TaskCard({
         <SelectionIndicator task={task} selected={selected} onSelect={onSelect} />
       )}
       <div className={cardClassName}>
-        {/* Ambient depth: a soft wash layer under the content. The source follows
-            the wash precedence — a board category outranks the keyword theme;
-            plain cards get UPCOMING_WASH; only canceled cards keep the neutral
-            ambient wash. */}
+        {/* Ambient depth: a soft wash layer under the content, sourced only from
+            the card's board category. An uncategorized card gets no tint at all;
+            only canceled cards keep the neutral ambient wash. */}
         {wash ? (
           <span
             aria-hidden="true"
             className={cn("pointer-events-none absolute inset-0 rounded-2xl", wash)}
           />
-        ) : (
+        ) : task.canceled ? (
           <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(115%_95%_at_0%_0%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_62%)]"
           />
-        )}
+        ) : null}
+        {/* Priority cue: a soft bottom-right corner glow (see PRIORITY_WASHES).
+            Sits above the category wash and below the rail so the left status
+            signal still paints on top. */}
+        {priorityWash ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute inset-0 rounded-2xl",
+              priorityWash,
+            )}
+          />
+        ) : null}
         {rail ? (
           <span
             aria-hidden="true"
@@ -881,8 +896,8 @@ export function TaskCard({
           {task.description ? (
             <p
               className={cn(
-                "line-clamp-2 leading-relaxed text-muted-foreground",
-                compact ? "mt-1 text-[0.8125rem]" : "mt-1.5 text-sm",
+                "mt-1.5 line-clamp-2 leading-relaxed text-muted-foreground",
+                compact ? "text-[0.8125rem]" : "text-sm",
               )}
             >
               {task.description}

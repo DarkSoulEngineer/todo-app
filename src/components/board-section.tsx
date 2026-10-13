@@ -1,6 +1,6 @@
 "use client";
 
-import { arrayMove, useSortable } from "@dnd-kit/sortable";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   EyeOff,
@@ -13,7 +13,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -24,7 +23,6 @@ import {
 import { createPortal } from "react-dom";
 import { BoardCard } from "@/components/board-card";
 import { useTasksContext } from "@/components/tasks-provider";
-import { groupForList } from "@/lib/smart-lists";
 import { STATUS_META } from "@/lib/status";
 import { getBoardColorByLabel } from "@/lib/boards";
 import type { BoardSection, Task } from "@/lib/types";
@@ -33,6 +31,12 @@ import { cn } from "@/lib/utils";
 interface BoardSectionColumnProps {
   section: BoardSection;
   tasks: Task[];
+  /**
+   * Live drag order for this column (includes the card being dragged while it
+   * hovers here). When omitted the committed `tasks` order is used, so the
+   * column renders identically outside a drag.
+   */
+  dragOrder?: Task[];
   now: Date;
   editing: boolean;
   isDropTarget: boolean;
@@ -50,6 +54,7 @@ interface BoardSectionColumnProps {
 export function BoardSectionColumn({
   section,
   tasks,
+  dragOrder,
   now,
   editing,
   isDropTarget,
@@ -63,22 +68,19 @@ export function BoardSectionColumn({
   onAddCard,
 }: BoardSectionColumnProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: section.id, data: { type: "section" } });
+    useSortable({
+      id: section.id,
+      data: { type: "section" },
+      // Same loop-free guard as BoardCard: no derived-transform recompute.
+      animateLayoutChanges: () => false,
+    });
   const { reorderTasks } = useTasksContext();
 
-  const orderedIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
+  // Cards to render, in order: the live drag order while dragging, otherwise
+  // the committed column order.
+  const renderTasks = dragOrder ?? tasks;
 
-  /**
-   * Upcoming column only: partition the flat card list into date buckets
-   * (Today / Tomorrow / This week / Later / No due date). `groupForList` keeps
-   * the list order inside each bucket, so the buckets never reorder or drop
-   * cards — the grouped count always equals tasks.length. Other columns stay
-   * flat, exactly as before.
-   */
-  const groups = useMemo(
-    () => (section.status === "upcoming" ? groupForList(tasks, "upcoming", now) : null),
-    [tasks, now, section.status],
-  );
+  const orderedIds = useMemo(() => renderTasks.map((task) => task.id), [renderTasks]);
 
   /** One card with its FLAT column index, as the manual reorder arrows expect. */
   const renderCard = (task: Task, index: number) => (
@@ -88,7 +90,7 @@ export function BoardSectionColumn({
       now={now}
       onEdit={onEdit}
       reorderIndex={reorderable ? index : undefined}
-      reorderTotal={reorderable ? tasks.length : undefined}
+      reorderTotal={reorderable ? renderTasks.length : undefined}
       onReorder={reorderable ? handleReorder : undefined}
     />
   );
@@ -164,29 +166,14 @@ export function BoardSectionColumn({
       </header>
 
       <div className="flex min-w-0 flex-col gap-2.5">
-        {tasks.length === 0 ? (
+        {tasks.length === 0 && renderTasks.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
             Drop cards here
           </p>
         ) : null}
-        {groups ? (
-          groups.map((group) => (
-            <Fragment key={group.id}>
-              {/* Passive date-bucket divider — quieter than the column title. */}
-              <div className="mt-1 flex items-center gap-1.5 border-b border-border/70 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                <span>{group.label}</span>
-                <span className="shrink-0 rounded-full bg-card px-1.5 text-[10px] font-semibold tabular-nums text-muted-foreground ring-1 ring-inset ring-border">
-                  {group.tasks.length}
-                </span>
-              </div>
-              {/* Buckets preserve flat column order, so an identity lookup
-                  yields each card's exact index for the reorder arrows. */}
-              {group.tasks.map((task) => renderCard(task, tasks.indexOf(task)))}
-            </Fragment>
-          ))
-        ) : (
-          tasks.map((task, index) => renderCard(task, index))
-        )}
+        <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
+          {renderTasks.map((task, index) => renderCard(task, index))}
+        </SortableContext>
       </div>
 
       <SectionComposer title={section.title} onAdd={(title) => onAddCard(section.id, title)} />

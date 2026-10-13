@@ -128,7 +128,10 @@ export function ListView({
                   const color = getBoardColorByLabel(group.label);
                   return color ? (
                     <span
-                      className={cn("flex-shrink-0 w-2 h-2 rounded-full", color.dot)}
+                      className={cn(
+                        "h-2.5 w-2.5 flex-shrink-0 rounded-full ring-1 ring-inset ring-black/[0.08] dark:ring-white/10",
+                        color.dot,
+                      )}
                       aria-hidden="true"
                     />
                   ) : null;

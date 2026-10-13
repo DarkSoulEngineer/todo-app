@@ -5,7 +5,7 @@ import { useMemo, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { InsightsFilters } from "@/lib/insights-filters";
 import type { Task } from "@/lib/types";
-import type { Board } from "@/lib/boards";
+import { boardColor, DEFAULT_BOARD_COLOR, type Board } from "@/lib/boards";
 import { getPriorityCounts, getWeekdayCompletionCounts, getCompletionDatesInWindow } from "@/lib/insights-filters";
 import { windowStartFromPreset, windowEndFromPreset } from "@/lib/insights-filters";
 
@@ -67,7 +67,7 @@ export function ProductivityCharts({ tasks, filters, boards, now }: Productivity
     return Array.from(counts.entries())
       .map(([id, count]) => {
         const board = boardMap.get(id);
-        return { id, label: board?.label || id, count, color: board ? board.color : "cyan" };
+        return { id, label: board?.label || id, count };
       })
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
@@ -109,10 +109,10 @@ export function ProductivityCharts({ tasks, filters, boards, now }: Productivity
         <p className="text-center text-sm text-muted-foreground py-8">No category data for current filters</p>
       ) : (
         categoryData.map(({ id, label, count }, index) => {
-          const boardColor = boards.find((b) => b.id === id);
-          const colorObj = boardColor
-            ? { dot: `bg-${boardColor.color}-500`, pill: `bg-${boardColor.color}-500/12 text-${boardColor.color}-700` }
-            : { dot: "bg-cyan-500", pill: "bg-cyan-500/12 text-cyan-700" };
+          const board = boards.find((b) => b.id === id);
+          // Draw the dot from the board palette so chart swatches match the
+          // board chips elsewhere. Complete static literals, never concatenated.
+          const dot = boardColor(board?.color ?? DEFAULT_BOARD_COLOR).dot;
           const ratio = count / maxCategory;
           return (
             <motion.li
@@ -122,11 +122,11 @@ export function ProductivityCharts({ tasks, filters, boards, now }: Productivity
               animate={{ opacity: 1, x: 0 }}
               transition={reduceMotion ? { duration: 0 } : { delay: index * 0.05, duration: 0.3 }}
             >
-              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", colorObj.dot)} />
+              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
               <span className="w-24 shrink-0 truncate text-sm font-medium">{label}</span>
               <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                 <motion.span
-                  className={cn("block h-full rounded-full", colorObj.dot)}
+                  className={cn("block h-full rounded-full", dot)}
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.max(ratio * 100, 4)}%` }}
                   transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 200, damping: 28, delay: index * 0.05 }}

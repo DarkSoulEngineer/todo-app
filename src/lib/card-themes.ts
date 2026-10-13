@@ -1,4 +1,5 @@
 import type { BoardColorId } from "@/lib/boards";
+import type { Priority } from "@/lib/types";
 
 /**
  * Card themes: keyword-driven visual identities for task cards.
@@ -25,6 +26,20 @@ import type { BoardColorId } from "@/lib/boards";
  *            dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(RGB,0.09),transparent_65%)]
  * Only the hue differs (a 500-scale Tailwind color / 500-scale RGB); the alphas
  * are identical everywhere by design.
+ *
+ * PRIORITY WASH: the same radial recipe mirrored to the BOTTOM-RIGHT corner
+ * (`at 100% 100%`, `transparent_65%`), so it complements the top-right category
+ * wash instead of overlapping it. Its alphas are a short ladder rather than a
+ * single step — see `PRIORITY_WASHES` below.
+ *
+ * The board tiles in `board-manager-card.tsx` draw from this same document:
+ * their card surface drops `CARD_COLOR_WASHES` in verbatim (same geometry, same
+ * 0.05 / 0.09 alphas, same dark variant), and their small icon chip borrows the
+ * `boards.ts` tile tokens (`tile` / `icon`). Task cards and board tiles therefore
+ * read as one palette in light and dark alike.
+ *
+ * The board washes below are built from the `--board-*` tokens rather than raw
+ * RGB, so every board hue and its wash stay in lockstep with `boards.ts`.
  */
 
 /**
@@ -114,14 +129,14 @@ const AMBER = {
  * board color rather than by any keyword theme. Keyed by every `BoardColorId`.
  */
 export const CARD_COLOR_WASHES: Record<BoardColorId, string> = {
-  cyan: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(6,182,212,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(6,182,212,0.09),transparent_65%)]",
-  pink: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(236,72,153,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(236,72,153,0.09),transparent_65%)]",
-  orange: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(249,115,22,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(249,115,22,0.09),transparent_65%)]",
-  teal: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(20,184,166,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(20,184,166,0.09),transparent_65%)]",
-  lime: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(132,204,22,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(132,204,22,0.09),transparent_65%)]",
-  indigo: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(99,102,241,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(99,102,241,0.09),transparent_65%)]",
-  violet: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(139,92,246,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(139,92,246,0.09),transparent_65%)]",
-  amber: "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(245,158,11,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(245,158,11,0.09),transparent_65%)]",
+  slate: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-slate)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-slate)_9%,transparent),transparent_65%)]",
+  blue: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-blue)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-blue)_9%,transparent),transparent_65%)]",
+  teal: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-teal)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-teal)_9%,transparent),transparent_65%)]",
+  lime: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-lime)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-lime)_9%,transparent),transparent_65%)]",
+  amber: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-amber)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-amber)_9%,transparent),transparent_65%)]",
+  orange: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-orange)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-orange)_9%,transparent),transparent_65%)]",
+  pink: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-pink)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-pink)_9%,transparent),transparent_65%)]",
+  violet: "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-violet)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--board-violet)_9%,transparent),transparent_65%)]",
 };
 
 /**
@@ -134,6 +149,42 @@ export const CARD_COLOR_WASHES: Record<BoardColorId, string> = {
  */
 export const UPCOMING_WASH =
   "bg-[radial-gradient(120%_100%_at_100%_0%,rgba(59,130,246,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,rgba(59,130,246,0.09),transparent_65%)]";
+
+/**
+ * NEUTRAL_WASH: the same canonical wash tinted with the `primary` hue.
+ *
+ * The fallback for a surface that has no dominant board colour (e.g. a manager
+ * tile whose boards carry no tasks yet). It keeps the exact geometry and alphas
+ * of every other wash — right-anchored top-right, 0.05 light / 0.09 dark,
+ * `transparent_65%` end stop — so the fallback never reads as a second recipe.
+ */
+export const NEUTRAL_WASH =
+  "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--primary)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--primary)_9%,transparent),transparent_65%)]";
+
+/**
+ * PRIORITY_WASHES: the bottom-right corner glow that names a card's priority.
+ *
+ * The same radial recipe as every wash above — one gradient, `transparent_65%`
+ * end stop, a complete static Tailwind literal with a light and dark variant —
+ * but anchored at the BOTTOM-RIGHT (`at 100% 100%`) so it mirrors the top-right
+ * category wash, leaves the left status rail clear, and never fights either.
+ *
+ * Only the hue steps with priority (the established `PRIORITY_META` scale:
+ * orange-500 / amber-500 / slate-500) and the alphas form a small ladder:
+ *   low    → slate-500  — 0.05 light / 0.09 dark, exactly the ambient wash
+ *            floor, so "low" reads as the quiet, near-neutral step.
+ *   medium → amber-500  — +0.03 light / +0.05 dark.
+ *   high   → orange-500 — 0.11 light / 0.19 dark, the most present step, yet
+ *            still below the priority pill's own fill (`500/12`) so the surface
+ *            never reads louder than the pill that names it.
+ * The dark alphas step up from the light ones the same way the wash recipe
+ * steps 0.05 → 0.09, keeping the glow legible on a dark card without shouting.
+ */
+export const PRIORITY_WASHES: Record<Priority, string> = {
+  high: "bg-[radial-gradient(120%_100%_at_100%_100%,rgba(249,115,22,0.11),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_100%,rgba(249,115,22,0.19),transparent_65%)]",
+  medium: "bg-[radial-gradient(120%_100%_at_100%_100%,rgba(245,158,11,0.08),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_100%,rgba(245,158,11,0.14),transparent_65%)]",
+  low: "bg-[radial-gradient(120%_100%_at_100%_100%,rgba(100,116,139,0.05),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_100%,rgba(100,116,139,0.09),transparent_65%)]",
+};
 
 /**
  * The theme list, in detection-priority order.

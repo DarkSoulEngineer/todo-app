@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState, type JSX } from "react";
 import { boardColor, type BoardColorId } from "@/lib/boards";
+import { CARD_COLOR_WASHES, NEUTRAL_WASH } from "@/lib/card-themes";
 import type { StrideProject } from "@/lib/projects";
 import type { Workspace } from "@/lib/types";
 import { cn, pluralize } from "@/lib/utils";
@@ -32,45 +33,14 @@ const GRID_EASE = "cubic-bezier(0.2, 0, 0, 1)";
 /** Reason surfaced on the disabled Remove control of the last board. */
 const KEEP_ONE_BOARD = "At least one board must remain";
 
-// Static accent maps keyed by palette id. Literals only, so Tailwind v4 keeps
-// every class it scans here — never build these strings dynamically.
-const TILE_WASH: Record<BoardColorId, string> = {
-  cyan: "from-cyan-500/25 to-cyan-500/5",
-  pink: "from-pink-500/25 to-pink-500/5",
-  orange: "from-orange-500/25 to-orange-500/5",
-  teal: "from-teal-500/25 to-teal-500/5",
-  lime: "from-lime-500/25 to-lime-500/5",
-  indigo: "from-indigo-500/25 to-indigo-500/5",
-  violet: "from-violet-500/25 to-violet-500/5",
-  amber: "from-amber-500/25 to-amber-500/5",
-};
+// The board colour palette (see `boards.ts`) supplies every accent used on a
+// tile — its `tile` gradient/ring and `icon` ink — so a board tile's accent and
+// a task's board chip are drawn from one source. Literals only, so Tailwind v4
+// keeps every class it scans — never build these strings dynamically.
 
-const TILE_ICON: Record<BoardColorId, string> = {
-  cyan: "text-cyan-700 dark:text-cyan-300",
-  pink: "text-pink-700 dark:text-pink-300",
-  orange: "text-orange-700 dark:text-orange-300",
-  teal: "text-teal-700 dark:text-teal-300",
-  lime: "text-lime-700 dark:text-lime-300",
-  indigo: "text-indigo-700 dark:text-indigo-300",
-  violet: "text-violet-700 dark:text-violet-300",
-  amber: "text-amber-700 dark:text-amber-300",
-};
-
-const CARD_WASH: Record<BoardColorId, string> = {
-  cyan: "from-cyan-500/10",
-  pink: "from-pink-500/10",
-  orange: "from-orange-500/10",
-  teal: "from-teal-500/10",
-  lime: "from-lime-500/10",
-  indigo: "from-indigo-500/10",
-  violet: "from-violet-500/10",
-  amber: "from-amber-500/10",
-};
-
-/** Violet-neutral fallbacks used when a board has no dominant category colour. */
-const DEFAULT_TILE_WASH = "from-primary/20 to-primary/5";
+/** Neutral fallback used when a board has no dominant category colour. */
+const DEFAULT_TILE_WASH = "from-primary/12 to-primary/5 ring-primary/25";
 const DEFAULT_TILE_ICON = "text-primary";
-const DEFAULT_CARD_WASH = "from-primary/10";
 
 interface BoardStats {
   openCount: number;
@@ -210,9 +180,11 @@ export function ManagerBoardCard({
   }
 
   const stats = useMemo(() => summarizeWorkspace(workspace, now), [workspace, now]);
-  const accentTile = stats.dominant ? TILE_WASH[stats.dominant] : DEFAULT_TILE_WASH;
-  const accentIcon = stats.dominant ? TILE_ICON[stats.dominant] : DEFAULT_TILE_ICON;
-  const accentWash = stats.dominant ? CARD_WASH[stats.dominant] : DEFAULT_CARD_WASH;
+  const accentTile = stats.dominant ? boardColor(stats.dominant).tile : DEFAULT_TILE_WASH;
+  const accentIcon = stats.dominant ? boardColor(stats.dominant).icon : DEFAULT_TILE_ICON;
+  // Same wash source as task cards (`CARD_COLOR_WASHES`), so a board tile's
+  // tint is literally the class a tagged task card carries.
+  const accentWash = stats.dominant ? CARD_COLOR_WASHES[stats.dominant] : NEUTRAL_WASH;
   const fillClass = stats.dominant ? boardColor(stats.dominant).dot : "bg-primary";
 
   function beginEdit(): void {
@@ -268,26 +240,24 @@ export function ManagerBoardCard({
         handleOpen();
       }}
       className={cn(
-        "group relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
+        "group relative flex flex-col gap-3.5 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
         editMode ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer",
         isDragging && "opacity-40",
       )}
     >
-      {/* Faint accent wash echoing the board's dominant category hue. */}
+      {/* Full-bleed radial wash — the canonical recipe task cards use
+          (`CARD_COLOR_WASHES`), so both card families tint identically. */}
       <span
         aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b to-transparent",
-          accentWash,
-        )}
+        className={cn("pointer-events-none absolute inset-0 rounded-2xl", accentWash)}
       />
 
-      <div className="relative flex min-w-0 flex-1 flex-col gap-3">
+      <div className="relative flex min-w-0 flex-1 flex-col gap-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span
               className={cn(
-                "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-black/5 dark:ring-white/10",
+                "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br ring-1 ring-inset",
                 accentTile,
               )}
             >
@@ -492,25 +462,24 @@ export function BoardDragPreview({
 }): JSX.Element {
   const { workspace } = project;
   const stats = useMemo(() => summarizeWorkspace(workspace, now), [workspace, now]);
-  const accentTile = stats.dominant ? TILE_WASH[stats.dominant] : DEFAULT_TILE_WASH;
-  const accentIcon = stats.dominant ? TILE_ICON[stats.dominant] : DEFAULT_TILE_ICON;
-  const accentWash = stats.dominant ? CARD_WASH[stats.dominant] : DEFAULT_CARD_WASH;
+  const accentTile = stats.dominant ? boardColor(stats.dominant).tile : DEFAULT_TILE_WASH;
+  const accentIcon = stats.dominant ? boardColor(stats.dominant).icon : DEFAULT_TILE_ICON;
+  // Same wash source as task cards (`CARD_COLOR_WASHES`), so a board tile's
+  // tint is literally the class a tagged task card carries.
+  const accentWash = stats.dominant ? CARD_COLOR_WASHES[stats.dominant] : NEUTRAL_WASH;
   const fillClass = stats.dominant ? boardColor(stats.dominant).dot : "bg-primary";
 
   return (
-    <div className="relative flex w-full flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-primary/20">
+    <div className="relative flex w-full flex-col gap-3.5 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-primary/20">
       <span
         aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b to-transparent",
-          accentWash,
-        )}
+        className={cn("pointer-events-none absolute inset-0 rounded-2xl", accentWash)}
       />
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <span
             className={cn(
-              "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br ring-1 ring-inset ring-black/5 dark:ring-white/10",
+              "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br ring-1 ring-inset",
               accentTile,
             )}
           >

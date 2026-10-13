@@ -1,6 +1,7 @@
 "use client";
 
-import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { TaskCard } from "@/components/task-card";
 import { useTasksContext } from "@/components/tasks-provider";
 import type { Task } from "@/lib/types";
@@ -36,9 +37,14 @@ export function BoardCard({
   reorderTotal,
   onReorder,
 }: BoardCardProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: "card" },
+    // Layout-change animations recompute derived transforms inside a layout
+    // effect (dnd-kit useDerivedTransform) that can loop on container moves.
+    // Disabling them removes that recompute path entirely; the sorting
+    // strategy still animates siblings into the gap while dragging.
+    animateLayoutChanges: () => false,
   });
   const { sections, assignTaskToSection } = useTasksContext();
 
@@ -47,6 +53,7 @@ export function BoardCard({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "min-w-0 cursor-grab touch-none transition-opacity active:cursor-grabbing",
         isDragging && "opacity-40",

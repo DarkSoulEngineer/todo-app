@@ -10,7 +10,7 @@ export const SAMPLE_BOARDS: Board[] = [
   ...BUILT_IN_BOARDS,
   { id: "design", label: "Design", color: "violet" },
   { id: "errands", label: "Errands", color: "amber" },
-  { id: "side-project", label: "Side project", color: "cyan" },
+  { id: "side-project", label: "Side project", color: "slate" },
   { id: "family", label: "Family", color: "pink" },
 ];
 

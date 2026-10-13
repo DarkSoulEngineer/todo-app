@@ -32,6 +32,29 @@
   --info: oklch(0.62 0.14 240);
 
   --dot: oklch(0.5 0.03 70 / 0.12);
+
+  /* Board identity palette.
+     Eight hues spaced around the wheel so no two read as the same colour, each
+     held near one perceived lightness so a board is never quieter than its
+     neighbour. `--board-*-ink` is the readable text/icon tone used on the tinted
+     board chip and stays AA on that tint in both themes. `slate` is a deliberate
+     achromatic option, so identity never has to lean on hue alone. */
+  --board-slate: oklch(0.55 0.02 260);
+  --board-slate-ink: oklch(0.4 0.02 260);
+  --board-blue: oklch(0.6 0.19 255);
+  --board-blue-ink: oklch(0.42 0.16 255);
+  --board-teal: oklch(0.68 0.13 185);
+  --board-teal-ink: oklch(0.43 0.1 190);
+  --board-lime: oklch(0.74 0.19 130);
+  --board-lime-ink: oklch(0.46 0.13 132);
+  --board-amber: oklch(0.77 0.16 75);
+  --board-amber-ink: oklch(0.48 0.11 70);
+  --board-orange: oklch(0.7 0.18 50);
+  --board-orange-ink: oklch(0.47 0.14 45);
+  --board-pink: oklch(0.63 0.22 350);
+  --board-pink-ink: oklch(0.46 0.18 350);
+  --board-violet: oklch(0.58 0.21 295);
+  --board-violet-ink: oklch(0.42 0.18 295);
 }
 
 .dark {
@@ -63,6 +86,25 @@
   --info: oklch(0.72 0.12 240);
 
   --dot: oklch(1 0 0 / 0.05);
+
+  /* Board identity palette (dark): the same eight hue families lifted in
+     lightness so a swatch glows on the dark card, with lighter ink for AA. */
+  --board-slate: oklch(0.72 0.02 260);
+  --board-slate-ink: oklch(0.86 0.015 260);
+  --board-blue: oklch(0.72 0.15 255);
+  --board-blue-ink: oklch(0.87 0.08 255);
+  --board-teal: oklch(0.78 0.12 185);
+  --board-teal-ink: oklch(0.89 0.07 190);
+  --board-lime: oklch(0.82 0.17 130);
+  --board-lime-ink: oklch(0.91 0.1 130);
+  --board-amber: oklch(0.84 0.13 80);
+  --board-amber-ink: oklch(0.91 0.08 85);
+  --board-orange: oklch(0.78 0.15 55);
+  --board-orange-ink: oklch(0.88 0.09 60);
+  --board-pink: oklch(0.74 0.16 350);
+  --board-pink-ink: oklch(0.89 0.08 350);
+  --board-violet: oklch(0.72 0.16 295);
+  --board-violet-ink: oklch(0.87 0.09 295);
 }
 
 @theme inline {
@@ -86,6 +128,26 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
+
+  /* Board identity tokens: utilities like `bg-board-pink`, `ring-board-pink/40`
+     and `text-board-pink-ink` are generated from these. Kept `inline` so the
+     `--board-*` values swap with the light/dark theme at runtime. */
+  --color-board-slate: var(--board-slate);
+  --color-board-slate-ink: var(--board-slate-ink);
+  --color-board-blue: var(--board-blue);
+  --color-board-blue-ink: var(--board-blue-ink);
+  --color-board-teal: var(--board-teal);
+  --color-board-teal-ink: var(--board-teal-ink);
+  --color-board-lime: var(--board-lime);
+  --color-board-lime-ink: var(--board-lime-ink);
+  --color-board-amber: var(--board-amber);
+  --color-board-amber-ink: var(--board-amber-ink);
+  --color-board-orange: var(--board-orange);
+  --color-board-orange-ink: var(--board-orange-ink);
+  --color-board-pink: var(--board-pink);
+  --color-board-pink-ink: var(--board-pink-ink);
+  --color-board-violet: var(--board-violet);
+  --color-board-violet-ink: var(--board-violet-ink);
 
   --font-sans: var(--font-sans-ui);
   --font-display: var(--font-display-serif);
