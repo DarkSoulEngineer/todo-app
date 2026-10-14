@@ -49,6 +49,10 @@ interface BoardSectionColumnProps {
   onDelete: (id: string) => void;
   onHide: (id: string) => void;
   onAddCard: (sectionId: string, title: string) => void;
+  /** When true, board cards render in the minimal (title + category) layout. */
+  compactView?: boolean;
+  /** Task id to briefly spotlight after activity navigation. */
+  spotlightTaskId?: string | null;
 }
 
 export function BoardSectionColumn({
@@ -66,6 +70,8 @@ export function BoardSectionColumn({
   onDelete,
   onHide,
   onAddCard,
+  compactView = false,
+  spotlightTaskId,
 }: BoardSectionColumnProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -89,6 +95,8 @@ export function BoardSectionColumn({
       task={task}
       now={now}
       onEdit={onEdit}
+      compactView={compactView}
+      spotlight={task.id === spotlightTaskId}
       reorderIndex={reorderable ? index : undefined}
       reorderTotal={reorderable ? renderTasks.length : undefined}
       onReorder={reorderable ? handleReorder : undefined}
@@ -134,9 +142,7 @@ export function BoardSectionColumn({
             <GripVertical className="h-4 w-4" />
           </button>
 
-          <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg ring-1 ring-inset", chip)}>
-            {Icon ? <Icon className="h-4 w-4" strokeWidth={2.4} /> : null}
-          </span>
+          {/* Section icons removed from board view. */}
 
           <span className="ml-auto shrink-0 rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums ring-1 ring-inset ring-border">
             {tasks.length}

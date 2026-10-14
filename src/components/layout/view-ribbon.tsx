@@ -8,14 +8,19 @@ import {
   Eye,
   Hash,
   Home as HomeIcon,
+  Keyboard,
+  Layers,
   List,
   ListFilter,
   Plus,
   Search,
+  Shrink,
   SlidersHorizontal,
   X,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Children,
   Fragment,
@@ -26,6 +31,7 @@ import {
   type RefObject,
 } from "react";
 import { motion } from "framer-motion";
+import { ThemeToggle } from "@/components/common/theme-toggle";
 import { WindowControls } from "@/components/layout/window-controls";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { STATUS_META } from "@/components/common/status-meta";
@@ -106,27 +112,29 @@ export interface ViewRibbonProps {
   onNewTask: () => void;
   /** Switches the active view (List/Board/Calendar). */
   onChangeView: (view: ViewMode) => void;
-  /** True while the board is shown as a floating window (the top bar becomes a drag handle). */
-  floating: boolean;
   /** True while the board fills the screen. Drives the maximize/restore icon. */
   maximized: boolean;
   onMinimize: () => void;
   onMaximize: () => void;
-  /** Leaves the current board and returns to the board manager. */
+  /** Removes the board window and returns to the board manager. */
   onCloseBoard: () => void;
-  /** Pointer handlers that move the floating window from its title bar. */
-  onTitlePointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onTitlePointerMove?: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onTitlePointerUp?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  /** Opens the keyboard-shortcuts dialog. */
+  onShowHelp?: () => void;
+  /** Loads a few sample tasks. */
+  onLoadSample?: () => void;
+  /** Board compact-view toggle state (only meaningful on the board view). */
+  compactView?: boolean;
+  onCompactViewChange?: (value: boolean) => void;
 }
 
 /**
  * Desktop-app style ribbon: a tab bar over a strip of grouped tools.
- * The window controls (minimize / maximize / close) and the View switcher
- * (List/Board/Calendar) live in the top row, so they're always one click away.
- * The Home tab holds the New card button and Clear done. The Filter tab holds
- * Search, Sort, and Categories. The Sections tab (board only) holds column
- * focus and hidden columns.
+ * The window controls (minimize / maximize / close), the board-manager link,
+ * and the View switcher (List/Board/Calendar) live in the top row, so they're
+ * always one click away. The Home tab holds the New card button, Clear done,
+ * the theme switcher, and the shortcuts button. The Filter tab holds Search,
+ * Sort, and Categories. The Sections tab (board only) holds column focus and
+ * hidden columns.
  */
 export function ViewRibbon({
   viewMode,
@@ -146,16 +154,18 @@ export function ViewRibbon({
   showClearCompleted,
   onNewTask,
   onChangeView,
-  floating,
   maximized,
   onMinimize,
   onMaximize,
   onCloseBoard,
-  onTitlePointerDown,
-  onTitlePointerMove,
-  onTitlePointerUp,
+  onShowHelp,
+  compactView = false,
+  onCompactViewChange,
+  onLoadSample,
 }: ViewRibbonProps) {
   const { sections, toggleSectionHidden } = useTasksContext();
+  const pathname = usePathname();
+  const onBoardManager = pathname === "/";
 
   const hasSections = useMemo(() => sections.length > 0, [sections]);
   const tabs = useMemo(() => tabsForView(viewMode, hasSections), [viewMode, hasSections]);
@@ -167,22 +177,26 @@ export function ViewRibbon({
 
   return (
     <section aria-label="Tools" className="shrink-0 border-b border-border bg-card/70">
-      {/* Persistent view switcher + window controls — always visible, like a
-          desktop title bar. While floating, the whole row is the drag handle. */}
-      <div
-        onPointerDown={onTitlePointerDown}
-        onPointerMove={onTitlePointerMove}
-        onPointerUp={onTitlePointerUp}
-        onPointerCancel={onTitlePointerUp}
-        className={cn(
-          "flex items-center gap-2 px-2 py-1.5",
-          floating && "cursor-grab touch-none select-none active:cursor-grabbing",
-        )}
-      >
+      {/* Persistent board link + view switcher + window controls — always
+          visible, like a desktop title bar. */}
+      <div className="flex flex-wrap items-center gap-2 px-2 py-1.5">
+        <Link
+          href="/"
+          title="Board manager"
+          aria-current={onBoardManager ? "page" : undefined}
+          className={cn(
+            "focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card/70 px-2.5 py-1.5 text-sm font-medium shadow-xs backdrop-blur transition-colors",
+            onBoardManager
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Layers className="h-4 w-4" strokeWidth={2.1} />
+          <span>Boards</span>
+        </Link>
         <ViewSwitcherRibbon active={viewMode} onChange={onChangeView} />
-        <div className="flex-1" />
+        <div className="min-w-2 flex-1" />
         <WindowControls
-          floating={floating}
           maximized={maximized}
           onMinimize={onMinimize}
           onMaximize={onMaximize}
@@ -221,6 +235,29 @@ export function ViewRibbon({
               disabled={!showClearCompleted}
             />
           </RibbonGroup>
+          {onLoadSample ? (
+            <RibbonGroup label="Sample">
+              <RibbonTool icon={Plus} label="Sample" onClick={onLoadSample} />
+            </RibbonGroup>
+          ) : null}
+          {viewMode !== "calendar" && viewMode !== "insights" && onCompactViewChange ? (
+            <RibbonGroup label="Display">
+              <RibbonTool
+                icon={Shrink}
+                label="Compact view"
+                onClick={() => onCompactViewChange(!compactView)}
+                active={compactView}
+              />
+            </RibbonGroup>
+          ) : null}
+          <RibbonGroup label="Theme">
+            <ThemeToggle />
+          </RibbonGroup>
+          {onShowHelp ? (
+            <RibbonGroup label="Help">
+              <RibbonTool icon={Keyboard} label="Shortcuts" onClick={onShowHelp} />
+            </RibbonGroup>
+          ) : null}
         </RibbonPanel>
       ) : null}
 
@@ -441,19 +478,27 @@ function RibbonTool({
   label,
   onClick,
   disabled,
+  active = false,
 }: {
   icon: LucideIcon;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={active}
       title={label}
-      className="focus-ring flex w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+      className={cn(
+        "focus-ring flex w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 transition-colors disabled:pointer-events-none disabled:opacity-40",
+        active
+          ? "bg-primary/15 text-primary hover:bg-primary/20"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
     >
       <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       <span className="max-w-full truncate text-[10px] font-medium">{label}</span>

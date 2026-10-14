@@ -256,16 +256,28 @@ const SEEDS: SampleSeed[] = [
 ];
 
 export function createSampleTasks(now: Date = new Date()): Task[] {
-  return SEEDS.map((seed) => {
-    const { offsetHours, completed, canceled, subtasks, ...draft } = seed;
-    const base = offsetHours < 0 ? subHours(now, -offsetHours) : addHours(now, offsetHours);
+  // Shuffle the seeds on every call so each sample is a fresh, random set.
+  const shuffledSeeds = [...SEEDS].sort(() => Math.random() - 0.5);
+  // Evenly distribute tasks across every sample category (shuffled too).
+  const categoryPool = SAMPLE_BOARDS.map((board) => board.id).sort(() => Math.random() - 0.5);
+
+  return shuffledSeeds.map((seed, index) => {
+    const { offsetHours, subtasks, ...draft } = seed;
+    // Spread statuses evenly: completed, canceled, overdue, upcoming.
+    const bucket = index % 4;
+    const isCompleted = bucket === 0;
+    const isCanceled = bucket === 1;
+    const isOverdue = bucket === 2;
+    const magnitude = Math.max(1, Math.abs(offsetHours));
+    const effectiveOffset = isOverdue ? -magnitude : magnitude;
+    const base = effectiveOffset < 0 ? subHours(now, -effectiveOffset) : addHours(now, effectiveOffset);
 
     const task = createTask({
       title: draft.title,
       description: draft.description,
       dueAt: base.toISOString(),
       priority: draft.priority,
-      category: draft.category,
+      category: categoryPool[index % categoryPool.length],
       subtasks: (subtasks ?? []).map((item) => ({
         id: makeId(8),
         title: item.title,
@@ -273,16 +285,15 @@ export function createSampleTasks(now: Date = new Date()): Task[] {
       })),
     });
 
-    const createdAt =
-      offsetHours < 0 ? subDays(now, 3) : subDays(now, 1);
+    const createdAt = effectiveOffset < 0 ? subDays(now, 3) : subDays(now, 1);
 
     return {
       ...task,
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
-      completed: completed ?? false,
-      canceled: canceled ?? false,
-      completedAt: completed ? addDays(createdAt, 1).toISOString() : null,
+      completed: isCompleted,
+      canceled: isCanceled,
+      completedAt: isCompleted ? addDays(createdAt, 1).toISOString() : null,
     };
   });
 }

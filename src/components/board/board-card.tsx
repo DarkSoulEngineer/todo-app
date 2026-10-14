@@ -17,6 +17,10 @@ interface BoardCardProps {
   reorderTotal?: number;
   /** Swaps this card with its neighbour (manual order). */
   onReorder?: (taskId: string, direction: "up" | "down") => void;
+  /** When true, renders the card in the minimal (title + category only) layout. */
+  compactView?: boolean;
+  /** Briefly ring the card when it is the target of an activity navigation. */
+  spotlight?: boolean;
 }
 
 /**
@@ -36,6 +40,8 @@ export function BoardCard({
   reorderIndex,
   reorderTotal,
   onReorder,
+  compactView = false,
+  spotlight = false,
 }: BoardCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -53,6 +59,7 @@ export function BoardCard({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      data-task-id={task.id}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "min-w-0 cursor-grab touch-none transition-opacity active:cursor-grabbing",
@@ -64,6 +71,8 @@ export function BoardCard({
         now={now}
         onEdit={onEdit}
         compact
+        compactView={compactView}
+        spotlight={spotlight}
         sections={sections}
         assignTaskToSection={assignTaskToSection}
         reorderIndex={reorderIndex}

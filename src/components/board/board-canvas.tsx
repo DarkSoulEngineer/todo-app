@@ -40,7 +40,14 @@ import { cn } from "@/lib/utils/utils";
  * drags and section reordering keep working untouched, because a pan only ever
  * starts on the backdrop — never on a card, column or button.
  */
-export function BoardCanvas({ children }: { children: ReactNode }) {
+export function BoardCanvas({
+  children,
+  revealTaskId,
+}: {
+  children: ReactNode;
+  /** Card to bring into view once (e.g. the target of an activity navigation). */
+  revealTaskId?: string | null;
+}) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const boxRef = useRef(EMPTY_BOX);
@@ -87,6 +94,32 @@ export function BoardCanvas({ children }: { children: ReactNode }) {
     observer.observe(content);
     return () => observer.disconnect();
   }, []);
+
+  // Bring a freshly located card into view. The canvas pans by CSS transform
+  // (overflow-hidden), so a plain scrollIntoView would never reach it; only
+  // nudges the view when the card is not already comfortably on screen.
+  useEffect(() => {
+    if (!revealTaskId) return;
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+    const el = content.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(revealTaskId)}"]`);
+    if (!el) return;
+    const box = boxRef.current;
+    const vpRect = viewport.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const margin = 24;
+    const inside =
+      elRect.top >= vpRect.top + margin &&
+      elRect.bottom <= vpRect.bottom - margin &&
+      elRect.left >= vpRect.left + margin &&
+      elRect.right <= vpRect.right - margin;
+    if (inside) return;
+    const current = viewRef.current;
+    const dx = vpRect.left + box.w / 2 - (elRect.left + elRect.width / 2);
+    const dy = vpRect.top + box.h / 2 - (elRect.top + elRect.height / 2);
+    apply(clampView({ x: current.x + dx, y: current.y + dy, scale: current.scale }, box));
+  }, [revealTaskId]);
 
   // React's onWheel is passive, so the zoom gesture needs a native listener.
   useEffect(() => {

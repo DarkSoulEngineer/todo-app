@@ -6,6 +6,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  useDroppable,
   useSensor,
   useSensors,
   type CollisionDetection,
@@ -19,7 +20,7 @@ import {
   horizontalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BoardCanvas } from "@/components/board/board-canvas";
@@ -40,6 +41,10 @@ interface BoardViewProps {
   sort: SortKey;
   /** When set, only that section is shown (driven by the ribbon's Sections tab). */
   focusedSectionId?: string | null;
+  /** When true, board cards render in a minimal (title + category only) layout. */
+  compactView?: boolean;
+  /** Task id to briefly spotlight after an activity navigation. */
+  spotlightTaskId?: string | null;
   /**
    * Called when a positional drop forces the board into manual order (only
    * meaningful when another sort was active, whose derived order would
@@ -129,6 +134,8 @@ export function BoardView({
   now,
   sort,
   focusedSectionId = null,
+  compactView = false,
+  spotlightTaskId = null,
   onSortChange,
   onEdit,
 }: BoardViewProps) {
@@ -142,6 +149,7 @@ export function BoardView({
     reorderSections,
     reorderTasks,
     addTask,
+    deleteTask,
     snapshot,
     restore,
   } = useTasksContext();
@@ -166,6 +174,7 @@ export function BoardView({
    * max-wait keeps a long, continuous drag from feeling frozen.
    */
   const boardItemsRef = useRef<Record<string, string[]> | null>(null);
+  const boardItemsSeedRef = useRef<Record<string, string[]> | null>(null);
   const overIdRef = useRef<string | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSinceRef = useRef<number | null>(null);
@@ -242,9 +251,27 @@ export function BoardView({
   const collisionDetection = useCallback<CollisionDetection>(
     (args) => {
       const draggingSection = args.active.data.current?.type === "section";
+
+      // Trash takes priority whenever the dragged card's pointer is over it,
+      // so a card is deleted instead of being dropped into a section beneath.
+      if (!draggingSection) {
+        const trashContainer = args.droppableContainers.find(
+          (container) => container.data.current?.type === "trash",
+        );
+        const pointer = (args as { pointerCoordinates?: { x: number; y: number } | null }).pointerCoordinates;
+        const rect = trashContainer?.rect.current;
+        if (trashContainer && rect && pointer) {
+          if (pointer.x >= rect.left && pointer.x <= rect.right && pointer.y >= rect.top && pointer.y <= rect.bottom) {
+            return [{ id: trashContainer.id }];
+          }
+        }
+      }
+
       const droppableContainers = args.droppableContainers.filter((container) => {
         const type = container.data.current?.type;
-        return draggingSection ? type === "section" : type === "card" || type === "section";
+        return draggingSection
+          ? type === "section"
+          : type === "card" || type === "section" || type === "trash";
       });
       return closestCorners({ ...args, droppableContainers });
     },
@@ -297,6 +324,7 @@ export function BoardView({
       seeded[section.id] = (tasksBySection.get(section.id) ?? []).map((task) => task.id);
     }
     boardItemsRef.current = seeded;
+    boardItemsSeedRef.current = seeded;
     overIdRef.current = null;
     previewSinceRef.current = null;
     setBoardItems(seeded);
@@ -307,6 +335,24 @@ export function BoardView({
     if (event.active.data.current?.type === "section") return;
     const { active, over } = event;
     if (!over) return;
+
+    // Hovering the trash (or its bottom range) must not publish a "next
+    // position" preview: the card is being deleted, so keep the (seeded)
+    // original arrangement instead.
+    const overIsTrash = over.data.current?.type === "trash" || String(over.id) === "board-trash";
+    const translated = event.active.rect.current?.translated;
+    const centerY = translated ? translated.top + translated.height / 2 : null;
+    const inTrashRange =
+      overIsTrash || (centerY !== null && typeof window !== "undefined" && centerY > window.innerHeight - 150);
+    if (inTrashRange) {
+      overIdRef.current = "board-trash";
+      const seeded = boardItemsSeedRef.current;
+      if (seeded) {
+        boardItemsRef.current = seeded;
+        setBoardItems(seeded);
+      }
+      return;
+    }
 
     const activeId = String(active.id);
     const overId = String(over.id);
@@ -334,6 +380,7 @@ export function BoardView({
     }
     previewSinceRef.current = null;
     boardItemsRef.current = null;
+    boardItemsSeedRef.current = null;
     overIdRef.current = null;
     setActiveTaskId(null);
     setActiveSectionId(null);
@@ -370,6 +417,17 @@ export function BoardView({
     const taskId = String(active.id);
     const task = tasks.find((item) => item.id === taskId);
     if (!task) return;
+
+    // Dropping a card onto the trash removes it.
+    if (over.data?.current?.type === "trash" || String(over.id) === "board-trash") {
+      const before = snapshot();
+      deleteTask(taskId);
+      toast.success("Card removed", {
+        duration: 4000,
+        action: { label: "Undo", onClick: () => restore(before) },
+      });
+      return;
+    }
 
     const committed: Record<string, string[]> = {};
     for (const section of sections) {
@@ -507,7 +565,7 @@ export function BoardView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -517,7 +575,7 @@ export function BoardView({
         onDragCancel={resetDrag}
       >
         <SortableContext items={visibleIds} strategy={horizontalListSortingStrategy}>
-          <BoardCanvas>
+          <BoardCanvas revealTaskId={spotlightTaskId}>
             <div className="-mx-1 flex items-start gap-3 px-1 pb-2">
               {visibleSections.map((section) => (
                 <BoardSectionColumn
@@ -538,6 +596,8 @@ export function BoardView({
                   onDelete={handleDeleteSection}
                   onHide={handleHideSection}
                   onAddCard={handleAddCard}
+                  compactView={compactView}
+                  spotlightTaskId={spotlightTaskId}
                 />
               ))}
 
@@ -570,6 +630,7 @@ export function BoardView({
                   now={now}
                   onEdit={onEdit}
                   compact
+                  compactView={compactView}
                   sections={sections}
                   assignTaskToSection={assignTaskToSection}
                 />
@@ -597,7 +658,33 @@ export function BoardView({
             </div>
           ) : null}
         </DragOverlay>
+
+        {activeTaskId ? <BoardTrashDropzone /> : null}
       </DndContext>
+    </div>
+  );
+}
+
+function BoardTrashDropzone() {
+  const { setNodeRef, isOver } = useDroppable({ id: "board-trash", data: { type: "trash" } });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "pointer-events-auto absolute bottom-0 left-0 right-0 z-50 flex items-center justify-center transition-all duration-200",
+        isOver ? "h-24" : "h-16",
+        isOver
+          ? "bg-gradient-to-t from-red-500/55 via-red-500/20 to-transparent"
+          : "bg-gradient-to-t from-red-500/25 via-red-500/8 to-transparent",
+      )}
+      aria-label="Drop card here to delete"
+    >
+      <Trash2
+        className={cn(
+          "h-7 w-7 transition-transform duration-200",
+          isOver ? "scale-125 text-red-600/70 dark:text-red-400/70" : "text-red-500/40",
+        )}
+      />
     </div>
   );
 }

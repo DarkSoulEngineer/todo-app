@@ -7,8 +7,6 @@ import { cn } from "@/lib/utils/utils";
 interface WindowControlsProps {
   /** True while the board fills the screen via the Fullscreen API. */
   maximized: boolean;
-  /** True while the board is shown as a small floating window. */
-  floating: boolean;
   onMinimize: () => void;
   onMaximize: () => void;
   onClose: () => void;
@@ -17,18 +15,17 @@ interface WindowControlsProps {
 /**
  * Desktop-style window buttons for the board's top bar. They emulate window
  * behaviour inside the app rather than the OS:
- * - Minimize collapses the board into a floating window (and restores it).
- * - Maximize goes full-screen (and restores a floating window to normal).
- * - Close leaves the current board and returns to the board manager.
+ * - Minimize hides the board and drops it onto the taskbar (restorable).
+ * - Maximize goes full-screen (and restores again).
+ * - Close removes the board window and returns to the board manager.
  */
 export function WindowControls({
   maximized,
-  floating,
   onMinimize,
   onMaximize,
   onClose,
 }: WindowControlsProps) {
-  const maximizeLabel = maximized ? "Restore board" : floating ? "Maximize board" : "Maximize board";
+  const maximizeLabel = maximized ? "Restore board" : "Maximize board";
 
   return (
     <div
@@ -36,7 +33,7 @@ export function WindowControls({
       aria-label="Window controls"
       className="flex shrink-0 items-center gap-0.5"
     >
-      <WindowButton label={floating ? "Restore board" : "Minimize board"} onClick={onMinimize}>
+      <WindowButton label="Minimize board" onClick={onMinimize}>
         <Minus className="h-4 w-4" strokeWidth={2.4} />
       </WindowButton>
       <WindowButton label={maximizeLabel} onClick={onMaximize}>
@@ -70,9 +67,6 @@ function WindowButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      // The title bar doubles as a drag handle while floating, so a click on a
-      // window button must never start a window drag.
-      onPointerDown={(event) => event.stopPropagation()}
       className={cn(
         "focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors",
         danger

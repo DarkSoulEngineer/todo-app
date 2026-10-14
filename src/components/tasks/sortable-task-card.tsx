@@ -32,6 +32,8 @@ interface SortableTaskCardProps {
   reorderTotal?: number;
   /** Moves the card up or down inside its list group / board column. */
   onReorder?: (taskId: string, direction: "up" | "down") => void;
+  /** When true, render the card in the compact (minimal) layout. */
+  compactView?: boolean;
 }
 
 export function SortableTaskCard({
@@ -48,6 +50,7 @@ export function SortableTaskCard({
   reorderIndex,
   reorderTotal,
   onReorder,
+  compactView = false,
 }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, disabled: !sortable });
@@ -93,6 +96,7 @@ export function SortableTaskCard({
         reorderIndex={reorderIndex}
         reorderTotal={reorderTotal}
         onReorder={onReorder}
+        compactView={compactView}
       />
     </motion.li>
   );

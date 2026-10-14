@@ -48,6 +48,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FieldLabel, Input } from "@/components/ui/field";
 import { useTasksContext } from "@/components/providers/tasks-provider";
+import { useWindowsContext } from "@/components/providers/window-provider";
 import type { StrideProject } from "@/lib/domain/projects";
 import { buildWorkspace } from "@/lib/data/storage";
 import { cn, pluralize } from "@/lib/utils/utils";
@@ -87,10 +88,10 @@ export function BoardManager(): JSX.Element {
     createProject,
     duplicateProject,
     renameProject,
-    switchProject,
     removeProject,
     importProject,
   } = useTasksContext();
+  const { openBoard } = useWindowsContext();
 
   const [dialog, setDialog] = useState<ManagerDialog>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
@@ -236,11 +237,12 @@ export function BoardManager(): JSX.Element {
 
   const loadBoard = useCallback(
     (project: StrideProject): void => {
-      switchProject(project.id);
-      // Opening a board is a hand-off: the work happens on /tasks.
+      // Opening a board is a hand-off: it becomes an open window and the work
+      // happens on /tasks.
+      openBoard(project.id);
       router.push("/tasks");
     },
-    [router, switchProject],
+    [router, openBoard],
   );
 
   function writePins(next: Set<string>): void {
@@ -371,9 +373,10 @@ export function BoardManager(): JSX.Element {
         ? ((parsed as { name: string }).name.trim() || "Imported board")
         : "Imported board",
     );
-    importProject(importedName, workspace);
-    // An import is only useful once you are working in the board, so follow it
-    // into the task view instead of leaving the user on the manager.
+    // An import is only useful once you are working in the board, so open it
+    // as a window and follow it into the task view.
+    const imported = importProject(importedName, workspace);
+    if (imported) openBoard(imported);
     router.push("/tasks");
     toast.success(`Imported “${importedName}”`, {
       description: `${pluralize(workspace.tasks.length, "task")} · ${pluralize(workspace.boards.length, "category", "categories")} · ${pluralize(workspace.sections.length, "section")}`,
@@ -501,8 +504,9 @@ export function BoardManager(): JSX.Element {
       onDuplicate={(target) => {
         const copy = duplicateProject(target.id);
         if (!copy) return;
-        // Duplicating activates the copy, so follow it in — the same hand-off
-        // as New board, Import and opening a board.
+        // Duplicating activates the copy, so open it as a window and follow it
+        // in — the same hand-off as New board, Import and opening a board.
+        openBoard(copy);
         toast.success(`Duplicated “${target.name}”`, {
           description: "Working in the copy",
           duration: 2500,
@@ -777,9 +781,10 @@ export function BoardManager(): JSX.Element {
         onClose={closeDialog}
         onCreate={(name) => {
           // A blank field falls back to the default "New board" name.
-          createProject(name.trim() || undefined);
+          const created = createProject(name.trim() || undefined);
           closeDialog();
-          // The fresh board is already active, so go work in it.
+          // The fresh board is already active, so open it and go work in it.
+          if (created) openBoard(created);
           router.push("/tasks");
         }}
       />

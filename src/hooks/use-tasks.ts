@@ -90,6 +90,12 @@ export interface TasksApi {
   /** Immutable copy of the workspace, for reversible bulk actions. */
   snapshot: () => Workspace;
   restore: (workspace: Workspace) => void;
+  /** True when this specific task has recoverable previous states. */
+  canRevertTask: (id: string) => boolean;
+  /** Reverts a specific task to its previous state, if available. */
+  revertTask: (id: string) => void;
+  /** Clears the tracked per-task history. */
+  clearTaskHistory: () => void;
   loadSample: () => void;
   // Boards as project tenants: each board owns a full workspace.
   /** All boards (projects) in registry order. */
@@ -177,6 +183,40 @@ export function useTasks(): TasksApi {
     [],
   );
 
+  const [taskHistory, setTaskHistory] = useState<Record<string, Task[]>>({});
+
+  /** Pushes the current version of one task onto its revert stack (last 10). */
+  const recordTask = useCallback((id: string) => {
+    const current = tasksRef.current.find((task) => task.id === id);
+    if (!current) return;
+    const clone: Task = { ...current, subtasks: current.subtasks.map((subtask) => ({ ...subtask })) };
+    setTaskHistory((prev) => ({
+      ...prev,
+      [id]: [clone, ...(prev[id] ?? [])].slice(0, 10),
+    }));
+  }, []);
+
+  const canRevertTask = useCallback(
+    (id: string) => (taskHistory[id]?.length ?? 0) > 0,
+    [taskHistory],
+  );
+
+  const revertTask = useCallback(
+    (id: string) => {
+      const stack = taskHistory[id];
+      if (!stack || stack.length === 0) return;
+      const previous = stack[0];
+      setTaskHistory((prev) => ({
+        ...prev,
+        [id]: (prev[id] ?? []).slice(1),
+      }));
+      setTasks((prev) => prev.map((task) => (task.id === id ? previous : task)));
+    },
+    [taskHistory],
+  );
+
+  const clearTaskHistory = useCallback(() => setTaskHistory({}), []);
+
   const addTask = useCallback((draft: TaskDraft): Task => {
     const task = createTask(draft);
     setTasks((prev) => [...prev, task]);
@@ -185,24 +225,28 @@ export function useTasks(): TasksApi {
 
   const updateTask = useCallback(
     (id: string, draft: TaskDraft) => {
+      recordTask(id);
       updateById(id, (task) => applyDraft(task, draft));
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const patchTask = useCallback(
     (id: string, patch: TaskPatch) => {
+      recordTask(id);
       updateById(id, (task) => ({ ...task, ...patch, updatedAt: new Date().toISOString() }));
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const deleteTask = useCallback((id: string) => {
+    recordTask(id);
     setTasks((prev) => prev.filter((task) => task.id !== id));
-  }, []);
+  }, [recordTask]);
 
   const toggleComplete = useCallback(
     (id: string) => {
+      recordTask(id);
       updateById(id, (task) => {
         const completed = !task.completed;
         return {
@@ -214,11 +258,12 @@ export function useTasks(): TasksApi {
         };
       });
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const toggleCancel = useCallback(
     (id: string) => {
+      recordTask(id);
       updateById(id, (task) => {
         const canceled = !task.canceled;
         return {
@@ -230,11 +275,12 @@ export function useTasks(): TasksApi {
         };
       });
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const toggleSubtask = useCallback(
     (taskId: string, subtaskId: string) => {
+      recordTask(taskId);
       updateById(taskId, (task) => ({
         ...task,
         subtasks: task.subtasks.map((subtask) =>
@@ -243,35 +289,38 @@ export function useTasks(): TasksApi {
         updatedAt: new Date().toISOString(),
       }));
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const addSubtask = useCallback(
     (taskId: string, title: string) => {
       const trimmed = title.trim();
       if (!trimmed) return;
+      recordTask(taskId);
       updateById(taskId, (task) => ({
         ...task,
         subtasks: [...task.subtasks, { id: makeId(8), title: trimmed, done: false }],
         updatedAt: new Date().toISOString(),
       }));
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const removeSubtask = useCallback(
     (taskId: string, subtaskId: string) => {
+      recordTask(taskId);
       updateById(taskId, (task) => ({
         ...task,
         subtasks: task.subtasks.filter((subtask) => subtask.id !== subtaskId),
         updatedAt: new Date().toISOString(),
       }));
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const setTaskStatus = useCallback(
     (id: string, status: "completed" | "canceled" | "open") => {
+      recordTask(id);
       updateById(id, (task) => {
         const stamp = new Date().toISOString();
         if (status === "completed") {
@@ -297,25 +346,27 @@ export function useTasks(): TasksApi {
         return { ...task, completed: false, canceled: false, completedAt: null, updatedAt: stamp };
       });
     },
-    [updateById],
+    [updateById, recordTask],
   );
 
   const setTaskDueAt = useCallback(
     (id: string, dueAt: string | null) => {
+      recordTask(id);
       updateById(id, (task) => ({ ...task, dueAt, updatedAt: new Date().toISOString() }));
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const setTaskSectionId = useCallback(
     (id: string, sectionId: string | null) => {
+      recordTask(id);
       updateById(id, (task) => ({
         ...task,
         sectionId,
         updatedAt: new Date().toISOString(),
       }));
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   /**
@@ -328,6 +379,7 @@ export function useTasks(): TasksApi {
       const section = sectionsRef.current.find((item) => item.id === sectionId);
       if (!section) return;
 
+      recordTask(taskId);
       const stamp = new Date().toISOString();
       updateById(taskId, (task) => {
         if (isStatusSection(section)) {
@@ -378,7 +430,7 @@ export function useTasks(): TasksApi {
         return { ...task, sectionId: section.id, updatedAt: stamp };
       });
     },
-    [updateById],
+    [recordTask, updateById],
   );
 
   const addSection = useCallback((title: string): BoardSection => {
@@ -713,6 +765,9 @@ export function useTasks(): TasksApi {
       getCompletedIds,
       snapshot,
       restore,
+      canRevertTask,
+      revertTask,
+      clearTaskHistory,
       loadSample,
       projects: projectsState?.projects ?? [],
       currentProjectId: projectsState?.currentId ?? "",

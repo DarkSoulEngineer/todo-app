@@ -28,6 +28,8 @@ interface TaskListProps {
   reorderable: boolean;
   /** Called after a card is moved to another section via the list arrows. */
   onMovedToSection?: (sectionId: string) => void;
+  /** When true, render cards in the compact (minimal) layout. */
+  compactView?: boolean;
 }
 
 export function TaskList({
@@ -44,6 +46,7 @@ export function TaskList({
   selectHighlighted,
   reorderable,
   onMovedToSection,
+  compactView = false,
 }: TaskListProps) {
   const { reorderTasks } = useTasksContext();
 
@@ -107,6 +110,7 @@ export function TaskList({
             reorderIndex={reorderable ? index : undefined}
             reorderTotal={reorderable ? tasks.length : undefined}
             onReorder={reorderable ? handleReorder : undefined}
+            compactView={compactView}
           />
         ))}
       </AnimatePresence>

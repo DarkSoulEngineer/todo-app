@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
@@ -16,26 +15,27 @@ import { AppShell } from "@/components/layout/app-shell";
 import { BoardView } from "@/components/board/board-view";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { Celebration } from "@/components/common/celebration";
+import { Desktop } from "@/components/layout/desktop";
 import { EmptyState } from "@/components/common/empty-state";
 import { InsightsView } from "@/components/insights/insights-view";
 import { ListView } from "@/components/list/list-view";
 import { ShortcutsHelp } from "@/components/common/shortcuts-help";
-import { Sidebar } from "@/components/layout/sidebar";
 import { TaskDialog } from "@/components/tasks/task-dialog";
 import { TaskSkeleton } from "@/components/tasks/task-skeleton";
 import { ViewRibbon, type CategoryCount, type RibbonCategories, type RibbonSections } from "@/components/layout/view-ribbon";
 import { useTasksContext } from "@/components/providers/tasks-provider";
+import { useWindowsContext } from "@/components/providers/window-provider";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useNow } from "@/hooks/use-now";
 import { getCategory, selectCategories } from "@/lib/domain/categories";
 import { filterBySmartList, smartListLabel } from "@/lib/domain/smart-lists";
 import { computeStats, matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
 import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
-import type { SmartList, SortKey, Task, TaskDraft, ViewMode } from "@/lib/domain/types";
-import { cn, pluralize } from "@/lib/utils/utils";
+import type { SmartList, SortKey, Task, TaskDraft, ViewMode, Workspace } from "@/lib/domain/types";
+import { pluralize } from "@/lib/utils/utils";
 
-/** How the board is presented: filling the viewport, a movable window, or full-screen. */
-type WindowMode = "normal" | "floating" | "maximized";
+/** How the board is presented: filling the viewport, or full-screen. */
+type WindowMode = "normal" | "maximized";
 
 /** Sensible default deadline when a task is created from an empty calendar day. */
 function defaultDueForDay(date: Date, now: Date): string {
@@ -54,6 +54,7 @@ export function TodoApp() {
   const {
     tasks,
     sections,
+    boards,
     deletedCategories,
     isLoading,
     isEmpty,
@@ -66,12 +67,13 @@ export function TodoApp() {
     restore,
     loadSample,
     assignTaskToSection,
-    currentProjectName,
+    currentProjectId,
   } = useTasksContext();
+  const { ready: windowsReady, activeId, minimize, closeBoard } = useWindowsContext();
   const now = useNow();
 
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [smartList, setSmartList] = useState<SmartList>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("board");
+  const [smartList] = useState<SmartList>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("manual");
   const [category, setCategory] = useState<string | "all">("all");
@@ -86,15 +88,41 @@ export function TodoApp() {
   const [ribbonTab, setRibbonTab] = useState("home");
   const [searchFocusSignal, setSearchFocusSignal] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarPinned, setSidebarPinned] = useState(false);
 
-  // Board window behaviour (docked / floating / maximized). Ephemeral chrome,
-  // so it lives in the task view rather than in the persisted tasks store.
+  // The task the activity feed just navigated to: ringed briefly so the user
+  // can spot it among the board's cards.
+  const [spotlightTaskId, setSpotlightTaskId] = useState<string | null>(null);
+  const spotlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Board window behaviour: docked or full-screen. Minimizing is a window-
+  // manager concern (the board becomes an open window on the taskbar), so it
+  // lives in the window store, not here.
   const [windowMode, setWindowMode] = useState<WindowMode>("normal");
-  const [floatPos, setFloatPos] = useState<{ x: number; y: number } | null>(null);
-  const floatRef = useRef<HTMLDivElement>(null);
-  const floatDrag = useRef<{ dx: number; dy: number } | null>(null);
+  const [compactView, setCompactView] = useState(false);
+
+  interface StoredVersion {
+    id: string;
+    label: string;
+    createdAt: string;
+    taskCount: number;
+    workspace: Workspace;
+  }
+  const [versions, setVersions] = useState<StoredVersion[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("stride.versions.v1");
+      if (!raw) return [];
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as StoredVersion[];
+    } catch {}
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("stride.versions.v1", JSON.stringify(versions));
+    } catch {}
+  }, [versions]);
 
   const router = useRouter();
 
@@ -189,12 +217,23 @@ export function TodoApp() {
     setViewMode(view);
     // Section focus only makes sense on the board.
     if (view !== "board") setFocusedSection(null);
-    setMobileNavOpen(false);
   }, []);
 
   const selectCategory = useCallback((next: string | "all") => {
     setCategory(next);
-    setMobileNavOpen(false);
+  }, []);
+
+  // Follow an activity entry to where the task lives: switch to the board and
+  // briefly spotlight the located card. The board keeps every section visible
+  // (no single-section filter) so the task is seen in context, and the canvas
+  // pans the highlighted card into view.
+  const openTaskLocation = useCallback((task: Task) => {
+    setFocusedSection(null);
+    setViewMode("board");
+    // Ring the located card briefly so it is easy to spot.
+    setSpotlightTaskId(task.id);
+    if (spotlightTimerRef.current !== null) clearTimeout(spotlightTimerRef.current);
+    spotlightTimerRef.current = setTimeout(() => setSpotlightTaskId(null), 1000);
   }, []);
 
   // Leaving fullscreen (e.g. via Esc) must return the maximize icon to normal.
@@ -208,14 +247,22 @@ export function TodoApp() {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  // Minimize: collapse the board into a movable floating window, or restore it.
-  const handleMinimize = useCallback(() => {
-    setFloatPos(null);
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-    setWindowMode((mode) => (mode === "floating" ? "normal" : "floating"));
-  }, []);
+  // Drop the pending spotlight timer if the app unmounts mid-countdown.
+  useEffect(
+    () => () => {
+      if (spotlightTimerRef.current !== null) clearTimeout(spotlightTimerRef.current);
+    },
+    [],
+  );
 
-  // Maximize: full-screen, or bring a floating window back up. Toggling again
+  // Minimize: hide the board completely and reveal the desktop + taskbar. The
+  // board stays open (and its data persists) so it can be restored later.
+  const handleMinimize = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    minimize();
+  }, [minimize]);
+
+  // Maximize: full-screen, or bring a floating board back up. Toggling again
   // restores. requestFullscreen must run inside the click gesture.
   const handleMaximize = useCallback(() => {
     if (windowMode === "maximized") {
@@ -223,72 +270,18 @@ export function TodoApp() {
       setWindowMode("normal");
       return;
     }
-    setFloatPos(null);
     setWindowMode("maximized");
     void document.documentElement.requestFullscreen?.().catch(() => {
       // Fullscreen can be blocked by the browser; the layout still maximizes.
     });
   }, [windowMode]);
 
-  // Close: leave the current board and return to the board manager landing page.
+  // Close: remove this board's window and return to the board manager, where
+  // the user can open another board.
   const handleCloseBoard = useCallback(() => {
+    closeBoard(currentProjectId);
     router.push("/");
-  }, [router]);
-
-  // Dragging the floating window by its title bar. Buttons opt out on pointer
-  // down, so clicks on the view switcher and window controls still work.
-  const handleTitlePointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (windowMode !== "floating") return;
-      const target = event.target as HTMLElement;
-      if (target.closest("button, a, input, select, textarea, [role='tab']")) return;
-      const rect = floatRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      floatDrag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
-      event.currentTarget.setPointerCapture(event.pointerId);
-    },
-    [windowMode],
-  );
-
-  const handleTitlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = floatDrag.current;
-    if (!drag) return;
-    const rect = floatRef.current?.getBoundingClientRect();
-    const width = rect?.width ?? 320;
-    const height = rect?.height ?? 240;
-    const maxX = Math.max(8, window.innerWidth - width - 8);
-    const maxY = Math.max(8, window.innerHeight - height - 8);
-    setFloatPos({
-      x: Math.min(Math.max(8, event.clientX - drag.dx), maxX),
-      y: Math.min(Math.max(8, event.clientY - drag.dy), maxY),
-    });
-  }, []);
-
-  const handleTitlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!floatDrag.current) return;
-    floatDrag.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, []);
-
-  // Follow a task moved via the list's section arrows to where it now lives.
-  const handleMovedToSection = useCallback(
-    (sectionId: string) => {
-      const section = sections.find((item) => item.id === sectionId);
-      if (!section) return;
-      setMobileNavOpen(false);
-      if (section.status) {
-        // Status sections feed a smart list (completed, canceled, overdue, upcoming).
-        setSmartList(section.status);
-      } else {
-        // Custom sections live on the board — focus that section.
-        setFocusedSection(sectionId);
-        setViewMode("board");
-      }
-    },
-    [sections],
-  );
+  }, [closeBoard, currentProjectId, router]);
 
   useKeyboardShortcuts({
     onNew: () => {
@@ -305,8 +298,7 @@ export function TodoApp() {
       if (!dialogOpen) setHelpOpen(true);
     },
     onEscape: () => {
-      if (mobileNavOpen) setMobileNavOpen(false);
-      else if (helpOpen) setHelpOpen(false);
+      if (helpOpen) setHelpOpen(false);
       else if (dialogOpen) setDialogOpen(false);
     },
   });
@@ -364,6 +356,32 @@ export function TodoApp() {
     },
     [category, deleteCategory, snapshot, restore],
   );
+
+  const createVersion = useCallback(() => {
+    const version: StoredVersion = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      label: `Version ${versions.length + 1}`,
+      createdAt: new Date().toISOString(),
+      taskCount: tasks.length,
+      workspace: { tasks, sections, boards },
+    };
+    setVersions((prev) => [version, ...prev]);
+    toast.success("Version saved", { duration: 2200 });
+  }, [tasks, sections, boards, versions.length]);
+
+  const restoreVersion = useCallback(
+    (id: string) => {
+      const version = versions.find((item) => item.id === id);
+      if (!version) return;
+      restore(version.workspace);
+      toast.success("Version restored", { duration: 2200 });
+    },
+    [versions, restore],
+  );
+
+  const deleteVersion = useCallback((id: string) => {
+    setVersions((prev) => prev.filter((item) => item.id !== id));
+  }, []);
 
   const resetFilters = useCallback(() => {
     setQuery("");
@@ -463,19 +481,8 @@ export function TodoApp() {
             </button>
           </div>
         ) : null}
-        <ListView
-          tasks={listTasks}
-          list={smartList}
-          now={now}
-          // The list has no drag and drop: reordering happens on the board.
-          sortable={false}
-          // Manual order still gets up/down arrows inside each group.
-          reorderable={sort === "manual"}
-          onEdit={openEdit}
-          sections={sections}
-          assignTaskToSection={assignTaskToSection}
-          onMovedToSection={handleMovedToSection}
-        />
+        {/* Read-only activity feed: cards navigate to where the task lives. */}
+        <ListView tasks={listTasks} onOpenTask={openTaskLocation} />
       </div>
     );
   } else if (viewMode === "board") {
@@ -492,6 +499,8 @@ export function TodoApp() {
           focusedSectionId={activeSection?.id ?? null}
           onSortChange={setSort}
           onEdit={openEdit}
+          compactView={compactView}
+          spotlightTaskId={spotlightTaskId}
         />
       </div>
     );
@@ -511,39 +520,17 @@ export function TodoApp() {
     );
   }
 
-  const sidebarBase = {
-    stats,
-    currentBoardName: currentProjectName,
-    pinned: sidebarPinned,
-    onTogglePin: () => setSidebarPinned((value) => !value),
-    onShowHelp: () => setHelpOpen(true),
-  };
-
-  const floating = windowMode === "floating";
+  // Minimized: the window store reports no active board, so the work surface
+  // gives way to the desktop and its taskbar. Waiting for hydration first means
+  // a board restored from a saved session never flashes the desktop.
+  if (windowsReady && activeId === null) {
+    return <Desktop />;
+  }
 
   return (
     <>
-      <div
-        ref={floatRef}
-        style={floating && floatPos ? { left: floatPos.x, top: floatPos.y } : undefined}
-        className={cn(
-          floating
-            ? cn(
-                "fixed z-40 flex h-[min(36rem,82dvh)] w-[min(34rem,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl",
-                floatPos ? null : "right-6 bottom-6",
-              )
-            : "h-dvh w-full",
-        )}
-      >
+      <div className="h-dvh w-full">
         <AppShell
-          sidebar={floating ? null : <Sidebar idPrefix="desktop" {...sidebarBase} />}
-          mobileSidebar={
-            <Sidebar
-              {...sidebarBase}
-              idPrefix="mobile"
-              onClose={() => setMobileNavOpen(false)}
-            />
-          }
           ribbon={
             <ViewRibbon
               viewMode={viewMode}
@@ -557,24 +544,22 @@ export function TodoApp() {
               sort={sort}
               onSortChange={setSort}
               showSort={viewMode === "list" || viewMode === "board"}
+              compactView={compactView}
+              onCompactViewChange={setCompactView}
+              onLoadSample={handleLoadSample}
               filterCategories={filterCategories}
               filterSections={filterSections}
               onClearCompleted={handleClearCompleted}
               showClearCompleted={viewMode === "list" && stats.completed > 0}
               onNewTask={openNew}
               onChangeView={selectView}
-              floating={floating}
               maximized={windowMode === "maximized"}
               onMinimize={handleMinimize}
               onMaximize={handleMaximize}
               onCloseBoard={handleCloseBoard}
-              onTitlePointerDown={handleTitlePointerDown}
-              onTitlePointerMove={handleTitlePointerMove}
-              onTitlePointerUp={handleTitlePointerUp}
+              onShowHelp={() => setHelpOpen(true)}
             />
           }
-          mobileOpen={mobileNavOpen}
-          onCloseMobile={() => setMobileNavOpen(false)}
         >
           {content}
         </AppShell>

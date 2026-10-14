@@ -17,9 +17,9 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState, Fragment, type ReactNode, type RefObject } from "react";
 import { toast } from "sonner";
-import { CompleteToggle } from "@/components/tasks/complete-toggle";
+
 import { SubtaskList } from "@/components/tasks/subtask-list";
-import { CategoryPill, DueBadge, PriorityPill, StatusPill } from "@/components/tasks/task-badges";
+import { DueBadge, PriorityPill, StatusPill } from "@/components/tasks/task-badges";
 import { TaskTooltip } from "@/components/tasks/task-tooltip";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { CARD_COLOR_WASHES, detectCardTheme, PRIORITY_WASHES } from "@/lib/features/card-themes";
@@ -42,6 +42,10 @@ interface TaskCardProps {
   dragging?: boolean;
   /** Compact layout for dense surfaces (e.g. board columns). */
   compact?: boolean;
+  /** When true, render only title + category (board compact view). */
+  compactView?: boolean;
+  /** Briefly ring the card when it is the target of an activity navigation. */
+  spotlight?: boolean;
   /** Board sections for section navigation arrows. */
   sections?: BoardSection[];
   /** Function to move task to a section. */
@@ -132,6 +136,58 @@ function TaskTitle({
   onRenameBlur,
   onOpenEdit,
 }: TaskTitleProps) {
+  const content = renaming ? (
+    <input
+      ref={renameInputRef}
+      type="text"
+      value={renameValue}
+      onChange={(e) => onRenameValueChange(e.target.value)}
+      onKeyDown={onRenameKeyDown}
+      onBlur={onRenameBlur}
+      onClick={(e) => e.stopPropagation()}
+      className="focus-ring min-w-0 w-full rounded-md border border-input bg-card px-2 py-1 text-sm font-semibold tracking-tight text-foreground"
+      autoFocus
+    />
+  ) : (
+    <button
+      type="button"
+      onClick={(e) => {
+        // Board cards open the editor on a deliberate double-click (handled by
+        // the card itself), so a single click on the title must never open it.
+        if (compact) return;
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        onOpenEdit();
+      }}
+      className="focus-ring -m-1 min-w-0 w-full cursor-pointer rounded-md p-1 text-left"
+    >
+      <h3
+        className={cn(
+          "font-semibold tracking-tight leading-snug",
+          compact ? "truncate text-sm" : "break-words text-[0.95rem]",
+          settled ? "text-muted-foreground line-through decoration-muted-foreground/50" : "text-foreground",
+        )}
+      >
+        {task.title}
+      </h3>
+    </button>
+  );
+
+  // Board cards (compact) show the plain title, with no hover preview panel.
+  if (compact) {
+    return (
+      <div
+        data-card-title
+        className="min-w-0"
+        onClick={(e) => {
+          if (!hasSelectOrRename) return;
+          e.stopPropagation();
+        }}
+      >
+        {content}
+      </div>
+    );
+  }
+
   return (
     <TaskTooltip task={task} now={now}>
       {(triggerProps) => (
@@ -144,38 +200,7 @@ function TaskTitle({
             e.stopPropagation();
           }}
         >
-          {renaming ? (
-            <input
-              ref={renameInputRef}
-              type="text"
-              value={renameValue}
-              onChange={(e) => onRenameValueChange(e.target.value)}
-              onKeyDown={onRenameKeyDown}
-              onBlur={onRenameBlur}
-              onClick={(e) => e.stopPropagation()}
-              className="focus-ring min-w-0 w-full rounded-md border border-input bg-card px-2 py-1 text-sm font-semibold tracking-tight text-foreground"
-              autoFocus
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => {
-                if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-                onOpenEdit();
-              }}
-              className="focus-ring -m-1 min-w-0 w-full cursor-pointer rounded-md p-1 text-left"
-            >
-              <h3
-                className={cn(
-                  "font-semibold tracking-tight leading-snug",
-                  compact ? "truncate text-sm" : "break-words text-[0.95rem]",
-                  settled ? "text-muted-foreground line-through decoration-muted-foreground/50" : "text-foreground",
-                )}
-              >
-                {task.title}
-              </h3>
-            </button>
-          )}
+          {content}
         </div>
       )}
     </TaskTooltip>
@@ -186,12 +211,13 @@ interface TaskMetaProps {
   task: Task;
   now: Date;
   compact?: boolean;
+  compactView?: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
 }
 
 /** Meta row: due, priority, category, subtask progress and settled status. */
-function TaskMeta({ task, now, compact, expanded, onToggleExpanded }: TaskMetaProps) {
+function TaskMeta({ task, now, compact, compactView = false, expanded, onToggleExpanded }: TaskMetaProps) {
   const doneSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
   const totalSubtasks = task.subtasks.length;
   const allSubtasksDone = totalSubtasks > 0 && doneSubtasks === totalSubtasks;
@@ -203,10 +229,10 @@ function TaskMeta({ task, now, compact, expanded, onToggleExpanded }: TaskMetaPr
         compact ? "mt-2.5" : "mt-3",
       )}
     >
-      <DueBadge task={task} now={now} />
-      <PriorityPill priority={task.priority} />
-      {task.category ? <CategoryPill categoryId={task.category} /> : null}
-      {totalSubtasks > 0 ? (
+      {!compactView ? <DueBadge task={task} now={now} hideIcon={compact} /> : null}
+      {!compactView ? <PriorityPill priority={task.priority} hideIcon={compact} /> : null}
+      {/* Category removed from card view. */}
+      {!compactView && totalSubtasks > 0 ? (
         <button
           type="button"
           onClick={onToggleExpanded}
@@ -225,7 +251,7 @@ function TaskMeta({ task, now, compact, expanded, onToggleExpanded }: TaskMetaPr
           <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
         </button>
       ) : null}
-      {task.completed || task.canceled ? <StatusPill task={task} now={now} /> : null}
+      {!compactView && (task.completed || task.canceled) ? <StatusPill task={task} now={now} hideIcon={compact} /> : null}
     </div>
   );
 }
@@ -430,55 +456,9 @@ function CardActions({
           </select>
         )}
 
-        {/* 4. In-column reorder arrows (up/down) — on list and board when enabled */}
-        {reorderEnabled &&
-          REORDER_DIRECTIONS.map((direction) => {
-            const isUp = direction === "up";
-            const enabled = isUp ? canMoveUp : canMoveDown;
-            const label = isUp
-              ? `Move “${task.title}” up`
-              : `Move “${task.title}” down`;
-            return (
-              <button
-                key={direction}
-                type="button"
-                disabled={!enabled}
-                className={cn(
-                  compact ? COMPACT_ARROW : ICON_BUTTON,
-                  "disabled:pointer-events-none disabled:opacity-40"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReorder?.(task.id, direction);
-                }}
-                aria-label={label}
-                title={label}
-              >
-                {isUp ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-              </button>
-            );
-          })}
+        {/* Reorder arrows removed from card view. */}
 
-        {/* 5. Section navigation arrows (left/right) — always visible on both list and board */}
-        {compact && moveTargets.map((target) => {
-          const Icon = target.direction === "prev" ? ArrowLeft : ArrowRight;
-          return (
-            <button
-              key={target.direction}
-              type="button"
-              className={COMPACT_ARROW}
-              onPointerDown={handleArrowPointerDown}
-              onClick={(e) => {
-                e.stopPropagation();
-                onMove(target.id, target.title);
-              }}
-              aria-label={`Move "${task.title}" to ${target.title}`}
-              title={`Move to ${target.title}`}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
-          );
-        })}
+        {/* Section navigation arrows removed from card view. */}
 
         {/* 5. Edit button — visible in action column on list (non-compact), in menu on board (compact) */}
         {!compact && (
@@ -496,57 +476,7 @@ function CardActions({
           </button>
         )}
 
-        {/* 6. Primary actions (Cancel, Delete) — in overflow menu */}
-        {/* 7. Overflow menu button */}
-        <div className="relative">
-          <button
-            ref={menuButtonRef}
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-label="More actions"
-            className={cn(ICON_BUTTON, menuOpen && "bg-muted text-foreground")}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
-
-          {menuOpen && typeof document !== "undefined" ? (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={closeMenu}
-                aria-hidden="true"
-              />
-              <div
-                role="menu"
-                aria-label={`Actions for "${task.title}"`}
-                className="fixed right-0 z-50 mt-1.5 min-w-[11rem] origin-top-right rounded-xl border border-border bg-popover/95 p-1 shadow-2xl ring-1 ring-black/5 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150 dark:ring-white/10"
-              >
-                {/* Primary actions in menu (on list, Edit is already in column, so skip it) */}
-                {primaryActions
-                  .filter((action) => compact || action.key !== "edit")
-                  .map((action) => (
-                    <Fragment key={action.key}>
-                      {action.key === "delete" && <div className="my-1 h-px bg-border" />}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={action.onClick}
-                        className={cn(
-                          MENU_ITEM,
-                          action.key === "delete" && "text-destructive hover:bg-destructive/10",
-                        )}
-                      >
-                        <action.icon className="h-4 w-4" />
-                        {action.label}
-                      </button>
-                    </Fragment>
-                  ))}
-              </div>
-            </>
-          ) : null}
-        </div>
+        {/* Overflow actions menu removed from card view. */}
       </div>
     </div>
   );
@@ -559,6 +489,8 @@ export function TaskCard({
   handle,
   dragging,
   compact,
+  compactView = false,
+  spotlight = false,
   sections,
   assignTaskToSection,
   selected = false,
@@ -660,12 +592,25 @@ export function TaskCard({
   }
 
   /**
-   * Double-click keeps two meanings, split by target: on the task title it
-   * renames (the long-standing gesture), anywhere else on the card it selects.
+   * Double-click means different things per surface:
+   * - board (compact): opens the editor — deliberately the only click that
+   *   does, so board edits are never accidental;
+   * - list (non-compact): on the task title it renames, elsewhere it selects.
    */
   function handleCardDoubleClick(e: React.MouseEvent) {
     const target = e.target;
     if (!(target instanceof Element)) return;
+
+    if (compact) {
+      const inTitle = target.closest(TITLE_SELECTOR) !== null;
+      // Interactive controls keep their own behaviour; anywhere else (including
+      // the title) a deliberate double-click opens the editor.
+      if (!inTitle && target.closest(INTERACTIVE_TARGET) !== null) return;
+      e.preventDefault();
+      onEdit(task);
+      return;
+    }
+
     if (target.closest(TITLE_SELECTOR) !== null) {
       // Inline rename is a self-contained, non-compact list feature: the card
       // commits it itself through `patchTask`. The select handler is the
@@ -749,7 +694,9 @@ export function TaskCard({
   const cardClassName = cn(
     "group relative flex min-w-0 overflow-hidden rounded-2xl border bg-card shadow-xs transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out",
     compact
-      ? "gap-3 p-3 hover:border-primary/25 hover:shadow-md"
+      ? compactView
+        ? "gap-2 p-2 hover:border-primary/25 hover:shadow-md"
+        : "gap-3 p-3 hover:border-primary/25 hover:shadow-md"
       : "gap-3.5 p-4 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
     // Theme border is secondary: it only tints plain (upcoming) cards, and sits
     // before the status / selection / drag states so those still win in cn().
@@ -760,6 +707,7 @@ export function TaskCard({
     task.canceled && "border-dashed border-slate-500/35 bg-muted/40 hover:border-slate-500/50",
     selected && "border-primary/40 bg-primary/[0.04] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-card",
     highlighted && "border-primary/40 bg-primary/[0.05]",
+    spotlight && "z-10 spotlight",
     pulse === "complete" && "animate-pulse ring-2 ring-emerald-500/50",
     pulse === "cancel" && "animate-pulse ring-2 ring-slate-500/50",
   );
@@ -816,15 +764,7 @@ export function TaskCard({
           />
         ) : null}
 
-        <div className={cn("shrink-0", compact ? "pt-0" : "pt-0.5")}>
-          <CompleteToggle
-            completed={task.completed}
-            canceled={task.canceled}
-            onToggle={handleCompleteWithPulse}
-            className={cn(pulse === "complete" && "animate-pulse")}
-          />
-        </div>
-
+        {/* Complete toggle removed from card view (compact and normal). */}
         <div className="min-w-0 flex-1">
           {/* Title row: title takes all space, actions are a separate non-shrinking sibling */}
           <div className="flex items-start gap-2">
@@ -847,26 +787,28 @@ export function TaskCard({
             </div>
 
             {/* Actions column - never shrinks, always on the right */}
-            <CardActions
-              task={task}
-              compact={compact}
-              pulse={pulse}
-              handle={handle}
-              prevSection={prevSection}
-              nextSection={nextSection}
-              sections={sections ?? []}
-              currentSectionId={currentSectionId}
-              onMove={handleMoveToSection}
-              onEdit={onEdit}
-              onCancelTask={handleCancelWithPulse}
-              onDeleteTask={handleDelete}
-              reorderIndex={reorderIndex}
-              reorderTotal={reorderTotal}
-              onReorder={onReorder}
-            />
+            {!compactView ? (
+              <CardActions
+                task={task}
+                compact={compact}
+                pulse={pulse}
+                handle={handle}
+                prevSection={prevSection}
+                nextSection={nextSection}
+                sections={sections ?? []}
+                currentSectionId={currentSectionId}
+                onMove={handleMoveToSection}
+                onEdit={onEdit}
+                onCancelTask={handleCancelWithPulse}
+                onDeleteTask={handleDelete}
+                reorderIndex={reorderIndex}
+                reorderTotal={reorderTotal}
+                onReorder={onReorder}
+              />
+            ) : null}
           </div>
 
-          {task.description ? (
+          {!compactView && task.description ? (
             <p
               className={cn(
                 "mt-1.5 line-clamp-2 leading-relaxed text-muted-foreground",
@@ -881,6 +823,7 @@ export function TaskCard({
             task={task}
             now={now}
             compact={compact}
+            compactView={compactView}
             expanded={expanded}
             onToggleExpanded={() => setExpanded((value) => !value)}
           />

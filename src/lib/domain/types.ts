@@ -43,6 +43,15 @@ export interface BoardSection {
   hidden?: boolean;
 }
 
+/** A saved point-in-time snapshot of a workspace. */
+export interface WorkspaceVersion {
+  id: string;
+  label: string;
+  createdAt: string;
+  taskCount: number;
+  workspace: Workspace;
+}
+
 /** The full persisted workspace: tasks, the board layout and the boards. */
 export interface Workspace {
   tasks: Task[];
