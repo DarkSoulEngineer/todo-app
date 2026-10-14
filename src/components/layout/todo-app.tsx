@@ -1,7 +1,16 @@
 "use client";
 
 import { CheckCheck, Plus, Search, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/app-shell";
 import { BoardView } from "@/components/board/board-view";
@@ -23,7 +32,10 @@ import { filterBySmartList, smartListLabel } from "@/lib/domain/smart-lists";
 import { computeStats, matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
 import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
 import type { SmartList, SortKey, Task, TaskDraft, ViewMode } from "@/lib/domain/types";
-import { pluralize } from "@/lib/utils/utils";
+import { cn, pluralize } from "@/lib/utils/utils";
+
+/** How the board is presented: filling the viewport, a movable window, or full-screen. */
+type WindowMode = "normal" | "floating" | "maximized";
 
 /** Sensible default deadline when a task is created from an empty calendar day. */
 function defaultDueForDay(date: Date, now: Date): string {
@@ -76,6 +88,15 @@ export function TodoApp() {
   const [celebrating, setCelebrating] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
+
+  // Board window behaviour (docked / floating / maximized). Ephemeral chrome,
+  // so it lives in the task view rather than in the persisted tasks store.
+  const [windowMode, setWindowMode] = useState<WindowMode>("normal");
+  const [floatPos, setFloatPos] = useState<{ x: number; y: number } | null>(null);
+  const floatRef = useRef<HTMLDivElement>(null);
+  const floatDrag = useRef<{ dx: number; dy: number } | null>(null);
+
+  const router = useRouter();
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -174,6 +195,81 @@ export function TodoApp() {
   const selectCategory = useCallback((next: string | "all") => {
     setCategory(next);
     setMobileNavOpen(false);
+  }, []);
+
+  // Leaving fullscreen (e.g. via Esc) must return the maximize icon to normal.
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement) {
+        setWindowMode((mode) => (mode === "maximized" ? "normal" : mode));
+      }
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  // Minimize: collapse the board into a movable floating window, or restore it.
+  const handleMinimize = useCallback(() => {
+    setFloatPos(null);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    setWindowMode((mode) => (mode === "floating" ? "normal" : "floating"));
+  }, []);
+
+  // Maximize: full-screen, or bring a floating window back up. Toggling again
+  // restores. requestFullscreen must run inside the click gesture.
+  const handleMaximize = useCallback(() => {
+    if (windowMode === "maximized") {
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      setWindowMode("normal");
+      return;
+    }
+    setFloatPos(null);
+    setWindowMode("maximized");
+    void document.documentElement.requestFullscreen?.().catch(() => {
+      // Fullscreen can be blocked by the browser; the layout still maximizes.
+    });
+  }, [windowMode]);
+
+  // Close: leave the current board and return to the board manager landing page.
+  const handleCloseBoard = useCallback(() => {
+    router.push("/");
+  }, [router]);
+
+  // Dragging the floating window by its title bar. Buttons opt out on pointer
+  // down, so clicks on the view switcher and window controls still work.
+  const handleTitlePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (windowMode !== "floating") return;
+      const target = event.target as HTMLElement;
+      if (target.closest("button, a, input, select, textarea, [role='tab']")) return;
+      const rect = floatRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      floatDrag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [windowMode],
+  );
+
+  const handleTitlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = floatDrag.current;
+    if (!drag) return;
+    const rect = floatRef.current?.getBoundingClientRect();
+    const width = rect?.width ?? 320;
+    const height = rect?.height ?? 240;
+    const maxX = Math.max(8, window.innerWidth - width - 8);
+    const maxY = Math.max(8, window.innerHeight - height - 8);
+    setFloatPos({
+      x: Math.min(Math.max(8, event.clientX - drag.dx), maxX),
+      y: Math.min(Math.max(8, event.clientY - drag.dy), maxY),
+    });
+  }, []);
+
+  const handleTitlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!floatDrag.current) return;
+    floatDrag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   }, []);
 
   // Follow a task moved via the list's section arrows to where it now lives.
@@ -423,44 +519,66 @@ export function TodoApp() {
     onShowHelp: () => setHelpOpen(true),
   };
 
+  const floating = windowMode === "floating";
+
   return (
     <>
-      <AppShell
-        sidebar={<Sidebar idPrefix="desktop" {...sidebarBase} />}
-        mobileSidebar={
-          <Sidebar
-            {...sidebarBase}
-            idPrefix="mobile"
-            onClose={() => setMobileNavOpen(false)}
-          />
-        }
-        ribbon={
-          <ViewRibbon
-            viewMode={viewMode}
-            tab={ribbonTab}
-            onTabChange={setRibbonTab}
-            now={now}
-            query={query}
-            onQueryChange={setQuery}
-            searchRef={searchRef}
-            searchFocusSignal={searchFocusSignal}
-            showQuickAdd={viewMode !== "insights"}
-            sort={sort}
-            onSortChange={setSort}
-            showSort={viewMode === "list" || viewMode === "board"}
-            filterCategories={filterCategories}
-            filterSections={filterSections}
-            onClearCompleted={handleClearCompleted}
-            showClearCompleted={viewMode === "list" && stats.completed > 0}
-            onNewTask={openNew}
-            onChangeView={selectView}
-          />
-        }
-        mobileOpen={mobileNavOpen}
-        onCloseMobile={() => setMobileNavOpen(false)}
+      <div
+        ref={floatRef}
+        style={floating && floatPos ? { left: floatPos.x, top: floatPos.y } : undefined}
+        className={cn(
+          floating
+            ? cn(
+                "fixed z-40 flex h-[min(36rem,82dvh)] w-[min(34rem,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl",
+                floatPos ? null : "right-6 bottom-6",
+              )
+            : "h-dvh w-full",
+        )}
       >
-        {content}
-      </AppShell>
+        <AppShell
+          sidebar={floating ? null : <Sidebar idPrefix="desktop" {...sidebarBase} />}
+          mobileSidebar={
+            <Sidebar
+              {...sidebarBase}
+              idPrefix="mobile"
+              onClose={() => setMobileNavOpen(false)}
+            />
+          }
+          ribbon={
+            <ViewRibbon
+              viewMode={viewMode}
+              tab={ribbonTab}
+              onTabChange={setRibbonTab}
+              query={query}
+              onQueryChange={setQuery}
+              searchRef={searchRef}
+              searchFocusSignal={searchFocusSignal}
+              showCreate={viewMode !== "insights"}
+              sort={sort}
+              onSortChange={setSort}
+              showSort={viewMode === "list" || viewMode === "board"}
+              filterCategories={filterCategories}
+              filterSections={filterSections}
+              onClearCompleted={handleClearCompleted}
+              showClearCompleted={viewMode === "list" && stats.completed > 0}
+              onNewTask={openNew}
+              onChangeView={selectView}
+              floating={floating}
+              maximized={windowMode === "maximized"}
+              onMinimize={handleMinimize}
+              onMaximize={handleMaximize}
+              onCloseBoard={handleCloseBoard}
+              onTitlePointerDown={handleTitlePointerDown}
+              onTitlePointerMove={handleTitlePointerMove}
+              onTitlePointerUp={handleTitlePointerUp}
+            />
+          }
+          mobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
+        >
+          {content}
+        </AppShell>
+      </div>
 
       <p aria-live="polite" className="sr-only">
         {isLoading ? "Loading tasks" : title}

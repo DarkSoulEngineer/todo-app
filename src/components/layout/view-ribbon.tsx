@@ -16,9 +16,17 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { Children, Fragment, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import {
+  Children,
+  Fragment,
+  useMemo,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { motion } from "framer-motion";
-import { QuickAdd } from "@/components/tasks/quick-add";
+import { WindowControls } from "@/components/layout/window-controls";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { STATUS_META } from "@/components/common/status-meta";
 import { getBoardColorByLabel } from "@/lib/domain/boards";
@@ -81,13 +89,12 @@ export interface ViewRibbonProps {
   /** Which tab is open. Controlled so "/" can open the Filter tab first. */
   tab: string;
   onTabChange: (tab: string) => void;
-  now: Date;
   query: string;
   onQueryChange: (value: string) => void;
   searchRef: RefObject<HTMLInputElement | null>;
   /** Bumped by the "/" shortcut; the field focuses itself as it mounts. */
   searchFocusSignal: number;
-  showQuickAdd: boolean;
+  showCreate: boolean;
   sort: SortKey;
   onSortChange: (value: SortKey) => void;
   showSort: boolean;
@@ -99,25 +106,37 @@ export interface ViewRibbonProps {
   onNewTask: () => void;
   /** Switches the active view (List/Board/Calendar). */
   onChangeView: (view: ViewMode) => void;
+  /** True while the board is shown as a floating window (the top bar becomes a drag handle). */
+  floating: boolean;
+  /** True while the board fills the screen. Drives the maximize/restore icon. */
+  maximized: boolean;
+  onMinimize: () => void;
+  onMaximize: () => void;
+  /** Leaves the current board and returns to the board manager. */
+  onCloseBoard: () => void;
+  /** Pointer handlers that move the floating window from its title bar. */
+  onTitlePointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onTitlePointerMove?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onTitlePointerUp?: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }
 
 /**
  * Desktop-app style ribbon: a tab bar over a strip of grouped tools.
- * The View switcher (List/Board/Calendar) and the New Task button live here
- * permanently so they're always one click away. The Home tab also holds
- * Quick Add, Sort, and Clear done. The Filter tab holds Search and Categories.
- * The Sections tab (board only) holds column focus and hidden columns.
+ * The window controls (minimize / maximize / close) and the View switcher
+ * (List/Board/Calendar) live in the top row, so they're always one click away.
+ * The Home tab holds the New card button and Clear done. The Filter tab holds
+ * Search, Sort, and Categories. The Sections tab (board only) holds column
+ * focus and hidden columns.
  */
 export function ViewRibbon({
   viewMode,
   tab,
   onTabChange,
-  now,
   query,
   onQueryChange,
   searchRef,
   searchFocusSignal,
-  showQuickAdd,
+  showCreate,
   sort,
   onSortChange,
   showSort,
@@ -127,6 +146,14 @@ export function ViewRibbon({
   showClearCompleted,
   onNewTask,
   onChangeView,
+  floating,
+  maximized,
+  onMinimize,
+  onMaximize,
+  onCloseBoard,
+  onTitlePointerDown,
+  onTitlePointerMove,
+  onTitlePointerUp,
 }: ViewRibbonProps) {
   const { sections, toggleSectionHidden } = useTasksContext();
 
@@ -140,18 +167,27 @@ export function ViewRibbon({
 
   return (
     <section aria-label="Tools" className="shrink-0 border-b border-border bg-card/70">
-      {/* Persistent view switcher + new task — always visible, like Word's ribbon. */}
-      <div className="flex items-center gap-2 px-2 py-1.5">
+      {/* Persistent view switcher + window controls — always visible, like a
+          desktop title bar. While floating, the whole row is the drag handle. */}
+      <div
+        onPointerDown={onTitlePointerDown}
+        onPointerMove={onTitlePointerMove}
+        onPointerUp={onTitlePointerUp}
+        onPointerCancel={onTitlePointerUp}
+        className={cn(
+          "flex items-center gap-2 px-2 py-1.5",
+          floating && "cursor-grab touch-none select-none active:cursor-grabbing",
+        )}
+      >
         <ViewSwitcherRibbon active={viewMode} onChange={onChangeView} />
         <div className="flex-1" />
-        <button
-          type="button"
-          onClick={onNewTask}
-          aria-label="New task"
-          className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </button>
+        <WindowControls
+          floating={floating}
+          maximized={maximized}
+          onMinimize={onMinimize}
+          onMaximize={onMaximize}
+          onClose={onCloseBoard}
+        />
       </div>
 
       {/* Tab bar */}
@@ -172,16 +208,9 @@ export function ViewRibbon({
 
       {activeTab === "home" ? (
         <RibbonPanel label="Home tools">
-          {showQuickAdd ? (
+          {showCreate ? (
             <RibbonGroup label="Create">
-              <div className="w-64">
-                <QuickAdd now={now} variant="inline" />
-              </div>
-            </RibbonGroup>
-          ) : null}
-          {showSort ? (
-            <RibbonGroup label="Sort">
-              <RibbonSelect value={sort} onChange={onSortChange} />
+              <RibbonTool icon={Plus} label="New card" onClick={onNewTask} />
             </RibbonGroup>
           ) : null}
           <RibbonGroup label="Clean up">
@@ -205,6 +234,11 @@ export function ViewRibbon({
               focusSignal={searchFocusSignal}
             />
           </RibbonGroup>
+          {showSort ? (
+            <RibbonGroup label="Sort">
+              <RibbonSelect value={sort} onChange={onSortChange} />
+            </RibbonGroup>
+          ) : null}
           {filterCategories ? (
             <RibbonGroup label="Categories">
               <RibbonChip
@@ -392,7 +426,7 @@ function RibbonPanel({ label, children }: { label: string; children: ReactNode }
 
 function RibbonGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1.5 px-1.5">
+    <div className="flex min-h-[4.5rem] shrink-0 flex-col items-center justify-between gap-1.5 px-1.5">
       <div className="flex flex-wrap items-center justify-center gap-1.5">{children}</div>
       <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
         {label}

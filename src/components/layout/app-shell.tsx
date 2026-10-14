@@ -16,8 +16,10 @@ interface AppShellProps {
 }
 
 /**
- * Full-viewport application frame: a hover-triggered sidebar plus a main column
- * whose content area scrolls on its own. On small screens the sidebar becomes a drawer.
+ * Application frame: a hover-triggered sidebar plus a main column whose content
+ * area scrolls on its own. On small screens the sidebar becomes a drawer. It
+ * fills its parent, so the caller can either give it the viewport (docked) or a
+ * floating window box.
  */
 export function AppShell({
   sidebar,
@@ -30,7 +32,7 @@ export function AppShell({
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       <div className="hidden shrink-0 lg:block">{sidebar}</div>
 
       <AnimatePresence>
