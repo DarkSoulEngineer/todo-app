@@ -208,18 +208,18 @@ export function ViewRibbon({
               <RibbonTool icon={Plus} label="New card" onClick={onNewTask} />
             </RibbonGroup>
           ) : null}
-          <RibbonGroup label="Clean up">
-            <RibbonTool
-              icon={CheckCheck}
-              label="Clear done"
-              onClick={onClearCompleted}
-              disabled={!showClearCompleted}
-              size="small"
-            />
-          </RibbonGroup>
           {onLoadSample ? (
             <RibbonGroup label="Sample">
-              <RibbonTool icon={Plus} label="Sample" onClick={onLoadSample} size="small" />
+              <div className="flex flex-col gap-1">
+                <RibbonTool icon={Plus} label="Sample" onClick={onLoadSample} size="small" />
+                <RibbonTool
+                  icon={CheckCheck}
+                  label="Clear done"
+                  onClick={onClearCompleted}
+                  disabled={!showClearCompleted}
+                  size="small"
+                />
+              </div>
             </RibbonGroup>
           ) : null}
           {viewMode === "board" && onCompactViewChange ? (
