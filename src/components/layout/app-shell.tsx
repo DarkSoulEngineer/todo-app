@@ -4,24 +4,25 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 
 interface AppShellProps {
-  /** Persistent sidebar (desktop). */
+  /** Persistent sidebar (desktop) — now hover-triggered. */
   sidebar: ReactNode;
   /** Sidebar rendered inside the mobile drawer (separate instance so layout animations stay unique). */
   mobileSidebar: ReactNode;
-  topBar: ReactNode;
+  /** Tool ribbon — the only header now. */
+  ribbon?: ReactNode;
   children: ReactNode;
   mobileOpen: boolean;
   onCloseMobile: () => void;
 }
 
 /**
- * Full-viewport application frame: a persistent sidebar plus a main column whose
- * content area scrolls on its own. On small screens the sidebar becomes a drawer.
+ * Full-viewport application frame: a hover-triggered sidebar plus a main column
+ * whose content area scrolls on its own. On small screens the sidebar becomes a drawer.
  */
 export function AppShell({
   sidebar,
   mobileSidebar,
-  topBar,
+  ribbon,
   children,
   mobileOpen,
   onCloseMobile,
@@ -59,7 +60,7 @@ export function AppShell({
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {topBar}
+        {ribbon}
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>

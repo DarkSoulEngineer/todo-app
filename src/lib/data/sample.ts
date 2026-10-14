@@ -1,7 +1,7 @@
 import { subDays, subHours, addHours, addDays } from "date-fns";
 import { makeId } from "@/lib/utils/id";
 import { BUILT_IN_BOARDS, type Board } from "@/lib/domain/boards";
-import type { Task, TaskDraft } from "@/lib/domain/types";
+import type { BoardSection, Task, TaskDraft } from "@/lib/domain/types";
 import { createTask } from "@/lib/domain/task-factory";
 
 /** Sample boards: the six built-ins plus four custom boards, so loading the
@@ -13,6 +13,31 @@ export const SAMPLE_BOARDS: Board[] = [
   { id: "side-project", label: "Side project", color: "slate" },
   { id: "family", label: "Family", color: "pink" },
 ];
+
+/**
+ * Sample columns. A board no longer starts with the predefined status columns,
+ * so the demo ships its own custom ones — which is also the clearest way to
+ * show how a board is meant to be built up.
+ */
+export const SAMPLE_SECTIONS: BoardSection[] = [
+  { id: "sample-backlog", title: "Backlog" },
+  { id: "sample-progress", title: "In progress" },
+  { id: "sample-done", title: "Done" },
+];
+
+/** Sorts the sample tasks into the sample columns: finished work to "Done", the
+ * rest spread over the other two so every column has something in it. */
+export function distributeSampleTasks(tasks: Task[]): Task[] {
+  return tasks.map((task, index) => ({
+    ...task,
+    sectionId:
+      task.completed || task.canceled
+        ? "sample-done"
+        : index % 2 === 0
+          ? "sample-backlog"
+          : "sample-progress",
+  }));
+}
 
 interface SampleSeed extends Omit<TaskDraft, "subtasks" | "dueAt"> {
   offsetHours: number;

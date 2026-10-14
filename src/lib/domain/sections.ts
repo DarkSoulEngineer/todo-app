@@ -1,17 +1,17 @@
 import { makeId } from "@/lib/utils/id";
-import { deriveStatus, STATUS_LABELS } from "@/lib/domain/status";
+import { deriveStatus } from "@/lib/domain/status";
 import type { BoardSection, Task, TaskStatus } from "@/lib/domain/types";
 
 /** Order of the built-in, status-backed columns. */
 export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed", "canceled"];
 
-/** Fresh copies of the default board layout (Upcoming, Overdue, Completed, Canceled). */
+/**
+ * A new board starts from scratch: no columns at all. The predefined
+ * Upcoming/Overdue/Completed/Canceled layout is gone — the user adds their own
+ * sections, and a card is only ever placed in a column that exists.
+ */
 export function defaultSections(): BoardSection[] {
-  return STATUS_SECTIONS.map((status) => ({
-    id: `status-${status}`,
-    title: STATUS_LABELS[status],
-    status,
-  }));
+  return [];
 }
 
 export function isStatusSection(
@@ -29,9 +29,9 @@ function asStatus(value: unknown): TaskStatus | undefined {
 }
 
 /**
- * Coerces unknown persisted data into a valid, ordered section list. Falls back
- * to the defaults when nothing usable is found, and guarantees a column exists
- * for every status so drag-to-status keeps working.
+ * Coerces unknown persisted data into a valid section list. A board that
+ * stored no sections stays empty: nothing is backfilled, so a board always
+ * shows exactly the columns the user created.
  */
 export function normalizeSections(value: unknown): BoardSection[] {
   const list = Array.isArray(value) ? value : [];
@@ -60,14 +60,7 @@ export function normalizeSections(value: unknown): BoardSection[] {
     result.push(section);
   }
 
-  // Guarantee every status has a column, appending any that are missing.
-  for (const status of STATUS_SECTIONS) {
-    if (!result.some((section) => section.status === status)) {
-      result.push({ id: `status-${status}`, title: STATUS_LABELS[status], status });
-    }
-  }
-
-  return result.length > 0 ? result : defaultSections();
+  return result;
 }
 
 /** Drops `sectionId` references that no longer point at a custom section. */

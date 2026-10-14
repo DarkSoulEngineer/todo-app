@@ -281,7 +281,7 @@ function FilterRow({
 }
 
 /** Icon for a board column: status glyph, category colour dot, or a hash. */
-function sectionIcon(section: BoardSection): ReactNode {
+export function sectionIcon(section: BoardSection): ReactNode {
   if (section.status) {
     const Icon: LucideIcon = STATUS_META[section.status].icon;
     return <Icon className="h-4 w-4" strokeWidth={2.2} />;

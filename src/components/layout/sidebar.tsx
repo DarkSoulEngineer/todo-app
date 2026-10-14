@@ -1,276 +1,188 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React, { useState, type ReactElement } from "react";
-import {
-  Ban,
-  BarChart3,
-  CalendarClock,
-  CalendarDays,
-  CalendarRange,
-  Check,
-  ChevronRight,
-  Hash,
-  Keyboard,
-  Layers,
-  ListChecks,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Sun,
-  TriangleAlert,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Keyboard, Layers, Pin, X, type LucideIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/common/theme-toggle";
-import { aggregateTimeCount, SMART_LISTS, TIME_GROUP_LISTS, type SmartListCounts } from "@/lib/domain/smart-lists";
 import type { TaskStats } from "@/lib/domain/tasks-selectors";
-import type { SmartList, ViewMode } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/utils";
-
-const LIST_ICONS: Record<SmartList, LucideIcon> = {
-  today: Sun,
-  tomorrow: CalendarDays,
-  thisWeek: CalendarRange,
-  upcoming: CalendarClock,
-  overdue: TriangleAlert,
-  all: ListChecks,
-  completed: Check,
-  canceled: Ban,
-  "by-section": Hash,
-};
 
 interface SidebarProps {
   /** Keeps layout animations unique between the desktop and mobile instances. */
   idPrefix: string;
-  collapsed: boolean;
-  viewMode: ViewMode;
-  smartList: SmartList;
-  counts: SmartListCounts;
   stats: TaskStats;
   /** Name of the board selected in the board manager, shown as the home row's secondary line. */
   currentBoardName?: string;
-  onSelectList: (list: SmartList) => void;
-  onSelectView: (view: ViewMode) => void;
+  /** Desktop only: the sidebar stays open once pinned, regardless of hover. */
+  pinned: boolean;
+  onTogglePin: () => void;
   onShowHelp: () => void;
-  onToggleCollapse: () => void;
   onClose?: () => void;
 }
 
+/**
+ * Overlay sidebar:
+ * - Fully hidden by default (slides off-screen to the left)
+ * - Reveals on hover over the thin handle at the left edge, or while pinned
+ * - A pin button in the header keeps it open without hovering
+ * - The mobile version (inside the drawer) is always expanded and never pinned
+ */
 export function Sidebar({
   idPrefix,
-  collapsed,
-  viewMode,
-  smartList,
-  counts,
   stats,
   currentBoardName,
-  onSelectList,
-  onSelectView,
+  pinned,
+  onTogglePin,
   onShowHelp,
-  onToggleCollapse,
   onClose,
 }: SidebarProps) {
-  const onLists = viewMode === "list" || viewMode === "board";
+  const isMobile = typeof onClose === "function";
+  const [hovered, setHovered] = useState(false);
+  const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hover handling with a small delay so the panel does not flicker when the
+  // pointer crosses the edge.
+  const handleMouseEnter = () => {
+    if (collapseTimerRef.current) {
+      clearTimeout(collapseTimerRef.current);
+      collapseTimerRef.current = null;
+    }
+    if (!expandTimerRef.current) {
+      expandTimerRef.current = setTimeout(() => {
+        expandTimerRef.current = null;
+        setHovered(true);
+      }, 120);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (expandTimerRef.current) {
+      clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+    if (!collapseTimerRef.current) {
+      collapseTimerRef.current = setTimeout(() => {
+        collapseTimerRef.current = null;
+        setHovered(false);
+      }, 250);
+    }
+  };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (expandTimerRef.current) clearTimeout(expandTimerRef.current);
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    };
+  }, []);
 
   // The board manager is its own route (the app's landing page), so its active
   // state comes from the pathname rather than from the in-page view mode.
   const pathname = usePathname();
   const onBoardManager = pathname === "/";
   const boardName = currentBoardName?.trim();
-
-  // The five time-based lists collapse under one "Upcoming" group; the other
-  // four stay flat. Both orderings follow SMART_LISTS.
-  const timeLists = SMART_LISTS.filter((def) => TIME_GROUP_LISTS.includes(def.id));
-  const flatLists = SMART_LISTS.filter((def) => !TIME_GROUP_LISTS.includes(def.id));
-  const timeCount = aggregateTimeCount(counts);
-  const timeActive = onLists && TIME_GROUP_LISTS.includes(smartList);
-  const [timeOpen, setTimeOpen] = useState(timeActive);
-  const reduceMotion = useReducedMotion();
-
-  // Auto-open when the active list enters the group. A manual collapse on the
-  // chevron is respected until the active list leaves the group and returns —
-  // adjusted during render so React never cascades an effect-driven render.
-  const [wasTimeActive, setWasTimeActive] = useState(timeActive);
-  if (timeActive && !wasTimeActive) {
-    setWasTimeActive(true);
-    setTimeOpen(true);
-  } else if (!timeActive && wasTimeActive) {
-    setWasTimeActive(false);
-  }
+  const open = isMobile || pinned || hovered;
 
   return (
-    <aside
-      className={cn(
-        "flex h-full flex-col border-r border-border bg-card/70 backdrop-blur-sm transition-[width] duration-200",
-        collapsed ? "w-[4.75rem]" : "w-[16rem]",
-      )}
-    >
-      <div className="flex items-center gap-2.5 px-3 py-3.5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
-          <Check className="h-[18px] w-[18px]" strokeWidth={3} />
-        </span>
-        {!collapsed ? (
+    <>
+      {/* Hover target: a thin strip at the left edge reveals the sidebar. */}
+      {!isMobile && !pinned ? (
+        <div
+          aria-hidden="true"
+          onMouseEnter={handleMouseEnter}
+          className="group fixed inset-y-0 left-0 z-30 hidden w-2 lg:block"
+        >
+          <span className="absolute top-1/2 left-0 h-16 w-1 -translate-y-1/2 rounded-r-full bg-border opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+        </div>
+      ) : null}
+
+      <aside
+        onMouseEnter={isMobile ? undefined : handleMouseEnter}
+        onMouseLeave={isMobile ? undefined : handleMouseLeave}
+        inert={!isMobile && !open ? true : undefined}
+        className={cn(
+          "flex flex-col border-r border-border bg-card/70 backdrop-blur-sm",
+          isMobile
+            ? "h-full"
+            : pinned
+              ? "relative h-full w-[16rem]"
+              : cn(
+                  "fixed inset-y-0 left-0 z-40 w-[16rem] transition-transform duration-200 ease-out",
+                  open ? "translate-x-0 shadow-2xl" : "pointer-events-none -translate-x-full",
+                ),
+        )}
+      >
+        <div className="flex items-center gap-2.5 px-3 py-3.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
+            <Check className="h-[18px] w-[18px]" strokeWidth={3} />
+          </span>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="font-display text-xl tracking-tight">Stride</p>
             <p className="truncate text-[11px] font-medium text-muted-foreground">
               Focused task manager
             </p>
           </div>
-        ) : null}
-        {onClose ? (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close navigation"
-            className="focus-ring ml-auto grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : null}
-      </div>
-
-      <nav aria-label="Primary" className="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
-        {/* Home row — the board manager is its own route, not an in-page view. */}
-        <div className="space-y-0.5">
-          <NavItem
-            icon={Layers}
-            label="Board manager"
-            secondary={boardName}
-            href="/"
-            active={onBoardManager}
-            collapsed={collapsed}
-            layoutId={`${idPrefix}-home-pill`}
-          />
-        </div>
-
-        <div className="space-y-0.5">
-          {!collapsed ? (
-            <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              Lists
-            </p>
+          {!isMobile ? (
+            <button
+              type="button"
+              onClick={onTogglePin}
+              aria-pressed={pinned}
+              aria-label={pinned ? "Unpin sidebar" : "Pin sidebar"}
+              title={pinned ? "Unpin sidebar" : "Pin sidebar"}
+              className={cn(
+                "focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors",
+                pinned
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              <Pin className={cn("h-4 w-4", pinned && "fill-current")} />
+            </button>
           ) : null}
-
-          {/* Time group — one collapsible parent over the five date lists. */}
-          {collapsed ? (
-            <NavItem
-              icon={CalendarClock}
-              label="Upcoming"
-              count={counts.upcoming}
-              active={onLists && smartList === "upcoming"}
-              collapsed
-              layoutId={`${idPrefix}-smart-pill`}
-              onClick={() => onSelectList("upcoming")}
-            />
-          ) : (
-            <>
-              <TimeGroupRow
-                label="Upcoming"
-                icon={CalendarClock}
-                count={timeCount}
-                active={timeActive}
-                open={timeOpen}
-                layoutId={`${idPrefix}-time-pill`}
-                controlsId={`${idPrefix}-time-children`}
-                onToggle={() => setTimeOpen((open) => !open)}
-              />
-              <AnimatePresence initial={false}>
-                {timeOpen ? (
-                  <motion.div
-                    key="time-children"
-                    id={`${idPrefix}-time-children`}
-                    initial={reduceMotion ? false : { height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: "easeOut" }}
-                    className="overflow-hidden"
-                  >
-                    <div className="space-y-0.5 pl-3">
-                      {timeLists.map((def) => (
-                        <NavItem
-                          key={def.id}
-                          icon={LIST_ICONS[def.id]}
-                          label={def.label}
-                          count={counts[def.id]}
-                          active={onLists && smartList === def.id}
-                          collapsed={false}
-                          layoutId={`${idPrefix}-smart-pill`}
-                          onClick={() => onSelectList(def.id)}
-                        />
-                      ))}
-                    </div>
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-            </>
-          )}
-
-          {/* Flat lists — always a single click away. */}
-          {flatLists.map((def) => (
-            <NavItem
-              key={def.id}
-              icon={LIST_ICONS[def.id]}
-              label={def.label}
-              count={counts[def.id]}
-              active={onLists && smartList === def.id}
-              collapsed={collapsed}
-              layoutId={`${idPrefix}-smart-pill`}
-              onClick={() => onSelectList(def.id)}
-            />
-          ))}
-        </div>
-
-        <div className="space-y-0.5">
-          {!collapsed ? (
-            <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              Views
-            </p>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close navigation"
+              className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
           ) : null}
-          <NavItem
-            icon={CalendarDays}
-            label="Calendar"
-            active={viewMode === "calendar"}
-            collapsed={collapsed}
-            layoutId={`${idPrefix}-view-pill`}
-            onClick={() => onSelectView("calendar")}
-          />
-          <NavItem
-            icon={BarChart3}
-            label="Insights"
-            active={viewMode === "insights"}
-            collapsed={collapsed}
-            layoutId={`${idPrefix}-view-pill`}
-            onClick={() => onSelectView("insights")}
-          />
         </div>
 
-      </nav>
-
-      <div className="border-t border-border px-3 py-3">
-        {!collapsed ? (
-          <>
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="font-medium text-muted-foreground">Progress</span>
-              <span className="font-semibold text-foreground tabular-nums">
-                {Math.round(stats.completionRate * 100)}%
-              </span>
-            </div>
-            <Progress value={stats.completionRate} label="Overall completion" />
-            <p className="mt-2 text-xs text-muted-foreground tabular-nums">
-              {stats.completed}/{stats.total} done · {stats.active} open
-            </p>
-          </>
-        ) : (
-          <div className="flex justify-center py-1">
-            <Progress value={stats.completionRate} label="Overall completion" className="w-8" />
+        <nav aria-label="Primary" className="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
+          {/* Home row — the board manager is its own route, not an in-page view. */}
+          <div className="space-y-0.5">
+            <NavItem
+              icon={Layers}
+              label="Board manager"
+              secondary={boardName}
+              href="/"
+              active={onBoardManager}
+              layoutId={`${idPrefix}-home-pill`}
+            />
           </div>
-        )}
+        </nav>
 
-        <div className={cn("mt-3 flex items-center", collapsed ? "flex-col gap-2" : "justify-between")}>
-          {!collapsed ? <ThemeToggle /> : null}
-          <div className="flex items-center gap-1">
+        <div className="border-t border-border px-3 py-3">
+          <div className="mb-2 flex items-center justify-between text-xs">
+            <span className="font-medium text-muted-foreground">Progress</span>
+            <span className="font-semibold text-foreground tabular-nums">
+              {Math.round(stats.completionRate * 100)}%
+            </span>
+          </div>
+          <Progress value={stats.completionRate} label="Overall completion" />
+          <p className="mt-2 text-xs text-muted-foreground tabular-nums">
+            {stats.completed}/{stats.total} done · {stats.active} open
+          </p>
+
+          <div className="mt-3 flex items-center justify-between">
+            <ThemeToggle />
             <button
               type="button"
               onClick={onShowHelp}
@@ -280,51 +192,31 @@ export function Sidebar({
             >
               <Keyboard className="h-4 w-4" />
             </button>
-            {!onClose ? (
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                className="focus-ring grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {collapsed ? (
-                  <PanelLeftOpen className="h-4 w-4" />
-                ) : (
-                  <PanelLeftClose className="h-4 w-4" />
-                )}
-              </button>
-            ) : null}
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
 interface NavItemProps {
-  /** A lucide icon component, or a ready-made element such as a colour dot. */
-  icon: LucideIcon | ReactElement;
+  icon: LucideIcon;
   label: string;
   /** Optional secondary line under the label (expanded state only). */
   secondary?: string;
-  count?: number;
   active: boolean;
-  collapsed: boolean;
   layoutId?: string;
   /** When set the row navigates instead of acting in place, so `onClick` is unnecessary. */
   href?: string;
   onClick?: () => void;
 }
 
-function NavItem({ icon: Icon, label, secondary, count, active, collapsed, layoutId, href, onClick }: NavItemProps) {
+function NavItem({ icon: Icon, label, secondary, active, layoutId, href, onClick }: NavItemProps) {
   const reduceMotion = useReducedMotion();
   const shared = {
     "aria-current": active ? ("page" as const) : undefined,
-    title: collapsed ? label : undefined,
     className: cn(
       "focus-ring relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
-      collapsed && "justify-center px-0 py-2.5",
       secondary && "items-start",
       active ? "text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
     ),
@@ -339,28 +231,16 @@ function NavItem({ icon: Icon, label, secondary, count, active, collapsed, layou
           transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
         />
       ) : null}
-      {React.isValidElement(Icon) ? (
-        <span className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}>
-          {Icon}
-        </span>
-      ) : (
-        <Icon
-          className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}
-          strokeWidth={2.2}
-        />
-      )}
-      {!collapsed ? (
-        <span className="relative flex-1 text-left">
-          <span className="block truncate">{label}</span>
-          {secondary ? <span className="block truncate text-xs font-normal text-muted-foreground">{secondary}</span> : null}
-        </span>
-      ) : null}
-      {!collapsed && count !== undefined && count > 0 ? (
-        <span className="relative text-xs text-muted-foreground tabular-nums">{count}</span>
-      ) : null}
-      {collapsed && count !== undefined && count > 0 ? (
-        <span className="absolute top-1.5 right-2 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-      ) : null}
+      <Icon
+        className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")}
+        strokeWidth={2.2}
+      />
+      <span className="relative flex-1 text-left">
+        <span className="block truncate">{label}</span>
+        {secondary ? (
+          <span className="block truncate text-xs font-normal text-muted-foreground">{secondary}</span>
+        ) : null}
+      </span>
     </>
   );
 
@@ -375,70 +255,6 @@ function NavItem({ icon: Icon, label, secondary, count, active, collapsed, layou
   return (
     <button type="button" onClick={onClick} {...shared}>
       {row}
-    </button>
-  );
-}
-
-interface TimeGroupRowProps {
-  icon: LucideIcon;
-  label: string;
-  count: number;
-  /** True when the current smart list lives inside the group. */
-  active: boolean;
-  open: boolean;
-  layoutId: string;
-  controlsId: string;
-  onToggle: () => void;
-}
-
-/**
- * Collapsible parent row for the time group. Unlike `NavItem` it navigates
- * nowhere — it toggles its child rows and lights up while one of them is the
- * active list. It carries its own pill `layoutId` so it never cross-animates
- * with the child pills.
- */
-function TimeGroupRow({
-  icon: Icon,
-  label,
-  count,
-  active,
-  open,
-  layoutId,
-  controlsId,
-  onToggle,
-}: TimeGroupRowProps) {
-  const reduceMotion = useReducedMotion();
-
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      aria-controls={controlsId}
-      className={cn(
-        "focus-ring relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
-        active ? "text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
-      {active ? (
-        <motion.span
-          layoutId={layoutId}
-          className="absolute inset-0 rounded-xl bg-primary/10 ring-1 ring-inset ring-primary/20"
-          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
-        />
-      ) : null}
-      <Icon className={cn("relative h-[18px] w-[18px] shrink-0", active && "text-primary")} strokeWidth={2.2} />
-      <span className="relative flex-1 truncate text-left">{label}</span>
-      {count > 0 ? (
-        <span className="relative text-xs text-muted-foreground tabular-nums">{count}</span>
-      ) : null}
-      <ChevronRight
-        className={cn(
-          "relative h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-          open && "rotate-90",
-        )}
-        strokeWidth={2.2}
-      />
     </button>
   );
 }

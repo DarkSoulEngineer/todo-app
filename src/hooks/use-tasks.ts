@@ -10,7 +10,12 @@ import {
 } from "@/lib/domain/boards";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overdueAt, rescheduleToNextDay } from "@/lib/utils/datetime";
-import { createSampleTasks, SAMPLE_BOARDS } from "@/lib/data/sample";
+import {
+  createSampleTasks,
+  distributeSampleTasks,
+  SAMPLE_BOARDS,
+  SAMPLE_SECTIONS,
+} from "@/lib/data/sample";
 import { isCustomSection, isStatusSection } from "@/lib/domain/sections";
 import {
   activeProject,
@@ -540,10 +545,19 @@ export function useTasks(): TasksApi {
 
   const loadSample = useCallback(() => {
     const samples = createSampleTasks();
-    setTasks(samples);
     // Install the sample boards too (built-ins + custom demo categories), so
     // custom categories are visible on the loaded example tasks.
     setBoards(SAMPLE_BOARDS);
+    if (sectionsRef.current.length === 0) {
+      // A from-scratch board has no columns, so the demo would render an empty
+      // board: give it the sample columns and sort the tasks into them. Boards
+      // that already have their own sections keep them — the tasks then fall
+      // into whichever column their status implies.
+      setSections(SAMPLE_SECTIONS);
+      setTasks(distributeSampleTasks(samples));
+    } else {
+      setTasks(samples);
+    }
   }, []);
 
   // ---- Boards as project tenants -------------------------------------------

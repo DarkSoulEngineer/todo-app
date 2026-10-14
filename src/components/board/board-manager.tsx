@@ -38,6 +38,7 @@ import {
   useMemo,
   useRef,
   useState,
+  Fragment,
   type ChangeEvent,
   type JSX,
 } from "react";
@@ -216,6 +217,11 @@ export function BoardManager(): JSX.Element {
   const lastBoard = projects.length <= 1;
   const removeTarget = projects.find((project) => project.id === removeId) ?? null;
 
+  // Where the edit-mode grid marks the end of the pinned run. With nothing
+  // pinned the line sits above the first card, showing that dropping there
+  // pins it; otherwise it sits under the last pinned card.
+  const pinBoundaryIndex = pinnedIds.size === 0 ? 0 : pinnedIds.size - 1;
+
   // Keyboard nav must not hijack typing: dialogs, edit mode and any
   // input/textarea/select keep their own key handling. While editing, cards
   // are moved with the grip (and its arrow-key drag), never the card-nav keys.
@@ -265,14 +271,19 @@ export function BoardManager(): JSX.Element {
   function handleDragEnd(event: DragEndEvent): void {
     const { active, over } = event;
     if (!over) return;
-    const from = sortableIds.indexOf(String(active.id));
+    const activeId = String(active.id);
+    const from = sortableIds.indexOf(activeId);
     const to = sortableIds.indexOf(String(over.id));
     if (from === -1 || to === -1 || from === to) return;
     const next = arrayMove(sortableIds, from, to);
-    // Position implies pin state: the leading segment stays pinned, so pulling
-    // a board into it pins it and pushing a pinned board below the line
-    // unpins it.
-    const nextPins = new Set(next.slice(0, pinnedIds.size));
+    // Position implies pin state: the pinned group is always the leading run of
+    // the order, and it grows or shrinks ONLY when a board actually crosses the
+    // boundary. Computing the prefix from a fixed `pinnedIds.size` instead kept
+    // the group the same size, so a board dropped into the pinned zone shoved
+    // the last pinned board out of it (and landed one row too low).
+    const otherPinned = next.filter((id) => id !== activeId && pinnedIds.has(id)).length;
+    const nextPinCount = to <= otherPinned ? otherPinned + 1 : otherPinned;
+    const nextPins = new Set(next.slice(0, nextPinCount));
     setOrderIds(next);
     setPinnedIds(nextPins);
     persistOrder(next);
@@ -660,7 +671,7 @@ export function BoardManager(): JSX.Element {
         {editMode ? (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Drag boards to rearrange — the top section stays Pinned.
+              Drag boards to rearrange — drop one above the dashed line to pin it.
             </p>
             <DndContext
               sensors={sensors}
@@ -669,7 +680,12 @@ export function BoardManager(): JSX.Element {
             >
               <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {sorted.map((project) => renderCard(project))}
+                  {sorted.map((project, index) => (
+                    <Fragment key={project.id}>
+                      {renderCard(project)}
+                      {index === pinBoundaryIndex ? <PinBoundary /> : null}
+                    </Fragment>
+                  ))}
                 </div>
               </SortableContext>
               <GridDragOverlay projects={sorted} now={now} pinnedIds={pinnedIds} />
@@ -774,6 +790,24 @@ export function BoardManager(): JSX.Element {
         onClose={closeDialog}
         onConfirm={handleRemove}
       />
+    </div>
+  );
+}
+
+/**
+ * The dashed line that shows where the pinned group ends while the grid is
+ * being arranged. Edit mode flattens both groups into one grid, so without this
+ * marker nothing on screen says which cards count as pinned — a board dropped
+ * just past the edge used to land in the group below.
+ */
+function PinBoundary(): JSX.Element {
+  return (
+    <div className="col-span-full -my-1 flex items-center gap-2" aria-hidden="true">
+      <span className="h-px flex-1 border-t border-dashed border-primary/40" />
+      <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary uppercase">
+        Pinned above · all boards below
+      </span>
+      <span className="h-px flex-1 border-t border-dashed border-primary/40" />
     </div>
   );
 }
@@ -921,7 +955,7 @@ function CreateBoardDialog({ open, onClose, onCreate }: CreateBoardDialogProps):
       open={open}
       onClose={onClose}
       title="New board"
-      description="An empty board with the default categories and sections."
+      description="An empty board. Add your own sections and columns."
     >
       <form
         onSubmit={(event) => {

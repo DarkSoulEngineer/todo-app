@@ -8,23 +8,18 @@ import { BoardView } from "@/components/board/board-view";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { Celebration } from "@/components/common/celebration";
 import { EmptyState } from "@/components/common/empty-state";
-import { FilterMenu, type CategoryCount } from "@/components/common/filter-menu";
 import { InsightsView } from "@/components/insights/insights-view";
 import { ListView } from "@/components/list/list-view";
 import { ShortcutsHelp } from "@/components/common/shortcuts-help";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TaskDialog } from "@/components/tasks/task-dialog";
 import { TaskSkeleton } from "@/components/tasks/task-skeleton";
-import { TopBar } from "@/components/layout/top-bar";
+import { ViewRibbon, type CategoryCount, type RibbonCategories, type RibbonSections } from "@/components/layout/view-ribbon";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useNow } from "@/hooks/use-now";
 import { getCategory, selectCategories } from "@/lib/domain/categories";
-import {
-  countBySmartList,
-  filterBySmartList,
-  smartListLabel,
-} from "@/lib/domain/smart-lists";
+import { filterBySmartList, smartListLabel } from "@/lib/domain/smart-lists";
 import { computeStats, matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
 import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
 import type { SmartList, SortKey, Task, TaskDraft, ViewMode } from "@/lib/domain/types";
@@ -74,13 +69,16 @@ export function TodoApp() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [initialDueAt, setInitialDueAt] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  // The ribbon's open tab, and a counter that asks the ribbon's search field
+  // for focus (raised by the "/" shortcut, which also opens the Filter tab).
+  const [ribbonTab, setRibbonTab] = useState("home");
+  const [searchFocusSignal, setSearchFocusSignal] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const counts = useMemo(() => countBySmartList(tasks, now), [tasks, now]);
   const stats = useMemo(() => computeStats(tasks, now), [tasks, now]);
 
   // The section focus only applies while a section still exists.
@@ -166,13 +164,6 @@ export function TodoApp() {
     [now],
   );
 
-  const selectList = useCallback((list: SmartList) => {
-    setSmartList(list);
-    setFocusedSection(null);
-    setViewMode("list");
-    setMobileNavOpen(false);
-  }, []);
-
   const selectView = useCallback((view: ViewMode) => {
     setViewMode(view);
     // Section focus only makes sense on the board.
@@ -208,7 +199,11 @@ export function TodoApp() {
       if (!dialogOpen && !helpOpen) openNew();
     },
     onSearch: () => {
-      if (!dialogOpen && !helpOpen) searchRef.current?.focus();
+      if (dialogOpen || helpOpen) return;
+      // Search lives on the ribbon's Filter tab: open that tab and bump the
+      // focus signal, which the field picks up as it mounts.
+      setRibbonTab("filter");
+      setSearchFocusSignal((value) => value + 1);
     },
     onHelp: () => {
       if (!dialogOpen) setHelpOpen(true);
@@ -281,17 +276,11 @@ export function TodoApp() {
 
   const hasFilters = query.trim() !== "" || category !== "all";
 
-  // On-screen filter menu inputs. The board gets sections + categories; the
-  // list and calendar get categories only.
+  // On-screen ribbon inputs. The board gets sections + categories; the list
+  // and calendar get categories only.
   const nonHiddenSections = useMemo(() => sections.filter((section) => !section.hidden), [sections]);
-  const filterSections = {
-    activeId: activeSection?.id ?? null,
-    items: nonHiddenSections,
-    counts: sectionCounts,
-    onSelect: (id: string | null) => setFocusedSection(id),
-  };
   const showCategoryFilter = categoryCounts.length > 0 || deletedCategories.length > 0;
-  const filterCategories = showCategoryFilter
+  const filterCategories: RibbonCategories | undefined = showCategoryFilter
     ? {
         activeId: category,
         counts: categoryCounts,
@@ -301,6 +290,12 @@ export function TodoApp() {
         onRestore: restoreCategories,
       }
     : undefined;
+  const filterSections: RibbonSections = {
+    activeId: activeSection?.id ?? null,
+    items: nonHiddenSections,
+    counts: sectionCounts,
+    onSelect: (id: string | null) => setFocusedSection(id),
+  };
 
   let welcomeState: ReactNode = null;
   let noResultsState: ReactNode = null;
@@ -357,9 +352,6 @@ export function TodoApp() {
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">{noResultsState}</div>
     ) : (
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <FilterMenu categories={filterCategories} />
-        </div>
         {smartList === "completed" ? (
           <div className="mb-4 flex items-center justify-between gap-3 px-1">
             <p className="text-sm text-muted-foreground">
@@ -402,9 +394,7 @@ export function TodoApp() {
           now={now}
           sort={sort}
           focusedSectionId={activeSection?.id ?? null}
-          onClearFocus={() => setFocusedSection(null)}
           onSortChange={setSort}
-          toolbar={<FilterMenu sections={filterSections} categories={filterCategories} />}
           onEdit={openEdit}
         />
       </div>
@@ -414,9 +404,6 @@ export function TodoApp() {
       <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">{welcomeState}</div>
     ) : (
       <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <FilterMenu categories={filterCategories} />
-        </div>
         <CalendarView tasks={filteredAll} now={now} onEdit={openEdit} onCreateOn={openCreateOn} />
       </div>
     );
@@ -429,48 +416,44 @@ export function TodoApp() {
   }
 
   const sidebarBase = {
-    viewMode,
-    smartList,
-    counts,
     stats,
     currentBoardName: currentProjectName,
-    onSelectList: selectList,
-    onSelectView: selectView,
+    pinned: sidebarPinned,
+    onTogglePin: () => setSidebarPinned((value) => !value),
     onShowHelp: () => setHelpOpen(true),
-    onToggleCollapse: () => setSidebarCollapsed((value) => !value),
   };
 
   return (
     <>
       <AppShell
-        sidebar={
-          <Sidebar idPrefix="desktop" collapsed={sidebarCollapsed} {...sidebarBase} />
-        }
+        sidebar={<Sidebar idPrefix="desktop" {...sidebarBase} />}
         mobileSidebar={
           <Sidebar
             {...sidebarBase}
             idPrefix="mobile"
-            collapsed={false}
             onClose={() => setMobileNavOpen(false)}
           />
         }
-        topBar={
-          <TopBar
-            title={title}
-            subtitle={subtitle}
+        ribbon={
+          <ViewRibbon
             viewMode={viewMode}
-            onChangeView={selectView}
+            tab={ribbonTab}
+            onTabChange={setRibbonTab}
+            now={now}
             query={query}
             onQueryChange={setQuery}
+            searchRef={searchRef}
+            searchFocusSignal={searchFocusSignal}
+            showQuickAdd={viewMode !== "insights"}
             sort={sort}
             onSortChange={setSort}
-            now={now}
-            searchRef={searchRef}
             showSort={viewMode === "list" || viewMode === "board"}
-            showQuickAdd={viewMode !== "insights"}
+            filterCategories={filterCategories}
+            filterSections={filterSections}
+            onClearCompleted={handleClearCompleted}
+            showClearCompleted={viewMode === "list" && stats.completed > 0}
             onNewTask={openNew}
-            onShowHelp={() => setHelpOpen(true)}
-            onOpenMobileNav={() => setMobileNavOpen(true)}
+            onChangeView={selectView}
           />
         }
         mobileOpen={mobileNavOpen}
