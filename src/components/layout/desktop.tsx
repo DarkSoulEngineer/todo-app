@@ -44,8 +44,9 @@ const MAX_CARDS = 5;
 /**
  * The minimized view: a Windows ALT+TAB-style switcher, with no taskbar.
  *
- * Every open board is a big square "thumbnail" that re-renders its real columns
- * and cards in miniature, with the board name beneath. Exactly one tile is
+ * Every open board is a square "thumbnail" that re-renders its real columns and
+ * cards in miniature, resting on a frosted, acrylic-style card with the board
+ * name beneath. Exactly one tile is
  * selected and highlighted; Tab / Shift+Tab and the arrow keys cycle the
  * selection with wrap-around, and Enter (or a click, or a hover) switches to the
  * selected board. Esc steps out, leaving the desktop as it is. When nothing is
@@ -129,7 +130,7 @@ export function Desktop() {
   };
 
   return (
-    <div className="flex h-dvh w-full items-center justify-center p-4 sm:p-8">
+    <div className="flex h-dvh w-full items-center justify-center bg-background/40 p-4 sm:p-8">
       <motion.div
         role="dialog"
         aria-modal="true"
@@ -146,7 +147,7 @@ export function Desktop() {
           <ul
             role="listbox"
             aria-label="Switch board"
-            className="grid max-h-[70dvh] w-full grid-cols-[repeat(auto-fit,minmax(0,clamp(8rem,25dvh,18rem)))] justify-center gap-4 overflow-y-auto pr-0.5"
+            className="grid max-h-[70dvh] w-full grid-cols-[repeat(auto-fit,minmax(0,clamp(10rem,32dvh,24rem)))] justify-center gap-4 overflow-y-auto pr-0.5"
           >
             {tiles.map((board, index) => {
               const isSelected = index === selectedIndex;
@@ -170,12 +171,24 @@ export function Desktop() {
                     }
                   }}
                   className={cn(
-                    "focus-ring group relative flex cursor-pointer flex-col gap-1.5 rounded-3xl border p-2 transition-all duration-200",
-                    isSelected
-                      ? "border-primary/60 bg-primary/5 shadow-xl ring-2 ring-primary/40"
-                      : "border-border bg-card/50 opacity-70 hover:bg-muted/60 hover:opacity-100",
+                    "focus-ring group relative flex cursor-pointer flex-col rounded-3xl p-2 transition-all duration-200",
+                    isSelected ? "ring-2 ring-primary/40" : "",
                   )}
                 >
+                  {/* Windows 11-style acrylic surface: a translucent, blurred panel
+                      that sits behind the tile content, with a hairline edge highlight. */}
+                  <div
+                    aria-hidden="true"
+                    className={cn(
+                      "pointer-events-none absolute inset-0 rounded-3xl border backdrop-blur-xl transition-all duration-200",
+                      isSelected
+                        ? "border-primary/40 bg-primary/10 shadow-xl"
+                        : "border-border/70 bg-card/60 shadow-md group-hover:bg-card/80",
+                    )}
+                  >
+                    <span className="absolute inset-x-6 top-px h-px rounded-full bg-foreground/10" />
+                  </div>
+
                   <button
                     type="button"
                     aria-label={`Close ${board.name}`}
@@ -184,19 +197,28 @@ export function Desktop() {
                       event.stopPropagation();
                       closeBoard(board.id);
                     }}
-                    className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:bg-background hover:text-foreground focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+                    className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:bg-background hover:text-foreground focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
                   >
                     <X className="h-4 w-4" strokeWidth={2.2} />
                   </button>
-                  <BoardThumbnail workspace={board.workspace} accent={board.accent} now={now} />
-                  <p
+
+                  {/* Crisp content layer, floating above the frosted surface. */}
+                  <div
                     className={cn(
-                      "truncate px-1 pb-0.5 text-center text-base font-semibold",
-                      isSelected ? "text-foreground" : "text-muted-foreground",
+                      "relative z-10 flex flex-col gap-1.5 transition-opacity duration-200",
+                      isSelected ? "opacity-100" : "opacity-75 group-hover:opacity-100",
                     )}
                   >
-                    {board.name}
-                  </p>
+                    <BoardThumbnail workspace={board.workspace} accent={board.accent} now={now} />
+                    <p
+                      className={cn(
+                        "truncate px-1 pb-0.5 text-center text-base font-semibold",
+                        isSelected ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {board.name}
+                    </p>
+                  </div>
                 </li>
               );
             })}
