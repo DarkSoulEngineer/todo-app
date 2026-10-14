@@ -146,7 +146,7 @@ export function Desktop() {
           <ul
             role="listbox"
             aria-label="Switch board"
-            className="grid max-h-[70dvh] w-full grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 overflow-y-auto pr-0.5"
+            className="grid max-h-[70dvh] w-full grid-cols-[repeat(auto-fit,minmax(0,clamp(8rem,25dvh,18rem)))] justify-center gap-4 overflow-y-auto pr-0.5"
           >
             {tiles.map((board, index) => {
               const isSelected = index === selectedIndex;
