@@ -5,8 +5,7 @@ import {
   CheckCheck,
   ChevronDown,
   Columns3,
-  Eye,
-  Hash,
+  Home as HomeIcon,
   Keyboard,
   Layers,
   List,
@@ -16,7 +15,6 @@ import {
   Shrink,
   SlidersHorizontal,
   X,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,7 +22,6 @@ import { usePathname } from "next/navigation";
 import {
   Children,
   Fragment,
-  useMemo,
   useRef,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -33,27 +30,15 @@ import {
 import { motion } from "framer-motion";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { WindowControls } from "@/components/layout/window-controls";
-import { useTasksContext } from "@/components/providers/tasks-provider";
-import { STATUS_META } from "@/components/common/status-meta";
-import { getBoardColorByLabel } from "@/lib/domain/boards";
 import { getCategory } from "@/lib/domain/categories";
 import { SORT_OPTIONS } from "@/lib/domain/constants";
-import type { BoardSection, SortKey, ViewMode } from "@/lib/domain/types";
+import type { SortKey, ViewMode } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/utils";
 
 /** A category plus how many tasks currently carry it. */
 export interface CategoryCount {
   id: string;
   count: number;
-}
-
-/** Board column focus: which column is on its own, or null for the whole board. */
-export interface RibbonSections {
-  activeId: string | null;
-  /** Board columns, in board order (hidden ones are filtered out by the caller). */
-  items: BoardSection[];
-  counts: Record<string, number>;
-  onSelect: (id: string | null) => void;
 }
 
 /** Category filter: the selected category, its counts, and the deleted ones. */
@@ -75,24 +60,18 @@ interface RibbonTab {
 }
 
 /**
- * Tabs are contextual, like Office: the board also exposes a "Sections" tab.
- * It appears whenever the board has columns at all — including when they are all
- * hidden, since that is the only way back to them.
+ * The ribbon's tabs. The internal `id`s stay stable for wiring: "home" is the
+ * default tab, and "filter" is the one the "/" search shortcut opens.
  *
- * Labels name what each tab holds (the `id`s stay stable for wiring):
- *  - "Actions"       — create, tidy up, load sample, display, theme, help
- *  - "Filter & sort" — search, category filters, ordering
- *  - "Sections"      — board-only column focus and hidden-column restore
+ * Labels name what each tab holds:
+ *  - "Home"    — create, tidy up, load sample, board display
+ *  - "Options" — search, category filters, ordering
  */
-function tabsForView(viewMode: ViewMode, hasSections: boolean): RibbonTab[] {
-  const tabs: RibbonTab[] = [
-    { id: "home", label: "Actions", icon: Zap },
-    { id: "filter", label: "Filter & sort", icon: ListFilter },
+function tabsForView(): RibbonTab[] {
+  return [
+    { id: "home", label: "Home", icon: HomeIcon },
+    { id: "filter", label: "Options", icon: ListFilter },
   ];
-  if (viewMode === "board" && hasSections) {
-    tabs.push({ id: "sections", label: "Sections", icon: Columns3 });
-  }
-  return tabs;
 }
 
 export interface ViewRibbonProps {
@@ -110,7 +89,6 @@ export interface ViewRibbonProps {
   onSortChange: (value: SortKey) => void;
   showSort: boolean;
   filterCategories?: RibbonCategories;
-  filterSections?: RibbonSections;
   onClearCompleted: () => void;
   showClearCompleted: boolean;
   /** Opens the new-task dialog. */
@@ -135,10 +113,10 @@ export interface ViewRibbonProps {
 /**
  * Desktop-app style ribbon: a tab bar over a strip of grouped tools.
  * The window controls (minimize / maximize / close), the board-manager link,
- * and the View switcher (List/Board/Calendar) live in the top row, so they're
- * always one click away. The Actions tab holds create / tidy-up / sample /
- * display / theme / help; the Filter & sort tab holds Search, Categories and
- * Sort; the Sections tab (board only) holds column focus and hidden columns.
+ * the View switcher (List/Board/Calendar), the theme switcher and the
+ * shortcuts button live in the top row, so they're always one click away.
+ * The Home tab holds create / tidy-up / sample / display; the Options tab
+ * holds Search, Categories and Sort.
  */
 export function ViewRibbon({
   viewMode,
@@ -153,7 +131,6 @@ export function ViewRibbon({
   onSortChange,
   showSort,
   filterCategories,
-  filterSections,
   onClearCompleted,
   showClearCompleted,
   onNewTask,
@@ -167,22 +144,18 @@ export function ViewRibbon({
   onCompactViewChange,
   onLoadSample,
 }: ViewRibbonProps) {
-  const { sections, toggleSectionHidden } = useTasksContext();
   const pathname = usePathname();
   const onBoardManager = pathname === "/";
 
-  const hasSections = useMemo(() => sections.length > 0, [sections]);
-  const tabs = useMemo(() => tabsForView(viewMode, hasSections), [viewMode, hasSections]);
+  const tabs = tabsForView();
   // The active tab falls back to the first one when the requested tab is not
-  // offered by the current view (e.g. Sections after leaving the board).
+  // offered (e.g. a stale "filter" after the tabs change).
   const activeTab = tabs.some((candidate) => candidate.id === tab) ? tab : tabs[0].id;
-
-  const hiddenSections = sections.filter((section) => section.hidden);
 
   return (
     <section aria-label="Tools" className="shrink-0 border-b border-border bg-card/70">
-      {/* Persistent board link + view switcher + window controls — always
-          visible, like a desktop title bar. */}
+      {/* Persistent board link + view switcher + theme + shortcuts + window
+          controls — always visible, like a desktop title bar. */}
       <div className="flex flex-wrap items-center gap-2 px-2 py-1.5">
         <Link
           href="/"
@@ -200,6 +173,10 @@ export function ViewRibbon({
         </Link>
         <ViewSwitcherRibbon active={viewMode} onChange={onChangeView} />
         <div className="min-w-2 flex-1" />
+        <ThemeToggle />
+        {onShowHelp ? (
+          <RibbonIconButton icon={Keyboard} label="Shortcuts" onClick={onShowHelp} />
+        ) : null}
         <WindowControls
           maximized={maximized}
           onMinimize={onMinimize}
@@ -225,7 +202,7 @@ export function ViewRibbon({
       </div>
 
       {activeTab === "home" ? (
-        <RibbonPanel label="Actions">
+        <RibbonPanel label="Home tools">
           {showCreate ? (
             <RibbonGroup label="Create">
               <RibbonTool icon={Plus} label="New card" onClick={onNewTask} />
@@ -237,34 +214,29 @@ export function ViewRibbon({
               label="Clear done"
               onClick={onClearCompleted}
               disabled={!showClearCompleted}
+              size="small"
             />
           </RibbonGroup>
           {onLoadSample ? (
             <RibbonGroup label="Sample">
-              <RibbonTool icon={Plus} label="Sample" onClick={onLoadSample} />
+              <RibbonTool icon={Plus} label="Sample" onClick={onLoadSample} size="small" />
             </RibbonGroup>
           ) : null}
-          <RibbonGroup label="Display">
-            {viewMode === "board" && onCompactViewChange ? (
+          {viewMode === "board" && onCompactViewChange ? (
+            <RibbonGroup label="Display">
               <RibbonTool
                 icon={Shrink}
                 label="Compact view"
                 onClick={() => onCompactViewChange(!compactView)}
                 active={compactView}
               />
-            ) : null}
-            <ThemeToggle />
-          </RibbonGroup>
-          {onShowHelp ? (
-            <RibbonGroup label="Help">
-              <RibbonTool icon={Keyboard} label="Shortcuts" onClick={onShowHelp} />
             </RibbonGroup>
           ) : null}
         </RibbonPanel>
       ) : null}
 
       {activeTab === "filter" ? (
-        <RibbonPanel label="Filter & sort">
+        <RibbonPanel label="Options">
           <RibbonGroup label="Find">
             <RibbonSearch
               value={query}
@@ -310,44 +282,6 @@ export function ViewRibbon({
           {showSort ? (
             <RibbonGroup label="Sort">
               <RibbonSelect value={sort} onChange={onSortChange} />
-            </RibbonGroup>
-          ) : null}
-        </RibbonPanel>
-      ) : null}
-
-      {activeTab === "sections" && filterSections ? (
-        <RibbonPanel label="Board sections">
-          <RibbonGroup label="Focus a column">
-            <RibbonChip
-              label="All sections"
-              active={filterSections.activeId === null}
-              onClick={() => filterSections.onSelect(null)}
-            />
-            {filterSections.items.map((section) => (
-              <RibbonChip
-                key={section.id}
-                label={section.title}
-                icon={sectionIcon(section)}
-                count={filterSections.counts[section.id] ?? 0}
-                active={filterSections.activeId === section.id}
-                onClick={() =>
-                  filterSections.onSelect(
-                    filterSections.activeId === section.id ? null : section.id,
-                  )
-                }
-              />
-            ))}
-          </RibbonGroup>
-          {hiddenSections.length > 0 ? (
-            <RibbonGroup label="Hidden columns">
-              {hiddenSections.map((section) => (
-                <RibbonTool
-                  key={section.id}
-                  icon={Eye}
-                  label={section.title}
-                  onClick={() => toggleSectionHidden(section.id)}
-                />
-              ))}
             </RibbonGroup>
           ) : null}
         </RibbonPanel>
@@ -474,20 +408,50 @@ function RibbonGroup({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-/** Large icon + caption button: the ribbon's basic unit. */
+/**
+ * Ribbon button. Two sizes, like a Word ribbon:
+ *  - "large" (default): icon stacked above a caption.
+ *  - "small": compact horizontal button (small icon + inline caption), sized to
+ *    stack vertically inside a group.
+ */
 function RibbonTool({
   icon: Icon,
   label,
   onClick,
   disabled,
   active = false,
+  size = "large",
 }: {
   icon: LucideIcon;
   label: string;
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
+  size?: "large" | "small";
 }) {
+  const tone = active
+    ? "bg-primary/15 text-primary hover:bg-primary/20"
+    : "text-muted-foreground hover:bg-muted hover:text-foreground";
+
+  if (size === "small") {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-pressed={active}
+        title={label}
+        className={cn(
+          "focus-ring inline-flex w-[5.25rem] shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1 text-left text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
+          tone,
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0" strokeWidth={2.1} />
+        <span className="truncate">{label}</span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -497,13 +461,37 @@ function RibbonTool({
       title={label}
       className={cn(
         "focus-ring flex w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 transition-colors disabled:pointer-events-none disabled:opacity-40",
-        active
-          ? "bg-primary/15 text-primary hover:bg-primary/20"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        tone,
       )}
     >
       <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       <span className="max-w-full truncate text-[10px] font-medium">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * Compact square icon button for the always-visible top row (e.g. Shortcuts).
+ * Matches the top row's chrome: bordered, blurred card surface, `focus-ring`.
+ */
+function RibbonIconButton({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="focus-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border bg-card/70 text-muted-foreground shadow-xs backdrop-blur transition-colors hover:text-foreground"
+    >
+      <Icon className="h-4 w-4" strokeWidth={2.1} />
     </button>
   );
 }
@@ -590,7 +578,6 @@ function RibbonChip({
   label,
   count,
   dot,
-  icon,
   active,
   onClick,
   onRemove,
@@ -600,8 +587,6 @@ function RibbonChip({
   count?: number;
   /** Category colour, when the row is a category. */
   dot?: string;
-  /** Column icon, when the row is a board section. */
-  icon?: ReactNode;
   active: boolean;
   onClick: () => void;
   onRemove?: () => void;
@@ -621,9 +606,6 @@ function RibbonChip({
         )}
       >
         {dot ? <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} aria-hidden="true" /> : null}
-        {icon ? (
-          <span className="grid h-4 w-4 shrink-0 place-items-center">{icon}</span>
-        ) : null}
         <span className="truncate">{label}</span>
         {count !== undefined && count > 0 ? (
           <span className="shrink-0 text-muted-foreground tabular-nums">{count}</span>
@@ -650,17 +632,4 @@ function categoryLabel(id: string): string {
 
 function categoryDot(id: string): string | undefined {
   return getCategory(id)?.dot;
-}
-
-/** Icon for a board column: status glyph, board colour dot, or a hash. */
-function sectionIcon(section: BoardSection): ReactNode {
-  if (section.status) {
-    const Icon: LucideIcon = STATUS_META[section.status].icon;
-    return <Icon className="h-4 w-4" strokeWidth={2.2} />;
-  }
-  const color = getBoardColorByLabel(section.title);
-  if (color) {
-    return <span className={cn("h-2.5 w-2.5 rounded-full", color.dot)} aria-hidden="true" />;
-  }
-  return <Hash className="h-4 w-4" strokeWidth={2.2} />;
 }

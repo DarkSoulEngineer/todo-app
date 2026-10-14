@@ -22,7 +22,7 @@ import { ListView } from "@/components/list/list-view";
 import { ShortcutsHelp } from "@/components/common/shortcuts-help";
 import { TaskDialog } from "@/components/tasks/task-dialog";
 import { TaskSkeleton } from "@/components/tasks/task-skeleton";
-import { ViewRibbon, type CategoryCount, type RibbonCategories, type RibbonSections } from "@/components/layout/view-ribbon";
+import { ViewRibbon, type CategoryCount, type RibbonCategories } from "@/components/layout/view-ribbon";
 import { useTasksContext } from "@/components/providers/tasks-provider";
 import { useWindowsContext } from "@/components/providers/window-provider";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -30,7 +30,6 @@ import { useNow } from "@/hooks/use-now";
 import { getCategory, selectCategories } from "@/lib/domain/categories";
 import { filterBySmartList, smartListLabel } from "@/lib/domain/smart-lists";
 import { computeStats, matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
-import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
 import type { SmartList, SortKey, Task, TaskDraft, ViewMode, Workspace } from "@/lib/domain/types";
 import { pluralize } from "@/lib/utils/utils";
 
@@ -66,7 +65,6 @@ export function TodoApp() {
     snapshot,
     restore,
     loadSample,
-    assignTaskToSection,
     currentProjectId,
   } = useTasksContext();
   const { ready: windowsReady, activeId, minimize, closeBoard } = useWindowsContext();
@@ -77,7 +75,6 @@ export function TodoApp() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("manual");
   const [category, setCategory] = useState<string | "all">("all");
-  const [focusedSection, setFocusedSection] = useState<string | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -129,22 +126,6 @@ export function TodoApp() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const stats = useMemo(() => computeStats(tasks, now), [tasks, now]);
-
-  // The section focus only applies while a section still exists.
-  const activeSection = useMemo(
-    () => (focusedSection ? (sections.find((section) => section.id === focusedSection) ?? null) : null),
-    [focusedSection, sections],
-  );
-
-  // Task count per board column (custom and status alike), for the filter menu.
-  const sectionCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const task of tasks) {
-      const id = getTaskSectionId(task, sections, now);
-      if (id) map[id] = (map[id] ?? 0) + 1;
-    }
-    return map;
-  }, [tasks, sections, now]);
 
   // Deleted categories drop out of the filter list along with their counts.
   const categoryCounts = useMemo<CategoryCount[]>(() => {
@@ -215,8 +196,6 @@ export function TodoApp() {
 
   const selectView = useCallback((view: ViewMode) => {
     setViewMode(view);
-    // Section focus only makes sense on the board.
-    if (view !== "board") setFocusedSection(null);
   }, []);
 
   const selectCategory = useCallback((next: string | "all") => {
@@ -224,11 +203,9 @@ export function TodoApp() {
   }, []);
 
   // Follow an activity entry to where the task lives: switch to the board and
-  // briefly spotlight the located card. The board keeps every section visible
-  // (no single-section filter) so the task is seen in context, and the canvas
-  // pans the highlighted card into view.
+  // briefly spotlight the located card. The board keeps every column visible so
+  // the task is seen in context, and the canvas pans the highlighted card in.
   const openTaskLocation = useCallback((task: Task) => {
-    setFocusedSection(null);
     setViewMode("board");
     // Ring the located card briefly so it is easy to spot.
     setSpotlightTaskId(task.id);
@@ -309,16 +286,11 @@ export function TodoApp() {
         updateTask(editing.id, draft);
         toast.success("Task updated", { duration: 2200 });
       } else {
-        const task = addTask(draft);
-        // A card created while a custom section is focused belongs to it,
-        // instead of falling into the status column its due date implies.
-        if (activeSection && isCustomSection(activeSection)) {
-          assignTaskToSection(task.id, activeSection.id);
-        }
+        addTask(draft);
         toast.success("Task added", { description: draft.title, duration: 2200 });
       }
     },
-    [editing, addTask, updateTask, activeSection, assignTaskToSection],
+    [editing, addTask, updateTask],
   );
 
   const handleClearCompleted = useCallback(() => {
@@ -390,9 +362,7 @@ export function TodoApp() {
 
   const hasFilters = query.trim() !== "" || category !== "all";
 
-  // On-screen ribbon inputs. The board gets sections + categories; the list
-  // and calendar get categories only.
-  const nonHiddenSections = useMemo(() => sections.filter((section) => !section.hidden), [sections]);
+  // On-screen ribbon inputs: categories for the Options tab.
   const showCategoryFilter = categoryCounts.length > 0 || deletedCategories.length > 0;
   const filterCategories: RibbonCategories | undefined = showCategoryFilter
     ? {
@@ -404,12 +374,6 @@ export function TodoApp() {
         onRestore: restoreCategories,
       }
     : undefined;
-  const filterSections: RibbonSections = {
-    activeId: activeSection?.id ?? null,
-    items: nonHiddenSections,
-    counts: sectionCounts,
-    onSelect: (id: string | null) => setFocusedSection(id),
-  };
 
   let welcomeState: ReactNode = null;
   let noResultsState: ReactNode = null;
@@ -437,7 +401,7 @@ export function TodoApp() {
     viewMode === "list"
       ? smartListLabel(smartList)
       : viewMode === "board"
-        ? (activeSection?.title ?? "Board")
+        ? "Board"
         : viewMode === "calendar"
           ? "Calendar"
           : "Insights";
@@ -445,9 +409,7 @@ export function TodoApp() {
     viewMode === "list"
       ? pluralize(listTasks.length, "task")
       : viewMode === "board"
-        ? activeSection
-          ? "Custom board section"
-          : "Drag cards between sections to change status"
+        ? "Drag cards between sections to change status"
         : viewMode === "calendar"
           ? "Plan your month by due date"
           : "Your progress at a glance";
@@ -496,7 +458,6 @@ export function TodoApp() {
           tasks={filteredAll}
           now={now}
           sort={sort}
-          focusedSectionId={activeSection?.id ?? null}
           onSortChange={setSort}
           onEdit={openEdit}
           compactView={compactView}
@@ -548,7 +509,6 @@ export function TodoApp() {
               onCompactViewChange={setCompactView}
               onLoadSample={handleLoadSample}
               filterCategories={filterCategories}
-              filterSections={filterSections}
               onClearCompleted={handleClearCompleted}
               showClearCompleted={viewMode === "list" && stats.completed > 0}
               onNewTask={openNew}

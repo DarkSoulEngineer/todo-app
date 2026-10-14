@@ -20,7 +20,7 @@ import {
   horizontalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { Plus, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BoardCanvas } from "@/components/board/board-canvas";
@@ -39,8 +39,6 @@ interface BoardViewProps {
   tasks: Task[];
   now: Date;
   sort: SortKey;
-  /** When set, only that section is shown (driven by the ribbon's Sections tab). */
-  focusedSectionId?: string | null;
   /** When true, board cards render in a minimal (title + category only) layout. */
   compactView?: boolean;
   /** Task id to briefly spotlight after an activity navigation. */
@@ -133,7 +131,6 @@ export function BoardView({
   tasks,
   now,
   sort,
-  focusedSectionId = null,
   compactView = false,
   spotlightTaskId = null,
   onSortChange,
@@ -210,16 +207,14 @@ export function BoardView({
   }, [tasks, sections, sectionIdForTask, sort]);
 
   const visibleSections = useMemo(() => {
-    if (focusedSectionId) {
-      const focused = sections.find((section) => section.id === focusedSectionId);
-      if (focused && !focused.hidden) return [focused];
-    }
     return sections.filter((section) => !section.hidden);
-  }, [sections, focusedSectionId]);
+  }, [sections]);
 
   const visibleIds = useMemo(() => visibleSections.map((section) => section.id), [visibleSections]);
   const allIds = useMemo(() => sections.map((section) => section.id), [sections]);
   const sectionIds = useMemo(() => new Set(sections.map((section) => section.id)), [sections]);
+
+  const hiddenSections = sections.filter((section) => section.hidden);
 
   const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
 
@@ -558,7 +553,7 @@ export function BoardView({
     toggleSectionHidden(id);
     if (target) {
       toast(`Hid “${target.title}”`, {
-        description: "Reveal it from the ribbon's Sections tab.",
+        description: "It's tucked into “Hidden columns” above the board.",
         duration: 3500,
       });
     }
@@ -566,6 +561,48 @@ export function BoardView({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {hiddenSections.length > 0 ? (
+        <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card/60 px-2.5 py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <EyeOff className="h-3.5 w-3.5" strokeWidth={2.1} />
+            Hidden columns
+          </span>
+          {hiddenSections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => toggleSectionHidden(section.id)}
+              aria-label={`Show ${section.title}`}
+              title={`Show “${section.title}”`}
+              className="focus-ring inline-flex max-w-[12rem] items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Eye className="h-3.5 w-3.5 shrink-0" strokeWidth={2.1} />
+              <span className="truncate">{section.title}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {hiddenSections.length > 0 ? (
+        <div className="mb-2 flex shrink-0 flex-wrap items-center justify-end gap-2 rounded-xl border border-border/70 bg-card/60 px-2.5 py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <EyeOff className="h-3.5 w-3.5" strokeWidth={2.1} />
+            Hidden columns
+          </span>
+          {hiddenSections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => toggleSectionHidden(section.id)}
+              aria-label={`Show ${section.title}`}
+              title={`Show “${section.title}”`}
+              className="focus-ring inline-flex max-w-[12rem] items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Eye className="h-3.5 w-3.5 shrink-0" strokeWidth={2.1} />
+              <span className="truncate">{section.title}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -601,21 +638,20 @@ export function BoardView({
                 />
               ))}
 
-              {!focusedSectionId ? (
-                <button
-                  type="button"
-                  onClick={handleAddSection}
-                  className="focus-ring flex w-[17rem] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 px-4 py-8 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-card hover:text-foreground sm:w-72"
-                >
-                  <Plus className="h-4 w-4" strokeWidth={2.4} />
-                  Add section
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={handleAddSection}
+                className="focus-ring flex w-[17rem] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 px-4 py-8 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-card hover:text-foreground sm:w-72"
+              >
+                <Plus className="h-4 w-4" strokeWidth={2.4} />
+                Add section
+              </button>
             </div>
           </BoardCanvas>
         </SortableContext>
+      </DndContext>
 
-        <DragOverlay dropAnimation={null}>
+      <DragOverlay dropAnimation={null}>
           {activeTask ? (
             <div
               aria-hidden="true"
@@ -660,7 +696,6 @@ export function BoardView({
         </DragOverlay>
 
         {activeTaskId ? <BoardTrashDropzone /> : null}
-      </DndContext>
     </div>
   );
 }
