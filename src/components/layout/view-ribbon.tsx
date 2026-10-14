@@ -7,7 +7,6 @@ import {
   Columns3,
   Eye,
   Hash,
-  Home as HomeIcon,
   Keyboard,
   Layers,
   List,
@@ -17,6 +16,7 @@ import {
   Shrink,
   SlidersHorizontal,
   X,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -75,14 +75,19 @@ interface RibbonTab {
 }
 
 /**
- * Tabs are contextual, like Office: the board also exposes a "Sections" group.
+ * Tabs are contextual, like Office: the board also exposes a "Sections" tab.
  * It appears whenever the board has columns at all — including when they are all
  * hidden, since that is the only way back to them.
+ *
+ * Labels name what each tab holds (the `id`s stay stable for wiring):
+ *  - "Actions"       — create, tidy up, load sample, display, theme, help
+ *  - "Filter & sort" — search, category filters, ordering
+ *  - "Sections"      — board-only column focus and hidden-column restore
  */
 function tabsForView(viewMode: ViewMode, hasSections: boolean): RibbonTab[] {
   const tabs: RibbonTab[] = [
-    { id: "home", label: "Home", icon: HomeIcon },
-    { id: "filter", label: "Filter", icon: ListFilter },
+    { id: "home", label: "Actions", icon: Zap },
+    { id: "filter", label: "Filter & sort", icon: ListFilter },
   ];
   if (viewMode === "board" && hasSections) {
     tabs.push({ id: "sections", label: "Sections", icon: Columns3 });
@@ -131,10 +136,9 @@ export interface ViewRibbonProps {
  * Desktop-app style ribbon: a tab bar over a strip of grouped tools.
  * The window controls (minimize / maximize / close), the board-manager link,
  * and the View switcher (List/Board/Calendar) live in the top row, so they're
- * always one click away. The Home tab holds the New card button, Clear done,
- * the theme switcher, and the shortcuts button. The Filter tab holds Search,
- * Sort, and Categories. The Sections tab (board only) holds column focus and
- * hidden columns.
+ * always one click away. The Actions tab holds create / tidy-up / sample /
+ * display / theme / help; the Filter & sort tab holds Search, Categories and
+ * Sort; the Sections tab (board only) holds column focus and hidden columns.
  */
 export function ViewRibbon({
   viewMode,
@@ -221,7 +225,7 @@ export function ViewRibbon({
       </div>
 
       {activeTab === "home" ? (
-        <RibbonPanel label="Home tools">
+        <RibbonPanel label="Actions">
           {showCreate ? (
             <RibbonGroup label="Create">
               <RibbonTool icon={Plus} label="New card" onClick={onNewTask} />
@@ -240,17 +244,15 @@ export function ViewRibbon({
               <RibbonTool icon={Plus} label="Sample" onClick={onLoadSample} />
             </RibbonGroup>
           ) : null}
-          {viewMode !== "calendar" && viewMode !== "insights" && onCompactViewChange ? (
-            <RibbonGroup label="Display">
+          <RibbonGroup label="Display">
+            {viewMode === "board" && onCompactViewChange ? (
               <RibbonTool
                 icon={Shrink}
                 label="Compact view"
                 onClick={() => onCompactViewChange(!compactView)}
                 active={compactView}
               />
-            </RibbonGroup>
-          ) : null}
-          <RibbonGroup label="Theme">
+            ) : null}
             <ThemeToggle />
           </RibbonGroup>
           {onShowHelp ? (
@@ -262,7 +264,7 @@ export function ViewRibbon({
       ) : null}
 
       {activeTab === "filter" ? (
-        <RibbonPanel label="Filters">
+        <RibbonPanel label="Filter & sort">
           <RibbonGroup label="Find">
             <RibbonSearch
               value={query}
@@ -271,11 +273,6 @@ export function ViewRibbon({
               focusSignal={searchFocusSignal}
             />
           </RibbonGroup>
-          {showSort ? (
-            <RibbonGroup label="Sort">
-              <RibbonSelect value={sort} onChange={onSortChange} />
-            </RibbonGroup>
-          ) : null}
           {filterCategories ? (
             <RibbonGroup label="Categories">
               <RibbonChip
@@ -308,6 +305,11 @@ export function ViewRibbon({
                   Restore deleted
                 </button>
               ) : null}
+            </RibbonGroup>
+          ) : null}
+          {showSort ? (
+            <RibbonGroup label="Sort">
+              <RibbonSelect value={sort} onChange={onSortChange} />
             </RibbonGroup>
           ) : null}
         </RibbonPanel>
