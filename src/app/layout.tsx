@@ -27,12 +27,12 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stride — Focused task manager",
+  title: "Janus — Focused task manager",
   description:
     "A fast, focused to-do list with priorities, due dates, tags, insights and offline support.",
-  applicationName: "Stride",
+  applicationName: "Janus",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Stride", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Janus", statusBarStyle: "default" },
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },

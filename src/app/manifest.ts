@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Stride — Focused task manager",
-    short_name: "Stride",
+    name: "Janus — Focused task manager",
+    short_name: "Janus",
     description:
       "A fast, focused to-do list with priorities, due dates, tags, insights and offline support.",
     start_url: "/",

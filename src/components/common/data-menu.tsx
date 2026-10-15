@@ -90,7 +90,7 @@ export function DataMenu() {
     const text = await file.text();
     const imported = parseWorkspaceJson(text);
     if (!imported) {
-      toast.error("That file could not be read as a Stride backup.");
+      toast.error("That file could not be read as a Janus backup.");
       return;
     }
 
