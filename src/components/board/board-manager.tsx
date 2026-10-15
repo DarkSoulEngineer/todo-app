@@ -530,6 +530,56 @@ export function BoardManager(): JSX.Element {
     // The manager is now the root route with nothing around it, so it fills the
     // viewport and scrolls the document instead of a task-view content area.
     <div className="mx-auto min-h-dvh w-full max-w-6xl px-3 py-8 sm:px-4 sm:py-10 lg:py-14">
+      {/* Search — the landing page's front door, centered at the very top. */}
+      <div className="mb-8 flex justify-center">
+        <div className="relative w-full max-w-md">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            strokeWidth={2.2}
+          />
+          <Input
+            ref={searchRef}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              // A query while arranging is incoherent (the toggle hides while
+              // searching anyway), so typing one leaves edit mode.
+              if (editMode && event.target.value.trim() !== "") finishEditing();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                if (query) setQuery("");
+                else event.currentTarget.blur();
+              }
+            }}
+            aria-label="Search boards"
+            placeholder="Search boards"
+            className="h-11 pl-9 pr-9"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                searchRef.current?.focus();
+              }}
+              aria-label="Clear search"
+              title="Clear search"
+              className="focus-ring absolute top-1/2 right-1.5 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-4 w-4" strokeWidth={2.2} />
+            </button>
+          ) : (
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground"
+            >
+              /
+            </kbd>
+          )}
+        </div>
+      </div>
+
       {/* Wayfinding: the sidebar's wordmark, so a bare landing page still reads
           as Stride's front door rather than a loose card on a blank canvas. */}
       <header>
@@ -588,59 +638,11 @@ export function BoardManager(): JSX.Element {
         />
       </div>
 
-      {/* Search + grid-editing toggle. */}
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              strokeWidth={2.2}
-            />
-            <Input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                // A query while arranging is incoherent (the toggle hides while
-                // searching anyway), so typing one leaves edit mode.
-                if (editMode && event.target.value.trim() !== "") finishEditing();
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  if (query) setQuery("");
-                  else event.currentTarget.blur();
-                }
-              }}
-              aria-label="Search boards"
-              placeholder="Search boards"
-              className="h-10 pl-9 pr-9"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery("");
-                  searchRef.current?.focus();
-                }}
-                aria-label="Clear search"
-                title="Clear search"
-                className="focus-ring absolute top-1/2 right-1.5 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-4 w-4" strokeWidth={2.2} />
-              </button>
-            ) : (
-              <kbd
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground"
-              >
-                /
-              </kbd>
-            )}
-          </div>
-          <p role="status" className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {visible.length} of {pluralize(projects.length, "board")}
-          </p>
-        </div>
+      {/* Result count + grid-editing toggle. */}
+      <div className="mt-4 flex items-center justify-between">
+        <p role="status" className="text-xs tabular-nums text-muted-foreground">
+          {visible.length} of {pluralize(projects.length, "board")}
+        </p>
         {!isLoading && query.trim() === "" && projects.length > 0 ? (
           <Button
             variant={editMode ? "primary" : "secondary"}

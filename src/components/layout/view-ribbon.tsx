@@ -22,6 +22,7 @@ import { usePathname } from "next/navigation";
 import {
   Children,
   Fragment,
+  useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -61,11 +62,11 @@ interface RibbonTab {
 
 /**
  * The ribbon's tabs. The internal `id`s stay stable for wiring: "home" is the
- * default tab, and "filter" is the one the "/" search shortcut opens.
+ * default tab and "filter" is the Options tab.
  *
  * Labels name what each tab holds:
  *  - "Home"    — create, tidy up, load sample, board display
- *  - "Options" — search, category filters, ordering
+ *  - "Options" — category filters and ordering
  */
 function tabsForView(): RibbonTab[] {
   return [
@@ -114,9 +115,10 @@ export interface ViewRibbonProps {
  * Desktop-app style ribbon: a tab bar over a strip of grouped tools.
  * The window controls (minimize / maximize / close), the board-manager link,
  * the View switcher (List/Board/Calendar), the theme switcher and the
- * shortcuts button live in the top row, so they're always one click away.
+ * shortcuts button live in the top row, so they're always one click away, and
+ * the task search sits centered in that top row (Microsoft Word style).
  * The Home tab holds create / tidy-up / sample / display; the Options tab
- * holds Search, Categories and Sort.
+ * holds Categories and Sort.
  */
 export function ViewRibbon({
   viewMode,
@@ -172,7 +174,15 @@ export function ViewRibbon({
           <span>Boards</span>
         </Link>
         <ViewSwitcherRibbon active={viewMode} onChange={onChangeView} />
-        <div className="min-w-2 flex-1" />
+        {/* Search sits centered in the top bar, Microsoft Word style. */}
+        <div className="flex min-w-2 flex-1 justify-center px-1">
+          <RibbonSearch
+            value={query}
+            onChange={onQueryChange}
+            inputRef={searchRef}
+            focusSignal={searchFocusSignal}
+          />
+        </div>
         <ThemeToggle />
         {onShowHelp ? (
           <RibbonIconButton icon={Keyboard} label="Shortcuts" onClick={onShowHelp} />
@@ -237,14 +247,6 @@ export function ViewRibbon({
 
       {activeTab === "filter" ? (
         <RibbonPanel label="Options">
-          <RibbonGroup label="Find">
-            <RibbonSearch
-              value={query}
-              onChange={onQueryChange}
-              inputRef={searchRef}
-              focusSignal={searchFocusSignal}
-            />
-          </RibbonGroup>
           {filterCategories ? (
             <RibbonGroup label="Categories">
               <RibbonChip
@@ -524,9 +526,9 @@ function RibbonSelect({
 }
 
 /**
- * Search field: the top bar's old middle row, now a ribbon tool. The field only
- * exists while the Filter tab is open, so it takes focus itself the moment it
- * mounts — which is how the "/" shortcut can open the tab and focus it.
+ * Search field, centered in the ribbon's top bar (Microsoft Word style). The
+ * field is always mounted, so the "/" shortcut focuses it by bumping the focus
+ * signal rather than by remounting it.
  */
 function RibbonSearch({
   value,
@@ -541,23 +543,24 @@ function RibbonSearch({
 }) {
   const handledSignal = useRef(focusSignal);
 
+  useEffect(() => {
+    if (focusSignal !== handledSignal.current) {
+      handledSignal.current = focusSignal;
+      inputRef.current?.focus();
+    }
+  }, [focusSignal, inputRef]);
+
   return (
-    <div className="relative flex items-center">
+    <div className="relative flex w-full max-w-[15rem] items-center sm:max-w-xs md:max-w-sm">
       <Search className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
       <input
-        ref={(node) => {
-          inputRef.current = node;
-          if (node && focusSignal !== handledSignal.current) {
-            handledSignal.current = focusSignal;
-            node.focus();
-          }
-        }}
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Search tasks…"
         aria-label="Search tasks"
-        className="focus-ring h-8 w-52 rounded-xl border border-input bg-card/70 pr-8 pl-8 text-sm shadow-xs placeholder:text-muted-foreground/70"
+        className="focus-ring h-8 w-full rounded-xl border border-input bg-card/70 pr-8 pl-8 text-sm shadow-xs placeholder:text-muted-foreground/70"
       />
       {value ? (
         <button

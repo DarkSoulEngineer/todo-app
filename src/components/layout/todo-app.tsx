@@ -266,9 +266,8 @@ export function TodoApp() {
     },
     onSearch: () => {
       if (dialogOpen || helpOpen) return;
-      // Search lives on the ribbon's Filter tab: open that tab and bump the
-      // focus signal, which the field picks up as it mounts.
-      setRibbonTab("filter");
+      // Search sits in the ribbon's top bar; bump the focus signal so it takes
+      // focus from wherever the user is.
       setSearchFocusSignal((value) => value + 1);
     },
     onHelp: () => {
