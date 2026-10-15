@@ -20,7 +20,7 @@ import {
   horizontalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BoardCanvas } from "@/components/board/board-canvas";
@@ -693,12 +693,6 @@ function BoardTrashDropzone() {
       )}
       aria-label="Drop card here to delete"
     >
-      <Trash2
-        className={cn(
-          "h-7 w-7 transition-transform duration-200",
-          isOver ? "scale-125 text-red-600/70 dark:text-red-400/70" : "text-red-500/40",
-        )}
-      />
     </div>
   );
 }

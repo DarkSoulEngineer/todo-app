@@ -1,7 +1,6 @@
 "use client";
 
-import { defaultAnimateLayoutChanges, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useDraggable } from "@dnd-kit/core";
 import { format, parseISO } from "date-fns";
 import {
   CheckCircle2,
@@ -13,7 +12,6 @@ import {
   GripVertical,
   Pencil,
   Star,
-  Trash2,
   TriangleAlert,
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type JSX } from "react";
@@ -26,9 +24,6 @@ import { Button } from "@/components/ui/button";
 
 /** A deadline inside the next seven days counts as "due soon". */
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-
-/** Shared easing for grid glides — the same curve dnd-kit uses internally. */
-const GRID_EASE = "cubic-bezier(0.2, 0, 0, 1)";
 
 /** Reason surfaced on the disabled Remove control of the last board. */
 const KEEP_ONE_BOARD = "At least one board must remain";
@@ -118,6 +113,8 @@ interface ManagerBoardCardProps {
   onSave: (project: StrideProject) => void;
   onTogglePin: (id: string) => void;
   cardRef: (element: HTMLElement | null) => void;
+  /** Extra classes so the grid cell can size the card (e.g. `h-full`). */
+  className?: string;
 }
 
 /**
@@ -141,6 +138,7 @@ export function ManagerBoardCard({
   onSave,
   onTogglePin,
   cardRef,
+  className,
 }: ManagerBoardCardProps): JSX.Element {
   const { workspace } = project;
 
@@ -149,32 +147,21 @@ export function ManagerBoardCard({
   const exitViaKeyRef = useRef(false);
   const titleRef = useRef<HTMLButtonElement>(null);
 
-  // Sortable only while arranging, inert otherwise. Following board-card.tsx's
-  // convention, the whole card is the drag surface: dnd-kit ignores pointerdowns
-  // on interactive elements (buttons, the rename input), so they all stay
-  // clickable while a 6px move from anywhere else starts a drag.
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  // Draggable only while arranging, inert otherwise. The whole card is the drag
+  // surface: dnd-kit ignores pointerdowns on interactive elements (buttons, the
+  // rename input), so they all stay clickable while a 6px move from anywhere
+  // else starts a drag. The card itself stays put while dragging — the floating
+  // DragOverlay is the moving piece, and the source just dims.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: project.id,
     disabled: !editMode,
     data: { type: "board" },
-    // Explicit default: neighbours glide into place while the overlay floats.
-    // (The derived-transform cost this adds is dwarfed by the ref fix below,
-    // which removed the ResizeObserver churn that was the real jank source.)
-    animateLayoutChanges: defaultAnimateLayoutChanges,
   });
-
-  // Trust dnd-kit's per-frame transition when it has an opinion (it briefly
-  // disables transitions for a setup frame); otherwise a shared 220ms glide
-  // carries hover, drag and settle motion on one buttery curve.
-  const cardTransition =
-    transition ??
-    `transform 220ms ${GRID_EASE}, border-color 200ms ease, box-shadow 200ms ease, opacity 200ms ease`;
 
   // The dnd-kit node ref and the manager's roving-focus ref share the card.
   // The identity must stay stable: a fresh callback each render makes React
   // detach (null) and reattach the node on every render, which thrashes
-  // dnd-kit's ResizeObserver (unobserve/observe) for every card on every
-  // pointer move while the grid is dragging — the source of the lag.
+  // dnd-kit's ResizeObserver for every card on every pointer move.
   const setRefs = useCallback(
     (element: HTMLElement | null): void => {
       setNodeRef(element);
@@ -236,9 +223,9 @@ export function ManagerBoardCard({
       {...(editMode ? attributes : {})}
       {...(editMode ? listeners : {})}
       tabIndex={editMode || focused ? 0 : -1}
-      aria-label={editMode ? `Arrange ${project.name}` : `Open ${project.name}`}
-      title={editMode ? "Drag to rearrange" : `Open ${project.name}`}
-      style={{ transform: CSS.Transform.toString(transform), transition: cardTransition }}
+      aria-label={editMode ? `Move ${project.name} to another cell` : `Open ${project.name}`}
+      aria-describedby={editMode ? "edit-grid-hint" : undefined}
+      title={editMode ? "Drag onto any cell" : `Open ${project.name}`}
       onClick={(event) => {
         // Edit mode is for arranging, not loading. Otherwise only the bare
         // surface opens the board — the controls below stop their own clicks,
@@ -249,9 +236,12 @@ export function ManagerBoardCard({
         handleOpen();
       }}
       className={cn(
-        "group relative flex flex-col gap-3.5 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
-        editMode ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer",
+        "group relative flex flex-col gap-3.5 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-[transform,border-color,box-shadow,opacity] duration-200",
+        editMode
+          ? "touch-none cursor-grab ring-2 ring-transparent hover:ring-primary/40 active:cursor-grabbing"
+          : "cursor-pointer hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
         isDragging && "opacity-40",
+        className,
       )}
     >
       {/* Full-bleed radial wash — the canonical recipe task cards use
@@ -324,8 +314,8 @@ export function ManagerBoardCard({
             {editMode ? (
               <span
                 aria-hidden="true"
-                title="Drag to rearrange"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground/50"
+                title="Drag onto any cell"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary"
               >
                 <GripVertical className="h-4 w-4" strokeWidth={2.2} />
               </span>
@@ -430,7 +420,6 @@ export function ManagerBoardCard({
               title={`Remove ${project.name}`}
               className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
-              <Trash2 className="h-3.5 w-3.5" />
               Remove
             </Button>
           ) : (
@@ -444,7 +433,6 @@ export function ManagerBoardCard({
                 onClick={(event) => event.stopPropagation()}
                 aria-label={`Remove ${project.name}`}
               >
-                <Trash2 className="h-3.5 w-3.5" />
                 Remove
               </Button>
             </span>
