@@ -384,10 +384,12 @@ function RibbonTabButton({
 function RibbonPanel({ label, children }: { label: string; children: ReactNode }) {
   const groups = Children.toArray(children).filter(Boolean);
   return (
+    // Fixed height so switching tabs (Home / Options) never resizes the ribbon
+    // and shifts the content below; groups stretch to fill it.
     <div
       role="tabpanel"
       aria-label={label}
-      className="flex items-stretch gap-1 overflow-x-auto px-2 pt-2 pb-2"
+      className="flex h-[6rem] items-stretch gap-1 overflow-x-auto px-2 pt-2 pb-2"
     >
       {groups.map((group, index) => (
         <Fragment key={index}>
@@ -401,8 +403,9 @@ function RibbonPanel({ label, children }: { label: string; children: ReactNode }
 
 function RibbonGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[4.5rem] shrink-0 flex-col items-center justify-between gap-1.5 px-1.5">
-      <div className="flex flex-wrap items-center justify-center gap-1.5">{children}</div>
+    <div className="flex min-h-[4.5rem] shrink-0 flex-col items-center gap-1.5 px-1.5">
+      {/* Grows to fill the fixed panel height, centering the tools vertically. */}
+      <div className="flex flex-1 flex-wrap items-center justify-center gap-1.5">{children}</div>
       <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
         {label}
       </span>
