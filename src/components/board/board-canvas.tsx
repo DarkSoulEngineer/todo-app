@@ -6,16 +6,22 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { BoardZoomControls } from "@/components/board/board-zoom-controls";
 import {
+  BOARD_SCROLL_SELECTOR,
+  BOARD_TRASH_RESERVE,
+  canScrollBy,
   clamp,
   clampView,
+  columnMaxHeight,
   CONTROLS_SELECTOR,
   EMPTY_BOX,
+  findBoardScroll,
   INITIAL_VIEW,
   INTERACTIVE_SELECTOR,
   MAX_WHEEL_DELTA,
@@ -39,6 +45,11 @@ import { cn } from "@/lib/utils/utils";
  * ctrl/cmd + wheel zooms about the cursor and two fingers pinch-zoom. Card
  * drags and section reordering keep working untouched, because a pan only ever
  * starts on the backdrop — never on a card, column or button.
+ *
+ * Each column also scrolls its own cards (Trello style). The wheel follows a
+ * column -> board -> page chain: it scrolls the column while it can, then pans
+ * the board once the column hits an edge, and finally falls through to the page
+ * once the board is pinned too — so no gesture ever gets trapped.
  */
 export function BoardCanvas({
   children,
@@ -57,9 +68,16 @@ export function BoardCanvas({
 
   const [view, setView] = useState<View>(INITIAL_VIEW);
   const [panning, setPanning] = useState(false);
+  // Live viewport height, published to the columns as a CSS variable so they
+  // can cap their own scroll area without re-rendering on every zoom step.
+  const [viewportHeight, setViewportHeight] = useState(0);
   // While a card or a section is being dragged, the canvas holds still so the
   // two gestures never fight over the same pointer.
   const { active: dragActive } = useDndContext();
+  // Only a card drag shows the trash dropzone; while it does, the columns give
+  // up some height so their bottom edge clears the trash instead of sitting
+  // under it. Sections keep their full height (they never show the trash).
+  const cardDragActive = dragActive?.data.current?.type === "card";
 
   function apply(next: View): void {
     viewRef.current = next;
@@ -84,6 +102,8 @@ export function BoardCanvas({
         cw: content.offsetWidth,
         ch: content.offsetHeight,
       };
+      const h = viewport.clientHeight;
+      setViewportHeight((prev) => (prev === h ? prev : h));
     };
     measure();
     const observer = new ResizeObserver(() => {
@@ -105,6 +125,24 @@ export function BoardCanvas({
     if (!viewport || !content) return;
     const el = content.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(revealTaskId)}"]`);
     if (!el) return;
+    const current = viewRef.current;
+
+    // A card scrolled out of sight inside its column would be pointed at while
+    // still hidden. Nudge that column's own scroll first (converting the
+    // screen-space gap back into content pixels), so the spotlight lands on a
+    // card the user can actually see.
+    const scroller = el.closest<HTMLElement>(BOARD_SCROLL_SELECTOR);
+    if (scroller && current.scale > 0) {
+      const sRect = scroller.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      const pad = 16;
+      if (eRect.top < sRect.top + pad) {
+        scroller.scrollTop -= (sRect.top + pad - eRect.top) / current.scale;
+      } else if (eRect.bottom > sRect.bottom - pad) {
+        scroller.scrollTop += (eRect.bottom - (sRect.bottom - pad)) / current.scale;
+      }
+    }
+
     const box = boxRef.current;
     const vpRect = viewport.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
@@ -115,7 +153,6 @@ export function BoardCanvas({
       elRect.left >= vpRect.left + margin &&
       elRect.right <= vpRect.right - margin;
     if (inside) return;
-    const current = viewRef.current;
     const dx = vpRect.left + box.w / 2 - (elRect.left + elRect.width / 2);
     const dy = vpRect.top + box.h / 2 - (elRect.top + elRect.height / 2);
     apply(clampView({ x: current.x + dx, y: current.y + dy, scale: current.scale }, box));
@@ -151,13 +188,24 @@ export function BoardCanvas({
         return;
       }
 
+      // Scroll chain: column -> board -> page.
+      //
+      // Over a column, a vertical wheel belongs to that column while it can
+      // still move that way: we leave the event alone (no preventDefault) so
+      // the browser scrolls the column natively.
+      //
+      // Once the column is pinned at an edge we fall through and pan the board
+      // (preventDefault). When the board is ALSO at its clamped edge we return
+      // without preventDefault, so the wheel chains on to the page (the
+      // app-shell's own scroll area) — the board never traps the scroll.
+      const scroller = findBoardScroll(event.target);
+      if (scroller && canScrollBy(scroller, dy)) return;
+
       const current = viewRef.current;
       const next = clampView(
         { x: current.x - dx, y: current.y - dy, scale: current.scale },
         boxRef.current,
       );
-      // Only swallow the gesture while the board can still move; at a clamped
-      // edge the wheel scrolls the page, so the board never traps the scroll.
       if (next.x === current.x && next.y === current.y) return;
       event.preventDefault();
       apply(next);
@@ -290,10 +338,24 @@ export function BoardCanvas({
     >
       <div
         ref={contentRef}
-        style={{
-          transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`,
-          transformOrigin: "0 0",
-        }}
+        style={
+          {
+            transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`,
+            transformOrigin: "0 0",
+            // Column cards scroll area cap, in content pixels. Recomputed on
+            // zoom/resize via the variable, so columns need no re-render. During
+            // a card drag a slice is reserved for the trash dropzone, so the
+            // columns shorten and a gap opens above it.
+            "--board-col-max":
+              viewportHeight > 0
+                ? `${columnMaxHeight(
+                    viewportHeight,
+                    view.scale,
+                    cardDragActive ? BOARD_TRASH_RESERVE : 0,
+                  )}px`
+                : "none",
+          } as CSSProperties
+        }
         className="w-max cursor-default touch-pan-y will-change-transform"
       >
         {children}

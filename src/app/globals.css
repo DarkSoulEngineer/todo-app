@@ -195,6 +195,30 @@
     outline-offset: 2px;
   }
 
+  /* Per-column card list: a slim, self-effacing scrollbar that reads as part of
+     the column rather than browser chrome. A stable gutter keeps every column's
+     cards the same width whether or not the list currently overflows. */
+  .board-scroll {
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 34%, transparent) transparent;
+  }
+  .board-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .board-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .board-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+    background-color: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
+  }
+  .board-scroll:hover::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--muted-foreground) 46%, transparent);
+  }
+
   /* Layered accent glow + dotted grid used as the app backdrop. */
   .app-canvas {
     background-image: radial-gradient(

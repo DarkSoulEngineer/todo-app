@@ -30,6 +30,51 @@ export const CONTROLS_SELECTOR = "[data-board-controls]";
 /** Elements that own their own pointer gesture: a pan never starts on them. */
 export const INTERACTIVE_SELECTOR = "button, input, textarea, select, a, [data-dnd]";
 export const TEXT_FIELD_SELECTOR = "input, textarea, select";
+/** A column's inner card list, which scrolls on its own inside the board. */
+export const BOARD_SCROLL_SELECTOR = "[data-board-scroll]";
+/** Bottom breathing room kept under a column so it never kisses the viewport. */
+export const BOARD_COLUMN_GUTTER = 8;
+/** Floor for a column's scroll height, so it stays usable on tiny viewports. */
+export const BOARD_COLUMN_MIN_HEIGHT = 200;
+/**
+ * Screen-space room reserved above the trash dropzone while a card is dragged,
+ * so the columns' bottom edge rises and leaves a clear gap instead of sitting
+ * under the trash. Roughly the resting trash height (h-16) plus a small margin.
+ */
+export const BOARD_TRASH_RESERVE = 72;
+
+/**
+ * The maximum height (in board/content pixels) a column may take so that, once
+ * the canvas scale is applied, it still fits inside the visible viewport. The
+ * board is scaled with a CSS transform, so a screen-space budget is divided by
+ * the scale to land back in the content's own coordinate space. `reserve` is a
+ * screen-space slice to keep clear (e.g. the trash dropzone during a drag).
+ */
+export function columnMaxHeight(
+  viewportHeight: number,
+  scale: number,
+  reserve = 0,
+): number {
+  if (viewportHeight <= 0 || scale <= 0) return BOARD_COLUMN_MIN_HEIGHT;
+  return Math.max(
+    BOARD_COLUMN_MIN_HEIGHT,
+    (viewportHeight - reserve) / scale - BOARD_COLUMN_GUTTER,
+  );
+}
+
+/** True while `el` can still scroll vertically in the wheel's direction. */
+export function canScrollBy(el: HTMLElement, dy: number): boolean {
+  if (dy === 0) return false;
+  const max = el.scrollHeight - el.clientHeight;
+  if (max <= 1) return false;
+  return dy < 0 ? el.scrollTop > 1 : el.scrollTop < max - 1;
+}
+
+/** Nearest scrollable column under an event target, if any. */
+export function findBoardScroll(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof Element)) return null;
+  return target.closest<HTMLElement>(BOARD_SCROLL_SELECTOR);
+}
 
 /** Bookkeeping for a pointer that is currently dragging the board. */
 export interface PanState {

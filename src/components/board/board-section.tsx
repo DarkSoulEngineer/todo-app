@@ -120,10 +120,17 @@ export function BoardSectionColumn({
   return (
     <section
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        // Cap the whole column so it fits the viewport at the current zoom
+        // (`--board-col-max` is set by the canvas); the card list then scrolls
+        // on its own inside it. Falls back to the natural height off-canvas.
+        maxHeight: "var(--board-col-max, none)",
+      }}
       aria-label={section.title}
       className={cn(
-        "flex min-h-[15rem] w-[17rem] shrink-0 snap-start flex-col gap-3 rounded-2xl border border-border bg-muted/30 p-2.5 transition-colors sm:w-72",
+        "flex min-h-[15rem] w-[17rem] shrink-0 snap-start flex-col gap-3 rounded-2xl border border-border bg-muted/30 p-2.5 transition-[color,background-color,border-color,max-height] duration-200 ease-out sm:w-72",
         isDropTarget && "bg-primary/5 ring-2 ring-primary/30",
         isDragging && "opacity-50",
       )}
@@ -171,7 +178,21 @@ export function BoardSectionColumn({
         )}
       </header>
 
-      <div className="flex min-w-0 flex-col gap-2.5">
+      {/* The card list scrolls on its own once the column reaches its capped
+          height. Focusable so the whole list can be scrolled from the keyboard
+          (arrow / Page keys) without hunting for a card first.
+
+          `overscroll-y-auto` (not `contain`) is deliberate: when the column is
+          pinned at an edge the wheel must be free to chain on to the page via
+          the app-shell's own scroll area (column -> board -> page), rather than
+          being swallowed here. */}
+      <div
+        data-board-scroll
+        tabIndex={0}
+        role="group"
+        aria-label={`${section.title} cards`}
+        className="board-scroll focus-ring flex min-h-0 min-w-0 flex-col gap-2.5 overflow-y-auto overscroll-y-auto rounded-lg"
+      >
         {tasks.length === 0 && renderTasks.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
             Drop cards here
