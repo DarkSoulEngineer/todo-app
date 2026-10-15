@@ -37,6 +37,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { BoardDragPreview, ManagerBoardCard } from "@/components/board/board-manager-card";
+import { JanusMark } from "@/components/brand/janus-logo";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FieldLabel, Input } from "@/components/ui/field";
@@ -237,8 +238,13 @@ export function BoardManager(): JSX.Element {
   const overview = useMemo(() => {
     let open = 0;
     let overdue = 0;
+    let completed = 0;
+    let total = 0;
     for (const project of projects) {
       for (const task of project.workspace.tasks) {
+        // `total` counts every task on every board; `completed` is its done slice.
+        total += 1;
+        if (task.completed) completed += 1;
         if (task.completed || task.canceled) continue;
         open += 1;
         // Deadline tallies wait for the post-hydration clock snapshot.
@@ -249,7 +255,7 @@ export function BoardManager(): JSX.Element {
         if (due - now.getTime() < 0) overdue += 1;
       }
     }
-    return { boards: projects.length, open, overdue };
+    return { boards: projects.length, open, overdue, completed, total };
   }, [projects, now]);
 
   const lastBoard = projects.length <= 1;
@@ -418,7 +424,7 @@ export function BoardManager(): JSX.Element {
     try {
       parsed = JSON.parse(await file.text());
     } catch {
-      toast.error("That file could not be read as a Stride board.");
+      toast.error("That file could not be read as a Janus board.");
       return;
     }
 
@@ -427,7 +433,7 @@ export function BoardManager(): JSX.Element {
     const inner = (parsed as { workspace?: unknown } | null)?.workspace;
     const workspace = buildWorkspace(inner ?? parsed);
     if (!workspace) {
-      toast.error("That file could not be read as a Stride board.");
+      toast.error("That file could not be read as a Janus board.");
       return;
     }
 
@@ -596,14 +602,14 @@ export function BoardManager(): JSX.Element {
     // viewport and scrolls the document instead of a task-view content area.
     <div className="mx-auto min-h-dvh w-full max-w-6xl px-3 py-8 sm:px-4 sm:py-10 lg:py-14">
       {/* Wayfinding: the sidebar's wordmark, so a bare landing page still reads
-          as Stride's front door rather than a loose card on a blank canvas. */}
+          as Janus's front door rather than a loose card on a blank canvas. */}
       <header>
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
-            <Check className="h-5 w-5" strokeWidth={3} />
+            <JanusMark className="h-6 w-6" />
           </span>
           <div className="min-w-0 leading-tight">
-            <p className="font-display text-lg tracking-tight">Stride</p>
+            <p className="font-display text-lg tracking-tight">Janus</p>
             <p className="truncate text-[11px] font-medium text-muted-foreground">
               Focused task manager
             </p>
@@ -817,6 +823,8 @@ export function BoardManager(): JSX.Element {
           boards={overview.boards}
           open={overview.open}
           overdue={overview.overdue}
+          completed={overview.completed}
+          total={overview.total}
         />
       </div>
 
@@ -923,18 +931,49 @@ function BoardStatsChart({
   boards,
   open,
   overdue,
+  completed,
+  total,
 }: {
   boards: number;
   open: number;
   overdue: number;
+  completed: number;
+  total: number;
 }): JSX.Element {
   const reduceMotion = useReducedMotion();
-  const slices = [
-    { label: "Boards", value: boards, color: "var(--primary)" },
-    { label: "Open tasks", value: open, color: "var(--success)" },
-    { label: "Overdue tasks", value: overdue, color: "var(--destructive)" },
+
+  // The four figures, in reading order: the task states that feed the total,
+  // then the boards themselves. Colours stay semantic (success / destructive /
+  // info / primary) so the donut and the list below always agree.
+  const figures = [
+    {
+      label: "Completed",
+      value: completed,
+      color: "var(--success)",
+      share: total > 0 ? Math.round((completed / total) * 100) : null,
+    },
+    {
+      label: "Overdue",
+      value: overdue,
+      color: "var(--destructive)",
+      share: total > 0 ? Math.round((overdue / total) * 100) : null,
+    },
+    {
+      label: "Open",
+      value: open,
+      color: "var(--info)",
+      share: total > 0 ? Math.round((open / total) * 100) : null,
+    },
+    // Boards are counted in their own unit, so they carry no share.
+    { label: "Boards", value: boards, color: "var(--primary)", share: null },
   ];
-  const total = boards + open + overdue;
+
+  // Slices are sized against the sum of the figures so the ring always closes;
+  // the centre still headlines the raw task total.
+  const ring = Math.max(
+    figures.reduce((sum, figure) => sum + figure.value, 0),
+    1,
+  );
 
   const radius = 60;
   const strokeWidth = 13;
@@ -945,24 +984,18 @@ function BoardStatsChart({
   const circumference = 2 * Math.PI * radius;
   const endTrim = (strokeWidth / 2 + 2.25) / circumference;
 
-  // Two compact figures derived from the same props, so the wide row reads as a
-  // deliberate stat strip instead of a lone circle floating in empty space.
-  const overdueRate = open > 0 ? `${Math.round((overdue / open) * 100)}%` : "—";
-  const openPerBoard = boards > 0 ? (open / boards).toFixed(1) : "—";
-
   let elapsed = 0;
-  const arcs = slices
-    .filter((slice) => slice.value > 0)
-    .map((slice, index) => {
-      const sweep = slice.value / Math.max(total, 1);
+  const arcs = figures
+    .filter((figure) => figure.value > 0)
+    .map((figure, index) => {
+      const sweep = figure.value / ring;
       const start = elapsed;
       elapsed += sweep;
       return {
-        ...slice,
+        ...figure,
         index,
         rotation: start * 360,
         pathLength: Math.max(sweep - endTrim * 2, 0.008),
-        percentage: Math.round(sweep * 100),
       };
     });
 
@@ -970,8 +1003,8 @@ function BoardStatsChart({
     <div>
       <h2 className="font-display text-sm font-semibold tracking-tight">Board stats</h2>
       {/* One wide row: the circle anchors the left, a thin rule separates it from
-          the breakdown on the right, and the two columns below spread to the far
-          edge — so the section fills the container instead of hugging the centre. */}
+          the figures on the right, and the list spreads to the far edge — so the
+          section fills the container instead of hugging the centre. */}
       <div className="mt-5 flex flex-col gap-8 sm:flex-row sm:items-center sm:gap-10 lg:gap-14">
         <svg
           width={size}
@@ -979,7 +1012,7 @@ function BoardStatsChart({
           viewBox={`0 0 ${size} ${size}`}
           className="mx-auto h-auto w-40 shrink-0 sm:mx-0 sm:w-44 lg:w-52"
           role="img"
-          aria-label={`Board statistics: ${boards} ${pluralize(boards, "board")}, ${open} open ${pluralize(open, "task")}, ${overdue} overdue ${pluralize(overdue, "task")}`}
+          aria-label={`Board statistics: ${total} ${pluralize(total, "task")} across ${boards} ${pluralize(boards, "board")} — ${completed} completed, ${open} open, ${overdue} overdue.`}
         >
           {/* Soft full-ring track behind the slices. */}
           <circle
@@ -1010,7 +1043,7 @@ function BoardStatsChart({
                   ease: "easeOut",
                 }}
               >
-                <title>{`${arc.label}: ${arc.value} (${arc.percentage}%)`}</title>
+                <title>{`${arc.label}: ${arc.value}${arc.share !== null ? ` (${arc.share}% of tasks)` : ""}`}</title>
               </motion.circle>
             ))}
           </g>
@@ -1034,74 +1067,53 @@ function BoardStatsChart({
             fontWeight="600"
             letterSpacing="0.08em"
           >
-            Total
+            Tasks
           </text>
         </svg>
 
         <div aria-hidden="true" className="hidden w-px self-stretch bg-border sm:block" />
 
-        {/* Breakdown (left) and the two derived figures (right); both stretch to
-            the container edge, and the whole thing stacks on narrow screens. */}
-        <div className="grid w-full min-w-0 flex-1 gap-x-10 gap-y-7 md:grid-cols-2">
-          <dl className="flex flex-col justify-center gap-4">
-            {slices.map((slice) => {
-              const pct = total > 0 ? Math.round((slice.value / total) * 100) : 0;
-              return (
-                <div key={slice.label}>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <dt className="flex min-w-0 items-center gap-2.5 text-sm text-muted-foreground">
-                      <span
-                        aria-hidden="true"
-                        className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ring-foreground/10"
-                        style={{ backgroundColor: slice.color }}
-                      />
-                      <span className="truncate">{slice.label}</span>
-                    </dt>
-                    <dd className="flex shrink-0 items-baseline gap-2">
-                      <span className="text-sm font-semibold tabular-nums text-foreground">
-                        {slice.value}
-                      </span>
-                      {total > 0 ? (
-                        <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
-                          {pct}%
-                        </span>
-                      ) : null}
-                    </dd>
-                  </div>
-                  <div
-                    aria-hidden="true"
-                    className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                  >
-                    <div
-                      className="h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none"
-                      style={{ width: `${pct}%`, backgroundColor: slice.color }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </dl>
-
-          <div className="flex flex-col justify-center gap-6">
+        {/* Total tasks headline, then the four figures as a wide two-column list
+            so the row reaches the container edge; stacks on narrow screens. */}
+        <div className="flex w-full min-w-0 flex-1 flex-col justify-center">
+          <div className="flex items-end justify-between gap-4 border-b border-border pb-4">
             <div>
               <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                Overdue rate
+                Total tasks
               </p>
-              <p className="mt-1.5 font-display text-2xl leading-none tabular-nums text-foreground">
-                {overdueRate}
+              <p className="mt-1.5 font-display text-3xl leading-none tabular-nums text-foreground">
+                {total}
               </p>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">of open tasks</p>
             </div>
-            <div>
-              <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                Open per board
-              </p>
-              <p className="mt-1.5 font-display text-2xl leading-none tabular-nums text-foreground">
-                {openPerBoard}
-              </p>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">average</p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              across {pluralize(boards, "board")}
+            </p>
           </div>
+
+          <dl className="mt-5 grid grid-cols-1 gap-y-4 md:grid-cols-2 md:gap-x-10">
+            {figures.map((figure) => (
+              <div key={figure.label} className="flex items-center justify-between gap-3">
+                <dt className="flex min-w-0 items-center gap-2.5 text-sm text-muted-foreground">
+                  <span
+                    aria-hidden="true"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ring-foreground/10"
+                    style={{ backgroundColor: figure.color }}
+                  />
+                  <span className="truncate">{figure.label}</span>
+                </dt>
+                <dd className="flex shrink-0 items-baseline gap-2">
+                  <span className="font-display text-lg leading-none tabular-nums text-foreground">
+                    {figure.value}
+                  </span>
+                  {figure.share !== null ? (
+                    <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">
+                      {figure.share}%
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </div>
     </div>
