@@ -1,6 +1,7 @@
 "use client";
 
-import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { format, parseISO } from "date-fns";
 import {
   CheckCircle2,
@@ -147,16 +148,23 @@ export function ManagerBoardCard({
   const exitViaKeyRef = useRef(false);
   const titleRef = useRef<HTMLButtonElement>(null);
 
-  // Draggable only while arranging, inert otherwise. The whole card is the drag
+  // Sortable only while arranging, inert otherwise. The whole card is the drag
   // surface: dnd-kit ignores pointerdowns on interactive elements (buttons, the
   // rename input), so they all stay clickable while a 6px move from anywhere
-  // else starts a drag. The card itself stays put while dragging — the floating
-  // DragOverlay is the moving piece, and the source just dims.
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: project.id,
-    disabled: !editMode,
-    data: { type: "board" },
-  });
+  // else starts a drag. Browse mode renders this card outside any
+  // `SortableContext`, where the hook's default context simply leaves it inert
+  // (no index, no transform), so one component serves both modes.
+  //
+  // The returned `transform`/`transition` slide the *other* cards into their new
+  // positions as you drag, which is what makes the drop read as an insert. The
+  // card being dragged stays put and dims — the floating DragOverlay is the
+  // moving piece.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({
+      id: project.id,
+      disabled: !editMode,
+      data: { type: "board" },
+    });
 
   // The dnd-kit node ref and the manager's roving-focus ref share the card.
   // The identity must stay stable: a fresh callback each render makes React
@@ -223,9 +231,15 @@ export function ManagerBoardCard({
       {...(editMode ? attributes : {})}
       {...(editMode ? listeners : {})}
       tabIndex={editMode || focused ? 0 : -1}
-      aria-label={editMode ? `Move ${project.name} to another cell` : `Open ${project.name}`}
-      aria-describedby={editMode ? "edit-grid-hint" : undefined}
-      title={editMode ? "Drag onto any cell" : `Open ${project.name}`}
+      aria-label={editMode ? `Reorder ${project.name}` : `Open ${project.name}`}
+      title={editMode ? "Drag to reorder" : `Open ${project.name}`}
+      // The sortable transform slides this card to the position it would take
+      // after the drop, so the grid visibly reflows in order while dragging.
+      style={
+        editMode && transform
+          ? { transform: CSS.Transform.toString(transform), transition }
+          : undefined
+      }
       onClick={(event) => {
         // Edit mode is for arranging, not loading. Otherwise only the bare
         // surface opens the board — the controls below stop their own clicks,
@@ -240,6 +254,7 @@ export function ManagerBoardCard({
         editMode
           ? "touch-none cursor-grab ring-2 ring-transparent hover:ring-primary/40 active:cursor-grabbing"
           : "cursor-pointer hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg",
+        isOver && !isDragging && "ring-primary/60",
         isDragging && "opacity-40",
         className,
       )}
@@ -314,7 +329,7 @@ export function ManagerBoardCard({
             {editMode ? (
               <span
                 aria-hidden="true"
-                title="Drag onto any cell"
+                title="Drag to reorder"
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary"
               >
                 <GripVertical className="h-4 w-4" strokeWidth={2.2} />

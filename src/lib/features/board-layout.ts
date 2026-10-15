@@ -1,15 +1,14 @@
 /**
- * Free 2D board placement for the Board Manager.
+ * Ordered board arrangement for the Board Manager.
  *
- * The manager lays boards out on a sparse, row-major grid: cell `i` holds a
- * board id or `null` for an empty slot, which lets a board be dropped anywhere —
- * including leaving deliberate gaps — instead of only reordering a flat list.
+ * Boards live in ONE sequence, not a sparse 2D grid: `order[i]` is the board
+ * that fills position `i`. The grid just wraps that sequence into the viewport's
+ * current column count (1 → 2 → 3 → 4), so the list is always compact — row 1
+ * reads 1 2 3, row 2 reads 4 5, and there is never an empty cell. Dragging a
+ * board onto another means "put me here", so every board after it shifts along.
  *
- * The grid's *column count is the viewport's*, chosen by responsive breakpoints
- * (1 → 2 → 3 → 4) rather than by the user, so a layout means "this row-major
- * order" and reflows sanely at every width. `cols` is kept on the payload only
- * so existing stored layouts keep loading and keep their shape on wide screens;
- * rendering never reads it.
+ * `cols` is kept on the payload only so an older stored layout keeps loading;
+ * rendering never reads it (the responsive grid chooses the real column count).
  *
  * Everything here is a pure function on plain data (no React, no storage) so the
  * reconciliation rules can be reasoned about and tested in isolation. The
@@ -17,39 +16,23 @@
  * so a missing or garbage layout can never break the landing page.
  */
 
-/** A sparse, row-major grid of board ids (or `null` slots). */
+/** A compact, ordered list of board ids (index 0 = top-left, filled row-major). */
 export interface BoardLayout {
   /** Persisted column hint (see the file note); rendering uses the viewport. */
   cols: number;
-  /** Cell at index `i` is read row-major: `i === row * cols + column`. */
-  cells: (string | null)[];
+  /** Board ids in display order; every board appears exactly once, no gaps. */
+  order: string[];
 }
 
-/** Clamp bounds kept for stored payloads and the padding helper. */
+/** Clamp bounds kept for stored payloads. */
 export const MIN_BOARD_COLS = 1;
 export const MAX_BOARD_COLS = 8;
 
 /** Default column count for a brand-new layout. */
 export const DEFAULT_BOARD_COLS = 4;
 
-/** Prefix shared by every cell's droppable id (`cell:0`, `cell:1`, …). */
-export const CELL_ID_PREFIX = "cell:";
-
-/** Fresh, empty layout — reconcile fills it row-major on first use. */
-export const EMPTY_BOARD_LAYOUT: BoardLayout = { cols: DEFAULT_BOARD_COLS, cells: [] };
-
-/** `0` → `"cell:0"`; the id a cell registers as a drop target. */
-export function cellId(index: number): string {
-  return `${CELL_ID_PREFIX}${index}`;
-}
-
-/** Inverse of {@link cellId}; `null` for any id that is not a cell. */
-export function cellIndexFromId(id: string | number): number | null {
-  const text = typeof id === "string" ? id : String(id);
-  if (!text.startsWith(CELL_ID_PREFIX)) return null;
-  const index = Number(text.slice(CELL_ID_PREFIX.length));
-  return Number.isInteger(index) && index >= 0 ? index : null;
-}
+/** Fresh, empty layout — reconcile fills it on first use. */
+export const EMPTY_BOARD_LAYOUT: BoardLayout = { cols: DEFAULT_BOARD_COLS, order: [] };
 
 /** Rounds and clamps a column count into the supported range. */
 export function clampBoardCols(value: number): number {
@@ -57,40 +40,55 @@ export function clampBoardCols(value: number): number {
   return Math.min(MAX_BOARD_COLS, Math.max(MIN_BOARD_COLS, Math.round(value)));
 }
 
-/** Drops trailing empty slots so the grid ends on a placed board. */
-function trimTrailingEmpty(cells: (string | null)[]): (string | null)[] {
-  let end = cells.length;
-  while (end > 0 && cells[end - 1] === null) end -= 1;
-  return end === cells.length ? cells : cells.slice(0, end);
+/**
+ * Keeps readable, de-duplicated ids in the order they appear. Anything that is
+ * not a non-empty string — including the `null` gaps of a legacy payload — is
+ * skipped, which is exactly what collapses an old sparse grid into a compact
+ * list without ever losing or reordering a board.
+ */
+function compactIds(values: readonly unknown[]): string[] {
+  const seen = new Set<string>();
+  const order: string[] = [];
+  for (const value of values) {
+    if (typeof value !== "string" || value.length === 0 || seen.has(value)) continue;
+    seen.add(value);
+    order.push(value);
+  }
+  return order;
 }
 
 /**
- * Validates an untrusted stored payload. Anything unusable returns `null` so the
- * caller can fall back to a default fill; individual bad cells become gaps.
+ * Validates an untrusted stored payload. Accepts both the current `{ cols,
+ * order }` shape and the legacy `{ cols, cells }` sparse grid (whose `null` gaps
+ * are flattened away). Anything unusable returns `null` so the caller can fall
+ * back to a default fill.
  */
 export function sanitizeBoardLayout(raw: unknown): BoardLayout | null {
   if (!raw || typeof raw !== "object") return null;
-  const record = raw as { cols?: unknown; cells?: unknown };
-  if (!Array.isArray(record.cells)) return null;
-  const cells: (string | null)[] = [];
-  for (const cell of record.cells) {
-    cells.push(typeof cell === "string" && cell.length > 0 ? cell : null);
-  }
+  const record = raw as { cols?: unknown; order?: unknown; cells?: unknown };
   const cols = typeof record.cols === "number" ? record.cols : DEFAULT_BOARD_COLS;
-  return { cols: clampBoardCols(cols), cells: trimTrailingEmpty(cells) };
+
+  if (Array.isArray(record.order)) {
+    return { cols: clampBoardCols(cols), order: compactIds(record.order) };
+  }
+  // Legacy shape: row-major cells where `null` marked an empty slot.
+  if (Array.isArray(record.cells)) {
+    return { cols: clampBoardCols(cols), order: compactIds(record.cells) };
+  }
+  return null;
 }
 
-/** Seeds a layout from the legacy linear order (first id = top-left). */
+/** Seeds a layout from the legacy linear order (first id = first position). */
 export function boardLayoutFromOrder(ids: readonly string[], cols = DEFAULT_BOARD_COLS): BoardLayout {
-  return { cols: clampBoardCols(cols), cells: [...ids] };
+  return { cols: clampBoardCols(cols), order: compactIds(ids) };
 }
 
 /**
  * The load-time repair pass. Given the stored layout and the boards that
- * actually exist, it drops cells whose ids are gone, de-duplicates, and appends
- * any board that is missing (into the first empty cell, else a trailing cell) —
- * guaranteeing every board appears exactly once. A `null` base falls back to a
- * plain row-major fill, so a garbage payload still renders sensibly.
+ * actually exist, it drops ids whose board is gone, de-duplicates, and appends
+ * any board that is missing — guaranteeing every board appears exactly once, in
+ * order, with no gaps. A `null` base falls back to a plain board-id fill, so a
+ * garbage payload still renders sensibly.
  */
 export function reconcileBoardLayout(
   base: BoardLayout | null,
@@ -98,40 +96,36 @@ export function reconcileBoardLayout(
 ): BoardLayout {
   const cols = base ? clampBoardCols(base.cols) : DEFAULT_BOARD_COLS;
   const valid = new Set(boardIds);
-  const placed = new Set<string>();
-  const cells: (string | null)[] = [];
+  const seen = new Set<string>();
+  const order: string[] = [];
 
   if (base) {
-    for (const cell of base.cells) {
-      if (typeof cell !== "string" || !valid.has(cell) || placed.has(cell)) {
-        cells.push(null);
-        continue;
-      }
-      placed.add(cell);
-      cells.push(cell);
+    for (const id of base.order) {
+      if (!valid.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      order.push(id);
     }
   }
 
+  // Defence in depth: a board the layout somehow missed still shows up, last.
   for (const id of boardIds) {
-    if (placed.has(id)) continue;
-    const gap = cells.indexOf(null);
-    if (gap === -1) cells.push(id);
-    else cells[gap] = id;
-    placed.add(id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    order.push(id);
   }
 
-  return { cols, cells: trimTrailingEmpty(cells) };
+  return { cols, order };
 }
 
-/** Board ids in true layout order (row-major), for browse-mode rendering. */
+/** Board ids in true display order, for browse-mode rendering. */
 export function boardLayoutOrder(layout: BoardLayout, boardIds: readonly string[]): string[] {
   const valid = new Set(boardIds);
   const seen = new Set<string>();
   const ordered: string[] = [];
-  for (const cell of layout.cells) {
-    if (typeof cell !== "string" || !valid.has(cell) || seen.has(cell)) continue;
-    seen.add(cell);
-    ordered.push(cell);
+  for (const id of layout.order) {
+    if (!valid.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    ordered.push(id);
   }
   // Defence in depth: a board the layout somehow missed still shows up.
   for (const id of boardIds) {
@@ -141,51 +135,28 @@ export function boardLayoutOrder(layout: BoardLayout, boardIds: readonly string[
 }
 
 /**
- * Drop semantics. Onto an empty cell the board simply moves (leaving a gap where
- * it was); onto an occupied cell the two swap. Returns the same reference when
- * nothing changes so callers can skip the write.
+ * Reorder semantics. Moves the board at `fromIndex` to `toIndex` and shifts
+ * everything between, so the list stays compact (an insert, never a swap with a
+ * gap). Returns the same reference when nothing moves so callers can skip the
+ * write.
  */
-export function placeBoardInLayout(layout: BoardLayout, boardId: string, toIndex: number): BoardLayout {
-  if (toIndex < 0) return layout;
-  const cells = layout.cells.slice();
-  // Dropping past the last cell grows the grid to reach the target.
-  while (cells.length <= toIndex) cells.push(null);
+export function moveBoardInLayout(layout: BoardLayout, fromIndex: number, toIndex: number): BoardLayout {
+  const count = layout.order.length;
+  if (fromIndex < 0 || fromIndex >= count) return layout;
+  const to = Math.min(Math.max(toIndex, 0), count - 1);
+  if (to === fromIndex) return layout;
 
-  const from = cells.indexOf(boardId);
-  if (from === toIndex) return layout;
-
-  if (from === -1) {
-    // Not currently placed: occupy the target without displacing anything else.
-    cells[toIndex] = boardId;
-    return { cols: layout.cols, cells };
-  }
-
-  const occupant = cells[toIndex];
-  cells[toIndex] = boardId;
-  // Swap when the cell was occupied; clear it (leave a gap) when it was empty.
-  cells[from] = occupant;
-  return { cols: layout.cols, cells };
+  const order = layout.order.slice();
+  const [moved] = order.splice(fromIndex, 1);
+  order.splice(to, 0, moved);
+  return { cols: layout.cols, order };
 }
 
-/** Clears a removed board's cell without compacting anyone else's position. */
+/** Drops a removed board and closes the gap behind it. */
 export function removeBoardFromLayout(layout: BoardLayout, boardId: string): BoardLayout {
-  const index = layout.cells.indexOf(boardId);
+  const index = layout.order.indexOf(boardId);
   if (index === -1) return layout;
-  const cells = layout.cells.slice();
-  cells[index] = null;
-  return { cols: layout.cols, cells: trimTrailingEmpty(cells) };
-}
-
-/**
- * Rendering helper: pads the sparse cells out to a full rectangle for the given
- * column count (the viewport's, at render time) so empty slots show as real grid
- * items — and real drop targets — and the last row is never half-width.
- */
-export function padBoardCells(cells: readonly (string | null)[], cols: number): (string | null)[] {
-  const width = clampBoardCols(cols);
-  const rows = Math.max(1, Math.ceil(cells.length / width));
-  const total = rows * width;
-  const padded = cells.slice();
-  while (padded.length < total) padded.push(null);
-  return padded;
+  const order = layout.order.slice();
+  order.splice(index, 1);
+  return { cols: layout.cols, order };
 }

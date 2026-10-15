@@ -219,30 +219,6 @@
     background-color: color-mix(in oklab, var(--muted-foreground) 46%, transparent);
   }
 
-  /* The board manager's edit grid scrolls sideways only as a safety net on very
-     narrow viewports. Same slim scrollbar as `.board-scroll`, minus the stable
-     gutter, so the grid keeps the header's exact width when nothing overflows. */
-  .grid-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 34%, transparent) transparent;
-  }
-  .grid-scroll::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  .grid-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .grid-scroll::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: 9999px;
-    background-clip: content-box;
-    background-color: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
-  }
-  .grid-scroll:hover::-webkit-scrollbar-thumb {
-    background-color: color-mix(in oklab, var(--muted-foreground) 46%, transparent);
-  }
-
   /* Layered accent glow + dotted grid used as the app backdrop. */
   .app-canvas {
     background-image: radial-gradient(

@@ -7,14 +7,13 @@ import {
   PointerSensor,
   closestCenter,
   useDndContext,
-  useDroppable,
   useSensor,
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
-  type KeyboardCoordinateGetter,
 } from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useReducedMotion } from "framer-motion";
 import {
   Check,
@@ -39,7 +38,6 @@ import {
   useState,
   type ChangeEvent,
   type JSX,
-  type ReactNode,
 } from "react";
 import { toast } from "sonner";
 import { BoardDragPreview, ManagerBoardCard } from "@/components/board/board-manager-card";
@@ -53,10 +51,7 @@ import {
   EMPTY_BOARD_LAYOUT,
   boardLayoutFromOrder,
   boardLayoutOrder,
-  cellId,
-  cellIndexFromId,
-  padBoardCells,
-  placeBoardInLayout,
+  moveBoardInLayout,
   reconcileBoardLayout,
   removeBoardFromLayout,
   sanitizeBoardLayout,
@@ -71,59 +66,14 @@ type ManagerDialog = "create" | "remove" | null;
 /** Private pin list: a JSON array of board ids, remembered across sessions. */
 const PINS_STORAGE_KEY = "stride.board-pins.v1";
 
-/** Legacy linear order (pre-2D), read once to seed the layout on migration. */
+/** Legacy linear order (pre-layout), read once to seed the layout on migration. */
 const ORDER_STORAGE_KEY = "stride.board-order.v1";
 
-/** Saved layout payload: `{ cols, cells }` — cells row-major, `null` = gap.
- *  `cols` is a legacy hint kept for stored payloads; the grid renders with the
- *  viewport's column count. */
+/** Saved layout payload: `{ cols, order }` — boards in display order.
+ *  Older payloads stored a sparse `{ cols, cells }` grid instead; both are read
+ *  (see `sanitizeBoardLayout`). `cols` is a legacy hint kept for stored payloads;
+ *  the grid renders with the viewport's column count. */
 const LAYOUT_STORAGE_KEY = "stride.board-layout.v1";
-
-/** Arrow-key moves during a keyboard drag: across a column, or a whole row. */
-const KEYBOARD_CELL_STEPS: Record<string, (cols: number) => number> = {
-  ArrowLeft: () => -1,
-  ArrowRight: () => 1,
-  ArrowUp: (cols) => -cols,
-  ArrowDown: (cols) => cols,
-};
-
-/**
- * Edit-grid column count per viewport, mobile-first — the same rhythm as the
- * browse grid (1 → 2 → 3) stretched to 4 once the capped container can spare
- * the width. The grid follows the window instead of a manual stepper, so a
- * layout means "this row-major order" and reflows sanely at every size.
- */
-const EDIT_GRID_BREAKPOINTS: ReadonlyArray<{ query: string; cols: number }> = [
-  { query: "(min-width: 1280px)", cols: 4 },
-  { query: "(min-width: 1024px)", cols: 3 },
-  { query: "(min-width: 640px)", cols: 2 },
-];
-
-/**
- * The edit grid's live column count, tracked from the media queries above.
- * Starts at 1 (the server/narrow-phone value, so hydration agrees) and follows
- * the viewport afterwards. Edit mode is only ever entered by a click, long
- * after this hook has measured, so the first grid render is already correct.
- */
-function useResponsiveGridCols(): number {
-  const [cols, setCols] = useState(1);
-  useEffect(() => {
-    const entries = EDIT_GRID_BREAKPOINTS.map((entry) => ({
-      entry,
-      list: window.matchMedia(entry.query),
-    }));
-    const update = (): void => {
-      const match = entries.find(({ list }) => list.matches);
-      setCols(match ? match.entry.cols : 1);
-    };
-    update();
-    for (const { list } of entries) list.addEventListener("change", update);
-    return () => {
-      for (const { list } of entries) list.removeEventListener("change", update);
-    };
-  }, []);
-  return cols;
-}
 
 /** True while the user is typing somewhere, so page-level shortcuts stand down. */
 function isEditable(element: Element | null): boolean {
@@ -154,9 +104,11 @@ function readPins(): Set<string> {
 }
 
 /**
- * Reads the saved 2D layout, migrating the legacy linear order when no layout
- * exists yet. Same hydration-safe pattern as pins: nothing on the server, and a
- * failure falls through to a fresh row-major fill rather than breaking the page.
+ * Reads the saved board order, migrating older payloads as needed: a compact
+ * `{ cols, order }` layout is used directly, a legacy sparse `{ cols, cells }`
+ * grid has its gaps flattened, and the pre-layout linear order is the last
+ * fallback. Same hydration-safe pattern as pins: nothing on the server, and a
+ * failure falls through to a fresh fill rather than breaking the page.
  */
 function readInitialLayout(): BoardLayout {
   if (typeof window === "undefined") return EMPTY_BOARD_LAYOUT;
@@ -175,7 +127,7 @@ function readInitialLayout(): BoardLayout {
       }
     }
   } catch {
-    // Unreadable layout — fall back to a fresh row-major fill.
+    // Unreadable layout — fall back to a fresh, board-id-ordered fill.
   }
   return EMPTY_BOARD_LAYOUT;
 }
@@ -186,11 +138,11 @@ function readInitialLayout(): BoardLayout {
  * Stride wordmark itself and hands off to `/tasks` once a board is opened —
  * creating, importing and loading a board all mean "work in this board now".
  *
- * In edit mode the grid is a true 2D board: a board can be dropped onto any
- * cell, leaving gaps or swapping with whatever is already there. Its column
- * count follows the viewport (1 → 2 → 3 → 4), so one arrangement reads the same
- * way at every size. Browse mode just walks the same layout row-major,
- * collapsing the gaps.
+ * In edit mode the boards are one ordered row: dragging a board onto another
+ * inserts it there and the rest shift along, so the grid is always compact (row
+ * 1 reads 1 2 3, row 2 reads 4 5, never a gap). The edit grid is the very same
+ * responsive grid as browse mode, so the cards are the same size in both — one
+ * order just reads the same way whether you are arranging or browsing.
  */
 export function BoardManager(): JSX.Element {
   const router = useRouter();
@@ -225,9 +177,6 @@ export function BoardManager(): JSX.Element {
   // True while the active drag came from the keyboard (no meaningful pointer).
   const keyboardDragRef = useRef(false);
 
-  // The edit grid follows the viewport: 1 column on phones, up to 4 wide.
-  const visibleCols = useResponsiveGridCols();
-
   // A single "now" snapshot keeps every card and the overview strip consistent.
   // The server has no clock: stay null there so the prerender output stays
   // deterministic. The client reads it once at first render — safe because the
@@ -257,8 +206,8 @@ export function BoardManager(): JSX.Element {
     [layout, boardIds],
   );
 
-  // True layout order (row-major, gaps collapsed) — the browse-mode sequence and
-  // the flattened list that drives keyboard nav.
+  // Boards in display order — the browse-mode sequence and the list the edit
+  // grid renders (and reorders) directly.
   const orderedIds = useMemo(
     () => boardLayoutOrder(resolvedLayout, boardIds),
     [resolvedLayout, boardIds],
@@ -276,19 +225,8 @@ export function BoardManager(): JSX.Element {
     return q ? ordered.filter((project) => project.name.toLowerCase().includes(q)) : ordered;
   }, [ordered, query]);
 
-  // Edit mode renders one sparse grid: every slot, empty or not, in place.
-  // Padding follows the viewport's column count, so the last row is always a
-  // full rectangle of real cells (and drop targets) at every size.
-  const editCells = useMemo(() => {
-    if (!editMode) return [] as Array<{ index: number; project: StrideProject | null }>;
-    return padBoardCells(resolvedLayout.cells, visibleCols).map((id, index) => ({
-      index,
-      project: id ? byId.get(id) ?? null : null,
-    }));
-  }, [editMode, resolvedLayout, byId, visibleCols]);
-
   // The grid renders two transparent groups — pinned first, then the rest — in
-  // true layout order; the combined list drives keyboard nav.
+  // true display order; the combined list drives keyboard nav.
   const pinnedBoards = useMemo(
     () => visible.filter((project) => pinnedIds.has(project.id)),
     [visible, pinnedIds],
@@ -321,58 +259,17 @@ export function BoardManager(): JSX.Element {
   const lastBoard = projects.length <= 1;
   const removeTarget = projects.find((project) => project.id === removeId) ?? null;
 
-  // Arrow-key placement during a keyboard drag: hop to the neighbour cell. A
-  // fresh closure each render is fine — the sensor reads its options at drag
-  // start, and the grid geometry only changes between drags. "Across" and
-  // "down" are measured in the viewport's current column count.
-  const gridCols = visibleCols;
-  const gridCellCount = editCells.length;
-  const keyboardCellCoordinates: KeyboardCoordinateGetter = (event, { context, currentCoordinates }) => {
-    const step = KEYBOARD_CELL_STEPS[event.code];
-    if (!step) return;
-    const { droppableRects, collisionRect } = context;
-    if (!collisionRect) return;
-    if (gridCellCount <= 0) return;
-
-    // The cell we are currently over is the one whose centre is nearest the
-    // dragged card's centre.
-    let currentIndex = -1;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    droppableRects.forEach((rect, id) => {
-      const index = cellIndexFromId(id);
-      if (index === null) return;
-      const dx = rect.left + rect.width / 2 - (collisionRect.left + collisionRect.width / 2);
-      const dy = rect.top + rect.height / 2 - (collisionRect.top + collisionRect.height / 2);
-      const distance = dx * dx + dy * dy;
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        currentIndex = index;
-      }
-    });
-    if (currentIndex === -1) return;
-
-    const target = currentIndex + step(gridCols);
-    if (target < 0 || target >= gridCellCount) return;
-    const targetRect = droppableRects.get(cellId(target));
-    if (!targetRect) return;
-
-    const moveX =
-      targetRect.left + targetRect.width / 2 - (collisionRect.left + collisionRect.width / 2);
-    const moveY =
-      targetRect.top + targetRect.height / 2 - (collisionRect.top + collisionRect.height / 2);
-    return { x: currentCoordinates.x + moveX, y: currentCoordinates.y + moveY };
-  };
-
   // Same sensors as the board view: a 6px pointer constraint lets plain clicks
-  // through, and arrow-key drags move a focused card cell by cell.
+  // through, and arrow-key drags walk the sortable grid card by card (dnd-kit's
+  // own coordinate getter handles the wrapping rows).
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: keyboardCellCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   // Pointer drags only resolve while inside the grid, so letting go outside
   // cancels the drop (over === null). Keyboard drags have no pointer, so they
-  // always snap to the nearest cell centre.
+  // always snap to the nearest card.
   const collisionDetection = useCallback<CollisionDetection>((args) => {
     if (!keyboardDragRef.current) {
       const pointer = args.pointerCoordinates;
@@ -428,7 +325,7 @@ export function BoardManager(): JSX.Element {
     try {
       window.localStorage.setItem(
         LAYOUT_STORAGE_KEY,
-        JSON.stringify({ cols: next.cols, cells: next.cells }),
+        JSON.stringify({ cols: next.cols, order: next.order }),
       );
     } catch {
       // Storage blocked — the in-memory layout still applies this session.
@@ -443,14 +340,15 @@ export function BoardManager(): JSX.Element {
     writePins(next);
   }
 
-  /** Drop: place the dragged board in the target cell (move or swap). */
+  /** Drop: insert the dragged board at the target's position; the rest shift. */
   function handleDragEnd(event: DragEndEvent): void {
     keyboardDragRef.current = false;
     const { active, over } = event;
-    if (!over) return;
-    const overData = over.data.current as { type?: unknown; index?: unknown } | undefined;
-    if (overData?.type !== "cell" || typeof overData.index !== "number") return;
-    const next = placeBoardInLayout(resolvedLayout, String(active.id), overData.index);
+    if (!over || active.id === over.id) return;
+    const from = resolvedLayout.order.indexOf(String(active.id));
+    const to = resolvedLayout.order.indexOf(String(over.id));
+    if (from === -1 || to === -1) return;
+    const next = moveBoardInLayout(resolvedLayout, from, to);
     if (next === resolvedLayout) return;
     setLayout(next);
     persistLayout(next);
@@ -461,7 +359,7 @@ export function BoardManager(): JSX.Element {
     setEditMode(false);
     // Record any boards reconciliation appended since the last explicit edit.
     persistLayout(resolvedLayout);
-    // Hand focus back to the Edit grid button, so keyboard users land on the
+    // Hand focus back to the Rearrange button, so keyboard users land on the
     // control that just changed (Done, Esc, or the toggle itself).
     requestAnimationFrame(() => editToggleRef.current?.focus());
   }, [resolvedLayout, persistLayout]);
@@ -477,7 +375,8 @@ export function BoardManager(): JSX.Element {
     // close quietly, there is nothing worth reporting.
     closeDialog();
     if (!removed) return;
-    // A gone board has no business staying pinned or keeping a grid slot.
+    // A gone board has no business staying pinned or keeping a place in the
+    // order.
     if (pinnedIds.has(project.id)) {
       const next = new Set(pinnedIds);
       next.delete(project.id);
@@ -655,7 +554,7 @@ export function BoardManager(): JSX.Element {
   }
 
   // One card renderer shared by both groups and the edit grid, so they can
-  // never drift apart. `className` lets the 2D grid stretch a card to its cell.
+  // never drift apart. `className` lets the edit grid stretch a card to its row.
   const renderCard = (project: StrideProject, className?: string) => (
     <ManagerBoardCard
       key={project.id}
@@ -809,18 +708,16 @@ export function BoardManager(): JSX.Element {
           </div>
 
           <div className="flex items-center justify-between gap-3 sm:justify-end">
-            <p role="status" className="text-xs tabular-nums text-muted-foreground">
-              {visible.length} of {pluralize(projects.length, "board")}
-            </p>
             {!isLoading && query.trim() === "" && projects.length > 0 ? (
               <Button
                 ref={editToggleRef}
                 variant="secondary"
-                title="Arrange boards on a grid"
+                aria-label="Rearrange boards"
+                title="Rearrange boards"
                 onClick={() => setEditMode(true)}
               >
                 <GripVertical className="h-4 w-4" strokeWidth={2.5} />
-                Edit grid
+                Rearrange
               </Button>
             ) : null}
           </div>
@@ -845,24 +742,16 @@ export function BoardManager(): JSX.Element {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            {/* The grid lays its cells out row-major in the viewport's current
-                column count (1 → 2 → 3 → 4), so the same arrangement reflows
-                instead of scrolling sideways. */}
-            <div className="grid-scroll overflow-x-auto overscroll-x-contain pb-2">
-              <div
-                ref={gridRef}
-                className="grid gap-3"
-                style={{
-                  gridTemplateColumns: `repeat(${visibleCols}, minmax(15rem, 1fr))`,
-                }}
-              >
-                {editCells.map((cell) => (
-                  <BoardCell key={cell.index} index={cell.index}>
-                    {cell.project ? renderCard(cell.project, "h-full") : <EmptyCellSlot />}
-                  </BoardCell>
-                ))}
+            {/* The same responsive grid as browse mode (`sm:grid-cols-2
+                xl:grid-cols-3`), so an edit-mode card — and the card you drag —
+                is exactly the real card's size at every breakpoint. One ordered
+                sequence wraps into it, so dropping a card in a new place shifts
+                the rest along instead of leaving a gap. */}
+            <SortableContext items={orderedIds} strategy={rectSortingStrategy}>
+              <div ref={gridRef} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {ordered.map((project) => renderCard(project, "h-full"))}
               </div>
-            </div>
+            </SortableContext>
             <GridDragOverlay projects={projects} now={now} pinnedIds={pinnedIds} />
           </DndContext>
         ) : isLoading ? (
@@ -970,26 +859,20 @@ export function BoardManager(): JSX.Element {
 }
 
 /**
- * Sticky toolbar shown while arranging: it names the mode, states what the
- * gesture does, and keeps Done (with its Esc shortcut) one click away even
+ * Sticky toolbar shown while arranging: a grip cue on the left names the mode
+ * without a sentence, and Done (with its Esc shortcut) stays one click away even
  * when the grid is long enough to scroll.
  */
 function EditGridBar({ onDone }: { onDone: () => void }): JSX.Element {
   return (
     <div className="sticky top-2 z-30 mt-4 flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-2xl border border-primary/25 bg-card/90 px-3.5 py-2.5 shadow-xs backdrop-blur-sm sm:px-4">
-      <div className="flex min-w-0 flex-1 basis-56 items-center gap-2.5">
-        <span
-          aria-hidden="true"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"
-        >
-          <GripVertical className="h-4 w-4" strokeWidth={2.4} />
-        </span>
-        <p id="edit-grid-hint" className="min-w-0 text-xs leading-snug text-muted-foreground">
-          <span className="font-semibold text-foreground">Arrange boards.</span> Drag a board onto
-          any cell — drop it on another board to swap. Empty cells stay as gaps.
-        </p>
-      </div>
-      <div className="flex items-center gap-2.5">
+      <span
+        aria-hidden="true"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"
+      >
+        <GripVertical className="h-4 w-4" strokeWidth={2.4} />
+      </span>
+      <div className="ml-auto flex items-center gap-2.5">
         <kbd
           aria-hidden="true"
           title="Press Esc to finish"
@@ -997,45 +880,11 @@ function EditGridBar({ onDone }: { onDone: () => void }): JSX.Element {
         >
           Esc
         </kbd>
-        <Button onClick={onDone} title="Finish arranging (Esc)">
+        <Button onClick={onDone} title="Finish rearranging (Esc)">
           <Check className="h-4 w-4" strokeWidth={2.5} />
           Done
         </Button>
       </div>
-    </div>
-  );
-}
-
-/**
- * One cell of the edit grid: a drop target that wraps either a board card or an
- * empty slot, and paints the hover highlight over whichever it holds.
- */
-function BoardCell({ index, children }: { index: number; children: ReactNode }): JSX.Element {
-  const { setNodeRef, isOver } = useDroppable({ id: cellId(index), data: { type: "cell", index } });
-  return (
-    <div ref={setNodeRef} className="relative flex">
-      <div className="min-w-0 flex-1">{children}</div>
-      {isOver ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-2xl bg-primary/[0.08] ring-2 ring-inset ring-primary/60"
-        />
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * An empty grid slot: a faint dashed outline with a plus, so a free cell reads
- * as somewhere a board can land, not as a hole in the grid.
- */
-function EmptyCellSlot(): JSX.Element {
-  return (
-    <div
-      aria-hidden="true"
-      className="grid h-full min-h-[10rem] place-items-center rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03]"
-    >
-      <Plus className="h-5 w-5 text-primary/40" strokeWidth={2.2} />
     </div>
   );
 }
