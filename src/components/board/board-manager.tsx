@@ -962,14 +962,9 @@ function BoardStatsChart({
     });
 
   return (
-    <div className="rounded-2xl border border-border bg-card/70 shadow-xs">
-      <div className="px-4 py-3 sm:px-5 sm:py-4">
-        <h2 className="font-display text-sm font-semibold tracking-tight">Board stats</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Overview of boards and task status
-        </p>
-      </div>
-      <div className="border-t border-border px-4 py-5 sm:px-5">
+    <div>
+      <h2 className="font-display text-sm font-semibold tracking-tight">Board stats</h2>
+      <div className="mt-4">
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10">
           <svg
             width={size}
