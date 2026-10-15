@@ -945,6 +945,11 @@ function BoardStatsChart({
   const circumference = 2 * Math.PI * radius;
   const endTrim = (strokeWidth / 2 + 2.25) / circumference;
 
+  // Two compact figures derived from the same props, so the wide row reads as a
+  // deliberate stat strip instead of a lone circle floating in empty space.
+  const overdueRate = open > 0 ? `${Math.round((overdue / open) * 100)}%` : "—";
+  const openPerBoard = boards > 0 ? (open / boards).toFixed(1) : "—";
+
   let elapsed = 0;
   const arcs = slices
     .filter((slice) => slice.value > 0)
@@ -964,93 +969,138 @@ function BoardStatsChart({
   return (
     <div>
       <h2 className="font-display text-sm font-semibold tracking-tight">Board stats</h2>
-      <div className="mt-4">
-        <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10">
-          <svg
-            width={size}
-            height={size}
-            viewBox={`0 0 ${size} ${size}`}
-            className="h-auto w-40 shrink-0 sm:w-44"
-            role="img"
-            aria-label={`Board statistics: ${boards} ${pluralize(boards, "board")}, ${open} open ${pluralize(open, "task")}, ${overdue} overdue ${pluralize(overdue, "task")}`}
-          >
-            {/* Soft full-ring track behind the slices. */}
-            <circle
-              cx={center}
-              cy={center}
-              r={radius}
-              fill="none"
-              stroke="var(--muted)"
-              strokeWidth={strokeWidth}
-            />
-            <g transform={`rotate(-90 ${center} ${center})`}>
-              {arcs.map((arc) => (
-                <motion.circle
-                  key={arc.label}
-                  cx={center}
-                  cy={center}
-                  r={radius}
-                  fill="none"
-                  stroke={arc.color}
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="round"
-                  initial={reduceMotion ? false : { pathLength: 0 }}
-                  animate={{ pathLength: arc.pathLength }}
-                  transform={`rotate(${arc.rotation} ${center} ${center})`}
-                  transition={{
-                    duration: reduceMotion ? 0 : 0.9,
-                    delay: reduceMotion ? 0 : 0.15 + arc.index * 0.12,
-                    ease: "easeOut",
-                  }}
-                >
-                  <title>{`${arc.label}: ${arc.value} (${arc.percentage}%)`}</title>
-                </motion.circle>
-              ))}
-            </g>
-            <text
-              x={center}
-              y={center - 4}
-              textAnchor="middle"
-              dominantBaseline="central"
-              className="fill-foreground"
-              fontSize="22"
-              fontWeight="700"
-            >
-              {total}
-            </text>
-            <text
-              x={center}
-              y={center + 16}
-              textAnchor="middle"
-              className="fill-muted-foreground uppercase"
-              fontSize="8"
-              fontWeight="600"
-              letterSpacing="0.08em"
-            >
-              Total
-            </text>
-          </svg>
-          <div className="flex w-full max-w-[220px] flex-col gap-2.5">
-            {slices.map((slice) => (
-              <div key={slice.label} className="flex items-center gap-3">
-                <span
-                  aria-hidden="true"
-                  className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ring-foreground/10"
-                  style={{ backgroundColor: slice.color }}
-                />
-                <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
-                  {slice.label}
-                </span>
-                <span className="text-xs font-semibold tabular-nums text-foreground">
-                  {slice.value}
-                </span>
-                {total > 0 && (
-                  <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">
-                    {Math.round((slice.value / total) * 100)}%
-                  </span>
-                )}
-              </div>
+      {/* One wide row: the circle anchors the left, a thin rule separates it from
+          the breakdown on the right, and the two columns below spread to the far
+          edge — so the section fills the container instead of hugging the centre. */}
+      <div className="mt-5 flex flex-col gap-8 sm:flex-row sm:items-center sm:gap-10 lg:gap-14">
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="mx-auto h-auto w-40 shrink-0 sm:mx-0 sm:w-44 lg:w-52"
+          role="img"
+          aria-label={`Board statistics: ${boards} ${pluralize(boards, "board")}, ${open} open ${pluralize(open, "task")}, ${overdue} overdue ${pluralize(overdue, "task")}`}
+        >
+          {/* Soft full-ring track behind the slices. */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke="var(--muted)"
+            strokeWidth={strokeWidth}
+          />
+          <g transform={`rotate(-90 ${center} ${center})`}>
+            {arcs.map((arc) => (
+              <motion.circle
+                key={arc.label}
+                cx={center}
+                cy={center}
+                r={radius}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                initial={reduceMotion ? false : { pathLength: 0 }}
+                animate={{ pathLength: arc.pathLength }}
+                transform={`rotate(${arc.rotation} ${center} ${center})`}
+                transition={{
+                  duration: reduceMotion ? 0 : 0.9,
+                  delay: reduceMotion ? 0 : 0.15 + arc.index * 0.12,
+                  ease: "easeOut",
+                }}
+              >
+                <title>{`${arc.label}: ${arc.value} (${arc.percentage}%)`}</title>
+              </motion.circle>
             ))}
+          </g>
+          <text
+            x={center}
+            y={center - 4}
+            textAnchor="middle"
+            dominantBaseline="central"
+            className="fill-foreground"
+            fontSize="22"
+            fontWeight="700"
+          >
+            {total}
+          </text>
+          <text
+            x={center}
+            y={center + 16}
+            textAnchor="middle"
+            className="fill-muted-foreground uppercase"
+            fontSize="8"
+            fontWeight="600"
+            letterSpacing="0.08em"
+          >
+            Total
+          </text>
+        </svg>
+
+        <div aria-hidden="true" className="hidden w-px self-stretch bg-border sm:block" />
+
+        {/* Breakdown (left) and the two derived figures (right); both stretch to
+            the container edge, and the whole thing stacks on narrow screens. */}
+        <div className="grid w-full min-w-0 flex-1 gap-x-10 gap-y-7 md:grid-cols-2">
+          <dl className="flex flex-col justify-center gap-4">
+            {slices.map((slice) => {
+              const pct = total > 0 ? Math.round((slice.value / total) * 100) : 0;
+              return (
+                <div key={slice.label}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="flex min-w-0 items-center gap-2.5 text-sm text-muted-foreground">
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ring-foreground/10"
+                        style={{ backgroundColor: slice.color }}
+                      />
+                      <span className="truncate">{slice.label}</span>
+                    </dt>
+                    <dd className="flex shrink-0 items-baseline gap-2">
+                      <span className="text-sm font-semibold tabular-nums text-foreground">
+                        {slice.value}
+                      </span>
+                      {total > 0 ? (
+                        <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
+                          {pct}%
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                  <div
+                    aria-hidden="true"
+                    className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                  >
+                    <div
+                      className="h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none"
+                      style={{ width: `${pct}%`, backgroundColor: slice.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </dl>
+
+          <div className="flex flex-col justify-center gap-6">
+            <div>
+              <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                Overdue rate
+              </p>
+              <p className="mt-1.5 font-display text-2xl leading-none tabular-nums text-foreground">
+                {overdueRate}
+              </p>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">of open tasks</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                Open per board
+              </p>
+              <p className="mt-1.5 font-display text-2xl leading-none tabular-nums text-foreground">
+                {openPerBoard}
+              </p>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">average</p>
+            </div>
           </div>
         </div>
       </div>
