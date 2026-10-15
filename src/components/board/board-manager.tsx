@@ -14,19 +14,15 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Check,
   FileSearch,
   GripVertical,
-  LayoutGrid,
-  ListChecks,
   Plus,
   Search,
-  TriangleAlert,
   Upload,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -58,7 +54,7 @@ import {
   type BoardLayout,
 } from "@/lib/features/board-layout";
 import { buildWorkspace } from "@/lib/data/storage";
-import { cn, pluralize } from "@/lib/utils/utils";
+import { pluralize } from "@/lib/utils/utils";
 
 /** Which board dialog is open, so only one can ever show at a time. */
 type ManagerDialog = "create" | "remove" | null;
@@ -602,29 +598,28 @@ export function BoardManager(): JSX.Element {
       {/* Wayfinding: the sidebar's wordmark, so a bare landing page still reads
           as Stride's front door rather than a loose card on a blank canvas. */}
       <header>
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
-            <Check className="h-[18px] w-[18px]" strokeWidth={3} />
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
+            <Check className="h-5 w-5" strokeWidth={3} />
           </span>
           <div className="min-w-0 leading-tight">
-            <p className="font-display text-xl tracking-tight">Stride</p>
+            <p className="font-display text-lg tracking-tight">Stride</p>
             <p className="truncate text-[11px] font-medium text-muted-foreground">
               Focused task manager
             </p>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-4 sm:mt-8 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+        <div className="mt-7 flex flex-col gap-5 sm:mt-9 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
           <div className="min-w-0">
-            <h1 className="font-display text-2xl leading-tight tracking-tight sm:text-3xl">
+            <h1 className="font-display text-3xl leading-[1.1] tracking-tight text-balance sm:text-4xl">
               Board manager
             </h1>
-            <p className="mt-1.5 max-w-prose text-sm text-muted-foreground">
-              Every board keeps its own tasks, categories and sections — open one to pick up
-              where you left off.
+            <p className="mt-2.5 max-w-prose text-sm text-pretty text-muted-foreground">
+              Open a board to pick up right where you left off.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
             <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-4 w-4" strokeWidth={2.5} />
               Import board
@@ -637,35 +632,17 @@ export function BoardManager(): JSX.Element {
         </div>
       </header>
 
-      {/* Slim overview strip: the landing page's pulse. */}
-      <div className="mt-5 flex overflow-hidden divide-x divide-border rounded-2xl border border-border bg-card/70 shadow-xs">
-        <OverviewStat
-          icon={LayoutGrid}
-          value={overview.boards}
-          label={pluralize(overview.boards, "board")}
-        />
-        <OverviewStat
-          icon={ListChecks}
-          value={overview.open}
-          label={pluralize(overview.open, "open task")}
-        />
-        <OverviewStat
-          icon={TriangleAlert}
-          value={overview.overdue}
-          label={pluralize(overview.overdue, "overdue task")}
-          danger={overview.overdue > 0}
-        />
-      </div>
 
-      {/* Toolbar: search, the result count and the grid-editing toggle share one
-          row, so the page's controls read as a single strip under the header.
-          While arranging, the row becomes the edit bar instead — one mode, one
-          place to look. */}
+
+      {/* Toolbar: the board search and the arranging toggle share one row, so the
+          page's controls read as a single strip under the header. While
+          arranging, the row becomes the edit bar instead — one mode, one place
+          to look. */}
       {editMode ? (
         <EditGridBar onDone={() => finishEditing()} />
       ) : (
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="relative w-full sm:max-w-xs">
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="relative w-full sm:max-w-sm">
             <Search
               className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               strokeWidth={2.2}
@@ -835,6 +812,14 @@ export function BoardManager(): JSX.Element {
         )}
       </section>
 
+      <div className="mt-10">
+        <BoardStatsChart
+          boards={overview.boards}
+          open={overview.open}
+          overdue={overview.overdue}
+        />
+      </div>
+
       <CreateBoardDialog
         open={dialog === "create"}
         onClose={closeDialog}
@@ -931,30 +916,148 @@ function GridDragOverlay({
   );
 }
 
-/** One headline number on the overview strip. */
-function OverviewStat({
-  icon: Icon,
-  value,
-  label,
-  danger = false,
+
+
+/** Donut chart summarizing board statistics at the bottom of the page. */
+function BoardStatsChart({
+  boards,
+  open,
+  overdue,
 }: {
-  icon: LucideIcon;
-  value: number;
-  label: string;
-  /** Critical stat (overdue): tints the number and icon like the card rows. */
-  danger?: boolean;
+  boards: number;
+  open: number;
+  overdue: number;
 }): JSX.Element {
+  const reduceMotion = useReducedMotion();
+  const slices = [
+    { label: "Boards", value: boards, color: "var(--primary)" },
+    { label: "Open tasks", value: open, color: "var(--success)" },
+    { label: "Overdue tasks", value: overdue, color: "var(--destructive)" },
+  ];
+  const total = boards + open + overdue;
+
+  const radius = 60;
+  const strokeWidth = 13;
+  const size = (radius + strokeWidth) * 2;
+  const center = size / 2;
+  // Each segment is trimmed at both ends by half a cap plus a sliver of air, so
+  // the round caps leave a crisp notch between neighbours instead of overlapping.
+  const circumference = 2 * Math.PI * radius;
+  const endTrim = (strokeWidth / 2 + 2.25) / circumference;
+
+  let elapsed = 0;
+  const arcs = slices
+    .filter((slice) => slice.value > 0)
+    .map((slice, index) => {
+      const sweep = slice.value / Math.max(total, 1);
+      const start = elapsed;
+      elapsed += sweep;
+      return {
+        ...slice,
+        index,
+        rotation: start * 360,
+        pathLength: Math.max(sweep - endTrim * 2, 0.008),
+        percentage: Math.round(sweep * 100),
+      };
+    });
+
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-3 sm:px-4">
-      <Icon
-        className={cn("h-4 w-4 shrink-0", danger ? "text-destructive" : "text-muted-foreground")}
-        strokeWidth={2.2}
-      />
-      <div className="min-w-0 leading-tight">
-        <p className={cn("text-sm font-semibold tabular-nums", danger && "text-destructive")}>
-          {value}
+    <div className="rounded-2xl border border-border bg-card/70 shadow-xs">
+      <div className="px-4 py-3 sm:px-5 sm:py-4">
+        <h2 className="font-display text-sm font-semibold tracking-tight">Board stats</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Overview of boards and task status
         </p>
-        <p className="truncate text-[11px] text-muted-foreground">{label}</p>
+      </div>
+      <div className="border-t border-border px-4 py-5 sm:px-5">
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10">
+          <svg
+            width={size}
+            height={size}
+            viewBox={`0 0 ${size} ${size}`}
+            className="h-auto w-40 shrink-0 sm:w-44"
+            role="img"
+            aria-label={`Board statistics: ${boards} ${pluralize(boards, "board")}, ${open} open ${pluralize(open, "task")}, ${overdue} overdue ${pluralize(overdue, "task")}`}
+          >
+            {/* Soft full-ring track behind the slices. */}
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke="var(--muted)"
+              strokeWidth={strokeWidth}
+            />
+            <g transform={`rotate(-90 ${center} ${center})`}>
+              {arcs.map((arc) => (
+                <motion.circle
+                  key={arc.label}
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  initial={reduceMotion ? false : { pathLength: 0 }}
+                  animate={{ pathLength: arc.pathLength }}
+                  transform={`rotate(${arc.rotation} ${center} ${center})`}
+                  transition={{
+                    duration: reduceMotion ? 0 : 0.9,
+                    delay: reduceMotion ? 0 : 0.15 + arc.index * 0.12,
+                    ease: "easeOut",
+                  }}
+                >
+                  <title>{`${arc.label}: ${arc.value} (${arc.percentage}%)`}</title>
+                </motion.circle>
+              ))}
+            </g>
+            <text
+              x={center}
+              y={center - 4}
+              textAnchor="middle"
+              dominantBaseline="central"
+              className="fill-foreground"
+              fontSize="22"
+              fontWeight="700"
+            >
+              {total}
+            </text>
+            <text
+              x={center}
+              y={center + 16}
+              textAnchor="middle"
+              className="fill-muted-foreground uppercase"
+              fontSize="8"
+              fontWeight="600"
+              letterSpacing="0.08em"
+            >
+              Total
+            </text>
+          </svg>
+          <div className="flex w-full max-w-[220px] flex-col gap-2.5">
+            {slices.map((slice) => (
+              <div key={slice.label} className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ring-foreground/10"
+                  style={{ backgroundColor: slice.color }}
+                />
+                <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
+                  {slice.label}
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-foreground">
+                  {slice.value}
+                </span>
+                {total > 0 && (
+                  <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">
+                    {Math.round((slice.value / total) * 100)}%
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
