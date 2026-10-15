@@ -16,7 +16,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useMemo, useRef, useState, type JSX } from "react";
+import { useCallback, useMemo, useRef, useState, type JSX } from "react";
 import { boardColor, type BoardColorId } from "@/lib/domain/boards";
 import { CARD_COLOR_WASHES, NEUTRAL_WASH } from "@/lib/features/card-themes";
 import type { StrideProject } from "@/lib/domain/projects";
@@ -158,6 +158,8 @@ export function ManagerBoardCard({
     disabled: !editMode,
     data: { type: "board" },
     // Explicit default: neighbours glide into place while the overlay floats.
+    // (The derived-transform cost this adds is dwarfed by the ref fix below,
+    // which removed the ResizeObserver churn that was the real jank source.)
     animateLayoutChanges: defaultAnimateLayoutChanges,
   });
 
@@ -169,10 +171,17 @@ export function ManagerBoardCard({
     `transform 220ms ${GRID_EASE}, border-color 200ms ease, box-shadow 200ms ease, opacity 200ms ease`;
 
   // The dnd-kit node ref and the manager's roving-focus ref share the card.
-  function setRefs(element: HTMLElement | null): void {
-    setNodeRef(element);
-    cardRef(element);
-  }
+  // The identity must stay stable: a fresh callback each render makes React
+  // detach (null) and reattach the node on every render, which thrashes
+  // dnd-kit's ResizeObserver (unobserve/observe) for every card on every
+  // pointer move while the grid is dragging — the source of the lag.
+  const setRefs = useCallback(
+    (element: HTMLElement | null): void => {
+      setNodeRef(element);
+      cardRef(element);
+    },
+    [setNodeRef, cardRef],
+  );
 
   /** Opens the board: click is an instant hand-off to /tasks. */
   function handleOpen(): void {

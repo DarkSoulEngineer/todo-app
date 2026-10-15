@@ -582,27 +582,6 @@ export function BoardView({
           ))}
         </div>
       ) : null}
-      {hiddenSections.length > 0 ? (
-        <div className="mb-2 flex shrink-0 flex-wrap items-center justify-end gap-2 rounded-xl border border-border/70 bg-card/60 px-2.5 py-1.5">
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <EyeOff className="h-3.5 w-3.5" strokeWidth={2.1} />
-            Hidden columns
-          </span>
-          {hiddenSections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => toggleSectionHidden(section.id)}
-              aria-label={`Show ${section.title}`}
-              title={`Show “${section.title}”`}
-              className="focus-ring inline-flex max-w-[12rem] items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <Eye className="h-3.5 w-3.5 shrink-0" strokeWidth={2.1} />
-              <span className="truncate">{section.title}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -649,9 +628,8 @@ export function BoardView({
             </div>
           </BoardCanvas>
         </SortableContext>
-      </DndContext>
 
-      <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={null}>
           {activeTask ? (
             <div
               aria-hidden="true"
@@ -696,6 +674,7 @@ export function BoardView({
         </DragOverlay>
 
         {activeTaskId ? <BoardTrashDropzone /> : null}
+      </DndContext>
     </div>
   );
 }
