@@ -1,6 +1,8 @@
 # Janus
 
-![Janus](public/icon-512.png)
+<p align="center">
+  <img src="public/icon-512.png" alt="Janus" width="320" />
+</p>
 
 **A focused task manager for the web.**
 

@@ -1,6 +1,8 @@
 # Janus
 
-![Janus](todo-app/public/icon-512.png)
+<p align="center">
+  <img src="todo-app/public/icon-512.png" alt="Janus" width="320" />
+</p>
 
 Janus is a local-first task manager inspired by the Roman god of thresholds
 and transitions. It provides web and mobile clients for tasks, boards,
