@@ -1,0 +1,24 @@
+# Local backup checkout
+/todo-app-bck/
+
+# Dependencies and generated output
+**/node_modules/
+**/.next/
+**/out/
+**/build/
+**/dist/
+**/coverage/
+**/.expo/
+**/.turbo/
+
+# Generated files and logs
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/*.log
+
+# Local environment and editor files
+**/.env*
+**/.DS_Store
+**/Thumbs.db
+**/.idea/
+**/.vscode/

@@ -1,0 +1,26 @@
+Tema proiectului ( TO DO LIST APPLICATION )
+
+- Sa se implementeze o aplicatie web folosind platforma React ( Next.js ) si o aplicatie mobile folosind platforma React Native de tip lista de activitati
+- Cerinte minimale
+  - Se pot adauga si elimina activitati
+  - Se pot marca activitatiile ca
+    - Overdue - Restant
+    - Upcoming - Urmeaza
+    - Completed - Complet
+    - Canceled - Anulat
+
+Alte cerinte - Alte cerinte discutate in echipa.
+
+- Documentatie
+scopul proiectului
+obiective masurabile si relevante spre success
+cerinte ridicate
+descriere a proiectului, edge cases si cai de dezvoltare
+riscul proiectului
+sumar cu cele mai relevante versiuni (milestones)
+
+Word document cu ( Descriere minimala )
+resurse folosite
+validarea proiectului si acceptarea acestuia
+manager de proiect, responsabilitate si autoritate
+sponsori 
