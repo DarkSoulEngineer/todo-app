@@ -53,8 +53,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const resolved = preference === "system" ? (system === "dark" ? "dark" : "light") : preference;
 
   const toggle = useCallback(() => {
-    setPreference(resolved === "dark" ? "light" : resolved === "light" ? "system" : "dark");
-  }, [resolved, setPreference]);
+    setPreference(preference === "system" ? "light" : preference === "light" ? "dark" : "system");
+  }, [preference, setPreference]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({ theme: themes[resolved], preference, setPreference, toggle }),

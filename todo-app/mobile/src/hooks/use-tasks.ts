@@ -1,5 +1,6 @@
 import { makeId } from "@/lib/utils/id";
 import {
+  BUILT_IN_BOARDS,
   defaultBoards,
   missingBuiltInBoards,
   type Board,
@@ -26,8 +27,17 @@ import {
   type JanusProject,
 } from "@/lib/domain/projects";
 import { loadVersions, saveVersions } from "@/lib/data/versions";
-import { applyDraft, createTask } from "@/lib/domain/task-factory";
+import {
+  applyTaskPatch,
+  applyDraft,
+  cloneTask,
+  createTask,
+  normalizeActivityEvent,
+  normalizeAttachment,
+} from "@/lib/domain/task-factory";
 import type {
+  ActivityEvent,
+  Attachment,
   BoardSection,
   Task,
   TaskDraft,
@@ -51,6 +61,12 @@ export interface TasksApi {
    * `completed`/`canceled`/`completedAt`.
    */
   patchTask: (id: string, patch: TaskPatch) => void;
+  /** Appends one timeline event; activity is intentionally not patchable. */
+  appendTaskActivity: (taskId: string, event: ActivityEvent) => void;
+  /** Adds attachment metadata; binary upload/storage is handled elsewhere. */
+  addAttachment: (taskId: string, attachment: Attachment) => void;
+  /** Removes attachment metadata by id. */
+  removeAttachment: (taskId: string, attachmentId: string) => void;
   deleteTask: (id: string) => void;
   toggleComplete: (id: string) => void;
   toggleCancel: (id: string) => void;
@@ -82,6 +98,14 @@ export interface TasksApi {
   deleteBoard: (id: string) => { label: string; affected: number } | null;
   /** Puts the built-in boards that are missing back on offer. */
   restoreBuiltInBoards: () => void;
+  /** @deprecated Board API wrapper — use the board actions above. */
+  deletedCategories: string[];
+  /** @deprecated Board API wrapper — use the board actions above. */
+  deleteCategory: (id: string) => { label: string; affected: number } | null;
+  /** @deprecated Board API wrapper — use the board actions above. */
+  restoreCategory: (id: string) => void;
+  /** @deprecated Board API wrapper — use the board actions above. */
+  restoreCategories: () => void;
   clearCompleted: () => number;
   getCompletedIds: () => string[];
   /** Immutable copy of the workspace, for reversible bulk actions. */
@@ -160,6 +184,9 @@ export function useTasks(): TasksApi {
       projectsRef.current = registry;
       activeIdRef.current = active.id;
       setProjectsState(registry);
+      tasksRef.current = active.workspace.tasks;
+      sectionsRef.current = active.workspace.sections;
+      boardsRef.current = active.workspace.boards;
       setTasks(active.workspace.tasks);
       setSections(active.workspace.sections);
       setBoards(active.workspace.boards);
@@ -190,9 +217,29 @@ export function useTasks(): TasksApi {
     saveQueueRef.current = saveQueueRef.current.then(() => saveVersions(versions));
   }, [versions, isLoading]);
 
-  const updateById = useCallback((id: string, updater: (task: Task) => Task) => {
-    setTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
+  // React batches state updates, while project actions can be invoked
+  // synchronously after a task/section/board action (for example, duplicate
+  // the current project immediately after editing it). Keep the refs eager so
+  // those actions always fold the latest in-memory workspace into the registry.
+  const setLiveTasks = useCallback((updater: (previous: Task[]) => Task[]) => {
+    const next = updater(tasksRef.current);
+    tasksRef.current = next;
+    setTasks(next);
   }, []);
+  const setLiveSections = useCallback((updater: (previous: BoardSection[]) => BoardSection[]) => {
+    const next = updater(sectionsRef.current);
+    sectionsRef.current = next;
+    setSections(next);
+  }, []);
+  const setLiveBoards = useCallback((updater: (previous: Board[]) => Board[]) => {
+    const next = updater(boardsRef.current);
+    boardsRef.current = next;
+    setBoards(next);
+  }, []);
+
+  const updateById = useCallback((id: string, updater: (task: Task) => Task) => {
+    setLiveTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
+  }, [setLiveTasks]);
 
   const [taskHistory, setTaskHistory] = useState<Record<string, Task[]>>({});
 
@@ -200,8 +247,8 @@ export function useTasks(): TasksApi {
   const recordTask = useCallback((id: string) => {
     const current = tasksRef.current.find((task) => task.id === id);
     if (!current) return;
-    const clone: Task = { ...current, subtasks: current.subtasks.map((subtask) => ({ ...subtask })) };
-    setTaskHistory((prev) => ({
+    const clone = cloneTask(current);
+      setTaskHistory((prev) => ({
       ...prev,
       [id]: [clone, ...(prev[id] ?? [])].slice(0, 10),
     }));
@@ -221,18 +268,18 @@ export function useTasks(): TasksApi {
         ...prev,
         [id]: (prev[id] ?? []).slice(1),
       }));
-      setTasks((prev) => prev.map((task) => (task.id === id ? previous : task)));
+      setLiveTasks((prev) => prev.map((task) => (task.id === id ? previous : task)));
     },
-    [taskHistory],
+    [setLiveTasks, taskHistory],
   );
 
   const clearTaskHistory = useCallback(() => setTaskHistory({}), []);
 
   const addTask = useCallback((draft: TaskDraft): Task => {
     const task = createTask(draft);
-    setTasks((prev) => [...prev, task]);
+    setLiveTasks((prev) => [...prev, task]);
     return task;
-  }, []);
+  }, [setLiveTasks]);
 
   const updateTask = useCallback(
     (id: string, draft: TaskDraft) => {
@@ -244,8 +291,50 @@ export function useTasks(): TasksApi {
 
   const patchTask = useCallback(
     (id: string, patch: TaskPatch) => {
+      if (typeof patch !== "object" || patch === null) return;
       recordTask(id);
-      updateById(id, (task) => ({ ...task, ...patch, updatedAt: new Date().toISOString() }));
+      updateById(id, (task) => ({ ...applyTaskPatch(task, patch), updatedAt: new Date().toISOString() }));
+    },
+    [recordTask, updateById],
+  );
+
+  const appendTaskActivity = useCallback(
+    (taskId: string, event: ActivityEvent) => {
+      const normalized = normalizeActivityEvent(event);
+      if (!normalized) return;
+      recordTask(taskId);
+      updateById(taskId, (task) => ({
+        ...cloneTask(task),
+        activity: [...(task.activity ?? []), normalized].slice(-50),
+        updatedAt: new Date().toISOString(),
+      }));
+    },
+    [recordTask, updateById],
+  );
+
+  const addAttachment = useCallback(
+    (taskId: string, attachment: Attachment) => {
+      const normalized = normalizeAttachment(attachment);
+      if (!normalized) return;
+      recordTask(taskId);
+      updateById(taskId, (task) => ({
+        ...cloneTask(task),
+        attachments: [...(task.attachments ?? []), normalized],
+        updatedAt: new Date().toISOString(),
+      }));
+    },
+    [recordTask, updateById],
+  );
+
+  const removeAttachment = useCallback(
+    (taskId: string, attachmentId: string) => {
+      if (typeof attachmentId !== "string" || !attachmentId) return;
+      recordTask(taskId);
+      updateById(taskId, (task) => ({
+        ...cloneTask(task),
+        attachments: (task.attachments ?? []).filter((attachment) => attachment.id !== attachmentId),
+        updatedAt: new Date().toISOString(),
+      }));
     },
     [recordTask, updateById],
   );
@@ -253,9 +342,9 @@ export function useTasks(): TasksApi {
   const deleteTask = useCallback(
     (id: string) => {
       recordTask(id);
-      setTasks((prev) => prev.filter((task) => task.id !== id));
+      setLiveTasks((prev) => prev.filter((task) => task.id !== id));
     },
-    [recordTask],
+    [recordTask, setLiveTasks],
   );
 
   const toggleComplete = useCallback(
@@ -452,39 +541,39 @@ export function useTasks(): TasksApi {
       id: `custom-${makeId(8)}`,
       title: title.trim() || "New section",
     };
-    setSections((prev) => [...prev, section]);
+    setLiveSections((prev) => [...prev, section]);
     return section;
-  }, []);
+  }, [setLiveSections]);
 
   const renameSection = useCallback((id: string, title: string) => {
     const trimmed = title.trim();
     if (!trimmed) return;
-    setSections((prev) =>
+    setLiveSections((prev) =>
       prev.map((section) => (section.id === id ? { ...section, title: trimmed } : section)),
     );
-  }, []);
+  }, [setLiveSections]);
 
   const deleteSection = useCallback((id: string) => {
-    setSections((prev) => {
+    setLiveSections((prev) => {
       const target = prev.find((section) => section.id === id);
       if (!target || !isCustomSection(target)) return prev;
       return prev.filter((section) => section.id !== id);
     });
-    setTasks((prev) =>
+    setLiveTasks((prev) =>
       prev.map((task) => (task.sectionId === id ? { ...task, sectionId: null } : task)),
     );
-  }, []);
+  }, [setLiveSections, setLiveTasks]);
 
   const toggleSectionHidden = useCallback((id: string) => {
-    setSections((prev) =>
+    setLiveSections((prev) =>
       prev.map((section) =>
         section.id === id ? { ...section, hidden: !section.hidden } : section,
       ),
     );
-  }, []);
+  }, [setLiveSections]);
 
   const reorderSections = useCallback((orderedIds: string[]) => {
-    setSections((prev) => {
+    setLiveSections((prev) => {
       const byId = new Map(prev.map((section) => [section.id, section]));
       const next: BoardSection[] = [];
       for (const id of orderedIds) {
@@ -497,11 +586,11 @@ export function useTasks(): TasksApi {
       for (const section of byId.values()) next.push(section);
       return next;
     });
-  }, []);
+  }, [setLiveSections]);
 
   /** Reorders a (possibly filtered) subset within the slots those tasks already occupy. */
   const reorderTasks = useCallback((orderedIds: string[]) => {
-    setTasks((prev) => {
+    setLiveTasks((prev) => {
       const byId = new Map(prev.map((task) => [task.id, task]));
       const moving = new Set(orderedIds.filter((id) => byId.has(id)));
       if (moving.size === 0) return prev;
@@ -519,16 +608,16 @@ export function useTasks(): TasksApi {
       });
       return next;
     });
-  }, []);
+  }, [setLiveTasks]);
 
   const clearCompleted = useCallback((): number => {
     const completedIds = new Set(
       tasksRef.current.filter((task) => task.completed).map((task) => task.id),
     );
     if (completedIds.size === 0) return 0;
-    setTasks((prev) => prev.filter((task) => !completedIds.has(task.id)));
+    setLiveTasks((prev) => prev.filter((task) => !completedIds.has(task.id)));
     return completedIds.size;
-  }, []);
+  }, [setLiveTasks]);
 
   const getCompletedIds = useCallback(
     () => tasksRef.current.filter((task) => task.completed).map((task) => task.id),
@@ -538,21 +627,21 @@ export function useTasks(): TasksApi {
   const createBoard = useCallback((input: { label: string; color: BoardColorId }): Board => {
     const label = input.label.trim() || "New board";
     const board: Board = { id: `board-${makeId(8)}`, label, color: input.color };
-    setBoards((prev) => [...prev, board]);
+    setLiveBoards((prev) => [...prev, board]);
     return board;
-  }, []);
+  }, [setLiveBoards]);
 
   const renameBoard = useCallback((id: string, label: string) => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    setBoards((prev) =>
+    setLiveBoards((prev) =>
       prev.map((board) => (board.id === id ? { ...board, label: trimmed } : board)),
     );
-  }, []);
+  }, [setLiveBoards]);
 
   const recolorBoard = useCallback((id: string, color: BoardColorId) => {
-    setBoards((prev) => prev.map((board) => (board.id === id ? { ...board, color } : board)));
-  }, []);
+    setLiveBoards((prev) => prev.map((board) => (board.id === id ? { ...board, color } : board)));
+  }, [setLiveBoards]);
 
   /** Removes a board and strips the tag from every task that carried it. */
   const deleteBoard = useCallback((id: string): { label: string; affected: number } | null => {
@@ -561,27 +650,42 @@ export function useTasks(): TasksApi {
 
     const stamp = new Date().toISOString();
     const affected = tasksRef.current.filter((task) => task.category === id).length;
-    setTasks((prev) =>
+    setLiveTasks((prev) =>
       prev.map((task) =>
         task.category === id ? { ...task, category: null, updatedAt: stamp } : task,
       ),
     );
-    setBoards((prev) => prev.filter((item) => item.id !== id));
+    setLiveBoards((prev) => prev.filter((item) => item.id !== id));
     return { label: board.label, affected };
-  }, []);
+  }, [setLiveBoards, setLiveTasks]);
 
   const restoreBuiltInBoards = useCallback(() => {
-    setBoards((prev) => {
+    setLiveBoards((prev) => {
       const missing = missingBuiltInBoards(prev);
       return missing.length > 0 ? [...prev, ...missing] : prev;
     });
-  }, []);
+  }, [setLiveBoards]);
+
+  const restoreBoard = useCallback((id: string) => {
+    const builtIn = BUILT_IN_BOARDS.find((board) => board.id === id);
+    if (!builtIn) return;
+    setLiveBoards((prev) => (prev.some((board) => board.id === id) ? prev : [...prev, { ...builtIn }]));
+  }, [setLiveBoards]);
+
+  // Deprecated wrappers around the board API, kept so category-named
+  // consumers can share the domain hook with the web build.
+  const deletedCategories = useMemo(
+    () => missingBuiltInBoards(boards).map((board) => board.id),
+    [boards],
+  );
+  const deleteCategory = useCallback((id: string) => deleteBoard(id), [deleteBoard]);
+  const restoreCategory = useCallback((id: string) => restoreBoard(id), [restoreBoard]);
+  const restoreCategories = useCallback(() => restoreBuiltInBoards(), [restoreBuiltInBoards]);
 
   const snapshot = useCallback(
     (): Workspace => ({
       tasks: tasksRef.current.map((task) => ({
-        ...task,
-        subtasks: task.subtasks.map((subtask) => ({ ...subtask })),
+        ...cloneTask(task),
       })),
       sections: sectionsRef.current.map((section) => ({ ...section })),
       boards: boardsRef.current.map((board) => ({ ...board })),
@@ -592,23 +696,31 @@ export function useTasks(): TasksApi {
   const restore = useCallback((workspace: Workspace) => {
     // Do not retain references supplied by an undo/version/import caller. A
     // later edit must not mutate the saved workspace behind that caller's back.
-    setTasks(
-      workspace.tasks.map((task) => ({
-        ...task,
-        subtasks: task.subtasks.map((subtask) => ({ ...subtask })),
-      })),
-    );
-    setSections(workspace.sections.map((section) => ({ ...section })));
-    setBoards(workspace.boards.map((board) => ({ ...board })));
+    const nextTasks = workspace.tasks.map(cloneTask);
+    const nextSections = workspace.sections.map((section) => ({ ...section }));
+    const nextBoards = workspace.boards.map((board) => ({ ...board }));
+    tasksRef.current = nextTasks;
+    sectionsRef.current = nextSections;
+    boardsRef.current = nextBoards;
+    setTasks(nextTasks);
+    setSections(nextSections);
+    setBoards(nextBoards);
   }, []);
 
   const loadSample = useCallback(() => {
     const samples = createSampleTasks();
-    setBoards(SAMPLE_BOARDS.map((board) => ({ ...board })));
+    const sampleBoards = SAMPLE_BOARDS.map((board) => ({ ...board }));
+    boardsRef.current = sampleBoards;
+    setBoards(sampleBoards);
     if (sectionsRef.current.length === 0) {
-      setSections(SAMPLE_SECTIONS.map((section) => ({ ...section })));
-      setTasks(distributeSampleTasks(samples));
+      const sampleSections = SAMPLE_SECTIONS.map((section) => ({ ...section }));
+      const sampleTasks = distributeSampleTasks(samples);
+      sectionsRef.current = sampleSections;
+      tasksRef.current = sampleTasks;
+      setSections(sampleSections);
+      setTasks(sampleTasks);
     } else {
+      tasksRef.current = samples;
       setTasks(samples);
     }
   }, []);
@@ -645,11 +757,14 @@ export function useTasks(): TasksApi {
    */
   const applyRegistry = useCallback((next: ProjectsState, activate: boolean) => {
     projectsRef.current = next;
-    setProjectsState(next);
+    setProjectsState((current) => (current === next ? current : next));
     saveQueueRef.current = saveQueueRef.current.then(() => saveProjects(next));
     if (!activate) return;
     const active = activeProject(next);
     activeIdRef.current = active.id;
+    tasksRef.current = active.workspace.tasks;
+    sectionsRef.current = active.workspace.sections;
+    boardsRef.current = active.workspace.boards;
     setTasks(active.workspace.tasks);
     setSections(active.workspace.sections);
     setBoards(active.workspace.boards);
@@ -677,7 +792,7 @@ export function useTasks(): TasksApi {
   const switchProject = useCallback(
     (id: string) => {
       const registry = registryWithLiveWorkspace();
-      if (!registry || registry.currentId === id) return;
+      if (!registry || registry.currentId === id || activeIdRef.current === id) return;
       if (!registry.projects.some((project) => project.id === id)) return;
       applyRegistry({ ...registry, currentId: id }, true);
     },
@@ -779,6 +894,9 @@ export function useTasks(): TasksApi {
       addTask,
       updateTask,
       patchTask,
+      appendTaskActivity,
+      addAttachment,
+      removeAttachment,
       deleteTask,
       toggleComplete,
       toggleCancel,
@@ -800,6 +918,10 @@ export function useTasks(): TasksApi {
       recolorBoard,
       deleteBoard,
       restoreBuiltInBoards,
+      deletedCategories,
+      deleteCategory,
+      restoreCategory,
+      restoreCategories,
       clearCompleted,
       getCompletedIds,
       snapshot,
@@ -830,6 +952,9 @@ export function useTasks(): TasksApi {
       addTask,
       updateTask,
       patchTask,
+      appendTaskActivity,
+      addAttachment,
+      removeAttachment,
       deleteTask,
       toggleComplete,
       toggleCancel,
@@ -851,6 +976,10 @@ export function useTasks(): TasksApi {
       recolorBoard,
       deleteBoard,
       restoreBuiltInBoards,
+      deletedCategories,
+      deleteCategory,
+      restoreCategory,
+      restoreCategories,
       clearCompleted,
       getCompletedIds,
       snapshot,

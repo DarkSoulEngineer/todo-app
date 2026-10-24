@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, isValid, parseISO } from "date-fns";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Circle, Svg } from "react-native-svg";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -11,8 +12,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,12 +23,27 @@ import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
 import { boardColor } from "@/lib/domain/boards";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
-import { describeDue } from "@/lib/domain/status";
+import { describeDue, deriveStatus, STATUS_LABELS } from "@/lib/domain/status";
 import { detectCardTheme } from "@/lib/features/card-themes";
-import { computeInsightsForWindow } from "@/lib/features/insights";
-import { getWeekdayCompletionCounts, windowEndFromPreset, windowStartFromPreset } from "@/lib/features/insights-filters";
+import { computeInsightsForWindow, getPreviousPeriodPoints } from "@/lib/features/insights";
+import { exportWorkspaceCsv } from "@/lib/data/transfer";
+import { computeStats } from "@/lib/domain/tasks-selectors";
+import {
+  DEFAULT_FILTERS,
+  filterTasksByFilters,
+  getPriorityCounts,
+  getWeekdayCompletionCounts,
+  hasActiveFilters,
+  computePeriodComparison,
+  type DateRangePreset,
+  type InsightsFilters,
+  type PriorityFilterOption,
+  type StatusFilterOption,
+  windowEndFromPreset,
+  windowStartFromPreset,
+} from "@/lib/features/insights-filters";
 import type { Board } from "@/lib/domain/boards";
-import type { BoardSection, Priority, Subtask, Task, TaskDraft } from "@/lib/domain/types";
+import type { Assignee, BoardSection, Priority, Subtask, Task, TaskDraft } from "@/lib/domain/types";
 
 export function IconButton({
   icon,
@@ -46,7 +64,7 @@ export function IconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={(event) => { event.stopPropagation(); onPress(); }}
       style={({ pressed }) => [styles.iconButton, { width: size, height: size, opacity: pressed ? 0.65 : 1 }]}
     >
       <Ionicons name={icon} size={20} color={color} />
@@ -56,10 +74,11 @@ export function IconButton({
 
 export function ThemeToggle() {
   const { theme, toggle } = useTheme();
-  return <IconButton icon={theme.scheme === "dark" ? "sunny-outline" : "moon-outline"} label="Toggle theme" onPress={toggle} />;
+  const nextScheme = theme.scheme === "dark" ? "light" : "dark";
+  return <IconButton icon={theme.scheme === "dark" ? "sunny-outline" : "moon-outline"} label={`Use ${nextScheme} theme`} onPress={toggle} />;
 }
 
-function Chip({ label, active, onPress, color }: { label: string; active?: boolean; onPress?: () => void; color?: string }) {
+function Chip({ label, active, onPress, color, icon }: { label: string; active?: boolean; onPress?: () => void; color?: string; icon?: keyof typeof Ionicons.glyphMap }) {
   const { theme } = useTheme();
   return (
     <Pressable
@@ -71,6 +90,7 @@ function Chip({ label, active, onPress, color }: { label: string; active?: boole
         { backgroundColor: active ? theme.colors.primarySoft : theme.colors.secondary, borderColor: active ? theme.colors.primary : theme.colors.border, opacity: pressed ? 0.75 : 1 },
       ]}
     >
+      {icon ? <Ionicons name={icon} size={14} color={active ? theme.colors.accentForeground : theme.colors.secondaryForeground} /> : null}
       {color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
       <Text style={{ color: active ? theme.colors.accentForeground : theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>{label}</Text>
     </Pressable>
@@ -100,37 +120,55 @@ export function TaskCard({
   const boardTone = board ? boardColor(board.color) : undefined;
   const cardTheme = detectCardTheme(task.title, task.description);
   const doneSubtasks = task.subtasks.filter((item) => item.done).length;
+  const status = deriveStatus(task, now);
+  const statusColor = status === "completed" ? theme.colors.success : status === "canceled" ? theme.colors.mutedForeground : status === "overdue" ? theme.colors.destructive : theme.colors.primary;
+  const statusBackground = status === "completed" ? theme.colors.successSoft : status === "canceled" ? theme.colors.secondary : status === "overdue" ? theme.colors.destructiveSoft : theme.colors.primarySoft;
+  const taskAction = onLongPress ?? onPress;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Edit task ${task.title}`}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={360}
-      style={({ pressed }) => [styles.taskPressable, { opacity: pressed ? 0.86 : 1 }]}
-    >
-      <Card style={[styles.taskCard, { borderLeftColor: cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14 }]}>
+    <View style={styles.taskPressable}>
+      <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`}
+          onPress={onPress}
+          onLongPress={onLongPress}
+          delayLongPress={360}
+          style={StyleSheet.absoluteFill}
+        />
+        <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
           <Pressable
             accessibilityRole="checkbox"
             accessibilityLabel={`${task.completed ? "Mark incomplete" : "Complete"} ${task.title}`}
             accessibilityState={{ checked: task.completed }}
             onPress={(event) => { event.stopPropagation(); onComplete(); }}
-            style={[styles.check, { borderColor: task.completed ? theme.colors.success : theme.colors.borderStrong, backgroundColor: task.completed ? theme.colors.success : "transparent" }]}
+            style={[styles.check, { borderColor: task.completed ? theme.colors.success : theme.colors.borderStrong, backgroundColor: task.completed ? theme.colors.success : theme.colors.card }]}
           >
-            {task.completed ? <Ionicons name="checkmark" size={15} color="#fff" /> : null}
+            {task.completed ? <Ionicons name="checkmark" size={15} color={theme.colors.successForeground} /> : null}
           </Pressable>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
-          <View style={[styles.priorityDot, { backgroundColor: PRIORITY_META[task.priority].dot }]} />
+           <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} accessibilityHint="Opens task actions" onPress={(event) => { event.stopPropagation(); taskAction(); }} style={({ pressed }) => [styles.taskAction, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary, opacity: pressed ? 0.65 : 1 }]}>
+             <Ionicons name="ellipsis-horizontal" size={19} color={theme.colors.mutedForeground} />
+           </Pressable>
         </View>
         {!compact && task.description ? <Text style={[styles.taskDescription, { color: theme.colors.mutedForeground }]} numberOfLines={2}>{task.description}</Text> : null}
         <View style={styles.metaRow}>
-          {due ? <View style={styles.metaItem}><Ionicons name="time-outline" size={14} color={due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground} /><Text style={{ color: due.overdue ? theme.colors.destructive : theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{due.label}</Text></View> : null}
-          {board && boardTone ? <Chip label={board.label} color={boardTone.dot} /> : null}
-          {task.subtasks.length > 0 ? <View style={styles.metaItem}><Ionicons name="list-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{doneSubtasks}/{task.subtasks.length}</Text></View> : null}
+           <View accessible accessibilityLabel={`Status: ${STATUS_LABELS[status]}`} style={[styles.statusBadge, { backgroundColor: statusBackground }]}><Ionicons name={status === "completed" ? "checkmark-circle-outline" : status === "canceled" ? "ban-outline" : status === "overdue" ? "alert-circle-outline" : "ellipse-outline"} size={13} color={statusColor} /><Text style={{ color: statusColor, fontSize: 12, fontWeight: "700" }}>{STATUS_LABELS[status]}</Text></View>
+           <View style={[styles.priorityBadge, { backgroundColor: PRIORITY_META[task.priority].tint }]}><View style={[styles.priorityDot, { backgroundColor: PRIORITY_META[task.priority].dot }]} /><Text style={{ color: PRIORITY_META[task.priority].ink, fontSize: 12, fontWeight: "700" }}>{PRIORITY_META[task.priority].label}</Text></View>
+           {due && !task.canceled ? <View accessible accessibilityLabel={`Due ${due.title}`} style={styles.metaItem}><Ionicons name="time-outline" size={14} color={due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground} /><Text style={{ color: due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{due.label}</Text></View> : null}
+            {board && boardTone ? <Chip label={board.label} color={boardTone.dot} /> : null}
+            {(task.tags ?? []).slice(0, 2).map((tag) => <Chip key={tag} label={tag} color={theme.colors.primary} />)}
+            {task.assignee ? <View accessible accessibilityLabel={`Assigned to ${task.assignee.name}`} style={styles.metaItem}><Ionicons name="person-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{task.assignee.name}</Text></View> : null}
+            {task.subtasks.length > 0 ? <View style={styles.metaItem}><Ionicons name="list-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{doneSubtasks}/{task.subtasks.length}</Text></View> : null}
+         </View>
+         {task.subtasks.length > 0 ? <View accessible accessibilityLabel={`Checklist: ${doneSubtasks} of ${task.subtasks.length} complete`} style={[{ borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginTop: 10, gap: 6 }, { borderTopColor: theme.colors.border }]}>
+           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}><Text style={{ color: theme.colors.mutedForeground, fontSize: 10, fontWeight: "800", letterSpacing: 1 }}>CHECKLIST</Text><Text style={{ color: doneSubtasks === task.subtasks.length ? theme.colors.success : theme.colors.mutedForeground, fontSize: 12, fontWeight: "700" }}>{doneSubtasks}/{task.subtasks.length}</Text></View>
+           {task.subtasks.slice(0, compact ? 2 : 3).map((subtask) => <View key={subtask.id} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}><Ionicons name={subtask.done ? "checkmark-circle" : "ellipse-outline"} size={16} color={subtask.done ? theme.colors.success : theme.colors.borderStrong} /><Text style={{ flex: 1, color: subtask.done ? theme.colors.mutedForeground : theme.colors.foreground, fontSize: 12, lineHeight: 17, textDecorationLine: subtask.done ? "line-through" : "none" }} numberOfLines={1}>{subtask.title}</Text></View>)}
+           {task.subtasks.length > (compact ? 2 : 3) ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 11, marginLeft: 23 }}>+ {task.subtasks.length - (compact ? 2 : 3)} more</Text> : null}
+          </View> : null}
         </View>
       </Card>
-    </Pressable>
+    </View>
   );
 }
 
@@ -181,21 +219,33 @@ function TaskEditorForm({
   onCancelTask?: () => void;
 }) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState(() => task?.title ?? "");
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [category, setCategory] = useState<string | null>(() => task?.category ?? null);
+  const [assigneeName, setAssigneeName] = useState(() => task?.assignee?.name ?? "");
+  const [tags, setTags] = useState<string[]>(() => task?.tags ?? []);
+  const [draftTag, setDraftTag] = useState("");
   const [sectionId, setSectionId] = useState<string | null>(() => task?.sectionId ?? null);
   const [dueAt, setDueAt] = useState<string | null>(() => task?.dueAt ?? initialDueAt ?? null);
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => task?.subtasks.map((item) => ({ ...item })) ?? []);
   const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
 
   const dateValue = dueAt && isValid(parseISO(dueAt)) ? parseISO(dueAt) : new Date();
   const save = () => {
     const trimmed = title.trim();
-    if (!trimmed) return;
-    onSave({ title: trimmed, description: description.trim(), dueAt, priority, category, subtasks }, sectionId);
+    if (!trimmed) {
+      setTitleError("Give your task a title.");
+      return;
+    }
+    const trimmedAssignee = assigneeName.trim();
+    const nextAssignee: Assignee | null = trimmedAssignee
+      ? { ...(task?.assignee ?? { id: "local-user" }), name: trimmedAssignee, initials: trimmedAssignee.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() }
+      : null;
+    onSave({ title: trimmed, description: description.trim(), dueAt, priority, category, subtasks: subtasks.map((item) => ({ ...item, title: item.title.trim() })).filter((item) => item.title.length > 0), assignee: nextAssignee, tags: tags.map((tag) => tag.trim()).filter(Boolean) }, sectionId);
   };
   const updateDate = (date: Date) => setDueAt(date.toISOString());
   const addSubtaskLocal = () => {
@@ -203,30 +253,42 @@ function TaskEditorForm({
     setSubtasks((current) => [...current, { id: `local-${Date.now()}`, title: subtaskTitle.trim(), done: false }]);
     setSubtaskTitle("");
   };
+  const addTagLocal = () => {
+    const value = draftTag.trim();
+    if (!value || tags.some((tag) => tag.toLowerCase() === value.toLowerCase())) return;
+    setTags((current) => [...current, value]);
+    setDraftTag("");
+  };
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={[styles.modalBackdrop, { backgroundColor: theme.colors.overlay }]}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalKeyboard}>
-          <View style={[styles.editor, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <View style={styles.editorHeader}><View><Text style={[styles.editorEyebrow, { color: theme.colors.primary }]}>{task ? "REFINE TASK" : "NEW TASK"}</Text><Text style={[styles.editorTitle, { color: theme.colors.foreground }]}>{task ? "Edit task" : "Add a task"}</Text></View><IconButton icon="close" label="Close task editor" onPress={onClose} /></View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
-              <Input autoFocus={!task} value={title} onChangeText={setTitle} placeholder="What needs your attention?" returnKeyType="next" />
-              <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>DESCRIPTION</Text>
+          <View style={[styles.editor, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, shadowColor: theme.colors.shadow, shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: -6 }, elevation: 12 }]}>
+             <View style={styles.editorHeader}><View><Text style={[styles.editorEyebrow, { color: theme.colors.primary }]}>{task ? "REFINE TASK" : "NEW TASK"}</Text><Text style={[styles.editorTitle, { color: theme.colors.foreground }]}>{task ? "Edit task" : "New task"}</Text></View><IconButton icon="close" label="Close task editor" onPress={onClose} /></View>
+             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
+               <Input autoFocus={!task} value={title} onChangeText={(value) => { setTitle(value); if (titleError) setTitleError(null); }} placeholder="What needs doing?" returnKeyType="next" accessibilityLabel="Task title" accessibilityHint="Required" style={titleError ? { borderColor: theme.colors.destructive } : undefined} />
+               {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
+               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>
               <TextInput value={description} onChangeText={setDescription} placeholder="Add a little context" placeholderTextColor={theme.colors.mutedForeground} multiline style={[styles.textArea, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]} />
               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
               <View style={styles.wrapRow}>{PRIORITY_ORDER.map((item) => <Chip key={item} label={PRIORITY_META[item].label} active={priority === item} color={PRIORITY_META[item].dot} onPress={() => setPriority(item)} />)}</View>
-              <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapRow}>{boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; })}</ScrollView>
-              <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>WHEN</Text>
+               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
+               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapRow}>{boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; })}</ScrollView>
+               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>ASSIGNEE</Text>
+               <View style={styles.addSubtask}><Ionicons name="person-outline" size={17} color={theme.colors.mutedForeground} /><TextInput value={assigneeName} onChangeText={setAssigneeName} placeholder="Name or email" placeholderTextColor={theme.colors.mutedForeground} style={[styles.subtaskInput, { flex: 1, color: theme.colors.foreground }]} />{assigneeName ? <IconButton size={36} icon="close-circle-outline" label="Remove assignee" onPress={() => setAssigneeName("")} /> : null}</View>
+               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
+               <View style={styles.tagWrap}>{tags.map((tag) => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Remove tag ${tag}`} onPress={() => setTags((current) => current.filter((item) => item !== tag))} style={[styles.tag, { backgroundColor: theme.colors.primarySoft }]}><Ionicons name="pricetag-outline" size={13} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: "700" }}>{tag}</Text><Ionicons name="close" size={13} color={theme.colors.primary} /></Pressable>)}</View>
+               <View style={styles.addSubtask}><Ionicons name="pricetag-outline" size={17} color={theme.colors.mutedForeground} /><TextInput value={draftTag} onChangeText={setDraftTag} onSubmitEditing={addTagLocal} placeholder="Add a tag" placeholderTextColor={theme.colors.mutedForeground} style={[styles.subtaskInput, { flex: 1, color: theme.colors.foreground }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add tag" onPress={addTagLocal}><Ionicons name="add" size={18} color={theme.colors.primary} /></Button></View>
+               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>WHEN</Text>
               <View style={styles.dateRow}><Button variant="secondary" label={dueAt ? format(dateValue, "MMM d") : "No deadline"} onPress={() => setPicker("date")} style={{ flex: 1 }} /><Button variant="secondary" label={dueAt ? format(dateValue, "h:mm a") : "Set time"} onPress={() => setPicker("time")} style={{ flex: 1 }} /><Button size="icon" variant="ghost" accessibilityLabel="Clear due date" onPress={() => setDueAt(null)}><Ionicons name="close-circle-outline" size={20} color={theme.colors.mutedForeground} /></Button></View>
               {picker ? <DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /> : null}
               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>SECTION</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapRow}><Chip label="Unsorted" active={!sectionId} onPress={() => setSectionId(null)} />{sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}</ScrollView>
               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>SUBTASKS</Text>
-              {subtasks.map((subtask, index) => <View key={subtask.id} style={styles.subtaskRow}><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.subtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : "transparent" }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color="#fff" /> : null}</Pressable><Text style={[styles.subtaskText, { color: theme.colors.foreground, textDecorationLine: subtask.done ? "line-through" : "none" }]} numberOfLines={2}>{subtask.title}</Text><IconButton size={36} icon="trash-outline" label={`Remove ${subtask.title}`} onPress={() => setSubtasks((current) => current.filter((_, itemIndex) => itemIndex !== index))} tone="danger" /></View>)}
+               {subtasks.map((subtask, index) => <View key={subtask.id} style={styles.subtaskRow}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.subtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><Input value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.subtaskInput, { flex: 1, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><IconButton size={36} icon="trash-outline" label={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} tone="danger" /></View>)}
               <View style={styles.addSubtask}><TextInput value={subtaskTitle} onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a subtask" placeholderTextColor={theme.colors.mutedForeground} style={[styles.subtaskInput, { color: theme.colors.foreground, borderColor: theme.colors.border, backgroundColor: theme.colors.input }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add subtask" onPress={addSubtaskLocal}><Ionicons name="add" size={19} color={theme.colors.primary} /></Button></View>
-              <Button label={task ? "Save changes" : "Create task"} onPress={save} disabled={!title.trim()} style={{ marginTop: 18 }} />
+               <Button label={task ? "Save changes" : "Add task"} onPress={save} style={{ marginTop: 18 }} />
               {task ? <View style={styles.editorActions}><Button variant="soft" label={task.canceled ? "Restore task" : "Cancel task"} onPress={onCancelTask ?? (() => undefined)} /><Button variant="ghost" label="Delete" onPress={onDelete ?? (() => undefined)} /></View> : null}
             </ScrollView>
           </View>
@@ -252,32 +314,322 @@ function TextEntrySheetForm({ visible, title, description, placeholder, initialV
   return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{description ? <Text style={[styles.sheetDescription, { color: theme.colors.mutedForeground }]}>{description}</Text> : null}<Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} onSubmitEditing={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 12 }} /><Button label={actionLabel} disabled={!value.trim()} onPress={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 14 }} /></Sheet>;
 }
 
-export function BoardCard({ label, count, completed, color, onPress, onMenu }: { label: string; count: number; completed: number; color: string; onPress: () => void; onMenu: () => void }) {
+export function BoardCard({ label, count, completed, createdAt, overdue = 0, dueSoon = 0, color, onPress, onMenu }: { label: string; count: number; completed: number; createdAt?: string; overdue?: number; dueSoon?: number; color: string; onPress: () => void; onMenu: () => void }) {
   const { theme } = useTheme();
   const progress = count === 0 ? 0 : completed / count;
-  return <Card style={styles.boardCard}><Pressable accessibilityRole="button" accessibilityLabel={`Open ${label}`} onPress={onPress} style={styles.boardCardBody}><View style={[styles.boardGlyph, { backgroundColor: `${color}20` }]}><Ionicons name="layers-outline" size={22} color={color} /></View><View style={styles.boardCardCopy}><Text style={[styles.boardName, { color: theme.colors.foreground }]} numberOfLines={1}>{label}</Text><Text style={[styles.boardMeta, { color: theme.colors.mutedForeground }]}>{count} tasks · {completed} done</Text></View></Pressable><IconButton icon="ellipsis-horizontal" label={`Actions for ${label}`} onPress={onMenu} size={44} /><View style={[styles.progressTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: color }]} /></View></Card>;
+  const createdLabel = createdAt && isValid(parseISO(createdAt)) ? `Created ${format(parseISO(createdAt), "MMM d, yyyy")}` : null;
+  const openCount = Math.max(0, count - completed);
+  
+  return (
+    <View style={[styles.boardCardNew, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+      <Pressable onPress={onPress} style={styles.boardCardNewPressable}>
+        <View style={styles.boardCardNewHeader}>
+          <View style={styles.boardCardNewTitleRow}>
+            <Text style={[styles.boardCardNewTitle, { color: theme.colors.foreground }]} numberOfLines={1}>{label}</Text>
+            <TouchableOpacity onPress={onMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="ellipsis-horizontal" size={18} color={theme.colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+          {createdLabel ? <Text style={[styles.boardCardNewMeta, { color: theme.colors.mutedForeground }]}>{createdLabel}</Text> : null}
+        </View>
+        
+        <View style={styles.boardCardNewProgress}>
+          <View style={styles.boardCardNewProgressHeader}>
+            <View style={styles.boardCardNewCounts}>
+              <View style={styles.boardCardNewCountItem}>
+                <View style={[styles.boardCardNewDot, { borderColor: theme.colors.mutedForeground }]} />
+                <Text style={[styles.boardCardNewCountText, { color: theme.colors.foreground }]}><Text style={{ fontWeight: "600" }}>{openCount}</Text> open</Text>
+              </View>
+              <View style={styles.boardCardNewCountItem}>
+                <Ionicons name="checkmark-circle" size={14} color={theme.scheme === "dark" ? "#4ade80" : "#16a34a"} />
+                <Text style={[styles.boardCardNewCountText, { color: theme.scheme === "dark" ? "#4ade80" : "#16a34a" }]}><Text style={{ fontWeight: "600" }}>{completed}</Text> done</Text>
+              </View>
+            </View>
+            <Text style={[styles.boardCardNewPct, { color: theme.colors.mutedForeground }]}>{Math.round(progress * 100)}%</Text>
+          </View>
+          <View style={[styles.boardCardNewProgressBar, { backgroundColor: theme.colors.secondary }]}>
+            <View style={[styles.boardCardNewProgressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: theme.scheme === "dark" ? (label === "My board" ? "#ec4899" : "#22c55e") : "#22c55e" }]} />
+          </View>
+        </View>
+        
+        <View style={styles.boardCardNewAlerts}>
+          <View style={styles.boardCardNewAlertsLeft}>
+            {overdue > 0 ? (
+              <View style={styles.boardCardNewAlertItem}>
+                <Ionicons name="warning-outline" size={12} color={theme.scheme === "dark" ? "#f87171" : "#dc2626"} />
+                <Text style={[styles.boardCardNewAlertText, { color: theme.scheme === "dark" ? "#f87171" : "#dc2626" }]}>{overdue} overdue</Text>
+              </View>
+            ) : null}
+            {dueSoon > 0 ? (
+              <View style={styles.boardCardNewAlertItem}>
+                <Ionicons name="time-outline" size={12} color={theme.scheme === "dark" ? "#38bdf8" : "#0284c7"} />
+                <Text style={[styles.boardCardNewAlertText, { color: theme.scheme === "dark" ? "#38bdf8" : "#0284c7" }]}>{dueSoon} due soon</Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.boardCardNewAvatars}>
+            <View style={[styles.boardCardNewAvatar, { backgroundColor: "#ec4899" }]}><Text style={styles.boardCardNewAvatarText}>A</Text></View>
+            <View style={[styles.boardCardNewAvatar, { backgroundColor: "#3b82f6", marginLeft: -6 }]}><Text style={styles.boardCardNewAvatarText}>J</Text></View>
+            <View style={[styles.boardCardNewAvatar, { backgroundColor: "#14b8a6", marginLeft: -6 }]}><Text style={styles.boardCardNewAvatarText}>R</Text></View>
+            <View style={[styles.boardCardNewAvatarCount, { backgroundColor: theme.colors.secondary, marginLeft: -6 }]}><Text style={[styles.boardCardNewAvatarCountText, { color: theme.colors.foreground }]}>+6</Text></View>
+          </View>
+        </View>
+      </Pressable>
+      
+      <View style={[styles.boardCardNewFooter, { borderTopColor: theme.colors.border }]}>
+        <View style={styles.boardCardNewFooterLeft}>
+          <TouchableOpacity style={styles.boardCardNewFooterBtn}>
+            <Ionicons name="download-outline" size={14} color={theme.colors.mutedForeground} />
+            <Text style={[styles.boardCardNewFooterBtnText, { color: theme.colors.mutedForeground }]}>Save</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.boardCardNewFooterBtn}>
+            <Ionicons name="copy-outline" size={14} color={theme.colors.mutedForeground} />
+            <Text style={[styles.boardCardNewFooterBtnText, { color: theme.colors.mutedForeground }]}>Duplicate</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity>
+          <Text style={[styles.boardCardNewRemoveText, { color: theme.scheme === "dark" ? "#f87171" : "#dc2626" }]}>Remove</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
 
-export function InsightsPanel({ tasks, boards, now }: { tasks: Task[]; boards: Board[]; now: Date }) {
+export interface InsightsPanelProps {
+  tasks: Task[];
+  boards: Board[];
+  now: Date;
+  onReset?: () => void;
+  onExport?: (tasks: Task[], boards: Board[]) => void | Promise<void>;
+}
+
+const INSIGHTS_DATE_OPTIONS: { value: DateRangePreset; label: string }[] = [
+  { value: "7d", label: "7 days" },
+  { value: "30d", label: "30 days" },
+  { value: "90d", label: "90 days" },
+  { value: "custom", label: "Custom" },
+];
+
+const INSIGHTS_STATUS_OPTIONS: { value: StatusFilterOption; label: string }[] = [
+  { value: "all", label: "All status" },
+  { value: "completed", label: "Completed" },
+  { value: "overdue", label: "Overdue" },
+  { value: "canceled", label: "Canceled" },
+];
+
+const INSIGHTS_PRIORITY_OPTIONS: { value: PriorityFilterOption; label: string }[] = [
+  { value: "all", label: "All priority" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
+const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+
+type ProductivityTab = "categories" | "trends" | "priorities" | "weekdays";
+
+const PRODUCTIVITY_TABS: { value: ProductivityTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: "categories", label: "Categories", icon: "layers-outline" },
+  { value: "trends", label: "Trends", icon: "trending-up-outline" },
+  { value: "priorities", label: "Priorities", icon: "flag-outline" },
+  { value: "weekdays", label: "Weekdays", icon: "calendar-outline" },
+];
+
+function comparisonLabel(change: number | null): string | undefined {
+  if (change === null) return undefined;
+  return `${change > 0 ? "+" : ""}${change}% vs prev`;
+}
+
+export function InsightsPanel({ tasks, boards, now, onReset, onExport }: InsightsPanelProps) {
   const { theme } = useTheme();
-  const [window, setWindow] = useState<7 | 30 | 90>(7);
-  const preset = `${window}d` as "7d" | "30d" | "90d";
-  const period = computeInsightsForWindow(tasks, windowStartFromPreset(now, preset, null), windowEndFromPreset(now, preset, null));
-  const completions = period.windowTotal;
-  const priority = PRIORITY_ORDER.map((key) => ({ key, value: tasks.filter((task) => task.priority === key).length }));
-  const maxPriority = Math.max(1, ...priority.map((item) => item.value));
-  const boardCounts = boards.map((board) => ({ board, value: tasks.filter((task) => task.category === board.id).length })).filter((item) => item.value > 0);
-  const maxDay = Math.max(1, period.best);
-  const weekday = getWeekdayCompletionCounts(tasks, period.windowStart, period.windowEnd);
+  const [filters, setFilters] = useState<InsightsFilters>(DEFAULT_FILTERS);
+  const [picker, setPicker] = useState<"start" | "end" | null>(null);
+  const [productivityTab, setProductivityTab] = useState<ProductivityTab>("categories");
+  const [selectedTrendPoint, setSelectedTrendPoint] = useState<{ label: string; count: number; previous: number; isPrevious: boolean } | null>(null);
+
+  const filteredTasks = useMemo(() => filterTasksByFilters(tasks, filters, now), [tasks, filters, now]);
+  const windowStart = windowStartFromPreset(now, filters.dateRange, filters.customStart);
+  const windowEnd = windowEndFromPreset(now, filters.dateRange, filters.customEnd);
+  const period = useMemo(() => computeInsightsForWindow(filteredTasks, windowStart, windowEnd, { metricsTasks: filteredTasks }), [filteredTasks, windowStart, windowEnd]);
+  const previousPeriodPoints = useMemo(() => getPreviousPeriodPoints(filteredTasks, windowStart, windowEnd), [filteredTasks, windowStart, windowEnd]);
+  const stats = useMemo(() => computeStats(filteredTasks, now), [filteredTasks, now]);
+  const completedChange = computePeriodComparison(period.metrics.completed, period.previousMetrics.completed);
+  const days = Math.max(1, period.points.length);
+  const activeFilters = hasActiveFilters(filters);
+  const trendPoints = period.points.slice(-14);
+  const previousTrendPoints = previousPeriodPoints.slice(-trendPoints.length);
+  const maxTrend = Math.max(1, ...trendPoints.map((point) => point.count), ...previousTrendPoints.map((point) => point.count));
+  const weekday = getWeekdayCompletionCounts(filteredTasks, period.windowStart, period.windowEnd);
   const maxWeekday = Math.max(1, ...weekday);
-  return <View style={{ gap: 14 }}><View style={styles.insightSwitch}>{([7, 30, 90] as const).map((item) => <Chip key={item} label={`${item} days`} active={window === item} onPress={() => setWindow(item)} />)}</View><View style={styles.statsGrid}><Stat label="Completed" value={completions.toString()} accent={theme.colors.success} /><Stat label="Streak" value={`${period.streak}d`} accent={theme.colors.primary} /><Stat label="Best day" value={period.best.toString()} accent={theme.colors.warning} /><Stat label="Period change" value={period.periodChange === null ? "—" : `${period.periodChange > 0 ? "+" : ""}${period.periodChange}%`} accent={theme.colors.info} /></View><Card style={styles.insightCard}><Text style={[styles.insightTitle, { color: theme.colors.foreground }]}>Daily completions</Text><View style={styles.chart}>{period.points.slice(-14).map((point) => <View key={point.key} style={styles.chartPoint}><View style={[styles.chartBar, { height: Math.max(5, (point.count / maxDay) * 76), backgroundColor: point.count ? theme.colors.primary : theme.colors.secondary }]} /><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{point.label}</Text></View>)}</View></Card><Card style={styles.insightCard}><Text style={[styles.insightTitle, { color: theme.colors.foreground }]}>Completion rhythm</Text><View style={styles.weekBars}>{weekday.map((value, index) => <View key={index} style={styles.weekBarItem}><View style={[styles.weekBar, { height: Math.max(5, (value / maxWeekday) * 56), backgroundColor: value ? theme.colors.info : theme.colors.secondary }]} /><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{["M", "T", "W", "T", "F", "S", "S"][index]}</Text></View>)}</View></Card><Card style={styles.insightCard}><Text style={[styles.insightTitle, { color: theme.colors.foreground }]}>Priority split</Text>{priority.map((item) => <View key={item.key} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.mutedForeground }]}>{PRIORITY_META[item.key].label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${(item.value / maxPriority) * 100}%`, backgroundColor: PRIORITY_META[item.key].dot }]} /></View><Text style={{ color: theme.colors.foreground, width: 26, textAlign: "right", fontWeight: "700" }}>{item.value}</Text></View>)}</Card>{boardCounts.length ? <Card style={styles.insightCard}><Text style={[styles.insightTitle, { color: theme.colors.foreground }]}>Where your work lives</Text>{boardCounts.map(({ board, value }) => { const tone = boardColor(board.color); return <View key={board.id} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.mutedForeground }]} numberOfLines={1}>{board.label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${(value / Math.max(1, ...boardCounts.map((item) => item.value))) * 100}%`, backgroundColor: tone.dot }]} /></View><Text style={{ color: theme.colors.foreground, width: 26, textAlign: "right", fontWeight: "700" }}>{value}</Text></View>; })}</Card> : null}</View>;
+  const priorityCounts = getPriorityCounts(filteredTasks);
+  const maxPriority = Math.max(1, ...Object.values(priorityCounts));
+  const categoryCounts = boards
+    .map((board) => ({ board, value: filteredTasks.filter((task) => task.category === board.id).length }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+  const maxCategory = Math.max(1, ...categoryCounts.map((item) => item.value));
+  const average = Math.round(stats.completed / days).toString();
+  const dateForPicker = picker === "start" ? filters.customStart ?? windowStart : filters.customEnd ?? windowEnd;
+  const completionPercent = Math.round(stats.completionRate * 100);
+  const periodLabel = filters.dateRange === "custom"
+    ? `Custom range (${filters.customStart ? format(filters.customStart, "MMM d") : "start"} - ${filters.customEnd ? format(filters.customEnd, "MMM d") : "end"})`
+    : `Completed over the last ${days} days`;
+  const completionRingSize = 62;
+  const completionRingStroke = 6;
+  const completionRingRadius = (completionRingSize - completionRingStroke) / 2 - 3;
+  const completionRingCircumference = 2 * Math.PI * completionRingRadius;
+  const completionRingOffset = completionRingCircumference * (1 - stats.completionRate);
+
+  const updateFilters = (patch: Partial<InsightsFilters>) => setFilters((current) => ({ ...current, ...patch }));
+  const chooseDateRange = (dateRange: DateRangePreset) => {
+    updateFilters({ dateRange });
+    if (dateRange === "custom" && !filters.customStart && !filters.customEnd) setPicker("start");
+  };
+  const chooseCustomDate = (date: Date) => {
+    if (picker === "start") {
+      const nextEnd = filters.customEnd && filters.customEnd >= date ? filters.customEnd : date;
+      updateFilters({ dateRange: "custom", customStart: date, customEnd: nextEnd });
+    } else {
+      const nextStart = filters.customStart && filters.customStart <= date ? filters.customStart : date;
+      updateFilters({ dateRange: "custom", customStart: nextStart, customEnd: date });
+    }
+    setPicker(null);
+  };
+  const reset = () => {
+    setFilters({ ...DEFAULT_FILTERS });
+    setPicker(null);
+    onReset?.();
+  };
+  const exportFiltered = () => {
+    if (onExport) {
+      void onExport(filteredTasks, boards);
+      return;
+    }
+    void exportWorkspaceCsv({ tasks: filteredTasks, boards, sections: [] }, "insights-export");
+  };
+
+  return (
+    <View style={{ gap: 14 }}>
+      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <View>
+            <Text style={[styles.editorEyebrow, { color: theme.colors.primary }]}>INSIGHTS FILTERS</Text>
+            <Text style={[styles.insightTitle, { color: theme.colors.foreground, marginBottom: 0 }]}>Focus your period</Text>
+          </View>
+          {activeFilters ? <Button variant="ghost" label="Reset" onPress={reset} accessibilityLabel="Reset insights filters" /> : null}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch} accessibilityLabel="Date range filters">
+          {INSIGHTS_DATE_OPTIONS.map((option) => <Chip key={option.value} label={option.label} active={filters.dateRange === option.value} onPress={() => chooseDateRange(option.value)} />)}
+        </ScrollView>
+        {filters.dateRange === "custom" ? <View style={[styles.dateRow, { marginTop: 10 }]}>
+          <Button variant="secondary" label={filters.customStart ? format(filters.customStart, "MMM d, yyyy") : "Start date"} onPress={() => setPicker("start")} style={{ flex: 1 }} />
+          <Text style={{ color: theme.colors.mutedForeground }}>to</Text>
+          <Button variant="secondary" label={filters.customEnd ? format(filters.customEnd, "MMM d, yyyy") : "End date"} onPress={() => setPicker("end")} style={{ flex: 1 }} />
+        </View> : null}
+        <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>STATUS</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch}>
+          {INSIGHTS_STATUS_OPTIONS.map((option) => <Chip key={option.value} label={option.label} active={filters.status === option.value} onPress={() => updateFilters({ status: option.value })} />)}
+        </ScrollView>
+        <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch}>
+          {INSIGHTS_PRIORITY_OPTIONS.map((option) => <Chip key={option.value} label={option.label} active={filters.priority === option.value} color={option.value !== "all" ? PRIORITY_META[option.value].dot : undefined} onPress={() => updateFilters({ priority: option.value })} />)}
+        </ScrollView>
+        <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch}>
+          <Chip label="All boards" active={filters.boardId === "all"} onPress={() => updateFilters({ boardId: "all" })} />
+          {boards.map((board) => <Chip key={board.id} label={board.label} color={boardColor(board.color).dot} active={filters.boardId === board.id} onPress={() => updateFilters({ boardId: board.id })} />)}
+        </ScrollView>
+        {picker ? <DateTimePicker value={dateForPicker} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} maximumDate={now} onChange={(event, selected) => { if (selected) chooseCustomDate(selected); else setPicker(null); }} /> : null}
+      </Card>
+
+      <View style={styles.statsGrid}>
+        <Stat label="Total tasks" value={stats.total.toString()} accent={theme.colors.primary} />
+        <Stat label="Completed" value={stats.completed.toString()} accent={theme.colors.success} change={comparisonLabel(completedChange)} />
+        <Stat label="Completion rate" value={`${Math.round(stats.completionRate * 100)}%`} accent={theme.colors.info} />
+        <Stat label="Overdue" value={stats.overdue.toString()} accent={theme.colors.destructive} />
+        <Stat label="Upcoming" value={stats.upcoming.toString()} accent={theme.colors.warning} />
+        <Stat label="Average / day" value={average} accent={theme.colors.primary} />
+        <Stat label="Current streak" value={`${period.streak}d`} accent={theme.colors.warning} />
+        <Stat label="Best day" value={period.best.toString()} accent={theme.colors.info} />
+      </View>
+
+      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+        <View style={styles.overviewHeader}>
+          <View style={{ flex: 1 }}><Text style={[styles.insightTitle, { color: theme.colors.foreground, marginBottom: 2 }]}>Completion overview</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>A quick read on the work behind this period</Text></View>
+          <View style={styles.completionRing} accessibilityLabel={`${completionPercent}% complete`}>
+            <Svg width={completionRingSize} height={completionRingSize} viewBox={`0 0 ${completionRingSize} ${completionRingSize}`}>
+              <Circle cx={completionRingSize / 2} cy={completionRingSize / 2} r={completionRingRadius} stroke={theme.colors.secondary} strokeWidth={completionRingStroke} fill="transparent" />
+              <Circle cx={completionRingSize / 2} cy={completionRingSize / 2} r={completionRingRadius} stroke={theme.colors.primary} strokeWidth={completionRingStroke} strokeLinecap="round" fill="transparent" strokeDasharray={`${completionRingCircumference} ${completionRingCircumference}`} strokeDashoffset={completionRingOffset} transform={`rotate(-90 ${completionRingSize / 2} ${completionRingSize / 2})`} />
+            </Svg>
+            <View style={styles.completionRingLabel}><Text style={[styles.completionRingValue, { color: theme.colors.foreground }]}>{completionPercent}%</Text></View>
+          </View>
+        </View>
+        <View style={styles.overviewCopy}><Text style={[styles.overviewMain, { color: theme.colors.foreground }]}>{stats.completed}/{stats.total} done</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{stats.active} open · {stats.canceled} canceled</Text></View>
+        <View style={[styles.overviewTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.overviewFill, { width: `${completionPercent}%`, backgroundColor: theme.colors.primary }]} /></View>
+        <View style={styles.overviewFooter}><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Overall progress</Text><Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: "700" }}>{completionPercent}% complete</Text></View>
+      </Card>
+
+      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+        <Text style={[styles.insightTitle, { color: theme.colors.foreground }]}>Completion trend</Text>
+          <View style={styles.trendMeta}><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{periodLabel}</Text><View style={styles.legend}><View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Current period</Text><View style={[styles.legendDash, { borderTopColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Previous period</Text></View></View>
+          {period.windowTotal === 0 && period.previousWindowTotal === 0 ? <Text style={{ color: theme.colors.mutedForeground, textAlign: "center", paddingVertical: 28 }}>No completions in this period</Text> : <View style={styles.chart}>{trendPoints.map((point, index) => { const previous = previousTrendPoints[index]?.count ?? 0; return <View key={point.key} style={styles.chartPoint}><View style={styles.chartValuePair}><Text style={[styles.chartLabel, { color: theme.colors.primary }]}>{point.count || ""}</Text><Text style={[styles.chartLabel, { color: theme.colors.primary }]}>{previous || ""}</Text></View><View style={styles.chartBars}><Pressable accessibilityRole="button" accessibilityLabel={`${point.count} completed on ${point.label}, current period`} onPress={() => setSelectedTrendPoint({ label: point.label, count: point.count, previous, isPrevious: false })} style={[styles.chartBarButton, { height: 76 }]}><View style={[styles.chartBar, { height: Math.max(5, (point.count / maxTrend) * 76), backgroundColor: point.count ? theme.colors.primary : theme.colors.secondary }]} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`${previous} completed on ${point.label}, previous period`} onPress={() => setSelectedTrendPoint({ label: point.label, count: previous, previous, isPrevious: true })} style={[styles.chartPreviousOverlay, { height: Math.max(5, (previous / maxTrend) * 76), borderTopColor: theme.colors.primary }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{point.label}</Text></View>; })}</View>}
+          {selectedTrendPoint ? <Pressable accessibilityRole="button" accessibilityLabel="Dismiss trend detail" onPress={() => setSelectedTrendPoint(null)} style={[styles.trendDetail, { backgroundColor: theme.colors.secondary }]}><View style={[styles.legendDot, { backgroundColor: selectedTrendPoint.isPrevious ? theme.colors.primary : theme.colors.primary }]} /><Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 12 }}>{selectedTrendPoint.isPrevious ? "Previous period" : "Current period"} · {selectedTrendPoint.label}</Text><Text style={{ color: theme.colors.foreground, fontSize: 12, fontWeight: "700" }}>{selectedTrendPoint.count} completed</Text><Ionicons name="close" size={15} color={theme.colors.mutedForeground} /></Pressable> : null}
+         <View style={styles.comparisonCallout}><Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }}>{period.windowTotal} completed this period</Text>{period.periodChange !== null ? <View style={styles.comparisonValue}><Ionicons name="trending-up-outline" size={14} color={theme.colors.success} /><Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: "700" }}>{period.periodChange > 0 ? "+" : ""}{period.periodChange}% vs prev</Text></View> : null}</View>
+      </Card>
+
+      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+        <View style={styles.productivityHeader}><View><Text style={[styles.insightTitle, { color: theme.colors.foreground, marginBottom: 2 }]}>Productivity details</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>Find the shape of your work</Text></View><Ionicons name="analytics-outline" size={22} color={theme.colors.primary} /></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productivityTabs}>{PRODUCTIVITY_TABS.map((tab) => <Chip key={tab.value} label={tab.label} icon={tab.icon} active={productivityTab === tab.value} onPress={() => setProductivityTab(tab.value)} />)}</ScrollView>
+        {productivityTab === "categories" ? <View style={styles.productivityBody}>{categoryCounts.length === 0 ? <Text style={[styles.emptyChartText, { color: theme.colors.mutedForeground }]}>No category data for these filters</Text> : categoryCounts.map(({ board, value }) => <View key={board.id} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.foreground }]} numberOfLines={1}>{board.label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${Math.max(8, (value / maxCategory) * 100)}%`, backgroundColor: boardColor(board.color).dot }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{value}</Text></View>)}</View> : null}
+        {productivityTab === "priorities" ? <View style={styles.productivityBody}>{PRIORITY_ORDER.map((key) => <View key={key} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.foreground }]}>{PRIORITY_META[key].label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${priorityCounts[key] ? Math.max(8, (priorityCounts[key] / maxPriority) * 100) : 0}%`, backgroundColor: PRIORITY_META[key].dot }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{priorityCounts[key]}</Text></View>)}</View> : null}
+        {productivityTab === "weekdays" ? <View style={styles.productivityBody}><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>Most productive rhythm across the selected period</Text><View style={styles.weekBars}>{weekday.map((value, index) => <View key={`${WEEKDAY_LABELS[index]}-${index}`} style={styles.weekBarItem}><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{value || ""}</Text><View style={[styles.weekBar, { height: Math.max(5, (value / maxWeekday) * 56), backgroundColor: value ? theme.colors.info : theme.colors.secondary }]} /><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{WEEKDAY_LABELS[index]}</Text></View>)}</View></View> : null}
+        {productivityTab === "trends" ? <View style={styles.productivityBody}><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>Current and previous periods stay aligned for an at-a-glance comparison.</Text><View style={styles.miniTrend}><Text style={[styles.miniTrendValue, { color: theme.colors.foreground }]}>{period.windowTotal}</Text><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>completed in this window</Text><View style={[styles.miniTrendDivider, { backgroundColor: theme.colors.border }]} /><Text style={[styles.miniTrendValue, { color: theme.colors.foreground }]}>{period.previousWindowTotal}</Text><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>previous window</Text></View></View> : null}
+      </Card>
+
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 13 }}>{filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"} match current filters</Text>
+        <Button variant="primary" label="Export CSV" onPress={exportFiltered} disabled={filteredTasks.length === 0} accessibilityLabel="Export filtered tasks as CSV" />
+      </View>
+    </View>
+  );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent: string }) { const { theme } = useTheme(); return <View style={[styles.stat, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}><View style={[styles.statAccent, { backgroundColor: accent }]} /><Text style={[styles.statValue, { color: theme.colors.foreground }]}>{value}</Text><Text style={[styles.statLabel, { color: theme.colors.mutedForeground }]}>{label}</Text></View>; }
+function Stat({ label, value, accent, change }: { label: string; value: string; accent: string; change?: string }) { const { theme } = useTheme(); return <View style={[styles.stat, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}><View style={[styles.statAccent, { backgroundColor: accent }]} /><Text style={[styles.statValue, { color: theme.colors.foreground }]}>{value}</Text><Text style={[styles.statLabel, { color: theme.colors.mutedForeground }]}>{label}</Text>{change ? <Text style={{ color: theme.colors.success, fontSize: 11, fontWeight: "700", marginTop: 5 }}>{change}</Text> : null}</View>; }
 
 const styles = StyleSheet.create({
   iconButton: { alignItems: "center", justifyContent: "center", borderRadius: 14 },
+  boardCardNew: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  boardCardNewPressable: { padding: 16, gap: 12 },
+  boardCardNewHeader: { gap: 2 },
+  boardCardNewTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  boardCardNewTitle: { fontSize: 15, fontWeight: "600", flex: 1, marginRight: 8 },
+  boardCardNewMeta: { fontSize: 11 },
+  boardCardNewProgress: { gap: 6 },
+  boardCardNewProgressHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  boardCardNewCounts: { flexDirection: "row", alignItems: "center", gap: 12 },
+  boardCardNewCountItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  boardCardNewDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1 },
+  boardCardNewCountText: { fontSize: 12 },
+  boardCardNewPct: { fontSize: 11, fontFamily: "monospace" },
+  boardCardNewProgressBar: { height: 6, borderRadius: 3, overflow: "hidden" },
+  boardCardNewProgressFill: { height: "100%", borderRadius: 3 },
+  boardCardNewAlerts: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  boardCardNewAlertsLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  boardCardNewAlertItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  boardCardNewAlertText: { fontSize: 11, fontWeight: "500" },
+  boardCardNewAvatars: { flexDirection: "row", alignItems: "center" },
+  boardCardNewAvatar: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(0,0,0,0.1)" },
+  boardCardNewAvatarText: { color: "#fff", fontSize: 9, fontWeight: "600" },
+  boardCardNewAvatarCount: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(0,0,0,0.1)" },
+  boardCardNewAvatarCountText: { fontSize: 9, fontWeight: "600" },
+  boardCardNewFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  boardCardNewFooterLeft: { flexDirection: "row", alignItems: "center", gap: 16 },
+  boardCardNewFooterBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
+  boardCardNewFooterBtnText: { fontSize: 12 },
+  boardCardNewRemoveText: { fontSize: 12, fontWeight: "500" },
   chip: { minHeight: 44, paddingHorizontal: 12, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  taskPressable: { marginBottom: 10 }, taskCard: { borderRadius: 16, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 2 }, taskTopline: { flexDirection: "row", alignItems: "flex-start", gap: 10 }, check: { width: 23, height: 23, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center", marginTop: 1 }, taskTitle: { flex: 1, fontSize: 15, lineHeight: 21, fontWeight: "700" }, priorityDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 }, taskDescription: { fontSize: 13, lineHeight: 18, marginTop: 8, marginLeft: 33 }, metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 11, marginLeft: 33 }, metaItem: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "75%" }, modalBackdrop: { flex: 1, justifyContent: "flex-end" }, modalKeyboard: { maxHeight: "94%" }, editor: { borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingTop: 16, maxHeight: "100%" }, editorHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }, editorEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 1.3 }, editorTitle: { fontSize: 23, lineHeight: 28, fontWeight: "700", marginTop: 2 }, fieldLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 16, marginBottom: 7 }, textArea: { minHeight: 78, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, textAlignVertical: "top", fontSize: 14 }, wrapRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, dateRow: { flexDirection: "row", alignItems: "center", gap: 4 }, subtaskRow: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 44 }, subtaskCheck: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center" }, subtaskText: { flex: 1, fontSize: 14, lineHeight: 19 }, addSubtask: { flexDirection: "row", alignItems: "center", gap: 8 }, subtaskInput: { flex: 1, height: 42, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 }, editorActions: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 }, sheetTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 }, sheetDescription: { fontSize: 14, lineHeight: 20 }, option: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 14, borderBottomWidth: StyleSheet.hairlineWidth }, boardCard: { borderRadius: 20, padding: 14, minHeight: 150 }, boardCardBody: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }, boardGlyph: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" }, boardCardCopy: { flex: 1 }, boardName: { fontSize: 16, fontWeight: "700" }, boardMeta: { fontSize: 12, marginTop: 4 }, progressTrack: { height: 5, borderRadius: 3, marginTop: 15, overflow: "hidden" }, progressFill: { height: "100%", borderRadius: 3 }, insightSwitch: { flexDirection: "row", gap: 8 }, statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 }, stat: { width: "48%", minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: 17, padding: 13, overflow: "hidden" }, statAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 }, statValue: { fontSize: 24, fontWeight: "800" }, statLabel: { fontSize: 12, marginTop: 4, fontWeight: "600" }, insightCard: { borderRadius: 19, padding: 16 }, insightTitle: { fontSize: 16, fontWeight: "700", marginBottom: 14 }, chart: { height: 105, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 3 }, chartPoint: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 5 }, chartBar: { width: "65%", minWidth: 4, borderRadius: 4 }, chartLabel: { fontSize: 9 }, weekBars: { height: 84, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 7 }, weekBarItem: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 6 }, weekBar: { width: "58%", minWidth: 5, borderRadius: 5 }, barRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 11 }, barLabel: { width: 66, fontSize: 12, fontWeight: "600" }, barTrack: { flex: 1, height: 9, borderRadius: 6, overflow: "hidden" }, barFill: { height: "100%", borderRadius: 6 },
+  taskPressable: { marginBottom: 10 }, taskCard: { borderRadius: 16, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 2 }, taskTopline: { flexDirection: "row", alignItems: "flex-start", gap: 10 }, check: { width: 23, height: 23, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center", marginTop: 1 }, taskTitle: { flex: 1, fontSize: 15, lineHeight: 21, fontWeight: "700" }, taskAction: { width: 44, height: 44, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center", marginTop: -10, marginRight: -6 }, priorityDot: { width: 7, height: 7, borderRadius: 4 }, priorityBadge: { minHeight: 28, paddingHorizontal: 9, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 6 }, statusBadge: { minHeight: 28, paddingHorizontal: 9, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 5 }, taskDescription: { fontSize: 13, lineHeight: 18, marginTop: 8, marginLeft: 33 }, metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 11, marginLeft: 33 }, metaItem: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "75%" }, modalBackdrop: { flex: 1, justifyContent: "flex-end" }, modalKeyboard: { maxHeight: "94%" }, editor: { borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingTop: 16, maxHeight: "100%" }, editorHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }, editorEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 1.3 }, editorTitle: { fontSize: 23, lineHeight: 28, fontWeight: "700", marginTop: 2 }, fieldLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 16, marginBottom: 7 }, textArea: { minHeight: 78, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, textAlignVertical: "top", fontSize: 14 }, tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 }, tag: { minHeight: 30, paddingHorizontal: 9, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 5 }, wrapRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, dateRow: { flexDirection: "row", alignItems: "center", gap: 4 }, subtaskRow: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 44 }, subtaskCheck: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center" }, subtaskText: { flex: 1, fontSize: 14, lineHeight: 19 }, addSubtask: { flexDirection: "row", alignItems: "center", gap: 8 }, subtaskInput: { flex: 1, height: 42, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 }, editorActions: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 }, sheetTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 }, sheetDescription: { fontSize: 14, lineHeight: 20 }, option: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 14, borderBottomWidth: StyleSheet.hairlineWidth }, boardCard: { borderRadius: 20, padding: 14, minHeight: 150 }, boardCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 }, boardCardBody: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minHeight: 44 }, boardGlyph: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" }, boardCardCopy: { flex: 1 }, boardName: { fontSize: 16, fontWeight: "700" }, boardMeta: { fontSize: 12, marginTop: 4 }, boardCreated: { fontSize: 10, marginTop: 2 }, boardSignals: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 12 }, boardSignal: { fontSize: 11, fontWeight: "700", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 }, progressTrack: { height: 5, borderRadius: 3, marginTop: 14, overflow: "hidden" }, progressFill: { height: "100%", borderRadius: 3 }, progressLabel: { fontSize: 11, fontWeight: "600", marginTop: 6 }, insightSwitch: { flexDirection: "row", gap: 8 }, statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 }, stat: { width: "48%", minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: 17, padding: 13, overflow: "hidden" }, statAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 }, statValue: { fontSize: 24, fontWeight: "800" }, statLabel: { fontSize: 12, marginTop: 4, fontWeight: "600" }, insightCard: { borderRadius: 19, padding: 16 }, insightTitle: { fontSize: 16, fontWeight: "700", marginBottom: 14 }, chart: { height: 105, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 3 }, chartPoint: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 5 }, chartBar: { width: "42%", minWidth: 4, borderRadius: 4 }, chartLabel: { fontSize: 9 }, weekBars: { height: 84, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 7 }, weekBarItem: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 6 }, weekBar: { width: "58%", minWidth: 5, borderRadius: 5 }, barRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 11 }, barLabel: { width: 66, fontSize: 12, fontWeight: "600" }, barTrack: { flex: 1, height: 9, borderRadius: 6, overflow: "hidden" }, barFill: { height: "100%", borderRadius: 6 },
+  overviewHeader: { flexDirection: "row", alignItems: "center", gap: 12 }, completionRing: { width: 62, height: 62, alignItems: "center", justifyContent: "center" }, completionRingLabel: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" }, completionRingValue: { fontSize: 13, fontWeight: "800" }, overviewCopy: { marginTop: 10 }, overviewMain: { fontSize: 20, fontWeight: "800" }, overviewTrack: { height: 8, borderRadius: 8, overflow: "hidden", marginTop: 12 }, overviewFill: { height: "100%", borderRadius: 8 }, overviewFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 7 }, trendMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: -8, marginBottom: 12 }, legend: { flexDirection: "row", alignItems: "center", gap: 4 }, legendDot: { width: 7, height: 7, borderRadius: 4 }, legendDash: { width: 16, borderTopWidth: 2, borderStyle: "dashed" }, chartValuePair: { minHeight: 18, alignItems: "center", justifyContent: "flex-end", gap: 1 }, chartBars: { width: "100%", flexDirection: "row", alignItems: "flex-end", justifyContent: "center", height: 76 }, chartBarButton: { width: "42%", alignItems: "center", justifyContent: "flex-end" }, chartPreviousOverlay: { position: "absolute", bottom: 0, left: "29%", width: "42%", borderTopWidth: 2, borderStyle: "dashed", opacity: 0.62 }, trendDetail: { minHeight: 34, borderRadius: 10, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }, comparisonCallout: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(127,127,127,0.22)" }, comparisonValue: { flexDirection: "row", alignItems: "center", gap: 3 }, productivityHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }, productivityTabs: { gap: 7, paddingVertical: 12 }, productivityBody: { minHeight: 88 }, emptyChartText: { color: "#8a8f9d", textAlign: "center", paddingVertical: 18, fontSize: 13 }, chartHint: { color: "#8a8f9d", fontSize: 12, lineHeight: 17 }, miniTrend: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 18 }, miniTrendValue: { fontSize: 28, fontWeight: "800" }, miniTrendDivider: { width: 1, height: 34, backgroundColor: "#d2d6df", marginHorizontal: 6 },
 });

@@ -1,0 +1,387 @@
+"use client";
+
+import { Check, ChevronDown, Circle, Minus, RotateCcw, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Button } from "@/components/ui/button";
+import { useTasksContext } from "@/components/providers/tasks-provider";
+import { PRIORITY_META } from "@/lib/domain/constants";
+import type { BoardSection, Task } from "@/lib/domain/types";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils/utils";
+
+interface SelectionToolbarProps {
+  selectedIds: Set<string>;
+  visibleTasks: Task[];
+  sections: BoardSection[];
+  onClear: () => void;
+  onSelectAll: () => void;
+  children?: ReactNode;
+}
+
+export function SelectionToolbar({
+  selectedIds,
+  visibleTasks,
+  sections,
+  onClear,
+  onSelectAll,
+}: SelectionToolbarProps) {
+  const { toggleComplete, toggleCancel, deleteTask, patchTask, assignTaskToSection, setTaskSectionId, snapshot, restore } = useTasksContext();
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const moveAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const priorityAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const count = selectedIds.size;
+  const selectedTasks = visibleTasks.filter((t) => selectedIds.has(t.id));
+
+  // Compute available bulk actions based on selection
+  const canComplete = selectedTasks.some((t) => !t.completed && !t.canceled);
+  const canCancel = selectedTasks.some((t) => !t.canceled && !t.completed);
+  const canRestore = selectedTasks.some((t) => t.completed || t.canceled);
+  const canDelete = count > 0;
+
+  // Determine applicable sections for "Move to section"
+  const applicableSections = sections.filter((s) => {
+    if (s.hidden) return false;
+    // Only show sections that aren't already the task's current section for ALL selected tasks
+    return selectedTasks.every((t) => {
+      if (s.status === "completed") return !t.completed;
+      if (s.status === "canceled") return !t.canceled;
+      if (s.status === "overdue") return !(t.dueAt && new Date(t.dueAt) < new Date());
+      if (s.status === "upcoming") return !(t.dueAt && new Date(t.dueAt) >= new Date()) || !t.dueAt;
+      return t.sectionId !== s.id;
+    });
+  });
+  // Unsorted is a board-only target. Moving there releases a custom section
+  // assignment instead of persisting a synthetic section.
+  const canMoveToUnsorted = selectedTasks.length > 0;
+
+  function handleBulkAction(action: () => number, label: string) {
+    const before = snapshot();
+    const changed = action();
+    if (changed === 0) return;
+    toast.success(`${label} (${count})`, {
+      duration: 3000,
+      action: { label: "Undo", onClick: () => restore(before) },
+    });
+    onClear();
+  }
+
+  function handleBulkComplete() {
+    handleBulkAction(() => {
+      let changed = 0;
+      selectedTasks.forEach((t) => {
+        if (!t.completed && !t.canceled) {
+          toggleComplete(t.id);
+          changed += 1;
+        }
+      });
+      return changed;
+    }, "Completed");
+  }
+
+  function handleBulkCancel() {
+    handleBulkAction(() => {
+      let changed = 0;
+      selectedTasks.forEach((t) => {
+        if (!t.canceled && !t.completed) {
+          toggleCancel(t.id);
+          changed += 1;
+        }
+      });
+      return changed;
+    }, "Canceled");
+  }
+
+  function handleBulkRestore() {
+    handleBulkAction(() => {
+      let changed = 0;
+      selectedTasks.forEach((t) => {
+        if (t.completed) {
+          toggleComplete(t.id);
+          changed += 1;
+        } else if (t.canceled) {
+          toggleCancel(t.id);
+          changed += 1;
+        }
+      });
+      return changed;
+    }, "Restored");
+  }
+
+  function handleBulkDelete() {
+    handleBulkAction(() => {
+      selectedTasks.forEach((t) => deleteTask(t.id));
+      return selectedTasks.length;
+    }, "Deleted");
+  }
+
+  function handleBulkPriority(priority: "low" | "medium" | "high") {
+    const before = snapshot();
+    // patchTask merges just `priority` and never re-runs keyword/status
+    // detection, so a task like "Cancel subscription" keeps its status.
+    selectedTasks.forEach((t) => {
+      patchTask(t.id, { priority });
+    });
+    toast.success(`Priority set to ${priority} (${count})`, {
+      duration: 3000,
+      action: { label: "Undo", onClick: () => restore(before) },
+    });
+    onClear();
+  }
+
+  function handleBulkMoveToSection(sectionId: string | null) {
+    if (sectionId === null) {
+      const before = snapshot();
+      selectedTasks.forEach((t) => setTaskSectionId(t.id, null));
+      toast.success(`Moved to Unsorted (${count})`, {
+        duration: 3000,
+        action: { label: "Undo", onClick: () => restore(before) },
+      });
+      setOpenMenu(null);
+      onClear();
+      return;
+    }
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const before = snapshot();
+    selectedTasks.forEach((t) => assignTaskToSection(t.id, sectionId));
+    toast.success(`Moved to ${section.title} (${count})`, {
+      duration: 3000,
+      action: { label: "Undo", onClick: () => restore(before) },
+    });
+    setOpenMenu(null);
+    onClear();
+  }
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!openMenu) return;
+    function onPointerDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [openMenu]);
+
+  // Position menu, anchored to whichever trigger opened it.
+  useEffect(() => {
+    if (!openMenu) return;
+    const anchor = openMenu === "move" ? moveAnchorRef.current : priorityAnchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const menu = menuRef.current;
+    if (!menu) return;
+    const { width, height } = menu.getBoundingClientRect();
+    const margin = 8;
+    let top = rect.bottom + 4;
+    if (top + height > window.innerHeight - margin) top = rect.top - height - 4;
+    let left = rect.left;
+    if (left + width > window.innerWidth - margin) left = window.innerWidth - width - margin;
+    left = Math.max(margin, left);
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+    menu.style.visibility = "visible";
+  }, [openMenu]);
+
+  return (
+    <>
+      <div
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex w-full max-w-3xl items-center gap-2 px-4 animate-in slide-in-from-bottom-4 duration-200 sm:px-6"
+        role="toolbar"
+        aria-label="Bulk actions"
+      >
+        <div className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card/95 px-4 py-2.5 shadow-2xl backdrop-blur-sm">
+          <span className="shrink-0 text-sm font-medium text-foreground">
+            {count} {count === 1 ? "task" : "tasks"} selected
+          </span>
+
+          <div className="flex flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {selectedIds.size < visibleTasks.length ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSelectAll}
+                className="whitespace-nowrap"
+                aria-label="Select all visible tasks"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Select all</span>
+              </Button>
+            ) : null}
+            {canComplete && (
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={handleBulkComplete}
+                className="whitespace-nowrap"
+                aria-label={`Complete ${count} task${count > 1 ? "s" : ""}`}
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Complete</span>
+              </Button>
+            )}
+            {canCancel && (
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={handleBulkCancel}
+                className="whitespace-nowrap"
+                aria-label={`Cancel ${count} task${count > 1 ? "s" : ""}`}
+              >
+                <Minus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Cancel</span>
+              </Button>
+            )}
+            {canRestore && (
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={handleBulkRestore}
+                className="whitespace-nowrap"
+                aria-label={`Restore ${count} task${count > 1 ? "s" : ""}`}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Restore</span>
+              </Button>
+            )}
+
+            {/* Move to section dropdown */}
+            {(applicableSections.length > 0 || canMoveToUnsorted) && (
+              <div className="relative">
+                <button
+                  ref={moveAnchorRef}
+                  type="button"
+                  onClick={() => setOpenMenu(openMenu === "move" ? null : "move")}
+                  aria-haspopup="menu"
+                  aria-expanded={openMenu === "move"}
+                  aria-label="Move to section"
+                  className="touch-target focus-ring inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg bg-muted px-3 text-sm font-medium transition-colors hover:bg-muted/80"
+                >
+                  <Circle className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Move to…</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+                {openMenu === "move" && typeof document !== "undefined" ? (
+                  createPortal(
+                    <div
+                      ref={menuRef}
+                      role="menu"
+                      aria-label="Move to section"
+                      className="z-50 min-w-[160px] rounded-xl border border-border bg-popover p-1 shadow-xl"
+                      style={{
+                        position: "fixed",
+                        top: -9999,
+                        left: -9999,
+                        visibility: "hidden",
+                      }}
+                    >
+                      {canMoveToUnsorted ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => handleBulkMoveToSection(null)}
+                           className="touch-target focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
+                        >
+                          <Circle className="h-3.5 w-3.5" />
+                          Unsorted
+                        </button>
+                      ) : null}
+                      {applicableSections.map((section) => (
+                        <button
+                          key={section.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => handleBulkMoveToSection(section.id)}
+                           className="touch-target focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
+                        >
+                          <Circle className="h-3.5 w-3.5" />
+                          {section.title}
+                        </button>
+                      ))}
+                    </div>,
+                    document.body
+                  )
+                ) : null}
+              </div>
+            )}
+
+            {/* Set priority dropdown */}
+            <div className="relative">
+              <button
+                ref={priorityAnchorRef}
+                type="button"
+                onClick={() => setOpenMenu(openMenu === "priority" ? null : "priority")}
+                aria-haspopup="menu"
+                aria-expanded={openMenu === "priority"}
+                aria-label="Set priority"
+                  className="touch-target focus-ring inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg bg-muted px-3 text-sm font-medium transition-colors hover:bg-muted/80"
+              >
+                <span className="hidden sm:inline">Priority</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {openMenu === "priority" && typeof document !== "undefined" ? (
+                createPortal(
+                  <div
+                    ref={menuRef}
+                    role="menu"
+                    aria-label="Set priority"
+                    className="z-50 min-w-[140px] rounded-xl border border-border bg-popover p-1 shadow-xl"
+                    style={{
+                      position: "fixed",
+                      top: -9999,
+                      left: -9999,
+                      visibility: "hidden",
+                    }}
+                  >
+                    {(["low", "medium", "high"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handleBulkPriority(p)}
+                         className="touch-target focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
+                      >
+                        <span
+                          className={cn("h-3.5 w-3.5 rounded-full", PRIORITY_META[p].dot)}
+                        />
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </button>
+                    ))}
+                  </div>,
+                  document.body
+                )
+              ) : null}
+            </div>
+
+            {canDelete && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleBulkDelete}
+                className="whitespace-nowrap"
+                aria-label={`Delete ${count} task${count > 1 ? "s" : ""}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClear}
+              className="ml-auto whitespace-nowrap"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Clear</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

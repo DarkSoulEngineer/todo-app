@@ -1,6 +1,144 @@
 import { makeId } from "@/lib/utils/id";
-import type { Task, TaskDraft } from "@/lib/domain/types";
+import { isValid, parseISO } from "date-fns";
+import type {
+  ActivityEvent,
+  Assignee,
+  Attachment,
+  Subtask,
+  Task,
+  TaskDraft,
+} from "@/lib/domain/types";
 import { detectStatusFromText } from "@/lib/domain/status-keywords";
+
+export function normalizeTags(tags: readonly unknown[] | undefined): string[] {
+  if (!tags) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const tag of tags) {
+    if (typeof tag !== "string") continue;
+    const value = tag.trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+
+export function normalizeAssignee(value: unknown): Assignee | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.name !== "string" || !record.name.trim()) return null;
+  const assignee: Assignee = {
+    id: typeof record.id === "string" && record.id ? record.id : makeId(8),
+    name: record.name,
+  };
+  for (const key of ["initials", "email", "avatarUrl", "subtitle", "color"] as const) {
+    if (typeof record[key] === "string") assignee[key] = record[key];
+  }
+  return assignee;
+}
+
+export function cloneAssignee(assignee: Assignee | null | undefined): Assignee | null {
+  return normalizeAssignee(assignee);
+}
+
+export function normalizeAttachment(value: unknown): Attachment | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.name !== "string" || !record.name.trim()) return null;
+  if (typeof record.url !== "string" || !record.url.trim()) return null;
+  const attachment: Attachment = {
+    id: typeof record.id === "string" && record.id ? record.id : makeId(8),
+    name: record.name,
+    url: record.url,
+  };
+  if (typeof record.mimeType === "string") attachment.mimeType = record.mimeType;
+  if (typeof record.size === "number" && Number.isFinite(record.size) && record.size >= 0) {
+    attachment.size = record.size;
+  }
+  return attachment;
+}
+
+export function cloneAttachment(attachment: Attachment): Attachment | null {
+  return normalizeAttachment(attachment);
+}
+
+export function normalizeActivityEvent(value: unknown): ActivityEvent | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    !record.id ||
+    typeof record.type !== "string" ||
+    !record.type.trim() ||
+    typeof record.message !== "string" ||
+    !record.message.trim() ||
+    typeof record.createdAt !== "string" ||
+    !record.createdAt.trim()
+  ) {
+    return null;
+  }
+  if (!isValid(parseISO(record.createdAt))) return null;
+  return {
+    id: record.id,
+    type: record.type,
+    message: record.message,
+    createdAt: record.createdAt,
+    actor: normalizeAssignee(record.actor),
+  };
+}
+
+export function cloneActivityEvent(event: ActivityEvent): ActivityEvent | null {
+  return normalizeActivityEvent(event);
+}
+
+export function cloneTask(task: Task): Task {
+  return {
+    ...task,
+    subtasks: (task.subtasks ?? []).map((subtask: Subtask) => ({ ...subtask })),
+    assignee: cloneAssignee(task.assignee),
+    tags: [...(task.tags ?? [])],
+    attachments: (task.attachments ?? [])
+      .map(cloneAttachment)
+      .filter((attachment): attachment is Attachment => attachment !== null),
+    activity: (task.activity ?? [])
+      .map(cloneActivityEvent)
+      .filter((event): event is ActivityEvent => event !== null)
+      .slice(-50),
+  };
+}
+
+function isPriority(value: unknown): value is Task["priority"] {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+/** Applies only supported task fields; metadata containers remain append-only. */
+export function applyTaskPatch(task: Task, patch: unknown): Task {
+  if (typeof patch !== "object" || patch === null) return cloneTask(task);
+  const record = patch as Record<string, unknown>;
+  const next = cloneTask(task);
+  if (typeof record.title === "string") next.title = record.title;
+  if (typeof record.description === "string") next.description = record.description;
+  if (record.dueAt === null || typeof record.dueAt === "string") next.dueAt = record.dueAt;
+  if (isPriority(record.priority)) next.priority = record.priority;
+  if (record.category === null || typeof record.category === "string") next.category = record.category;
+  if (record.sectionId === null || typeof record.sectionId === "string") next.sectionId = record.sectionId;
+  if (Array.isArray(record.subtasks)) {
+    next.subtasks = record.subtasks
+      .filter((subtask): subtask is Record<string, unknown> => typeof subtask === "object" && subtask !== null)
+      .filter((subtask) => typeof subtask.title === "string" && typeof subtask.done === "boolean")
+      .map((subtask) => ({
+        id: typeof subtask.id === "string" ? subtask.id : makeId(8),
+        title: subtask.title as string,
+        done: subtask.done as boolean,
+      }));
+  }
+  if (Object.prototype.hasOwnProperty.call(record, "assignee")) {
+    next.assignee = normalizeAssignee(record.assignee);
+  }
+  if (Array.isArray(record.tags)) next.tags = normalizeTags(record.tags);
+  return next;
+}
 
 /** Builds a fresh task from a draft, trimming text and stamping timestamps.
  * Auto-detects status from title/description keywords if present. */
@@ -25,6 +163,10 @@ export function createTask(draft: TaskDraft): Task {
       title: subtask.title.trim(),
       done: subtask.done,
     })),
+    assignee: cloneAssignee(draft.assignee),
+    tags: normalizeTags(draft.tags),
+    attachments: [],
+    activity: [],
     createdAt: now,
     updatedAt: now,
     completedAt: detectedStatus === "completed" ? now : null,
@@ -40,7 +182,7 @@ export function createTask(draft: TaskDraft): Task {
  */
 export function applyDraft(task: Task, draft: TaskDraft): Task {
   return {
-    ...task,
+    ...cloneTask(task),
     title: draft.title.trim(),
     description: draft.description.trim(),
     dueAt: draft.dueAt,
@@ -51,6 +193,8 @@ export function applyDraft(task: Task, draft: TaskDraft): Task {
       title: subtask.title.trim(),
       done: subtask.done,
     })),
+    assignee: draft.assignee === undefined ? cloneAssignee(task.assignee) : cloneAssignee(draft.assignee),
+    tags: draft.tags === undefined ? [...task.tags] : normalizeTags(draft.tags),
     updatedAt: new Date().toISOString(),
   };
 }

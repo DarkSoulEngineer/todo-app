@@ -18,7 +18,7 @@ export function Button({ variant = "primary", size = "md", label, children, styl
   const variantStyle = (() => {
     switch (variant) {
       case "primary":
-        return { backgroundColor: theme.colors.primary };
+        return { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary, shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 };
       case "secondary":
         return { backgroundColor: theme.colors.secondary, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border };
       case "outline":
@@ -26,9 +26,9 @@ export function Button({ variant = "primary", size = "md", label, children, styl
       case "ghost":
         return { backgroundColor: "transparent" };
       case "danger":
-        return { backgroundColor: theme.colors.destructive };
+        return { backgroundColor: theme.colors.destructive, shadowColor: theme.colors.destructive, shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 };
       case "soft":
-        return { backgroundColor: theme.colors.primarySoft };
+        return { backgroundColor: theme.colors.primarySoft, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.primarySoft };
       default:
         return { backgroundColor: theme.colors.primary };
     }
@@ -45,7 +45,7 @@ export function Button({ variant = "primary", size = "md", label, children, styl
       case "ghost":
         return theme.colors.mutedForeground;
       case "danger":
-        return "#FFFFFF";
+        return theme.colors.destructiveForeground;
       case "soft":
         return theme.colors.accentForeground;
       default:
@@ -73,6 +73,7 @@ export function Button({ variant = "primary", size = "md", label, children, styl
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       disabled={disabled}
       style={({ pressed }) => [
         styles.base,

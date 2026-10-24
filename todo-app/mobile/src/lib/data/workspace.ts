@@ -2,7 +2,15 @@ import { isValid, parseISO } from "date-fns";
 import { defaultBoards, normalizeBoards } from "@/lib/domain/boards";
 import { isCategoryId } from "@/lib/domain/categories";
 import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/domain/sections";
-import type { Priority, Subtask, Task, Workspace } from "@/lib/domain/types";
+import type {
+  ActivityEvent,
+  Assignee,
+  Attachment,
+  Priority,
+  Subtask,
+  Task,
+  Workspace,
+} from "@/lib/domain/types";
 import { makeId } from "@/lib/utils/id";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
@@ -34,6 +42,69 @@ function normalizeSubtask(value: unknown): Subtask | null {
   };
 }
 
+function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeAssignee(value: unknown): Assignee | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const name = optionalString(record, "name");
+  if (!name) return null;
+  const assignee: Assignee = { id: asString(record.id) || makeId(8), name };
+  for (const key of ["initials", "email", "avatarUrl", "subtitle", "color"] as const) {
+    const item = optionalString(record, key);
+    if (item) assignee[key] = item;
+  }
+  return assignee;
+}
+
+function normalizeAttachment(value: unknown): Attachment | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const name = optionalString(record, "name");
+  const url = optionalString(record, "url");
+  if (!name || !url) return null;
+  const attachment: Attachment = { id: asString(record.id) || makeId(8), name, url };
+  const mimeType = optionalString(record, "mimeType");
+  if (mimeType) attachment.mimeType = mimeType;
+  if (typeof record.size === "number" && Number.isFinite(record.size) && record.size >= 0) {
+    attachment.size = record.size;
+  }
+  return attachment;
+}
+
+function normalizeActivityEvent(value: unknown): ActivityEvent | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const type = optionalString(record, "type");
+  const message = optionalString(record, "message");
+  const createdAt = normalizeDate(record.createdAt) ?? normalizeDate(record.timestamp);
+  if (!type || !message || !createdAt) return null;
+  return {
+    id: asString(record.id) || makeId(8),
+    type,
+    message,
+    createdAt,
+    actor: normalizeAssignee(record.actor),
+  };
+}
+
+function normalizeTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const tag = item.trim();
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    tags.push(tag);
+  }
+  return tags;
+}
+
 /** Turns unknown persisted data into a safe, fully-populated Task. */
 function normalizeTask(value: unknown): Task | null {
   if (typeof value !== "object" || value === null) return null;
@@ -48,6 +119,17 @@ function normalizeTask(value: unknown): Task | null {
 
   const subtasks = Array.isArray(record.subtasks)
     ? record.subtasks.map(normalizeSubtask).filter((item): item is Subtask => item !== null)
+    : [];
+  const attachments = Array.isArray(record.attachments)
+    ? record.attachments
+        .map(normalizeAttachment)
+        .filter((item): item is Attachment => item !== null)
+    : [];
+  const activity = Array.isArray(record.activity)
+    ? record.activity
+        .map(normalizeActivityEvent)
+        .filter((item): item is ActivityEvent => item !== null)
+        .slice(-50)
     : [];
 
   return {
@@ -64,6 +146,10 @@ function normalizeTask(value: unknown): Task | null {
     createdAt,
     updatedAt: normalizeDate(record.updatedAt) ?? createdAt,
     completedAt: completed ? normalizeDate(record.completedAt) : null,
+    assignee: normalizeAssignee(record.assignee),
+    tags: normalizeTags(record.tags),
+    attachments,
+    activity,
   };
 }
 
@@ -77,7 +163,25 @@ function extractParts(parsed: unknown): {
   if (Array.isArray(parsed)) {
     return { tasks: parsed, sections: undefined, boards: undefined, deletedCategories: undefined };
   }
-  const record = (parsed ?? {}) as Record<string, unknown>;
+
+  if (typeof parsed !== "object" || parsed === null) {
+    return { tasks: undefined, sections: undefined, boards: undefined, deletedCategories: undefined };
+  }
+
+  const record = parsed as Record<string, unknown>;
+  // Board exports from the web app wrap the portable workspace in metadata:
+  // `{ workspace: { tasks, sections, boards } }`. Once that property is
+  // present, use it as the source of truth rather than falling back to the
+  // wrapper; this keeps malformed wrappers from being treated as a different
+  // format and accidentally importing partial data.
+  if (Object.prototype.hasOwnProperty.call(record, "workspace")) {
+    const workspace = record.workspace;
+    if (typeof workspace !== "object" || workspace === null || Array.isArray(workspace)) {
+      return { tasks: undefined, sections: undefined, boards: undefined, deletedCategories: undefined };
+    }
+    return extractParts(workspace);
+  }
+
   return {
     tasks: record.tasks,
     sections: record.sections,
@@ -123,9 +227,29 @@ export function buildWorkspace(parsed: unknown): Workspace | null {
         seenSubtaskIds.add(subtaskId);
         return subtaskId === subtask.id ? subtask : { ...subtask, id: subtaskId };
       });
-      return id === task.id && subtasks.every((subtask, index) => subtask === task.subtasks[index])
+
+      const seenAttachmentIds = new Set<string>();
+      const attachments = task.attachments.map((attachment) => {
+        let attachmentId = attachment.id;
+        while (seenAttachmentIds.has(attachmentId)) attachmentId = makeId(8);
+        seenAttachmentIds.add(attachmentId);
+        return attachmentId === attachment.id ? attachment : { ...attachment, id: attachmentId };
+      });
+
+      const seenActivityIds = new Set<string>();
+      const activity = task.activity.map((event) => {
+        let eventId = event.id;
+        while (seenActivityIds.has(eventId)) eventId = makeId(8);
+        seenActivityIds.add(eventId);
+        return eventId === event.id ? event : { ...event, id: eventId };
+      });
+
+      const subtasksUnchanged = subtasks.every((subtask, index) => subtask === task.subtasks[index]);
+      const attachmentsUnchanged = attachments.every((attachment, index) => attachment === task.attachments[index]);
+      const activityUnchanged = activity.every((event, index) => event === task.activity[index]);
+      return id === task.id && subtasksUnchanged && attachmentsUnchanged && activityUnchanged
         ? task
-        : { ...task, id, subtasks };
+        : { ...task, id, subtasks, attachments, activity };
     });
   const sections = normalizeSections(rawSections);
   reconcileSectionIds(tasks, sections);

@@ -1,7 +1,7 @@
 import { TextInput, StyleSheet, type TextInputProps } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
 
-export function Input(props: TextInputProps) {
+export function Input({ style, ...props }: TextInputProps) {
   const { theme } = useTheme();
   return (
     <TextInput
@@ -16,7 +16,7 @@ export function Input(props: TextInputProps) {
           fontSize: 14,
           paddingHorizontal: 12,
         },
-        props.style,
+        style,
       ]}
       {...props}
     />

@@ -18,7 +18,7 @@ export function EmptyState({
 }) {
   const { theme } = useTheme();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radius.xl }]}>
       <View style={[styles.iconWrap, { backgroundColor: theme.colors.primarySoft }]}>
         <Ionicons name={icon} size={22} color={theme.colors.primary} />
       </View>
@@ -35,6 +35,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
     gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: "dashed",
   },
   iconWrap: {
     width: 48,

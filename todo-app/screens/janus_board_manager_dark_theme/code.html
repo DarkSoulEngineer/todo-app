@@ -1,0 +1,475 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>Janus - Board Manager</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#0e0e11',
+              card: '#16161a',
+              cardBorder: '#23232a',
+              purple: '#8c7cf0',
+              accent: '#a78bfa',
+              green: '#4ade80',
+              red: '#f87171',
+              blue: '#38bdf8',
+              orange: '#fb923c'
+            }
+          },
+          fontFamily: {
+            serifHeading: ['Newsreader', 'Playfair Display', 'Georgia', 'serif'],
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&amp;display=swap" rel="stylesheet">
+<style data-purpose="custom-background">
+    /* Subtle dot grid pattern seen in Janus desktop & mobile viewports */
+    .bg-dot-pattern {
+      background-color: #0e0e11;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    /* Safe-area insets for modern mobile devices */
+    .pt-safe {
+      padding-top: env(safe-area-inset-top, 12px);
+    }
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+  </style>
+<style data-purpose="scroll-behavior">
+    /* Smooth native scroll feel without unsightly scrollbars */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#0e0e11] text-gray-200 font-sans antialiased selection:bg-purple-500 selection:text-white min-h-screen flex justify-center">
+<!-- Mobile Screen Container -->
+<div class="w-full max-w-[430px] min-h-screen flex flex-col bg-dot-pattern border-x border-[#1c1c22] shadow-2xl relative pb-28">
+<!-- BEGIN: MobileStatusBar -->
+
+<!-- END: MobileStatusBar -->
+<!-- BEGIN: AppHeader -->
+<header class="px-5 pt-3 pb-4 border-b border-[#1f1f26]/60 flex items-center justify-between">
+<!-- App Brand & Title -->
+<div class="flex items-center space-x-3">
+
+<div>
+<h1 class="text-base font-semibold text-white tracking-tight flex items-center gap-1.5 leading-none">
+            Janus
+          </h1>
+<span class="text-[11px] text-zinc-400 font-normal">Focused task manager</span>
+</div>
+</div>
+<!-- Controls: Theme Toggle & Avatar Menu -->
+<div class="flex items-center space-x-2">
+<!-- Segmented Theme Switcher -->
+<div class="flex items-center bg-[#17171c] p-0.5 rounded-lg border border-[#272730]">
+<button aria-label="Light mode" class="p-1.5 text-zinc-400 hover:text-zinc-200 transition" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+</button>
+<button aria-label="Dark mode active" class="p-1.5 text-purple-300 bg-[#282834] rounded-[6px] shadow-sm" type="button">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+</button>
+</div>
+<!-- User Profile Pill / Menu Trigger -->
+<button class="w-8 h-8 rounded-lg bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-semibold flex items-center justify-center hover:bg-purple-600/50 transition">
+          YO
+        </button>
+</div>
+</header>
+<!-- END: AppHeader -->
+<!-- Scrollable Content View -->
+<main class="flex-1 px-5 pt-5 pb-6 space-y-6 overflow-y-auto no-scrollbar">
+<!-- BEGIN: HeroHeadlineSection -->
+<section class="space-y-1.5" data-purpose="hero-title">
+<div class="text-[10px] tracking-wider uppercase font-semibold text-purple-400/90 flex items-center gap-1.5">
+<span class="">HOME</span>
+<span class="text-zinc-600">/</span>
+<span class="">BOARDS</span>
+</div>
+<h2 class="text-3xl font-normal font-serifHeading text-zinc-100 tracking-tight">Board manager</h2>
+<p class="text-xs text-zinc-400 max-w-[340px] leading-relaxed">
+          Open a board to pick up right where you left off.
+        </p>
+</section>
+<!-- END: HeroHeadlineSection -->
+<!-- BEGIN: ActionControlsBar -->
+<section class="flex items-center gap-2.5" data-purpose="action-buttons">
+<!-- Import Board Action -->
+<button class="flex-1 py-2.5 px-3 rounded-xl bg-[#18181f] border border-[#2b2b36] hover:border-zinc-500 text-zinc-200 text-xs font-medium flex items-center justify-center gap-2 transition active:scale-[0.98]" type="button">
+<svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          Import board
+        </button>
+<!-- New Board Primary Action -->
+<button class="flex-1 py-2.5 px-3 rounded-xl bg-purple-400 hover:bg-purple-300 text-zinc-950 font-semibold text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] shadow-md shadow-purple-900/20" type="button">
+<svg class="w-4 h-4 text-zinc-950 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          New board
+        </button>
+</section>
+<!-- END: ActionControlsBar -->
+<!-- BEGIN: SearchAndArrangeBar -->
+<section class="flex items-center gap-2" data-purpose="search-and-arrange">
+<div class="relative flex-1">
+<svg class="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<circle cx="11" cy="11" r="8"></circle>
+<line x1="21" x2="16.65" y1="21" y2="16.65"></line>
+</svg>
+<input class="w-full bg-[#14141a]/90 text-xs text-zinc-200 pl-9 pr-9 py-2 rounded-xl border border-[#262632] placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition" placeholder="Search boards" type="text">
+<kbd class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-mono border border-zinc-700/60 rounded px-1.5 py-0.5 bg-[#1a1a24]">
+            /
+          </kbd>
+</div>
+<button class="py-2 px-3 bg-[#17171f] border border-[#262632] hover:border-zinc-600 rounded-xl text-xs text-zinc-300 font-medium flex items-center gap-1.5 transition" type="button">
+<svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<rect height="7" width="7" x="3" y="3"></rect>
+<rect height="7" width="7" x="14" y="3"></rect>
+<rect height="7" width="7" x="14" y="14"></rect>
+<rect height="7" width="7" x="3" y="14"></rect>
+</svg>
+          Rearrange
+        </button>
+</section>
+<!-- END: SearchAndArrangeBar -->
+<!-- BEGIN: BoardsSection -->
+<section class="space-y-3.5" data-purpose="boards-list">
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-baseline gap-2">
+<h3 class="text-sm font-semibold text-zinc-200">Your boards</h3>
+<span class="text-[11px] text-zinc-500">2 active</span>
+</div>
+<button aria-label="More board options" class="text-zinc-500 hover:text-zinc-300 p-1">
+<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="2"></circle>
+<circle cx="19" cy="12" r="2"></circle>
+<circle cx="5" cy="12" r="2"></circle>
+</svg>
+</button>
+</div>
+<!-- Board Card 1: BoardGame -->
+<article class="bg-[#141419]/90 border border-[#23232d] rounded-2xl p-4 shadow-sm hover:border-[#353545] transition-all space-y-3.5">
+<!-- Card Header Info -->
+<div class="flex items-start justify-between">
+<div class="flex items-center space-x-3">
+
+<div>
+<h4 class="text-sm font-semibold text-white tracking-tight">BoardGame</h4>
+<p class="text-[11px] text-zinc-500">Created 24 Oct 2026</p>
+</div>
+</div>
+<button aria-label="Bookmark board" class="text-zinc-500 hover:text-amber-400 transition">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+</svg>
+</button>
+</div>
+<!-- Progress and Counts -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center space-x-3 text-zinc-300">
+<span class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full border border-zinc-400 inline-block"></span>
+<strong class="font-medium">12</strong> open
+                </span>
+<span class="flex items-center gap-1.5 text-emerald-400 font-medium">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path></svg>
+<strong>7</strong> done
+                </span>
+</div>
+<span class="text-zinc-400 font-mono text-[11px]">37%</span>
+</div>
+<!-- Progress Bar -->
+<div class="w-full h-1.5 bg-[#202029] rounded-full overflow-hidden">
+<div class="bg-gradient-to-r from-emerald-400 to-green-500 h-full rounded-full" style="width: 37%"></div>
+</div>
+</div>
+<!-- Deadlines & Collaborator Stack -->
+<div class="flex items-center justify-between text-[11px] pt-0.5">
+<div class="flex items-center space-x-2.5">
+<span class="text-rose-400 flex items-center gap-1">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+                6 overdue
+              </span>
+<span class="text-sky-400 flex items-center gap-1">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+                5 due soon
+              </span>
+</div>
+<!-- Member Avatar Stack -->
+<div class="flex items-center -space-x-1.5">
+<span class="w-5 h-5 rounded-full bg-pink-500 border border-[#141419] flex items-center justify-center text-[9px] text-white font-medium">A</span>
+<span class="w-5 h-5 rounded-full bg-blue-500 border border-[#141419] flex items-center justify-center text-[9px] text-white font-medium">J</span>
+<span class="w-5 h-5 rounded-full bg-teal-500 border border-[#141419] flex items-center justify-center text-[9px] text-white font-medium">R</span>
+<span class="w-5 h-5 rounded-full bg-[#272733] border border-[#141419] flex items-center justify-center text-[9px] text-zinc-300 font-semibold font-mono">+6</span>
+</div>
+</div>
+<hr class="border-[#202029]">
+<!-- Footer Actions -->
+<div class="flex items-center justify-between text-xs pt-0.5">
+<div class="flex items-center space-x-4 text-zinc-400">
+<button class="hover:text-zinc-200 flex items-center gap-1.5 transition">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+                Save
+              </button>
+<button class="hover:text-zinc-200 flex items-center gap-1.5 transition">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect height="13" rx="2" ry="2" width="13" x="9" y="9"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Duplicate
+              </button>
+</div>
+<button class="text-rose-400/90 hover:text-rose-300 text-xs font-medium transition">
+              Remove
+            </button>
+</div>
+</article>
+<!-- Board Card 2: My board -->
+<article class="bg-[#141419]/90 border border-[#23232d] rounded-2xl p-4 shadow-sm hover:border-[#353545] transition-all space-y-3.5">
+<!-- Card Header Info -->
+<div class="flex items-start justify-between">
+<div class="flex items-center space-x-3">
+
+<div>
+<h4 class="text-sm font-semibold text-white tracking-tight">My board</h4>
+<p class="text-[11px] text-zinc-500">Created 24 Oct 2026</p>
+</div>
+</div>
+<button aria-label="Bookmark board" class="text-zinc-500 hover:text-amber-400 transition">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+</svg>
+</button>
+</div>
+<!-- Progress and Counts -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center space-x-3 text-zinc-300">
+<span class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full border border-zinc-400 inline-block"></span>
+<strong class="font-medium">12</strong> open
+                </span>
+<span class="flex items-center gap-1.5 text-pink-400 font-medium">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path></svg>
+<strong>7</strong> done
+                </span>
+</div>
+<span class="text-zinc-400 font-mono text-[11px]">37%</span>
+</div>
+<!-- Progress Bar -->
+<div class="w-full h-1.5 bg-[#202029] rounded-full overflow-hidden">
+<div class="bg-gradient-to-r from-pink-500 to-rose-400 h-full rounded-full" style="width: 37%"></div>
+</div>
+</div>
+<!-- Deadlines & Collaborator Stack -->
+<div class="flex items-center justify-between text-[11px] pt-0.5">
+<div class="flex items-center space-x-2.5">
+<span class="text-rose-400 flex items-center gap-1">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+                7 overdue
+              </span>
+<span class="text-sky-400 flex items-center gap-1">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+                5 due soon
+              </span>
+</div>
+<!-- Member Avatar Stack -->
+<div class="flex items-center -space-x-1.5">
+<span class="w-5 h-5 rounded-full bg-cyan-500 border border-[#141419] flex items-center justify-center text-[9px] text-white font-medium">M</span>
+<span class="w-5 h-5 rounded-full bg-emerald-500 border border-[#141419] flex items-center justify-center text-[9px] text-white font-medium">B</span>
+<span class="w-5 h-5 rounded-full bg-amber-500 border border-[#141419] flex items-center justify-center text-[9px] text-white font-medium">S</span>
+<span class="w-5 h-5 rounded-full bg-[#272733] border border-[#141419] flex items-center justify-center text-[9px] text-zinc-300 font-semibold font-mono">+6</span>
+</div>
+</div>
+<hr class="border-[#202029]">
+<!-- Footer Actions -->
+<div class="flex items-center justify-between text-xs pt-0.5">
+<div class="flex items-center space-x-4 text-zinc-400">
+<button class="hover:text-zinc-200 flex items-center gap-1.5 transition">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+                Save
+              </button>
+<button class="hover:text-zinc-200 flex items-center gap-1.5 transition">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect height="13" rx="2" ry="2" width="13" x="9" y="9"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Duplicate
+              </button>
+</div>
+<button class="text-rose-400/90 hover:text-rose-300 text-xs font-medium transition">
+              Remove
+            </button>
+</div>
+</article>
+</section>
+<!-- END: BoardsSection -->
+<!-- BEGIN: BoardStatsSection -->
+<section class="pt-2" data-purpose="aggregated-statistics">
+<div class="bg-[#141419]/90 border border-[#23232d] rounded-2xl p-5 shadow-sm space-y-4">
+<!-- Section Title -->
+<div class="flex items-center justify-between">
+<div>
+<h3 class="text-sm font-semibold text-zinc-200 tracking-tight">Board stats</h3>
+<p class="text-[11px] text-zinc-500">Across all boards · canceled tasks excluded</p>
+</div>
+<!-- Activity Sparkle / Pulse Icon -->
+<div class="text-purple-400/80">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+</svg>
+</div>
+</div>
+<!-- Total Tasks Header Callout -->
+<div class="flex items-baseline justify-between pt-1">
+<div>
+<span class="text-[10px] tracking-wider uppercase text-zinc-400 font-semibold block">TOTAL TASKS</span>
+<span class="text-3xl font-serifHeading text-white">50</span>
+</div>
+<span class="text-xs text-zinc-400 font-mono">across 2 boards</span>
+</div>
+<hr class="border-[#202029]">
+<!-- Donut Breakdown Grid -->
+<div class="grid grid-cols-12 gap-3 items-center">
+<!-- SVG Donut Chart Column -->
+<div class="col-span-5 flex justify-center py-2 relative">
+<svg class="w-28 h-28 transform -rotate-90" viewBox="0 0 100 100">
+<!-- Background Base Ring -->
+<circle cx="50" cy="50" fill="transparent" r="38" stroke="#1f1f28" stroke-width="9"></circle>
+<!-- Completed Segment (28% ~ 66.8 circumference) -->
+<!-- C = 2 * pi * 38 = 238.76 -->
+<!-- Completed: 28% -> 66.85 -->
+<circle cx="50" cy="50" fill="transparent" r="38" stroke="#34d399" stroke-dasharray="66.85 238.76" stroke-dashoffset="0" stroke-linecap="round" stroke-width="9"></circle>
+<!-- Overdue Segment (26% -> 62.07) -->
+<circle cx="50" cy="50" fill="transparent" r="38" stroke="#f87171" stroke-dasharray="62.07 238.76" stroke-dashoffset="-69" stroke-linecap="round" stroke-width="9"></circle>
+<!-- Open Segment (48% -> 114.6) -->
+<circle cx="50" cy="50" fill="transparent" r="38" stroke="#38bdf8" stroke-dasharray="88 238.76" stroke-dashoffset="-133" stroke-linecap="round" stroke-width="9"></circle>
+<!-- Boards Segment Indicator (Accent Violet Cap) -->
+<circle cx="50" cy="50" fill="transparent" r="38" stroke="#c084fc" stroke-dasharray="10 238.76" stroke-dashoffset="-225" stroke-linecap="round" stroke-width="9"></circle>
+</svg>
+<!-- Central Donut Count Display -->
+<div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+<span class="text-base font-bold text-white leading-none">50</span>
+<span class="text-[9px] uppercase tracking-wider text-zinc-400 mt-0.5">Tasks</span>
+</div>
+</div>
+<!-- Stats List Details Column -->
+<div class="col-span-7 space-y-2 text-xs">
+<!-- Item: Completed -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+<span class="text-zinc-300">Completed</span>
+</div>
+<div class="flex items-center space-x-2 font-mono">
+<span class="text-white font-serifHeading text-sm">14</span>
+<span class="text-[11px] text-zinc-500 w-8 text-right">28%</span>
+</div>
+</div>
+<!-- Item: Overdue -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+<span class="text-zinc-300">Overdue</span>
+</div>
+<div class="flex items-center space-x-2 font-mono">
+<span class="text-white font-serifHeading text-sm">13</span>
+<span class="text-[11px] text-zinc-500 w-8 text-right">26%</span>
+</div>
+</div>
+<!-- Item: Open -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+<span class="text-zinc-300">Open</span>
+</div>
+<div class="flex items-center space-x-2 font-mono">
+<span class="text-white font-serifHeading text-sm">24</span>
+<span class="text-[11px] text-zinc-500 w-8 text-right">48%</span>
+</div>
+</div>
+<!-- Item: Boards -->
+<div class="flex items-center justify-between pt-0.5 border-t border-[#1f1f28]">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+<span class="text-zinc-300">Boards</span>
+</div>
+<div class="flex items-center font-mono">
+<span class="text-white font-serifHeading text-sm">2</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Metrics Bar (from ref Image 3) -->
+
+</div>
+<!-- Privacy Footer -->
+
+</section>
+<!-- END: BoardStatsSection -->
+</main>
+<!-- BEGIN: BottomNavigation -->
+<nav class="fixed bottom-0 w-full max-w-[430px] bg-[#111116]/95 backdrop-blur-md border-t border-[#23232c] px-4 py-2 pb-safe flex justify-around items-center z-50 shadow-2xl">
+<!-- Nav Item: Boards (Active) -->
+<button class="flex flex-col items-center group py-1 px-3 rounded-xl bg-purple-950/40 text-purple-300" type="button">
+<svg class="w-5 h-5 stroke-2" fill="currentColor" viewBox="0 0 24 24">
+<path d="M4 3h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm10 0h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM4 13h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1zm10 0h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z"></path>
+</svg>
+<span class="text-[10px] font-semibold mt-1">Boards</span>
+</button>
+<!-- Nav Item: My Tasks -->
+<button class="flex flex-col items-center group py-1 px-3 text-zinc-400 hover:text-zinc-200 transition" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-medium mt-1">My Tasks</span>
+</button>
+<!-- Nav Item: Calendar -->
+<button class="flex flex-col items-center group py-1 px-3 text-zinc-400 hover:text-zinc-200 transition" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect>
+<line x1="16" x2="16" y1="2" y2="6"></line>
+<line x1="8" x2="8" y1="2" y2="6"></line>
+<line x1="3" x2="21" y1="10" y2="10"></line>
+</svg>
+<span class="text-[10px] font-medium mt-1">Calendar</span>
+</button>
+<!-- Nav Item: Settings -->
+<button class="flex flex-col items-center group py-1 px-3 text-zinc-400 hover:text-zinc-200 transition" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span class="text-[10px] font-medium mt-1">Settings</span>
+</button>
+</nav>
+<!-- END: BottomNavigation -->
+</div>
+
+
+</body></html>

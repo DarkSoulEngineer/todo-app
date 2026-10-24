@@ -1,4 +1,4 @@
-import { format, isSameDay, parseISO, startOfDay, subDays, isValid } from "date-fns";
+import { differenceInCalendarDays, format, isSameDay, parseISO, startOfDay, subDays, isValid } from "date-fns";
 import type { Task } from "@/lib/domain/types";
 import type { Board } from "@/lib/domain/boards";
 
@@ -31,6 +31,16 @@ export const DEFAULT_FILTERS: InsightsFilters = {
   boardId: "all",
 };
 
+// Keep the source population alongside a filtered array so Insights can
+// reproduce the web contract: filters affect task/stat tiles, while the web
+// trend, streak, and period comparison are calculated from all tasks.
+const filterSources = new WeakMap<Task[], Task[]>();
+
+function escapeCsvField(value: string | null | undefined): string {
+  const text = value ?? "";
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 /** Compute the number of days for a given preset. */
 export function daysFromPreset(preset: DateRangePreset, customStart: Date | null, customEnd: Date | null): number {
   switch (preset) {
@@ -42,8 +52,7 @@ export function daysFromPreset(preset: DateRangePreset, customStart: Date | null
       return 90;
     case "custom":
       if (customStart && customEnd) {
-        const diffMs = customEnd.getTime() - customStart.getTime();
-        return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1);
+        return Math.max(1, differenceInCalendarDays(customEnd, customStart) + 1);
       }
       return 7;
     default:
@@ -79,7 +88,7 @@ export function windowEndFromPreset(now: Date, preset: DateRangePreset, customEn
 
 /** Applies the board, status and priority filters (no date-range window). */
 export function filterTasksByFilters(tasks: Task[], filters: InsightsFilters, now: Date): Task[] {
-  return tasks.filter((task) => {
+  const filtered = tasks.filter((task) => {
     // Board filter
     if (filters.boardId !== "all" && task.category !== filters.boardId) {
       return false;
@@ -103,17 +112,26 @@ export function filterTasksByFilters(tasks: Task[], filters: InsightsFilters, no
 
     return true;
   });
+  filterSources.set(filtered, tasks);
+  return filtered;
+}
+
+/** Return the unfiltered source for a result of filterTasksByFilters. */
+export function getFilterSource(tasks: Task[]): Task[] | undefined {
+  return filterSources.get(tasks);
 }
 
 /** Get completion dates from filtered tasks within the window. */
 export function getCompletionDatesInWindow(tasks: Task[], windowStart: Date, windowEnd: Date): Date[] {
+  const start = startOfDay(windowStart);
+  const end = startOfDay(windowEnd);
   const dates: Date[] = [];
   for (const task of tasks) {
     if (!task.completed || !task.completedAt) continue;
     const date = parseISO(task.completedAt);
     if (isValid(date)) {
       const dayStart = startOfDay(date);
-      if (dayStart >= windowStart && dayStart <= windowEnd) {
+      if (dayStart >= start && dayStart <= end) {
         dates.push(date);
       }
     }
@@ -134,7 +152,7 @@ export function computeWindowInsights(
   windowStart: Date,
   windowEnd: Date
 ): WindowInsights {
-  const days = Math.ceil((windowEnd.getTime() - windowStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const days = Math.max(0, differenceInCalendarDays(windowEnd, windowStart) + 1);
   const completed = getCompletionDatesInWindow(tasks, windowStart, windowEnd);
 
   const points: Array<{ key: string; label: string; count: number }> = [];
@@ -168,7 +186,7 @@ export function computePreviousWindow(
 ): { start: Date; end: Date } {
   const currentStart = windowStartFromPreset(now, dateRange, customStart);
   const currentEnd = windowEndFromPreset(now, dateRange, customEnd);
-  const length = Math.ceil((currentEnd.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const length = Math.max(0, differenceInCalendarDays(currentEnd, currentStart) + 1);
 
   const prevEnd = subDays(currentStart, 1);
   const prevStart = subDays(prevEnd, length - 1);
@@ -229,16 +247,16 @@ export function exportTasksToCSV(tasks: Task[], boards: Board[]): string {
 
     return [
       task.id,
-      `"${task.title.replace(/"/g, '""')}"`,
+      task.title,
       status,
       task.priority,
       board?.label || "",
       task.completedAt || "",
       task.createdAt,
-    ].join(",");
+    ].map(escapeCsvField).join(",");
   });
 
-  return [headers.join(","), ...rows].join("\n");
+  return [headers.map(escapeCsvField).join(","), ...rows].join("\n");
 }
 
 /** Check if any filter is non-default. */

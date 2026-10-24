@@ -14,13 +14,19 @@ export function emptyWorkspace(): Workspace {
 /** Reads the workspace from device storage. Always safe to call. */
 export async function loadWorkspace(): Promise<{ workspace: Workspace; hadData: boolean }> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY) ?? await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!raw) return { workspace: emptyWorkspace(), hadData: false };
-
-    const workspace = buildWorkspace(JSON.parse(raw));
-    if (!workspace) return { workspace: emptyWorkspace(), hadData: false };
-    return { workspace, hadData: true };
+    // A corrupt current payload must not mask a usable legacy backup.
+    for (const key of [STORAGE_KEY, LEGACY_STORAGE_KEY]) {
+      const raw = await AsyncStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const workspace = buildWorkspace(JSON.parse(raw));
+        if (workspace) return { workspace, hadData: true };
+      } catch {
+        // Try the next migration key before falling back to an empty workspace.
+      }
+    }
   } catch {
-    return { workspace: emptyWorkspace(), hadData: false };
+    // Storage can be unavailable; return the safe empty workspace below.
   }
+  return { workspace: emptyWorkspace(), hadData: false };
 }

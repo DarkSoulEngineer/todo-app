@@ -163,7 +163,12 @@ export async function loadProjects(): Promise<ProjectsState> {
     for (const key of [PROJECTS_STORAGE_KEY, LEGACY_PROJECTS_STORAGE_KEY]) {
       const raw = await AsyncStorage.getItem(key);
       if (!raw) continue;
-      const parsed = sanitizeRegistry(JSON.parse(raw));
+      let parsed: ProjectsState | null;
+      try {
+        parsed = sanitizeRegistry(JSON.parse(raw));
+      } catch {
+        continue;
+      }
       if (!parsed) continue;
       if (key !== PROJECTS_STORAGE_KEY && await saveProjects(parsed)) {
         await AsyncStorage.removeItem(LEGACY_PROJECTS_STORAGE_KEY);
