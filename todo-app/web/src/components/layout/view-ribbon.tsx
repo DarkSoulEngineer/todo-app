@@ -154,12 +154,12 @@ export function ViewRibbon({
   const activeTab = tabs.some((candidate) => candidate.id === tab) ? tab : tabs[0].id;
 
   return (
-    <section aria-label="Tools" className="relative shrink-0 border-b border-border bg-card/90 shadow-sm backdrop-blur-xl">
+    <section aria-label="Tools" className="@container/ribbon relative shrink-0 border-b border-border bg-card/90 shadow-sm backdrop-blur-xl">
       <div className="h-0.5 w-full bg-gradient-to-r from-primary/55 via-secondary/35 to-success/35" aria-hidden="true" />
       {/* Persistent board link + view switcher + theme + shortcuts + window
           controls: always visible, like a desktop title bar. */}
-      <div className="flex min-h-9 flex-wrap items-center gap-1.5 border-b border-border/60 bg-muted/30 px-2 py-1 max-[639px]:gap-1 sm:px-3">
-        <div className="mr-1 hidden items-center gap-1.5 border-r border-border/70 pr-2 sm:flex">
+      <div className="flex min-h-9 flex-wrap items-center gap-1.5 border-b border-border/60 bg-muted/30 px-2 py-1.5 @min-[40rem]/ribbon:px-3">
+        <div className="mr-1 hidden items-center gap-1.5 border-r border-border/70 pr-2 @min-[40rem]/ribbon:flex">
           <span className="grid h-5 w-5 place-items-center rounded-md bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">J</span>
           <span className="text-xs font-bold tracking-tight text-foreground">Janus</span>
         </div>
@@ -168,18 +168,19 @@ export function ViewRibbon({
           title="Board manager"
           aria-current={onBoardManager ? "page" : undefined}
           className={cn(
-            "touch-target focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-card/80 px-2 py-1 text-xs font-semibold shadow-xs backdrop-blur transition-colors max-[639px]:px-1.5",
+            "touch-target focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-card/80 px-2 py-1 text-xs font-semibold shadow-xs backdrop-blur transition-colors",
             onBoardManager
               ? "text-primary"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
           <Layers className="h-4 w-4" strokeWidth={2.1} />
-          <span className="max-[479px]:hidden">Boards</span>
+          <span className="hidden @min-[30rem]/ribbon:inline">Boards</span>
         </Link>
         <ViewSwitcherRibbon active={viewMode} onChange={onChangeView} />
-        {/* Search sits centered in the top bar, Microsoft Word style. */}
-        <div className="order-last flex min-w-0 basis-full flex-1 justify-center px-0 sm:order-none sm:basis-auto sm:px-1">
+        {/* Use the actual window width, not the viewport: floating boards can
+            be narrow even on a desktop. Search gets its own row until it fits. */}
+        <div className="order-last flex min-w-0 basis-full flex-1 justify-center @min-[56rem]/ribbon:order-none @min-[56rem]/ribbon:basis-auto @min-[56rem]/ribbon:px-1">
           <RibbonSearch
             value={query}
             onChange={onQueryChange}
@@ -187,23 +188,25 @@ export function ViewRibbon({
             focusSignal={searchFocusSignal}
           />
         </div>
-        <ThemeToggle />
-        {onShowHelp ? (
-          <RibbonIconButton icon={Keyboard} label="Shortcuts" onClick={onShowHelp} />
-        ) : null}
-        <WindowControls
-          maximized={maximized}
-          onMinimize={onMinimize}
-          onMaximize={onMaximize}
-          onClose={onCloseBoard}
-        />
+        <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5 [@media(pointer:coarse)]:[&_button]:min-h-11 [@media(pointer:coarse)]:[&_button]:min-w-11">
+          <ThemeToggle />
+          {onShowHelp ? (
+            <RibbonIconButton icon={Keyboard} label="Shortcuts" onClick={onShowHelp} />
+          ) : null}
+          <WindowControls
+            maximized={maximized}
+            onMinimize={onMinimize}
+            onMaximize={onMaximize}
+            onClose={onCloseBoard}
+          />
+        </div>
       </div>
 
       {/* Tab bar */}
       <div
         role="tablist"
         aria-label="Tool groups"
-        className="flex h-8 items-end gap-0.5 overflow-x-auto bg-card/70 px-2"
+        className="flex min-h-10 items-end gap-0.5 border-b border-border/50 bg-card/70 px-2 pt-1"
       >
         {tabs.map((candidate) => (
           <RibbonTabButton
@@ -389,11 +392,12 @@ function RibbonPanel({ label, children }: { label: string; children: ReactNode }
   const groups = Children.toArray(children).filter(Boolean);
   return (
     // Fixed height so switching tabs (Home / Options) never resizes the ribbon
-    // and shifts the content below; groups stretch to fill it.
+    // and shifts the content below. Reserve room for two stacked touch targets,
+    // the group caption and a horizontal scrollbar (never a vertical one).
     <div
       role="tabpanel"
       aria-label={label}
-      className="flex h-[3.75rem] items-stretch gap-1 overflow-x-auto px-2 py-1 sm:h-[4.25rem] sm:px-3"
+      className="flex h-28 items-stretch gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain px-2 py-2 [scrollbar-width:thin] @min-[40rem]/ribbon:px-3 [@media(pointer:coarse)]:h-34"
     >
       {groups.map((group, index) => (
         <Fragment key={index}>
@@ -407,10 +411,10 @@ function RibbonPanel({ label, children }: { label: string; children: ReactNode }
 
 function RibbonGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[3.25rem] shrink-0 flex-col items-center gap-0.5 px-1.5">
+    <div className="flex shrink-0 flex-col items-center gap-1 px-1.5">
       {/* Grows to fill the fixed panel height, centering the tools vertically. */}
-      <div className="flex flex-1 flex-wrap items-center justify-center gap-1.5">{children}</div>
-      <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+      <div className="flex min-h-0 flex-1 items-center justify-center gap-1.5">{children}</div>
+      <span className="shrink-0 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
         {label}
       </span>
     </div>
@@ -451,7 +455,7 @@ function RibbonTool({
         aria-pressed={active}
         title={label}
         className={cn(
-          "touch-target focus-ring inline-flex w-[5.25rem] shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
+          "touch-target focus-ring inline-flex w-[6.5rem] shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
           tone,
         )}
       >
@@ -469,7 +473,7 @@ function RibbonTool({
       aria-pressed={active}
       title={label}
       className={cn(
-        "touch-target focus-ring flex w-[4.5rem] shrink-0 flex-col items-center gap-0.5 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40",
+        "touch-target focus-ring flex w-[5.5rem] shrink-0 flex-col items-center gap-0.5 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40",
         tone,
       )}
     >
@@ -558,7 +562,7 @@ function RibbonSearch({
   }, [focusSignal, inputRef]);
 
   return (
-    <div className="relative flex w-full max-w-[15rem] items-center sm:max-w-xs md:max-w-sm">
+    <div className="relative flex w-full items-center @min-[56rem]/ribbon:max-w-sm">
       <Search className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
       <input
         ref={inputRef}

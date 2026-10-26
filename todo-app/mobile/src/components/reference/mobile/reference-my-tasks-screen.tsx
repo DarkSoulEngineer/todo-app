@@ -26,7 +26,7 @@ export interface ReferenceMyTasksScreenProps {
   userName?: string;
 }
 
-export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggleComplete, onCreateTask, onReviewAttention, onRescheduleAttention, onNavigate, activeTab = "my-tasks", userName = "You" }: ReferenceMyTasksScreenProps) {
+export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggleComplete, onCreateTask, onReviewAttention, onRescheduleAttention, onNavigate, activeTab = "my-tasks" }: ReferenceMyTasksScreenProps) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
   const insets = useSafeAreaInsets();
@@ -47,26 +47,26 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
     });
   }, [assignedOnly, query, resolved]);
   const counts = useMemo(() => ({
-    Today: matching.filter(({ task }) => task.dueAt && isValid(parseISO(task.dueAt)) && parseISO(task.dueAt).toDateString() === now.toDateString() && !task.completed).length,
-    Upcoming: matching.filter(({ task }) => !task.completed && (!task.dueAt || (isValid(parseISO(task.dueAt)) && parseISO(task.dueAt).getTime() >= now.getTime()))).length,
+    Today: matching.filter(({ task }) => task.dueAt && isValid(parseISO(task.dueAt)) && parseISO(task.dueAt).toDateString() === now.toDateString() && !task.completed && !task.canceled).length,
+    Upcoming: matching.filter(({ task }) => !task.completed && !task.canceled && (!task.dueAt || (isValid(parseISO(task.dueAt)) && parseISO(task.dueAt).getTime() >= now.getTime()))).length,
     Overdue: matching.filter(({ task }) => deriveStatus(task, now) === "overdue").length,
     Completed: matching.filter(({ task }) => task.completed).length,
   }), [matching, now]);
   const summary = useMemo(() => {
     const total = resolved.length;
     const completed = resolved.filter(({ task }) => task.completed).length;
-    const remaining = total - completed;
+    const canceled = resolved.filter(({ task }) => task.canceled).length;
+    const remaining = resolved.filter(({ task }) => !task.completed && !task.canceled).length;
     const overdue = resolved.filter(({ task }) => deriveStatus(task, now) === "overdue").length;
-    return { total, completed, remaining, overdue, progress: total > 0 ? completed / total : 0 };
+    return { total, completed, remaining, canceled, overdue, progress: total > 0 ? completed / total : 0 };
   }, [now, resolved]);
-  const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
   const visible = useMemo(() => {
     const filtered = matching.filter(({ task }) => {
       if (filter === "Completed") return task.completed;
       if (filter === "Overdue") return deriveStatus(task, now) === "overdue";
-      if (filter === "Upcoming") return !task.completed && (!task.dueAt || (isValid(parseISO(task.dueAt)) && parseISO(task.dueAt).getTime() >= now.getTime()));
+      if (filter === "Upcoming") return !task.completed && !task.canceled && (!task.dueAt || (isValid(parseISO(task.dueAt)) && parseISO(task.dueAt).getTime() >= now.getTime()));
       const dueAt = task.dueAt;
-      return !task.completed && dueAt !== null && isValid(parseISO(dueAt)) && parseISO(dueAt).toDateString() === now.toDateString();
+      return !task.completed && !task.canceled && dueAt !== null && isValid(parseISO(dueAt)) && parseISO(dueAt).toDateString() === now.toDateString();
     });
     const direction = sortDirection === "asc" ? 1 : -1;
       return [...filtered].sort((a, b) => {
@@ -82,13 +82,13 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
       <ThemeAtmosphere />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 112 }]}> 
        <ScreenHeader title="My tasks" subtitle={boardName ?? "Workspace"} onSearch={() => searchRef.current?.focus()} />
-        <View style={styles.searchRow}><View style={styles.searchBox}><Ionicons name="search-outline" size={18} color={colors.muted} /><TextInput ref={searchRef} value={query} onChangeText={setQuery} placeholder="Search tasks, tags or people" placeholderTextColor={colors.muted} accessibilityLabel="Search my tasks" style={[type.body, styles.searchInput]} />{query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear task search" onPress={() => setQuery("")} style={styles.clearSearch}><Ionicons name="close-circle" size={18} color={colors.muted} /></Pressable> : null}</View><Pressable accessibilityRole="switch" accessibilityState={{ checked: assignedOnly }} accessibilityLabel="Show assigned tasks only" onPress={() => setAssignedOnly((current) => !current)} style={[styles.assignedButton, assignedOnly && styles.assignedButtonActive]}><Ionicons name="person-outline" size={16} color={assignedOnly ? colors.primary : colors.muted} /><Text style={[type.caption, { color: assignedOnly ? colors.primary : colors.muted, fontWeight: "700" }]}>Assigned</Text></Pressable></View>
+        <View style={styles.searchRow}><View style={styles.searchBox}><Ionicons name="search-outline" size={18} color={colors.muted} /><TextInput ref={searchRef} value={query} onChangeText={setQuery} placeholder="Search tasks, tags or people" placeholderTextColor={colors.muted} accessibilityLabel="Search my tasks" style={[type.body, styles.searchInput]} />{query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear task search" onPress={() => setQuery("")} style={styles.clearSearch}><Ionicons name="close-circle" size={18} color={colors.muted} /></Pressable> : null}</View><Pressable accessibilityRole="switch" aria-checked={assignedOnly} accessibilityState={{ checked: assignedOnly }} accessibilityLabel="Show assigned tasks only" onPress={() => setAssignedOnly((current) => !current)} style={[styles.assignedButton, assignedOnly && styles.assignedButtonActive]}><Ionicons name="person-outline" size={16} color={assignedOnly ? colors.primary : colors.muted} /><Text style={[type.caption, { color: assignedOnly ? colors.primary : colors.muted, fontWeight: "700" }]}>Assigned</Text></Pressable></View>
 
         <SurfaceCard style={styles.summaryCard}>
           <View style={styles.summaryCopy}>
-            <Text style={styles.greeting}>{greeting}, {userName}</Text>
-            <Text style={[type.body, { color: colors.muted }]}><Text style={type.bodyStrong}>{summary.completed} of {summary.total}</Text> tasks completed • {summary.remaining} remaining</Text>
-            <View style={styles.summaryPills}><Pill label={`${summary.remaining} remaining`} tone="primary" icon="time-outline" />{summary.overdue > 0 ? <Pill label={`${summary.overdue} overdue`} tone="error" icon="alert-circle-outline" /> : null}</View>
+            <Text style={styles.greeting}>Task overview</Text>
+            <Text style={[type.body, { color: colors.muted }]}><Text style={type.bodyStrong}>{summary.completed} of {summary.total}</Text> completed · {summary.remaining} open{summary.canceled ? ` · ${summary.canceled}\u00a0canceled` : ""}</Text>
+            <View style={styles.summaryPills}><Pill label={`${summary.remaining} open`} tone="primary" icon="time-outline" />{summary.overdue > 0 ? <Pill label={`${summary.overdue} overdue`} tone="error" icon="alert-circle-outline" /> : null}</View>
           </View>
           <ProgressRing value={summary.progress} />
         </SurfaceCard>
@@ -100,12 +100,12 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
           </SurfaceCard>
         ) : null}
 
-         <View style={styles.segmented}>{(["Today", "Upcoming", "Overdue", "Completed"] as AgendaFilter[]).map((item) => <Pressable key={item} accessibilityRole="tab" accessibilityLabel={`${item} tasks`} accessibilityState={{ selected: filter === item }} onPress={() => setFilter(item)} style={[styles.segment, filter === item && styles.segmentActive]}><Text style={[type.bodyStrong, { color: filter === item ? colors.primary : colors.muted }]}>{item}</Text>{counts[item] > 0 ? <Text style={[styles.count, { color: item === "Overdue" ? colors.error : colors.primary, backgroundColor: item === "Overdue" ? colors.errorContainer : colors.primaryFixed }]}>{counts[item]}</Text> : null}</Pressable>)}</View>
+         <View style={styles.segmented}>{(["Today", "Upcoming", "Overdue", "Completed"] as AgendaFilter[]).map((item) => <Pressable key={item} accessibilityRole="tab" accessibilityLabel={`${item} tasks`} aria-selected={filter === item} accessibilityState={{ selected: filter === item }} onPress={() => setFilter(item)} style={[styles.segment, filter === item && styles.segmentActive]}><Text style={[type.bodyStrong, { color: filter === item ? colors.primary : colors.muted }]}>{item}</Text>{counts[item] > 0 ? <Text style={[styles.count, { color: item === "Overdue" ? colors.error : colors.primary, backgroundColor: item === "Overdue" ? colors.errorContainer : colors.primaryFixed }]}>{counts[item]}</Text> : null}</Pressable>)}</View>
 
-        <View style={styles.scheduleHeading}><View style={styles.headingTitle}><Ionicons name="calendar-outline" size={21} color={colors.primary} /><Text style={[type.title, { fontSize: 18 }]}>Today&apos;s Schedule</Text></View><Pressable accessibilityRole="button" accessibilityLabel={sortDirection === "asc" ? "Sort by due time, earliest first" : "Sort by due time, latest first"} onPress={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")} style={styles.sortButton}><Text style={[type.body, { color: colors.muted }]}>{sortDirection === "asc" ? "Earliest first" : "Latest first"}</Text><Ionicons name={sortDirection === "asc" ? "arrow-up-outline" : "arrow-down-outline"} size={15} color={colors.muted} /></Pressable></View>
+        <View style={styles.scheduleHeading}><View style={styles.headingTitle}><Ionicons name="calendar-outline" size={21} color={colors.primary} /><Text style={[type.title, { fontSize: 18 }]}>{filter === "Today" ? "Today's tasks" : `${filter} tasks`}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={sortDirection === "asc" ? "Sort by due time, earliest first" : "Sort by due time, latest first"} onPress={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")} style={styles.sortButton}><Text style={[type.body, { color: colors.muted }]}>{sortDirection === "asc" ? "Earliest first" : "Latest first"}</Text><Ionicons name={sortDirection === "asc" ? "arrow-up-outline" : "arrow-down-outline"} size={15} color={colors.muted} /></Pressable></View>
           <View style={{ gap: referenceSpacing.sm }}>{visible.length ? visible.map((item, index) => <ScheduleCard key={item.task.id} item={item} index={index} now={now} onPress={() => onTaskPress?.(item.task)} onComplete={() => onToggleComplete?.(item.task)} />) : <EmptyAgendaState filtered={Boolean(query || assignedOnly)} onCreate={onCreateTask} />}</View>
       </ScrollView>
-      <Pressable accessibilityRole="button" accessibilityLabel="Create a new personal task" onPress={onCreateTask} style={styles.fab}><Ionicons name="add-circle-outline" size={23} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary, fontSize: 16 }]}>+ New Personal Task</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Create a new task" onPress={onCreateTask} style={styles.fab}><Ionicons name="add-circle-outline" size={23} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary, fontSize: 16 }]}>New task</Text></Pressable>
       <ReferenceMobileBottomNav active={activeTab} onNavigate={onNavigate} />
     </View>
   );
@@ -125,12 +125,13 @@ function ScheduleCard({ item, index, now, onPress, onComplete }: { item: ReturnT
   const title = task.title || "Untitled task";
   const meta = [item.projectLabel, item.boardLabel].filter((value): value is string => Boolean(value)).join(" • ");
   const doneSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
-  return <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onPress} style={({ pressed }) => [styles.taskCard, { opacity: pressed ? 0.82 : completed ? 0.82 : 1 }]}>
-    <View style={[styles.taskRail, { backgroundColor: rail }]} />
-    <View style={styles.taskTop}><Text style={[type.bodyStrong, { color: overdue ? colors.error : completed ? colors.muted : colors.primary }]}><Ionicons name={overdue ? "timer-outline" : "time-outline"} size={15} /> {overdue && dueTime ? `${dueTime} • Past due` : dueTime ?? "No due time"}</Text><View style={styles.taskPills}><Pill label={task.priority === "high" ? "High Priority" : task.priority === "medium" ? "Medium" : "Normal"} tone={task.priority === "high" ? "purple" : "neutral"} /><Pill label={label} tone={completed ? "success" : overdue ? "error" : "primary"} icon={completed ? "checkmark" : undefined} /></View></View>
-    <View style={styles.taskMain}><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel={`${completed ? "Mark incomplete" : "Complete"} ${title}`} onPress={(event) => { event.stopPropagation(); onComplete(); }} style={[styles.checkbox, completed && { backgroundColor: colors.success, borderColor: colors.success }]}>{completed ? <Ionicons name="checkmark" size={15} color={colors.onPrimary} /> : null}</Pressable><View style={{ flex: 1, minWidth: 0 }}><Text style={[type.title, { fontSize: 16, lineHeight: 21, textDecorationLine: completed ? "line-through" : "none", color: completed ? colors.muted : colors.text }]} numberOfLines={2}>{title}</Text>{meta ? <Text style={[type.body, { color: colors.muted, marginTop: 3 }]} numberOfLines={1}>{meta}</Text> : null}</View>{assignee ? <Avatar person={assignee} size={34} /> : null}</View>
-    <View style={styles.taskFooter}><View style={styles.footerMeta}><Ionicons name={completed ? "checkmark-circle-outline" : "ellipse-outline"} size={15} color={completed ? colors.success : colors.muted} /><Text style={[type.body, { color: completed ? colors.success : colors.muted }]}>{completed ? "Completed" : label}</Text>{task.subtasks.length ? <><Ionicons name="checkmark-done-outline" size={15} color={colors.muted} /><Text style={[type.body, { color: colors.muted }]}>{doneSubtasks}/{task.subtasks.length}</Text></> : null}{item.attachmentCount ? <><Ionicons name="attach-outline" size={15} color={colors.muted} /><Text style={[type.body, { color: colors.muted }]}>{item.attachmentCount} file{item.attachmentCount === 1 ? "" : "s"}</Text></> : null}</View><Text style={[type.body, { color: overdue ? colors.error : colors.muted }]}>{dueInfo?.label ?? "No due date"}</Text></View>
-  </Pressable>;
+  return <View style={styles.taskCard}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onPress} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: referenceRadii.md, backgroundColor: pressed ? colors.primaryFixed : "transparent" }]} />
+    <View pointerEvents="none" style={[styles.taskRail, { backgroundColor: rail }]} />
+    <View pointerEvents="none" style={styles.taskTop}><Text style={[type.bodyStrong, { color: overdue ? colors.error : completed ? colors.muted : colors.primary }]}><Ionicons name={overdue ? "timer-outline" : "time-outline"} size={15} /> {overdue && dueTime ? `${dueTime} • Past due` : dueTime ?? "No due time"}</Text><View style={styles.taskPills}><Pill label={task.priority === "high" ? "High Priority" : task.priority === "medium" ? "Medium" : "Low"} tone={task.priority === "high" ? "purple" : "neutral"} /><Pill label={label} tone={completed ? "success" : overdue ? "error" : "primary"} icon={completed ? "checkmark" : undefined} /></View></View>
+    <View pointerEvents="box-none" style={styles.taskMain}><Pressable accessibilityRole="checkbox" aria-checked={task.completed} accessibilityState={{ checked: task.completed }} accessibilityLabel={`${completed ? "Mark incomplete" : "Complete"} ${title}`} onPress={onComplete} style={styles.checkboxHit}><View style={[styles.checkbox, completed && { backgroundColor: colors.success, borderColor: colors.success }]}>{completed ? <Ionicons name="checkmark" size={15} color={colors.onPrimary} /> : null}</View></Pressable><View pointerEvents="none" style={{ flex: 1, minWidth: 0 }}><Text style={[type.title, { fontSize: 16, lineHeight: 21, textDecorationLine: completed ? "line-through" : "none", color: completed ? colors.muted : colors.text }]} numberOfLines={2}>{title}</Text>{meta ? <Text style={[type.body, { color: colors.muted, marginTop: 3 }]} numberOfLines={1}>{meta}</Text> : null}</View>{assignee ? <View pointerEvents="none"><Avatar person={assignee} size={34} /></View> : null}</View>
+    <View pointerEvents="none" style={styles.taskFooter}><View style={styles.footerMeta}><Ionicons name={completed ? "checkmark-circle-outline" : "ellipse-outline"} size={15} color={completed ? colors.success : colors.muted} /><Text style={[type.body, { color: completed ? colors.success : colors.muted }]}>{completed ? "Completed" : label}</Text>{task.subtasks.length ? <><Ionicons name="checkmark-done-outline" size={15} color={colors.muted} /><Text style={[type.body, { color: colors.muted }]}>{doneSubtasks}/{task.subtasks.length}</Text></> : null}{item.attachmentCount ? <><Ionicons name="attach-outline" size={15} color={colors.muted} /><Text style={[type.body, { color: colors.muted }]}>{item.attachmentCount} file{item.attachmentCount === 1 ? "" : "s"}</Text></> : null}</View><Text style={[type.body, { color: overdue ? colors.error : colors.muted }]}>{dueInfo?.label ?? "No due date"}</Text></View>
+  </View>;
 }
 
 function EmptyAgendaState({ filtered, onCreate }: { filtered: boolean; onCreate?: () => void }) {
@@ -163,8 +164,8 @@ function createStyles(colors: ReferenceColors, type: ReferenceType) { return Sty
   attentionActions: { flexDirection: "row", justifyContent: "flex-end", gap: referenceSpacing.sm, marginTop: 12 },
   lightAction: { minHeight: 44, paddingHorizontal: 14, borderRadius: referenceRadii.lg, backgroundColor: colors.card, flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center" },
   dangerAction: { minHeight: 44, paddingHorizontal: 17, borderRadius: referenceRadii.lg, backgroundColor: colors.error, alignItems: "center", justifyContent: "center" },
-  segmented: { marginTop: referenceSpacing.md, padding: 4, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 3 },
-  segment: { flex: 1, minHeight: 44, paddingHorizontal: 4, borderRadius: referenceRadii.md, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 },
+  segmented: { marginTop: referenceSpacing.md, padding: 4, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  segment: { flexGrow: 1, flexBasis: "45%", minHeight: 44, paddingHorizontal: 4, borderRadius: referenceRadii.md, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 },
   segmentActive: { backgroundColor: colors.card, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 5, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   count: { minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, textAlign: "center", ...type.micro, lineHeight: 20 },
   scheduleHeading: { marginTop: 23, marginBottom: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -175,7 +176,8 @@ function createStyles(colors: ReferenceColors, type: ReferenceType) { return Sty
   taskTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
   taskPills: { flex: 1, flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: 4 },
   taskMain: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginTop: 10 },
-  checkbox: { width: 30, height: 30, borderRadius: 7, backgroundColor: colors.surfaceHigh, borderWidth: 1, borderColor: colors.surfaceHigh, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  checkboxHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  checkbox: { width: 28, height: 28, borderRadius: 7, backgroundColor: colors.surfaceLow, borderWidth: 1, borderColor: colors.outline, alignItems: "center", justifyContent: "center" },
   taskFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 12, paddingLeft: 40 },
   footerMeta: { flexDirection: "row", alignItems: "center", gap: 5, flex: 1 },
   emptyState: { minHeight: 174, padding: referenceSpacing.lg, alignItems: "center", justifyContent: "center", gap: 7, borderStyle: "dashed" },

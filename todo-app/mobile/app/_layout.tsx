@@ -12,7 +12,7 @@ function RootLayoutInner() {
   return (
     <GestureHandlerRootView style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <StatusBar style={theme.scheme === "dark" ? "light" : "dark"} />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }} />
     </GestureHandlerRootView>
   );
 }

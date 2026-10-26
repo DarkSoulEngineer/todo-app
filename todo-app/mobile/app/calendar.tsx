@@ -71,7 +71,7 @@ export default function CalendarRoute() {
             <IconButton icon="chevron-forward" label={calendarMode === "week" ? "Next week" : "Next month"} onPress={() => shiftCalendar(1)} size={40} />
           </View>
            <View style={styles.modeSwitch} accessibilityLabel="Calendar view">
-             {(["month", "week"] as CalendarMode[]).map((value) => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: calendarMode === value }} onPress={() => setCalendarMode(value)} style={[styles.modeOption, calendarMode === value && { backgroundColor: colors.primaryContainer }]}><Text style={[type.caption, { color: calendarMode === value ? colors.onPrimaryContainer : colors.muted, fontWeight: "700" }]}>{value === "month" ? "Month" : "Week"}</Text></Pressable>)}
+             {(["month", "week"] as CalendarMode[]).map((value) => <Pressable key={value} accessibilityRole="tab" aria-selected={calendarMode === value} accessibilityState={{ selected: calendarMode === value }} onPress={() => setCalendarMode(value)} style={[styles.modeOption, calendarMode === value && { backgroundColor: colors.primaryContainer }]}><Text style={[type.caption, { color: calendarMode === value ? colors.onPrimaryContainer : colors.muted, fontWeight: "700" }]}>{value === "month" ? "Month" : "Week"}</Text></Pressable>)}
            </View>
          </View>
          <View style={styles.legend} accessibilityLabel="Calendar legend">
@@ -88,7 +88,8 @@ export default function CalendarRoute() {
             const selected = isSameDay(day, selectedDay);
             const current = isSameDay(day, today);
             return <View key={day.toISOString()} style={[styles.calendarDay, selected && styles.calendarDaySelected, calendarMode === "month" && !isSameMonth(day, calendarAnchor) && styles.calendarDayOutside]}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Select ${format(day, "EEEE, MMMM d")}`} accessibilityState={{ selected }} onPress={() => selectDay(day)} style={styles.calendarDayHeader}><Text style={[type.caption, { color: current || selected ? colors.primary : colors.text, fontWeight: current || selected ? "800" : "600" }]}>{format(day, "d")}</Text>{dayTasks.length > 2 ? <Text style={[type.micro, { color: colors.muted }]}>+{dayTasks.length - 2}</Text> : null}</Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Select ${format(day, "EEEE, MMMM d")}`} aria-pressed={selected} accessibilityState={{ selected }} onPress={() => selectDay(day)} style={StyleSheet.absoluteFill} />
+              <View pointerEvents="none" style={styles.calendarDayHeader}><Text style={[type.caption, { color: current || selected ? colors.primary : colors.text, fontWeight: current || selected ? "800" : "600" }]}>{format(day, "d")}</Text>{dayTasks.length > 2 ? <Text style={[type.micro, { color: colors.muted }]}>+{dayTasks.length - 2}</Text> : null}</View>
               {dayTasks.slice(0, calendarMode === "week" ? 5 : 2).map((task) => <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} onPress={(event) => { event.stopPropagation(); router.push({ pathname: "/task/[id]", params: { id: task.id, origin: "calendar" } }); }} onLongPress={(event) => { event.stopPropagation(); setCalendarActionTask(task); }} style={styles.calendarTask}><View style={[styles.taskDot, { backgroundColor: taskColor(task, colors) }]} /><Text style={[type.micro, { color: colors.text, flex: 1 }]} numberOfLines={1}>{task.title || "Untitled task"}</Text></Pressable>)}
             </View>;
           })}
@@ -134,8 +135,8 @@ function CalendarTask({ task, onPress, onToggle, onMenu }: { task: Task; onPress
   const styles = createStyles(colors);
   return (
     <View style={styles.taskRow}>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel={`${task.completed ? "Mark incomplete" : "Complete"} ${task.title}`} onPress={(event) => { event.stopPropagation(); onToggle(); }} style={[styles.checkbox, task.completed && styles.checkboxDone]}>{task.completed ? <Text style={styles.checkmark}>✓</Text> : null}</Pressable>
-      <Pressable style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} onPress={onPress} onLongPress={onMenu}>
+      <Pressable accessibilityRole="checkbox" aria-checked={task.completed} accessibilityState={{ checked: task.completed }} accessibilityLabel={`${task.completed ? "Mark incomplete" : "Complete"} ${task.title}`} onPress={(event) => { event.stopPropagation(); onToggle(); }} style={styles.checkboxHit}><View style={[styles.checkbox, task.completed && styles.checkboxDone]}>{task.completed ? <Text style={styles.checkmark}>✓</Text> : null}</View></Pressable>
+      <Pressable style={{ flex: 1, minHeight: 44, justifyContent: "center" }} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} onPress={onPress} onLongPress={onMenu}>
         <Text style={[type.bodyStrong, { textDecorationLine: task.completed ? "line-through" : "none", color: task.completed ? colors.muted : colors.text }]}>{task.title || "Untitled task"}</Text>
         <Text style={[type.caption, { color: colors.muted, marginTop: 3 }]}>{task.dueAt ? format(parseISO(task.dueAt), "h:mm a") : "No deadline"} · {task.priority} priority</Text>
       </Pressable>
@@ -157,7 +158,7 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   calendarGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: StyleSheet.hairlineWidth, borderColor: colors.outlineVariant },
   weekday: { width: "14.2857%", textAlign: "center", color: colors.muted, paddingVertical: 7 },
   calendarDay: { width: "14.2857%", minHeight: 82, padding: 5, borderRightWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.outlineVariant, backgroundColor: colors.surface },
-  calendarDaySelected: { backgroundColor: colors.primaryContainer },
+  calendarDaySelected: { backgroundColor: colors.primaryFixed },
   calendarDayOutside: { opacity: 0.45 },
   calendarDayHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 3 },
   calendarTask: { flexDirection: "row", alignItems: "center", gap: 3, paddingVertical: 2 },
@@ -165,10 +166,11 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   sectionHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16, marginBottom: 9 },
   taskCard: { padding: referenceSpacing.sm },
   taskRow: { minHeight: 62, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant },
-  checkbox: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, borderColor: colors.outlineVariant, alignItems: "center", justifyContent: "center" },
+  checkboxHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  checkbox: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, borderColor: colors.outline, alignItems: "center", justifyContent: "center" },
   checkboxDone: { backgroundColor: colors.success, borderColor: colors.success },
   checkmark: { color: colors.onPrimary, fontWeight: "800" },
-  taskAction: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  taskAction: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   addDayButton: { minHeight: 44, marginTop: 8, borderRadius: 10, backgroundColor: colors.surfaceLow, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   unscheduled: { marginTop: 12, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.outlineVariant, borderStyle: "dashed", backgroundColor: colors.surfaceLow, padding: 13 },
   unscheduledHeader: { marginBottom: 5 },

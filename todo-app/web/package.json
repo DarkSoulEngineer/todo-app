@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:client-assets": "node scripts/check-client-assets.mjs",
+    "test:client-assets": "node --test scripts/check-client-assets.test.mjs"
   },
   "overrides": {
     "braces": "^3.0.3"

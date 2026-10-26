@@ -127,10 +127,14 @@ export function Pill({ label, active = false, tone = "neutral", icon, onPress, s
     purple: { backgroundColor: colors.secondaryFixed, color: colors.onSecondaryContainer },
     warning: { backgroundColor: colors.warningContainer, color: colors.warning },
   }[tone];
+  const content = <>
+    {icon ? <Ionicons name={icon} size={13} color={palette.color} /> : null}
+    <Text style={[type.caption, { color: palette.color }]} numberOfLines={1}>{label}</Text>
+  </>;
+  if (!onPress) return <View style={[styles.pill, { backgroundColor: palette.backgroundColor }, style]}>{content}</View>;
   return (
-    <Pressable accessibilityRole={onPress ? "button" : undefined} onPress={onPress} style={({ pressed }) => [styles.pill, { backgroundColor: palette.backgroundColor, opacity: pressed ? 0.75 : 1 }, style]}>
-      {icon ? <Ionicons name={icon} size={13} color={palette.color} /> : null}
-      <Text style={[type.caption, { color: palette.color }]} numberOfLines={1}>{label}</Text>
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.pill, { backgroundColor: palette.backgroundColor, opacity: pressed ? 0.75 : 1 }, style]}>
+      {content}
     </Pressable>
   );
 }
