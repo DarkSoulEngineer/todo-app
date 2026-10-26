@@ -350,7 +350,15 @@ export default function WorkspaceScreen() {
        </Sheet>
        <TextEntrySheet visible={renameSectionTarget !== null} title="Rename list" initialValue={renameSectionTarget?.title ?? ""} placeholder="List name" onClose={() => setRenameSectionTarget(null)} onSubmit={(value) => { if (renameSectionTarget) api.renameSection(renameSectionTarget.id, value); setRenameSectionTarget(null); }} />
       <Sheet visible={addSectionOpen} onClose={() => setAddSectionOpen(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>Add a list</Text><Text style={[styles.sheetCopy, { color: theme.colors.mutedForeground }]}>Use lists to shape this board around your flow.</Text><Input autoFocus value={sectionTitle} onChangeText={setSectionTitle} placeholder="e.g. In progress" onSubmitEditing={() => { if (sectionTitle.trim()) { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); } }} style={{ marginTop: 12 }} /><Button label="Add list" disabled={!sectionTitle.trim()} onPress={() => { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); }} style={{ marginTop: 14 }} /></Sheet>
-       {calendarDay ? <Sheet visible onClose={() => setCalendarDay(null)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{format(calendarDay, "EEEE, MMM d")}</Text>{calendarTasks.length ? calendarTasks.map((task) => <TaskCard key={task.id} task={task} boards={boards} now={now} onPress={() => openEditor(task)} onComplete={() => api.toggleComplete(task.id)} onLongPress={() => setCalendarActionTask(task)} />) : <EmptyState icon="sunny-outline" title="A clear day" message="Nothing is due here yet." />}<Button variant="soft" label="Add task for this day" onPress={() => { const due = new Date(calendarDay); due.setHours(9, 0, 0, 0); setCalendarDay(null); addNewTask(due.toISOString()); }} style={{ marginTop: 6 }}><Ionicons name="add" size={18} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task for this day</Text></Button></Sheet> : null}
+       <Sheet visible={calendarDay !== null} onClose={() => setCalendarDay(null)}>
+         {calendarDay ? (
+           <>
+             <Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{format(calendarDay, "EEEE, MMM d")}</Text>
+             {calendarTasks.length ? calendarTasks.map((task) => <TaskCard key={task.id} task={task} boards={boards} now={now} onPress={() => openEditor(task)} onComplete={() => api.toggleComplete(task.id)} onLongPress={() => setCalendarActionTask(task)} />) : <EmptyState icon="sunny-outline" title="A clear day" message="Nothing is due here yet." />}
+             <Button variant="soft" label="Add task for this day" onPress={() => { const due = new Date(calendarDay); due.setHours(9, 0, 0, 0); setCalendarDay(null); addNewTask(due.toISOString()); }} style={{ marginTop: 6 }}><Ionicons name="add" size={18} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task for this day</Text></Button>
+           </>
+         ) : null}
+       </Sheet>
      </View>
   );
 }

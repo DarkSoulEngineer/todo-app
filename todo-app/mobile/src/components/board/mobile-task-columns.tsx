@@ -79,7 +79,6 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const heading = (section: { id: string; title: string }) => <View style={styles.heading}>
     <View style={styles.columnTools}>
       <Text numberOfLines={1} style={[styles.columnTitle, { color: c.foreground, fontSize: 14 * zoom }]}>{section.title}</Text>
-      <Text style={[styles.count, { color: c.mutedForeground, borderColor: c.border, backgroundColor: c.card }]}>{grouped.get(section.id)?.length ?? 0}</Text>
       {section.id !== UNSORTED ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${section.title}`} onPress={() => props.onSectionMenu(section as BoardSection)} style={styles.icon}><Ionicons name="ellipsis-horizontal" size={16} color={c.mutedForeground} /></Pressable> : null}
     </View>
     <View style={{ height: 2, backgroundColor: c.borderStrong, borderRadius: 1 }} />
@@ -103,7 +102,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0 }, carousel: { flex: 1, minHeight: 0 }, columns: { padding: 10, gap: 10, alignItems: "flex-start" },
-  column: { maxHeight: "100%", minHeight: 220, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingTop: 5 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, count: { fontSize: 11, borderWidth: 1, borderRadius: 10, paddingHorizontal: 5, marginRight: 5 }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
+  column: { maxHeight: "100%", minHeight: 220, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingTop: 5 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
   cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 7 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },
   addSection: { borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   hiddenRail: { flexGrow: 0, maxHeight: 44 }, hiddenContent: { paddingHorizontal: 12, paddingVertical: 5, gap: 7 }, hiddenChip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderRadius: 8 }, tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { flex: 1, minHeight: 0, margin: 10, paddingHorizontal: 8, borderWidth: 1, borderRadius: 12 },

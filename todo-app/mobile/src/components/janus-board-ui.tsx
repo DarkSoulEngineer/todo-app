@@ -4,8 +4,6 @@ import { format, isValid, parseISO } from "date-fns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Svg } from "react-native-svg";
 import {
-  KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -17,7 +15,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
-import { mobileModalMaxWidth } from "@/theme/layout";
+import { useOpenSession } from "@/hooks/use-open-session";
+import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -195,7 +194,8 @@ export function TaskEditor({
   onDelete?: () => void;
   onCancelTask?: () => void;
 }) {
-  const editorKey = `${visible ? "open" : "closed"}:${task?.id ?? "new"}:${initialDueAt ?? ""}`;
+  const session = useOpenSession(visible);
+  const editorKey = `${session}:${task?.id ?? "new"}:${initialDueAt ?? ""}`;
   return <TaskEditorForm key={editorKey} visible={visible} task={task} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={onClose} onSave={onSave} onAutoSave={onAutoSave} onDelete={onDelete} onCancelTask={onCancelTask} />;
 }
 
@@ -306,11 +306,8 @@ function TaskEditorForm({
     setSubtaskTitle("");
   };
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={closeEditor}>
-      <View style={[styles.modalBackdrop, { backgroundColor: theme.colors.overlay }]}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.taskEditorKeyboard}>
-          <View style={[styles.taskEditorSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, shadowColor: theme.colors.shadow }]}>
-            <View style={[styles.taskEditorHandle, { backgroundColor: theme.colors.borderStrong }]} />
+    <BottomSheetModal visible={visible} onClose={closeEditor} style={styles.taskEditorSheet}>
+      <View style={[styles.taskEditorHandle, { backgroundColor: theme.colors.borderStrong }]} />
             <View style={styles.taskEditorHeader}>
               <View style={styles.taskEditorHeaderCopy}>
                 <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task details" : "New task"}</Text>
@@ -395,10 +392,7 @@ function TaskEditorForm({
                 <Button label="Add task" onPress={save} />
               )}
             </View>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
@@ -408,7 +402,8 @@ export function OptionSheet({ visible, title, options, onClose }: { visible: boo
 }
 
 export function TextEntrySheet({ visible, title, description, placeholder, initialValue = "", actionLabel = "Save", onClose, onSubmit }: { visible: boolean; title: string; description?: string; placeholder?: string; initialValue?: string; actionLabel?: string; onClose: () => void; onSubmit: (value: string) => void }) {
-  const entryKey = `${visible ? "open" : "closed"}:${initialValue}`;
+  const session = useOpenSession(visible);
+  const entryKey = `${session}:${initialValue}`;
   return <TextEntrySheetForm key={entryKey} visible={visible} title={title} description={description} placeholder={placeholder} initialValue={initialValue} actionLabel={actionLabel} onClose={onClose} onSubmit={onSubmit} />;
 }
 
@@ -721,8 +716,7 @@ const styles = StyleSheet.create({
   boardCardNewFooterBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
   boardCardNewFooterBtnText: { fontSize: 12 },
   boardCardNewRemoveText: { fontSize: 12, fontWeight: "500" },
-  taskEditorKeyboard: { width: "100%", maxWidth: mobileModalMaxWidth, maxHeight: "94%", alignSelf: "center" },
-  taskEditorSheet: { width: "100%", maxHeight: "100%", paddingTop: 10, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: StyleSheet.hairlineWidth, shadowOpacity: 1, shadowRadius: 22, shadowOffset: { width: 0, height: -8 }, elevation: 16 },
+  taskEditorSheet: { paddingTop: 10, borderTopLeftRadius: 28, borderTopRightRadius: 28, shadowRadius: 22, shadowOffset: { width: 0, height: -8 }, elevation: 16 },
   taskEditorHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   taskEditorHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 18, paddingBottom: 4 },
   taskEditorHeaderCopy: { flex: 1, minWidth: 0 },

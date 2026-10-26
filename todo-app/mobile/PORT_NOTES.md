@@ -13,6 +13,9 @@ them instead of re-implementing storage or task rules.
 - No Tailwind. Use `StyleSheet` + theme tokens.
 - All bottom-sheet modals share `mobileModalMaxWidth` (620): full width on
   phones, centered with a capped width on tablets and web.
+- Sheet opening animates only the panel; the full-screen backdrop fades in.
+  Tapping the backdrop closes the sheet, and the task editor flushes pending
+  auto-save before closing.
 
 ## Current behavior
 
@@ -167,7 +170,7 @@ following the theme. Global background color from the theme.
 - Search input (debounced is optional), board filter, sort (manual/due/priority/created).
 - Create cards from the ribbon **New card** action or the add-card control at
   the end of each list.
-- **Board**: horizontal `ScrollView` of lists. Each column shows title, count,
+- **Board**: horizontal `ScrollView` of lists. Each column shows the list title,
   cards, and a menu (rename/hide/reorder/delete custom lists). “Add list” tile at
   the end. Deleting a list requires an in-app confirmation and keeps its cards.
   Cards: complete toggle, title, due label, priority dot, board chip, subtask
