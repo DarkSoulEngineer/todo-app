@@ -51,7 +51,7 @@ function readPayload(): WindowsPayload | null {
       activeId: typeof parsed.activeId === "string" ? parsed.activeId : null,
     };
   } catch {
-    // Unreadable session — start fresh rather than breaking the app.
+    // Unreadable session: start fresh rather than breaking the app.
     return null;
   }
 }
@@ -64,7 +64,7 @@ function writePayload(openIds: string[], activeId: string | null): void {
       JSON.stringify({ version: VERSION, openIds, activeId } satisfies WindowsPayload),
     );
   } catch {
-    // Storage blocked — the open windows still work for this session.
+    // Storage blocked: the open windows still work for this session.
   }
 }
 
@@ -83,7 +83,7 @@ export function useWindows(): WindowsApi {
   const [rawActiveId, setRawActiveId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Hydrate once the board registry is loaded — the first-run seed needs the
+  // Hydrate once the board registry is loaded: the first-run seed needs the
   // current board id. A deliberate external-store read that must not run during
   // SSR, so the server and first client render agree.
   useEffect(() => {

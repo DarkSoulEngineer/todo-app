@@ -186,7 +186,7 @@ export function loadProjects(): ProjectsState {
       return parsed;
     }
   } catch {
-    // Unreadable registry — same fallback as a corrupt one.
+    // Unreadable registry: same fallback as a corrupt one.
   }
 
   const { workspace, hadData } = loadWorkspace();
@@ -212,7 +212,7 @@ export function loadProjects(): ProjectsState {
         window.localStorage.getItem(LEGACY_STORAGE_KEY) ?? window.localStorage.getItem(STORAGE_KEY) ?? ""
       );
     } catch {
-      // No room for a backup — the legacy key itself is still the fallback.
+      // No room for a backup: the legacy key itself is still the fallback.
     }
   }
 
@@ -225,7 +225,7 @@ export function loadProjects(): ProjectsState {
       window.localStorage.removeItem(LEGACY_PROJECTS_STORAGE_KEY);
       window.localStorage.removeItem(LEGACY_BACKUP_KEY);
     } catch {
-      // Storage unavailable — the registry wins on the next load anyway.
+      // Storage unavailable: the registry wins on the next load anyway.
     }
   }
   return registry;

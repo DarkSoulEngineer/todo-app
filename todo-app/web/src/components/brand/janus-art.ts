@@ -2,7 +2,7 @@
  * Janus brand art.
  *
  * A real public-domain artwork: "Janus, from Illustrium imagines, 1517"
- * (Wikimedia Commons, public domain) — the two-faced god Janus. The source is
+ * (Wikimedia Commons, public domain): the two-faced god Janus. The source is
  * black ink carried by its alpha channel, re-keyed here to white ink on
  * transparency and embedded as a base64 data URI so the mark ships with the
  * code and needs no separate asset request.

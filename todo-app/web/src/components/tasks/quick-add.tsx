@@ -79,7 +79,7 @@ export function QuickAdd({ now, variant = "card" }: { now: Date; variant?: "card
         </div>
       ) : inline ? null : (
         <p className="mt-1.5 px-1 text-xs text-muted-foreground">
-          Add details as you type —{" "}
+          Add details as you type:{" "}
           <span className="font-mono text-foreground/80">!high</span> ·{" "}
           <span className="font-mono text-foreground/80">#home</span> ·{" "}
           <span className="font-mono text-foreground/80">tomorrow 5pm</span>

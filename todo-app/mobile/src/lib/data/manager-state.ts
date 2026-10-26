@@ -100,6 +100,7 @@ export interface TaskMetrics {
   total: number;
   open: number;
   done: number;
+  canceled: number;
   completionPercent: number;
   overdue: number;
   dueSoon: number;
@@ -109,12 +110,16 @@ export interface TaskMetrics {
 export function getTaskMetrics(tasks: readonly Task[], now = Date.now()): TaskMetrics {
   let open = 0;
   let done = 0;
+  let canceled = 0;
   let overdue = 0;
   let dueSoon = 0;
   const nextWeek = now + 7 * 24 * 60 * 60 * 1000;
 
   for (const task of tasks) {
-    if (task.canceled) continue;
+    if (task.canceled) {
+      canceled += 1;
+      continue;
+    }
     if (task.completed) {
       done += 1;
       continue;
@@ -127,11 +132,12 @@ export function getTaskMetrics(tasks: readonly Task[], now = Date.now()): TaskMe
     else if (due <= nextWeek) dueSoon += 1;
   }
 
-  const total = open + done;
+  const total = open + done + canceled;
   return {
     total,
     open,
     done,
+    canceled,
     completionPercent: total === 0 ? 0 : Math.round((done / total) * 100),
     overdue,
     dueSoon,

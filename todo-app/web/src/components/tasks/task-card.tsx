@@ -73,7 +73,7 @@ interface TaskCardProps {
 const ICON_BUTTON =
   "touch-target focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
-/** Ghost button for the board arrows — present on every card, so it stays quiet. */
+/** Ghost button for the board arrows: present on every card, so it stays quiet. */
 const COMPACT_ARROW =
   "touch-target focus-ring grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground/80 transition-[background-color,color,transform] duration-150 hover:bg-muted hover:text-foreground active:scale-90";
 
@@ -89,7 +89,7 @@ const INTERACTIVE_TARGET = "button, input, textarea, a, select, [role='menu']";
 /**
  * Leading accent rail so overdue / completed / canceled read at a glance.
  *
- * CANONICAL RAIL: every rail — status here, theme rails in `card-themes.ts` —
+ * CANONICAL RAIL: status rails here and theme rails in `card-themes.ts`
  * uses the same alpha ladder `from-{hue}-500/70 via-{hue}-500/45 to-{hue}-500/10`.
    * Canceled uses the muted theme role so it remains quiet in both themes.
  */
@@ -338,7 +338,7 @@ interface SelectionIndicatorProps {
 }
 
 /**
- * Subtle selection indicator — a thin left-edge bar that fills when selected.
+ * Subtle selection indicator: a thin left-edge bar that fills when selected.
  * Clicking it toggles selection. Much quieter than a checkbox button.
  * The card's ring/tint is the primary selection state; this is just an affordance.
  */
@@ -494,12 +494,12 @@ function CardActions({
           <Check className="h-4 w-4" strokeWidth={3} />
         </button>
 
-        {/* 2. Drag handle — hidden below sm and on pointer-coarse */}
+        {/* 2. Drag handle: hidden below sm and on pointer-coarse */}
         {handle && !compact && (
           <div className="hidden sm:block">{handle}</div>
         )}
 
-        {/* 3. Section move — dropdown to move card to any section (list only, compact uses arrows) */}
+        {/* 3. Section move: dropdown to move card to any section (list only, compact uses arrows) */}
         {!compact && sections && sections.length > 0 && (
           <select
             className="focus-ring h-6 w-auto min-w-[80px] max-w-[140px] text-xs rounded-md border border-input/50 bg-card px-2 py-0.5 pr-7 text-foreground appearance-none cursor-pointer transition-[border-color,background-color] duration-150 hover:border-primary/50 hover:bg-muted/30"
@@ -707,7 +707,7 @@ export function TaskCard({
     const completing = !task.completed;
     toggleComplete(task.id);
     if (completing) {
-      toast.success("Nice work — task completed", {
+      toast.success("Task completed", {
         duration: 2500,
         action: { label: "Undo", onClick: () => toggleComplete(task.id) },
       });
@@ -763,7 +763,7 @@ export function TaskCard({
   }
 
   /**
-   * A plain click must never select — it was far too easy to trigger by
+   * A plain click must never select: it was far too easy to trigger by
    * accident. Selection needs a deliberate gesture: ctrl/cmd+click (shift
    * extends a range), a double-click, the row's checkbox, or the keyboard.
    */
@@ -774,7 +774,7 @@ export function TaskCard({
 
   /**
    * Double-click means different things per surface:
-   * - board (compact): opens the editor — deliberately the only click that
+   * - board (compact): opens the editor: deliberately the only click that
    *   does, so board edits are never accidental;
    * - list (non-compact): on the task title it renames, elsewhere it selects.
    */
@@ -834,7 +834,7 @@ export function TaskCard({
   // The board behind task.category, when that board still exists.
   const board = boards?.find((entry) => entry.id === task.category) ?? null;
 
-  // Wash precedence — a card is tinted ONLY by its board category:
+  // Wash precedence: a card is tinted ONLY by its board category:
   //   board category → that board's wash
   //   no category    → no tint at all; an uncategorized card stays neutral
   //                    (no board, keyword-theme or default blue wash)
@@ -842,15 +842,15 @@ export function TaskCard({
   const wash = !task.canceled && board ? CARD_COLOR_WASHES[board.color] : null;
 
   // Precedence: a status rail (overdue/completed/canceled) always wins. The
-  // keyword-theme rail is secondary AND category-gated — it only decorates a
+  // keyword-theme rail is secondary AND category-gated: it only decorates a
   // categorized card, so an uncategorized card is never colorized.
   const rail = statusRail(task, status) ?? (board ? theme?.accent : null) ?? null;
 
   // Priority cue: a calm bottom-right corner glow in the priority hue. It is
   // additive and independent of category and status colour, so it shows on
-  // EVERY card — categorized or not. Canceled cards are the one exception: they
+  // EVERY card: categorized or not. Canceled cards are the one exception: they
   // read as set aside, so the warm priority glow is muted rather than inviting
-  // attention back to a discarded task (completed cards keep it — the alphas
+  // attention back to a discarded task (completed cards keep it: the alphas
   // are quiet enough to sit beside the emerald completion cue).
   const priorityWash = task.canceled ? null : PRIORITY_WASHES[task.priority];
 
@@ -907,7 +907,7 @@ export function TaskCard({
         }
       }}
     >
-      {/* Subtle selection indicator on left edge — fills when selected, click to toggle */}
+      {/* Subtle selection indicator on left edge: fills when selected, click to toggle */}
       {!compact && (
         <SelectionIndicator task={task} selected={selected} onSelect={onSelect} />
       )}

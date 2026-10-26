@@ -76,7 +76,7 @@ export function FilterMenu({ sections, categories }: FilterMenuProps) {
     };
   }, [open]);
 
-  // Nothing to filter on (e.g. list/calendar with no categories) — render no control.
+  // Nothing to filter on (e.g. list/calendar with no categories): render no control.
   if (!sections && !categories) return null;
 
   const activeCount =

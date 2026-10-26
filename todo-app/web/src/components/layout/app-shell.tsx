@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 interface AppShellProps {
-  /** Tool ribbon — the only header now. */
+  /** Tool ribbon: the only header now. */
   ribbon?: ReactNode;
   /** Compact desktop-style status strip shown below the work surface. */
   statusBar?: ReactNode;

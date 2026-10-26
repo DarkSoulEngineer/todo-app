@@ -3,7 +3,7 @@
  *
  * Boards live in ONE sequence, not a sparse 2D grid: `order[i]` is the board
  * that fills position `i`. The grid just wraps that sequence into the viewport's
- * current column count (1 → 2 → 3 → 4), so the list is always compact — row 1
+ * current column count (1 → 2 → 3 → 4), so the list is always compact: row 1
  * reads 1 2 3, row 2 reads 4 5, and there is never an empty cell. Dragging a
  * board onto another means "put me here", so every board after it shifts along.
  *
@@ -31,7 +31,7 @@ export const MAX_BOARD_COLS = 8;
 /** Default column count for a brand-new layout. */
 export const DEFAULT_BOARD_COLS = 4;
 
-/** Fresh, empty layout — reconcile fills it on first use. */
+/** Fresh, empty layout: reconcile fills it on first use. */
 export const EMPTY_BOARD_LAYOUT: BoardLayout = { cols: DEFAULT_BOARD_COLS, order: [] };
 
 /** Rounds and clamps a column count into the supported range. */
@@ -42,7 +42,7 @@ export function clampBoardCols(value: number): number {
 
 /**
  * Keeps readable, de-duplicated ids in the order they appear. Anything that is
- * not a non-empty string — including the `null` gaps of a legacy payload — is
+ * not a non-empty string: including the `null` gaps of a legacy payload: is
  * skipped, which is exactly what collapses an old sparse grid into a compact
  * list without ever losing or reordering a board.
  */
@@ -86,7 +86,7 @@ export function boardLayoutFromOrder(ids: readonly string[], cols = DEFAULT_BOAR
 /**
  * The load-time repair pass. Given the stored layout and the boards that
  * actually exist, it drops ids whose board is gone, de-duplicates, and appends
- * any board that is missing — guaranteeing every board appears exactly once, in
+ * any board that is missing: guaranteeing every board appears exactly once, in
  * order, with no gaps. A `null` base falls back to a plain board-id fill, so a
  * garbage payload still renders sensibly.
  */

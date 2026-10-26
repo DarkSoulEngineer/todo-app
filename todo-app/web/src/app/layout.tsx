@@ -27,7 +27,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Janus — Focused task manager",
+  title: "Janus: Focused task manager",
   description:
     "A fast, focused to-do list with priorities, due dates, tags, insights and offline support.",
   applicationName: "Janus",

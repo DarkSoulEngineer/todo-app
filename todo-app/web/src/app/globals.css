@@ -298,7 +298,7 @@
        1. a thin `outline` (painted outside the border box, so the card's own
           `overflow-hidden` never clips it and it never fights `shadow-xs`),
        2. a low, tight `drop-shadow` halo via `filter` (a separate property, so
-          it composes with — never clobbers — the card's shadow utilities),
+          it composes with: never clobbers: the card's shadow utilities),
        3. an `::after` overlay carrying a faint inset ring + primary tint, all
           strictly inside the card. It is a pseudo-element, so its own inset
           box-shadow can never replace the card's `shadow-xs`.

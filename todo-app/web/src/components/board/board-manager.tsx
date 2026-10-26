@@ -67,10 +67,7 @@ const PINS_STORAGE_KEY = "janus.board-pins.v1";
 /** Legacy linear order (pre-layout), read once to seed the layout on migration. */
 const ORDER_STORAGE_KEY = "janus.board-order.v1";
 
-/** Saved layout payload: `{ cols, order }` — boards in display order.
- *  Older payloads stored a sparse `{ cols, cells }` grid instead; both are read
- *  (see `sanitizeBoardLayout`). `cols` is a legacy hint kept for stored payloads;
- *  the grid renders with the viewport's column count. */
+/** Display order, with support for legacy sparse-grid payloads. */
 const LAYOUT_STORAGE_KEY = "janus.board-layout.v1";
 
 /** True while the user is typing somewhere, so page-level shortcuts stand down. */
@@ -96,7 +93,7 @@ function readPins(): Set<string> {
       return new Set(parsed.filter((id): id is string => typeof id === "string"));
     }
   } catch {
-    // Unreadable pins — start unpinned rather than breaking the landing page.
+    // Unreadable pins: start unpinned rather than breaking the landing page.
   }
   return new Set();
 }
@@ -125,23 +122,12 @@ function readInitialLayout(): BoardLayout {
       }
     }
   } catch {
-    // Unreadable layout — fall back to a fresh, board-id-ordered fill.
+    // Unreadable layout: fall back to a fresh, board-id-ordered fill.
   }
   return EMPTY_BOARD_LAYOUT;
 }
 
-/**
- * Landing page: every board the user owns, in one place. It has no shell of its
- * own (the sidebar and top bar belong to the task view), so it carries the
- * Janus wordmark itself and hands off to `/tasks` once a board is opened —
- * creating, importing and loading a board all mean "work in this board now".
- *
- * In edit mode the boards are one ordered row: dragging a board onto another
- * inserts it there and the rest shift along, so the grid is always compact (row
- * 1 reads 1 2 3, row 2 reads 4 5, never a gap). The edit grid is the very same
- * responsive grid as browse mode, so the cards are the same size in both — one
- * order just reads the same way whether you are arranging or browsing.
- */
+/** Board library with a shared responsive grid for browsing and reordering. */
 export function BoardManager(): JSX.Element {
   const router = useRouter();
   const {
@@ -177,7 +163,7 @@ export function BoardManager(): JSX.Element {
 
   // A single "now" snapshot keeps every card and the overview strip consistent.
   // The server has no clock: stay null there so the prerender output stays
-  // deterministic. The client reads it once at first render — safe because the
+  // deterministic. The client reads it once at first render: safe because the
   // skeleton still covers that render.
   const [now, setNow] = useState<Date | null>(() =>
     typeof window === "undefined" ? null : new Date(),
@@ -204,7 +190,7 @@ export function BoardManager(): JSX.Element {
     [layout, boardIds],
   );
 
-  // Boards in display order — the browse-mode sequence and the list the edit
+  // Boards in display order: the browse-mode sequence and the list the edit
   // grid renders (and reorders) directly.
   const orderedIds = useMemo(
     () => boardLayoutOrder(resolvedLayout, boardIds),
@@ -223,7 +209,7 @@ export function BoardManager(): JSX.Element {
     return q ? ordered.filter((project) => project.name.toLowerCase().includes(q)) : ordered;
   }, [ordered, query]);
 
-  // The grid renders two transparent groups — pinned first, then the rest — in
+  // The grid renders two transparent groups: pinned first, then the rest: in
   // true display order; the combined list drives keyboard nav.
   const pinnedBoards = useMemo(
     () => visible.filter((project) => pinnedIds.has(project.id)),
@@ -240,11 +226,16 @@ export function BoardManager(): JSX.Element {
     let open = 0;
     let overdue = 0;
     let completed = 0;
+    let canceled = 0;
     let total = 0;
     for (const project of projects) {
       for (const task of project.workspace.tasks) {
         // `total` counts every task on every board; `completed` is its done slice.
         total += 1;
+        if (task.canceled) {
+          canceled += 1;
+          continue;
+        }
         if (task.completed) completed += 1;
         if (task.completed || task.canceled) continue;
         open += 1;
@@ -256,7 +247,7 @@ export function BoardManager(): JSX.Element {
         if (due - now.getTime() < 0) overdue += 1;
       }
     }
-    return { boards: projects.length, open, overdue, completed, total };
+    return { boards: projects.length, open, overdue, completed, canceled, total };
   }, [projects, now]);
 
   const lastBoard = projects.length <= 1;
@@ -320,7 +311,7 @@ export function BoardManager(): JSX.Element {
     try {
       window.localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify([...next]));
     } catch {
-      // Storage blocked — pins keep working for this session.
+      // Storage blocked: pins keep working for this session.
     }
   }
 
@@ -331,7 +322,7 @@ export function BoardManager(): JSX.Element {
         JSON.stringify({ cols: next.cols, order: next.order }),
       );
     } catch {
-      // Storage blocked — the in-memory layout still applies this session.
+      // Storage blocked: the in-memory layout still applies this session.
     }
   }, []);
 
@@ -543,7 +534,7 @@ export function BoardManager(): JSX.Element {
 
   // Keep the roving focus on a card that still exists; otherwise settle on the
   // first visible card. Re-anchoring happens during render, guarded by the
-  // last-seen list key — the documented alternative to a setState-in-effect,
+  // last-seen list key: the documented alternative to a setState-in-effect,
   // and the same commit either way.
   const visibleKey = visible.map((project) => project.id).join("|");
   const [knownVisibleKey, setKnownVisibleKey] = useState(visibleKey);
@@ -577,7 +568,7 @@ export function BoardManager(): JSX.Element {
         const copy = duplicateProject(target.id);
         if (!copy) return;
         // Duplicating activates the copy, so open it as a window and follow it
-        // in — the same hand-off as New board, Import and opening a board.
+        // in: the same hand-off as New board, Import and opening a board.
         openBoard(copy);
         toast.success(`Duplicated “${target.name}”`, {
           description: "Working in the copy",
@@ -626,7 +617,7 @@ export function BoardManager(): JSX.Element {
               Board manager
             </h1>
             <p className="mt-2.5 max-w-prose text-sm text-pretty text-muted-foreground">
-              Open a board to pick up right where you left off.
+              All your boards in one place.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
@@ -646,7 +637,7 @@ export function BoardManager(): JSX.Element {
 
       {/* Toolbar: the board search and the arranging toggle share one row, so the
           page's controls read as a single strip under the header. While
-          arranging, the row becomes the edit bar instead — one mode, one place
+          arranging, the row becomes the edit bar instead: one mode, one place
           to look. */}
       {editMode ? (
         <EditGridBar onDone={() => finishEditing()} />
@@ -729,11 +720,7 @@ export function BoardManager(): JSX.Element {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            {/* The same responsive grid as browse mode (`sm:grid-cols-2
-                xl:grid-cols-3`), so an edit-mode card — and the card you drag —
-                is exactly the real card's size at every breakpoint. One ordered
-                sequence wraps into it, so dropping a card in a new place shifts
-                the rest along instead of leaving a gap. */}
+            {/* Match browse-mode card sizes and keep reordered rows compact. */}
             <SortableContext items={orderedIds} strategy={rectSortingStrategy}>
               <div ref={gridRef} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {ordered.map((project) => renderCard(project, "h-full"))}
@@ -828,6 +815,7 @@ export function BoardManager(): JSX.Element {
           open={overview.open}
           overdue={overview.overdue}
           completed={overview.completed}
+          canceled={overview.canceled}
           total={overview.total}
         />
       </div>
@@ -919,7 +907,7 @@ function GridDragOverlay({
       <div
         className="pointer-events-none"
         // A second wrapper keeps the scale/rotate from fighting DragOverlay's
-        // own positioning transform — one inline transform, nothing stacked.
+        // own positioning transform: one inline transform, nothing stacked.
         style={reduceMotion ? undefined : { transform: "scale(1.03) rotate(1.5deg)" }}
       >
         <BoardDragPreview project={project} now={now} pinned={pinnedIds.has(project.id)} />
@@ -936,19 +924,19 @@ function BoardStatsChart({
   open,
   overdue,
   completed,
+  canceled,
   total,
 }: {
   boards: number;
   open: number;
   overdue: number;
   completed: number;
+  canceled: number;
   total: number;
 }): JSX.Element {
   const reduceMotion = useReducedMotion();
 
-  // The four figures, in reading order: the task states that feed the total,
-  // then the boards themselves. Colours stay semantic (success / destructive /
-  // info / primary) so the donut and the list below always agree.
+  // Each task belongs to exactly one slice. Boards are a separate total.
   const figures = [
     {
       label: "Completed",
@@ -963,30 +951,21 @@ function BoardStatsChart({
       share: total > 0 ? Math.round((overdue / total) * 100) : null,
     },
     {
-      label: "Open",
-      value: open,
+      label: "Open (not overdue)",
+      value: open - overdue,
       color: "var(--info)",
-      share: total > 0 ? Math.round((open / total) * 100) : null,
+      share: total > 0 ? Math.round(((open - overdue) / total) * 100) : null,
     },
-    // Boards are counted in their own unit, so they carry no share.
-    { label: "Boards", value: boards, color: "var(--primary)", share: null },
+    { label: "Canceled", value: canceled, color: "var(--muted-foreground)", share: total > 0 ? Math.round((canceled / total) * 100) : null },
   ];
 
-  // Slices are sized against the sum of the figures so the ring always closes;
-  // the centre still headlines the raw task total.
-  const ring = Math.max(
-    figures.reduce((sum, figure) => sum + figure.value, 0),
-    1,
-  );
+  const ring = Math.max(total, 1);
 
   const radius = 60;
+  const circumference = 2 * Math.PI * radius;
   const strokeWidth = 13;
   const size = (radius + strokeWidth) * 2;
   const center = size / 2;
-  // Each segment is trimmed at both ends by half a cap plus a sliver of air, so
-  // the round caps leave a crisp notch between neighbours instead of overlapping.
-  const circumference = 2 * Math.PI * radius;
-  const endTrim = (strokeWidth / 2 + 2.25) / circumference;
 
   let elapsed = 0;
   const arcs = figures
@@ -999,15 +978,16 @@ function BoardStatsChart({
         ...figure,
         index,
         rotation: start * 360,
-        pathLength: Math.max(sweep - endTrim * 2, 0.008),
+        sweep,
       };
     });
 
   return (
-    <div>
+    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <h2 className="font-display text-sm font-semibold tracking-tight">Board stats</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Across all boards · includes canceled tasks</p>
       {/* One wide row: the circle anchors the left, a thin rule separates it from
-          the figures on the right, and the list spreads to the far edge — so the
+          the figures on the right, and the list spreads to the far edge: so the
           section fills the container instead of hugging the centre. */}
       <div className="mt-5 flex flex-col gap-8 sm:flex-row sm:items-center sm:gap-10 lg:gap-14">
         <svg
@@ -1016,7 +996,7 @@ function BoardStatsChart({
           viewBox={`0 0 ${size} ${size}`}
           className="mx-auto h-auto w-40 shrink-0 sm:mx-0 sm:w-44 lg:w-52"
           role="img"
-          aria-label={`Board statistics: ${total} ${pluralize(total, "task")} across ${boards} ${pluralize(boards, "board")} — ${completed} completed, ${open} open, ${overdue} overdue.`}
+          aria-label={`Board statistics: ${pluralize(total, "task")} across ${pluralize(boards, "board")}. ${completed} completed, ${open - overdue} open and not overdue, ${overdue} overdue, ${canceled} canceled.`}
         >
           {/* Soft full-ring track behind the slices. */}
           <circle
@@ -1037,9 +1017,9 @@ function BoardStatsChart({
                 fill="none"
                 stroke={arc.color}
                 strokeWidth={strokeWidth}
-                strokeLinecap="round"
-                initial={reduceMotion ? false : { pathLength: 0 }}
-                animate={{ pathLength: arc.pathLength }}
+                strokeDasharray={`${arc.sweep * circumference} ${circumference}`}
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transform={`rotate(${arc.rotation} ${center} ${center})`}
                 transition={{
                   duration: reduceMotion ? 0 : 0.9,
@@ -1169,7 +1149,7 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-/** `janus-board-work-2026-10-11.json` — dated so repeat saves stack up. */
+/** `janus-board-work-2026-10-11.json`: dated so repeat saves stack up. */
 function boardFileName(name: string): string {
   const stamp = new Date().toISOString().slice(0, 10);
   return `janus-board-${slugify(name) || "board"}-${stamp}.json`;

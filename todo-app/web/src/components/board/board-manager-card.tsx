@@ -30,9 +30,9 @@ const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 const KEEP_ONE_BOARD = "At least one board must remain";
 
 // The board colour palette (see `boards.ts`) supplies every accent used on a
-// tile — its `tile` gradient/ring and `icon` ink — so a board tile's accent and
+// tile: its `tile` gradient/ring and `icon` ink: so a board tile's accent and
 // a task's board chip are drawn from one source. Literals only, so Tailwind v4
-// keeps every class it scans — never build these strings dynamically.
+// keeps every class it scans: never build these strings dynamically.
 
 /** Neutral fallback used when a board has no dominant category colour. */
 const DEFAULT_TILE_WASH = "from-primary/12 to-primary/5 ring-primary/25";
@@ -57,6 +57,7 @@ function summarizeWorkspace(workspace: Workspace, now: Date | null): BoardStats 
   const tally = new Map<BoardColorId, number>();
 
   for (const task of workspace.tasks) {
+    if (task.canceled) continue;
     if (task.completed) {
       doneCount += 1;
     } else if (!task.canceled) {
@@ -70,7 +71,6 @@ function summarizeWorkspace(workspace: Workspace, now: Date | null): BoardStats 
         }
       }
     }
-    if (task.canceled) continue;
     const board = workspace.boards.find((candidate) => candidate.id === task.category);
     if (board) tally.set(board.color, (tally.get(board.color) ?? 0) + 1);
   }
@@ -84,7 +84,7 @@ function summarizeWorkspace(workspace: Workspace, now: Date | null): BoardStats 
     }
   }
 
-  const total = openCount + doneCount;
+  const total = workspace.tasks.length;
   return {
     openCount,
     doneCount,
@@ -157,7 +157,7 @@ export function ManagerBoardCard({
   //
   // The returned `transform`/`transition` slide the *other* cards into their new
   // positions as you drag, which is what makes the drop read as an insert. The
-  // card being dragged stays put and dims — the floating DragOverlay is the
+  // card being dragged stays put and dims: the floating DragOverlay is the
   // moving piece.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
     useSortable({
@@ -242,7 +242,7 @@ export function ManagerBoardCard({
       }
       onClick={(event) => {
         // Edit mode is for arranging, not loading. Otherwise only the bare
-        // surface opens the board — the controls below own their clicks.
+        // surface opens the board: the controls below own their clicks.
         if (editMode) return;
         const target = event.target as HTMLElement;
         if (target.closest("button, a, input, textarea, [data-no-load]")) return;
@@ -258,7 +258,7 @@ export function ManagerBoardCard({
         className,
       )}
     >
-      {/* Full-bleed radial wash — the canonical recipe task cards use
+      {/* Full-bleed radial wash: the canonical recipe task cards use
           (`CARD_COLOR_WASHES`), so both card families tint identically. */}
       <span
         aria-hidden="true"
@@ -461,8 +461,8 @@ export function ManagerBoardCard({
 
 /**
  * The floating ghost shown in the DragOverlay while a board is being dragged:
- * the same visual identity as the live card — accent wash, icon tile, title,
- * created line, stats, progress and category dots — with no interactivity.
+ * the same visual identity as the live card: accent wash, icon tile, title,
+ * created line, stats, progress and category dots: with no interactivity.
  */
 export function BoardDragPreview({
   project,
@@ -553,7 +553,7 @@ export function BoardDragPreview({
   );
 }
 
-/** The board's category swatches — first four, then a "+N" overflow count. */
+/** The board's category swatches: first four, then a "+N" overflow count. */
 function CategoryDots({ boards }: { boards: Workspace["boards"] }): JSX.Element {
   if (boards.length === 0) {
     return <span className="text-[11px] text-muted-foreground/70">No categories</span>;
@@ -590,6 +590,6 @@ function formatCreated(iso: string): string {
   try {
     return format(parseISO(iso), "d MMM yyyy");
   } catch {
-    return "—";
+    return "Unknown date";
   }
 }

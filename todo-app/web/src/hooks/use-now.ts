@@ -34,7 +34,7 @@ function getSnapshot(): number {
   return current;
 }
 
-/** Prerender/hydration snapshot — a fixed value keeps output deterministic. */
+/** Prerender/hydration snapshot: a fixed value keeps output deterministic. */
 function getServerSnapshot(): number {
   return 0;
 }

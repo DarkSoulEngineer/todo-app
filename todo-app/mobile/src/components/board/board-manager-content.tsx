@@ -47,13 +47,12 @@ export function BoardManagerContent(props: Props) {
       <View style={[styles.themeSwitch, { backgroundColor: c.secondary, borderColor: c.border }]}>
         {(["light", "dark"] as const).map((scheme) => <Pressable key={scheme} accessibilityRole="button" accessibilityLabel={`Use ${scheme} theme`} accessibilityState={{ selected: theme.scheme === scheme }} onPress={() => setPreference(scheme)} style={[styles.themeButton, theme.scheme === scheme && { backgroundColor: c.cardElevated }]}><Ionicons name={scheme === "light" ? "sunny-outline" : "moon"} size={18} color={theme.scheme === scheme ? scheme === "light" ? "#D97706" : c.primary : c.mutedForeground} /></Pressable>)}
       </View>
-      <View accessible accessibilityLabel="Local workspace" style={[styles.profile, { backgroundColor: c.primarySoft, borderColor: `${c.primary}55` }]}><Text style={{ color: c.accentForeground, fontWeight: "700", fontSize: 12 }}>YO</Text></View>
       <IconButton icon="ellipsis-horizontal" label="Workspace options" onPress={props.onMore} size={36} />
     </View>
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110, paddingLeft: Math.max(insets.left, 18), paddingRight: Math.max(insets.right, 18) }]}>
       <Text style={[styles.breadcrumb, { color: c.primary }]}>HOME <Text style={{ color: c.borderStrong }}>/</Text> BOARDS</Text>
       <Text accessibilityRole="header" style={[styles.title, { color: c.foreground, fontFamily: serif }]}>Board manager</Text>
-      <Text style={[styles.intro, { color: c.mutedForeground }]}>Open a board to pick up right where you left off.</Text>
+      <Text style={[styles.intro, { color: c.mutedForeground }]}>All your boards in one place.</Text>
       <View style={styles.actions}>
         <Button variant="outline" label="Import board" onPress={props.onImport} style={styles.mainAction}><Ionicons name="push-outline" size={17} color={c.mutedForeground} /><Text style={{ color: c.secondaryForeground, fontWeight: "500" }}>Import board</Text></Button>
         <Button label="New board" onPress={props.onCreate} style={styles.mainAction}><Ionicons name="add" size={21} color={c.primaryForeground} /><Text style={{ color: c.primaryForeground, fontWeight: "600" }}>New board</Text></Button>
@@ -64,7 +63,7 @@ export function BoardManagerContent(props: Props) {
       </View>
       <View style={styles.sectionHeader}><View style={styles.sectionCopy}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>YOUR BOARDS</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{props.totalBoards} active</Text></View><IconButton icon="ellipsis-horizontal" label="Board options" onPress={props.onMore} size={36} /></View>
       {props.editing ? <Text style={[styles.editHint, { color: c.primary }]}>Use the arrows to arrange your boards.</Text> : null}
-      {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a focused home for your work."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View style={styles.boards}>{props.projects.map((project, index) => <ManagerCard key={project.id} project={project} accent={index % 2 ? "#EC4899" : c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />)}</View>}
+      {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View style={styles.boards}>{props.projects.map((project, index) => <ManagerCard key={project.id} project={project} accent={index % 2 ? "#EC4899" : c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />)}</View>}
       <WorkspaceOverview metrics={props.metrics} boards={props.totalBoards} />
     </ScrollView>
   </>;
@@ -100,27 +99,27 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
   const c = theme.colors;
   const [width, setWidth] = useState(0);
   // Overdue is a subset of open tasks: do not count it twice in the donut.
-  const slices = [{ label: "Completed", value: metrics.done, color: c.success }, { label: "Overdue", value: metrics.overdue, color: c.destructive }, { label: "Open", value: metrics.open - metrics.overdue, color: c.info }];
+  const slices = [{ label: "Completed", value: metrics.done, color: c.success }, { label: "Overdue", value: metrics.overdue, color: c.destructive }, { label: "Open (not overdue)", value: metrics.open - metrics.overdue, color: c.info }, { label: "Canceled", value: metrics.canceled, color: c.mutedForeground }];
   const circumference = 2 * Math.PI * 48;
   let offset = 0;
   return <View style={styles.overview}>
-    <View style={styles.overviewHeading}><View style={{ flex: 1 }}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>BOARD STATS</Text><Text style={[styles.overviewHint, { color: c.mutedForeground }]}>Across all boards · canceled tasks excluded</Text></View><Ionicons name="trending-up-outline" size={20} color={c.primary} /></View>
+    <View style={styles.overviewHeading}><View style={{ flex: 1 }}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>BOARD STATS</Text><Text style={[styles.overviewHint, { color: c.mutedForeground }]}>Across all boards · includes canceled tasks</Text></View></View>
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.statsCard, { backgroundColor: c.card, borderColor: c.border }]}>
       <View style={[styles.statsTotal, { borderColor: c.border }]}><View><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={{ color: c.mutedForeground, fontSize: 12 }}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>
       <View style={[styles.statsBody, width > 0 && width < 330 && { flexDirection: "column" }]}>
-        <View accessible accessibilityLabel={`${metrics.total} tasks, ${metrics.completionPercent}% completed`} style={styles.donut}>
+        <View accessible accessibilityLabel={`${metrics.total} tasks: ${metrics.done} completed, ${metrics.overdue} overdue, ${metrics.open - metrics.overdue} open and not overdue, ${metrics.canceled} canceled`} style={styles.donut}>
           <Svg width={132} height={132} viewBox="0 0 120 120">
             <Circle cx={60} cy={60} r={48} fill="none" stroke={c.secondary} strokeWidth={11} />
             {slices.map((slice) => {
               const length = metrics.total ? slice.value / metrics.total * circumference : 0;
               const start = offset;
               offset += length;
-              return length > 0 ? <Circle key={slice.label} cx={60} cy={60} r={48} fill="none" stroke={slice.color} strokeWidth={11} strokeDasharray={`${Math.max(0, length - 2)} ${circumference}`} strokeDashoffset={-start} strokeLinecap="round" transform="rotate(-90 60 60)" /> : null;
+              return length > 0 ? <Circle key={slice.label} cx={60} cy={60} r={48} fill="none" stroke={slice.color} strokeWidth={11} strokeDasharray={`${length} ${circumference}`} strokeDashoffset={-start} transform="rotate(-90 60 60)" /> : null;
             })}
           </Svg>
           <View style={styles.donutLabel}><Text style={[styles.donutValue, { color: c.foreground }]}>{metrics.total}</Text><Text style={{ color: c.mutedForeground, fontSize: 9, marginTop: 3 }}>TASKS</Text></View>
         </View>
-        <View style={styles.legend}>{[...slices, { label: "Boards", value: boards, color: c.primary }].map((slice) => <View key={slice.label} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: slice.color }]} /><Text style={[styles.legendLabel, { color: c.secondaryForeground }]}>{slice.label}</Text><Text style={{ color: c.foreground, fontSize: 14 }}>{slice.value}</Text>{slice.label !== "Boards" ? <Text style={[styles.legendPercent, { color: c.mutedForeground }]}>{metrics.total ? Math.round(slice.value / metrics.total * 100) : 0}%</Text> : <View style={styles.legendPercent} />}</View>)}</View>
+        <View style={styles.legend}>{slices.map((slice) => <View key={slice.label} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: slice.color }]} /><Text style={[styles.legendLabel, { color: c.secondaryForeground }]}>{slice.label}</Text><Text style={{ color: c.foreground, fontSize: 14 }}>{slice.value}</Text><Text style={[styles.legendPercent, { color: c.mutedForeground }]}>{metrics.total ? Math.round(slice.value / metrics.total * 100) : 0}%</Text></View>)}</View>
       </View>
     </View>
   </View>;
@@ -129,7 +128,7 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingBottom: 14, gap: 6, borderBottomWidth: 1 },
   identity: { flex: 1 }, brand: { fontSize: 17, fontWeight: "700", letterSpacing: -0.5 }, subtitle: { fontSize: 11, marginTop: 5 },
-  themeSwitch: { flexDirection: "row", borderWidth: 1, borderRadius: 10, padding: 2 }, themeButton: { width: 32, height: 36, borderRadius: 7, alignItems: "center", justifyContent: "center" }, profile: { width: 32, height: 36, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  themeSwitch: { flexDirection: "row", borderWidth: 1, borderRadius: 10, padding: 2 }, themeButton: { width: 32, height: 36, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   content: { width: "100%", maxWidth: 680, alignSelf: "center", paddingTop: 24 }, breadcrumb: { fontSize: 10, fontWeight: "700", letterSpacing: 0.8 }, title: { fontSize: 34, fontWeight: "400", letterSpacing: -1.2, marginTop: 10 }, intro: { fontSize: 13, lineHeight: 21, marginTop: 10 }, actions: { flexDirection: "row", gap: 10, marginTop: 24 }, mainAction: { flex: 1, height: 44, borderRadius: 14, paddingHorizontal: 8 },
   searchRow: { flexDirection: "row", gap: 8, marginTop: 20 }, search: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 13, paddingLeft: 12, minHeight: 44 }, searchInput: { flex: 1, minWidth: 0, fontSize: 13, paddingVertical: 10 }, arrange: { paddingHorizontal: 10, borderRadius: 13 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 22, marginBottom: 12 }, sectionCopy: { flexDirection: "row", alignItems: "center", gap: 10 }, sectionTitle: { fontSize: 14, fontWeight: "700", letterSpacing: 0.7 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },

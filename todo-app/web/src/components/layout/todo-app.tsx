@@ -165,7 +165,7 @@ export function TodoApp() {
     }
     if (!previousAllDone.current && allDone) {
       setCelebrating(true);
-      toast.success("All clear — nice work!", {
+      toast.success("No open tasks", {
         description: "Every task is done or set aside.",
         duration: 4000,
       });

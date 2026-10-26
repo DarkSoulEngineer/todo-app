@@ -7,7 +7,7 @@ export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed"
 
 /**
  * A new board starts from scratch: no columns at all. The predefined
- * Upcoming/Overdue/Completed/Canceled layout is gone — the user adds their own
+ * Upcoming/Overdue/Completed/Canceled layout is gone: the user adds their own
  * sections, and a card is only ever placed in a column that exists.
  */
 export function defaultSections(): BoardSection[] {

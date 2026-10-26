@@ -141,9 +141,6 @@ export function ReferenceTitlebar({ boardTitle, documentTitle }: { boardTitle: s
       <View style={styles.titlebarActions}>
         <Text style={styles.syncText}>Local workspace</Text>
         <IconButton icon={scheme === "dark" ? "sunny-outline" : "moon-outline"} label={scheme === "dark" ? "Use light theme" : "Use dark theme"} onPress={toggle} compact />
-        <View accessibilityLabel="Local profile" accessibilityRole="text" style={styles.profile}>
-          <Text style={styles.profileText}>YO</Text>
-        </View>
       </View>
     </View>
   );

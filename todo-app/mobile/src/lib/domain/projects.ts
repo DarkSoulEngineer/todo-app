@@ -176,7 +176,7 @@ export async function loadProjects(): Promise<ProjectsState> {
       return parsed;
     }
   } catch {
-    // Unreadable registry — fall through to migration.
+    // Unreadable registry: fall through to migration.
   }
 
   const { workspace, hadData } = await loadWorkspace();
@@ -198,7 +198,7 @@ export async function loadProjects(): Promise<ProjectsState> {
       const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY) ?? await AsyncStorage.getItem(STORAGE_KEY);
       if (legacy) await AsyncStorage.setItem(LEGACY_BACKUP_KEY, legacy);
     } catch {
-      // No room for a backup — the legacy key itself is still the fallback.
+      // No room for a backup: the legacy key itself is still the fallback.
     }
   }
 
@@ -210,7 +210,7 @@ export async function loadProjects(): Promise<ProjectsState> {
       await AsyncStorage.removeItem(LEGACY_PROJECTS_STORAGE_KEY);
       await AsyncStorage.removeItem(LEGACY_BACKUP_KEY);
     } catch {
-      // Storage unavailable — the registry wins on the next load anyway.
+      // Storage unavailable: the registry wins on the next load anyway.
     }
   }
   return registry;

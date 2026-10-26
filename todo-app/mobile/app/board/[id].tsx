@@ -339,7 +339,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, onA
   const [calendarMode, setCalendarMode] = useState<"month" | "week">("month");
   const first = startOfWeek(calendarMode === "week" ? month : startOfMonth(month), { weekStartsOn: 1 });
   const days = Array.from({ length: calendarMode === "week" ? 7 : 42 }, (_, index) => addDays(first, index));
-  const title = calendarMode === "week" ? `${format(days[0], "MMM d")} – ${format(days[6], "MMM d, yyyy")}` : format(month, "MMMM yyyy");
+  const title = calendarMode === "week" ? `${format(days[0], "MMM d")} to ${format(days[6], "MMM d, yyyy")}` : format(month, "MMMM yyyy");
   const shift = (delta: number) => setMonth(calendarMode === "week" ? addWeeks(month, delta) : addMonths(month, delta));
   const taskColor = (task: Task) => task.canceled ? theme.colors.mutedForeground : task.completed ? theme.colors.success : task.priority === "high" ? theme.colors.warning : theme.colors.primary;
   const visibleDayTasks = (day: Date) => tasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), day)).sort((a, b) => (a.dueAt || "").localeCompare(b.dueAt || ""));

@@ -33,7 +33,7 @@ export default function CalendarRoute() {
   const selectedTasks = useMemo(() => tasksForDay(api.tasks, selectedDay), [api.tasks, selectedDay]);
   const unscheduledTasks = useMemo(() => api.tasks.filter((task) => !task.dueAt), [api.tasks]);
   const title = calendarMode === "week"
-    ? `${format(days[0], "MMM d")} – ${format(days[6], "MMM d, yyyy")}`
+    ? `${format(days[0], "MMM d")} to ${format(days[6], "MMM d, yyyy")}`
     : format(calendarAnchor, "MMMM yyyy");
 
   const selectDay = (day: Date) => {

@@ -98,13 +98,13 @@ export interface TasksApi {
   deleteBoard: (id: string) => { label: string; affected: number } | null;
   /** Puts the built-in boards that are missing back on offer. */
   restoreBuiltInBoards: () => void;
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   deletedCategories: string[];
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   deleteCategory: (id: string) => { label: string; affected: number } | null;
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   restoreCategory: (id: string) => void;
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   restoreCategories: () => void;
   clearCompleted: () => number;
   getCompletedIds: () => string[];

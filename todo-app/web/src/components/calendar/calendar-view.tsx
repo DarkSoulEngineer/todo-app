@@ -87,7 +87,7 @@ export function CalendarView({ tasks, now, onEdit, onCreateOn }: CalendarViewPro
 
   const title =
     mode === "week"
-      ? `${format(days[0], "MMM d")} – ${format(days[days.length - 1], "MMM d, yyyy")}`
+      ? `${format(days[0], "MMM d")} to ${format(days[days.length - 1], "MMM d, yyyy")}`
       : format(cursor, "MMMM yyyy");
 
   const shift = (delta: number): void => {

@@ -16,7 +16,7 @@ export const SAMPLE_BOARDS: Board[] = [
 
 /**
  * Sample columns. A board no longer starts with the predefined status columns,
- * so the demo ships its own custom ones — which is also the clearest way to
+ * so the demo ships its own custom ones: which is also the clearest way to
  * show how a board is meant to be built up.
  */
 export const SAMPLE_SECTIONS: BoardSection[] = [
@@ -93,7 +93,7 @@ const SEEDS: SampleSeed[] = [
   },
   {
     title: "Book the dentist appointment",
-    description: "Every six months — it has been a while.",
+    description: "Every six months: it has been a while.",
     priority: "medium",
     category: "family",
     offsetHours: -200,
@@ -120,7 +120,7 @@ const SEEDS: SampleSeed[] = [
     ],
   },
   {
-    title: "Team standup — prep the agenda",
+    title: "Team standup: prep the agenda",
     description: "Keep it to five talking points.",
     priority: "medium",
     category: "work",
@@ -142,7 +142,7 @@ const SEEDS: SampleSeed[] = [
   },
   {
     title: "Buy a birthday gift for Ana",
-    description: "She loves coffee — a nice mug, maybe.",
+    description: "She loves coffee: a nice mug, maybe.",
     priority: "medium",
     category: "errands",
     offsetHours: 50,
@@ -167,7 +167,7 @@ const SEEDS: SampleSeed[] = [
     offsetHours: 12,
   },
   {
-    title: "Gym workout — leg day",
+    title: "Gym workout: leg day",
     description: "Squats, lunges and a light run.",
     priority: "medium",
     category: "health",
@@ -175,7 +175,7 @@ const SEEDS: SampleSeed[] = [
   },
   {
     title: "Study for the final exam",
-    description: "Focus on chapters 4–7 and past papers.",
+    description: "Focus on chapters 4-7 and past papers.",
     priority: "high",
     category: "learning",
     offsetHours: 96,
@@ -200,7 +200,7 @@ const SEEDS: SampleSeed[] = [
     completed: true,
   },
   {
-    title: "Pay the credit card — avoid the late fee",
+    title: "Pay the credit card: avoid the late fee",
     description: "",
     priority: "high",
     category: null,

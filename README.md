@@ -1,7 +1,7 @@
 # Janus
 
 <p align="center">
-  <img src="todo-app/public/icon-512.png" alt="Janus" width="320" />
+  <img src="todo-app/web/public/icon-512.png" alt="Janus" width="320" />
 </p>
 
 Janus is a local-first task manager inspired by the Roman god of thresholds
@@ -12,7 +12,7 @@ calendar planning, and progress insights without an account or backend.
 
 | Application | Directory | Start command |
 |---|---|---|
-| Web | `todo-app/` | `npm run dev` |
+| Web | `todo-app/web/` | `npm run dev` |
 | Mobile | `todo-app/mobile/` | `npm start` |
 
 The web client uses Next.js, React, TypeScript, and Tailwind CSS. The mobile
@@ -23,13 +23,13 @@ data on the device.
 
 ```bash
 # Web
-cd todo-app
+cd todo-app/web
 npm run lint
 npx tsc --noEmit
 npm run build
 
 # Mobile
-cd mobile
+cd ../mobile
 npm run lint
 npm run typecheck
 ```

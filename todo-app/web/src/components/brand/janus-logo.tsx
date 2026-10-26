@@ -4,7 +4,7 @@ import { JANUS_ART_DATA_URI } from "@/components/brand/janus-art";
 /**
  * Janus brand mark.
  *
- * Janus is the Roman god of doorways, gates and thresholds — and of duality:
+ * Janus is the Roman god of doorways, gates and thresholds: and of duality:
  * his two faces look to the past and the future at once (the month of January is
  * his). The mark is the real thing: the public-domain two-faced Janus medallion
  * from "Illustrium imagines" (1517), embedded as a base64 data URI in
@@ -17,7 +17,8 @@ import { JANUS_ART_DATA_URI } from "@/components/brand/janus-art";
  */
 export function JanusMark({ className }: { className?: string }): JSX.Element {
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- a tiny inlined data URI; next/image adds nothing here.
+    // Inline artwork does not need image optimization.
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={JANUS_ART_DATA_URI}
       alt=""

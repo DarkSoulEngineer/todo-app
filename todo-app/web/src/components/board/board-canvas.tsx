@@ -44,12 +44,12 @@ import { cn } from "@/lib/utils/utils";
  * canvas (or with the middle button) moves the board, the wheel pans it,
  * ctrl/cmd + wheel zooms about the cursor and two fingers pinch-zoom. Card
  * drags and section reordering keep working untouched, because a pan only ever
- * starts on the backdrop — never on a card, column or button.
+ * starts on the backdrop: never on a card, column or button.
  *
  * Each column also scrolls its own cards (Trello style). The wheel follows a
  * column -> board -> page chain: it scrolls the column while it can, then pans
  * the board once the column hits an edge, and finally falls through to the page
- * once the board is pinned too — so no gesture ever gets trapped.
+ * once the board is pinned too: so no gesture ever gets trapped.
  */
 export function BoardCanvas({
   children,
@@ -197,7 +197,7 @@ export function BoardCanvas({
       // Once the column is pinned at an edge we fall through and pan the board
       // (preventDefault). When the board is ALSO at its clamped edge we return
       // without preventDefault, so the wheel chains on to the page (the
-      // app-shell's own scroll area) — the board never traps the scroll.
+      // app-shell's own scroll area): the board never traps the scroll.
       const scroller = findBoardScroll(event.target);
       if (scroller && canScrollBy(scroller, dy)) return;
 

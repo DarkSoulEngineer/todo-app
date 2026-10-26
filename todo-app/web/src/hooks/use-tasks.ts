@@ -98,13 +98,13 @@ export interface TasksApi {
   deleteBoard: (id: string) => { label: string; affected: number } | null;
   /** Puts the built-in boards that are missing back on offer. */
   restoreBuiltInBoards: () => void;
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   deletedCategories: string[];
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   deleteCategory: (id: string) => { label: string; affected: number } | null;
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   restoreCategory: (id: string) => void;
-  /** @deprecated Board API wrapper — use the board actions above. */
+  /** @deprecated Board API wrapper: use the board actions above. */
   restoreCategories: () => void;
   clearCompleted: () => number;
   getCompletedIds: () => string[];
@@ -666,7 +666,7 @@ export function useTasks(): TasksApi {
     if (sectionsRef.current.length === 0) {
       // A from-scratch board has no columns, so the demo would render an empty
       // board: give it the sample columns and sort the tasks into them. Boards
-      // that already have their own sections keep them — the tasks then fall
+      // that already have their own sections keep them: the tasks then fall
       // into whichever column their status implies.
       setSections(SAMPLE_SECTIONS.map((section) => ({ ...section })));
       setTasks(distributeSampleTasks(samples));

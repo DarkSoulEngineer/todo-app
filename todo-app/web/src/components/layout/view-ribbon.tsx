@@ -64,8 +64,8 @@ interface RibbonTab {
  * default tab and "filter" is the Options tab.
  *
  * Labels name what each tab holds:
- *  - "Home"    — create, tidy up, load sample, board display
- *  - "Options" — category filters and ordering
+ *  - "Home"   : create, tidy up, load sample, board display
+ *  - "Options": category filters and ordering
  */
 function tabsForView(): RibbonTab[] {
   return [
@@ -157,7 +157,7 @@ export function ViewRibbon({
     <section aria-label="Tools" className="relative shrink-0 border-b border-border bg-card/90 shadow-sm backdrop-blur-xl">
       <div className="h-0.5 w-full bg-gradient-to-r from-primary/55 via-secondary/35 to-success/35" aria-hidden="true" />
       {/* Persistent board link + view switcher + theme + shortcuts + window
-          controls — always visible, like a desktop title bar. */}
+          controls: always visible, like a desktop title bar. */}
       <div className="flex min-h-9 flex-wrap items-center gap-1.5 border-b border-border/60 bg-muted/30 px-2 py-1 max-[639px]:gap-1 sm:px-3">
         <div className="mr-1 hidden items-center gap-1.5 border-r border-border/70 pr-2 sm:flex">
           <span className="grid h-5 w-5 place-items-center rounded-md bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">J</span>

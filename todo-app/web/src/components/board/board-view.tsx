@@ -674,7 +674,7 @@ export function BoardView({
               className="pointer-events-none w-[16rem] rotate-2 cursor-grabbing rounded-2xl border border-border bg-card p-3 shadow-2xl ring-1 ring-primary/20"
             >
               {/* Minimized version of the dragged card, tilted like the classic
-                  ghost. Renders the static task once per drag — no live
+                  ghost. Renders the static task once per drag: no live
                   status/color emulation on hover, so pointer moves stay cheap. */}
               <div className="scale-[0.92]">
                 <TaskCard

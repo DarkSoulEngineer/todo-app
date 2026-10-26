@@ -14,7 +14,7 @@ interface ListViewProps {
 
 /**
  * Read-only activity feed grouped by day. Cards only navigate to where the
- * task lives — the view never adds, edits or deletes any data.
+ * task lives: the view never adds, edits or deletes any data.
  */
 export function ListView({ tasks, onOpenTask, now }: ListViewProps) {
   // The list view is presented as a changelog of board changes, ordered by the

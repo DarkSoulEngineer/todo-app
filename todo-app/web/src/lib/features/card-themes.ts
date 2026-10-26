@@ -14,11 +14,11 @@ import type { Priority } from "@/lib/domain/types";
  * `task-card.tsx` for exactly which layer wins.
  *
  * Every class below is a complete static Tailwind literal (no concatenation or
- * dynamic construction) so Tailwind's compiler can see it — built-up class
+ * dynamic construction) so Tailwind's compiler can see it: built-up class
  * names get purged. The hues follow the `boards.ts` / `status.ts` palette
  * language with translucent tints that read quietly on light and dark cards.
  *
- * CANONICAL RECIPE — every rail, border and wash in this file (and the status
+ * CANONICAL RECIPE: every rail, border and wash in this file (and the status
  * rails/borders in `task-card.tsx`) shares one set of alphas:
  *   rail   → from-{hue}-500/70 via-{hue}-500/45 to-{hue}-500/10
  *   border → border-{hue}-500/35
@@ -30,7 +30,7 @@ import type { Priority } from "@/lib/domain/types";
  * PRIORITY WASH: the same radial recipe mirrored to the BOTTOM-RIGHT corner
  * (`at 100% 100%`, `transparent_65%`), so it complements the top-right category
  * wash instead of overlapping it. Its alphas are a short ladder rather than a
- * single step — see `PRIORITY_WASHES` below.
+ * single step: see `PRIORITY_WASHES` below.
  *
  * The board tiles in `board-manager-card.tsx` draw from this same document:
  * their card surface drops `CARD_COLOR_WASHES` in verbatim (same geometry, same
@@ -53,7 +53,7 @@ export interface CardTheme {
   keywords: string[];
   /** Gradient stops for the left accent rail (used with `bg-gradient-to-b`). */
   accent: string;
-  /** Themed border tone — only applied to plain (upcoming) cards. */
+  /** Themed border tone: only applied to plain (upcoming) cards. */
   border: string;
   /** Full-bleed radial background wash layered over the card. */
   wash: string;
@@ -123,9 +123,9 @@ const AMBER = {
 /**
  * Category wash: the background tint for cards tagged with a board.
  *
- * Same subtle recipe as the theme washes — right-anchored top-right gradient,
+ * Same subtle recipe as the theme washes: right-anchored top-right gradient,
  * light-mode alpha 0.05, dark-mode 0.09, `transparent_65%` end stop, complete
- * static Tailwind literals — so a tagged card reads as tinted by its
+ * static Tailwind literals: so a tagged card reads as tinted by its
  * board color rather than by any keyword theme. Keyed by every `BoardColorId`.
  */
 export const CARD_COLOR_WASHES: Record<BoardColorId, string> = {
@@ -144,8 +144,8 @@ export const CARD_COLOR_WASHES: Record<BoardColorId, string> = {
  *
  * The fallback for a surface that has no dominant board colour (e.g. a manager
  * tile whose boards carry no tasks yet). It keeps the exact geometry and alphas
- * of every other wash — right-anchored top-right, 0.05 light / 0.09 dark,
- * `transparent_65%` end stop — so the fallback never reads as a second recipe.
+ * of every other wash: right-anchored top-right, 0.05 light / 0.09 dark,
+ * `transparent_65%` end stop: so the fallback never reads as a second recipe.
  */
 export const NEUTRAL_WASH =
   "bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--primary)_5%,transparent),transparent_65%)] dark:bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--primary)_9%,transparent),transparent_65%)]";
@@ -153,17 +153,17 @@ export const NEUTRAL_WASH =
 /**
  * PRIORITY_WASHES: the bottom-right corner glow that names a card's priority.
  *
- * The same radial recipe as every wash above — one gradient, `transparent_65%`
- * end stop, a complete static Tailwind literal with a light and dark variant —
+ * The same radial recipe as every wash above: one gradient, `transparent_65%`
+ * end stop, a complete static Tailwind literal with a light and dark variant,
  * but anchored at the BOTTOM-RIGHT (`at 100% 100%`) so it mirrors the top-right
  * category wash, leaves the left status rail clear, and never fights either.
  *
  * Only the hue steps with priority (the established `PRIORITY_META` scale:
  * orange-500 / amber-500 / slate-500) and the alphas form a small ladder:
- *   low    → slate-500  — 0.05 light / 0.09 dark, exactly the ambient wash
+ *   low    → slate-500 : 0.05 light / 0.09 dark, exactly the ambient wash
  *            floor, so "low" reads as the quiet, near-neutral step.
- *   medium → amber-500  — +0.03 light / +0.05 dark.
- *   high   → orange-500 — 0.11 light / 0.19 dark, the most present step, yet
+ *   medium → amber-500 : +0.03 light / +0.05 dark.
+ *   high   → orange-500: 0.11 light / 0.19 dark, the most present step, yet
  *            still below the priority pill's own fill (`500/12`) so the surface
  *            never reads louder than the pill that names it.
  * The dark alphas step up from the light ones the same way the wash recipe
@@ -179,7 +179,7 @@ export const PRIORITY_WASHES: Record<Priority, string> = {
  * The theme list, in detection-priority order.
  *
  * PRECEDENCE: the first theme (in this array order) to match wins. Ordering is
- * deliberate — high-urgency and high-specificity themes sit first so a task like
+ * deliberate: high-urgency and high-specificity themes sit first so a task like
  * "Urgent: pay the bill" reads as urgent rather than finance. Within a theme the
  * keywords are tested in order, but since they all select the same theme that
  * order is cosmetic.
@@ -531,7 +531,7 @@ const THEME_MATCHERS: ReadonlyArray<{ theme: CardTheme; matchers: readonly RegEx
  *
  * Case-insensitive, whole-word, and deterministic: themes are tested in
  * `CARD_THEMES` order, so the first theme with any matching keyword wins (see
- * the precedence note above the array). Pure and side-effect free — inputs are
+ * the precedence note above the array). Pure and side-effect free: inputs are
  * never mutated, and empty / missing text returns null.
  */
 export function detectCardTheme(title: string, description: string): CardTheme | null {

@@ -97,7 +97,7 @@ export function Desktop() {
     tileRefs.current[index]?.focus();
   };
 
-  // Move selection — and focus — by one step, wrapping around the open boards.
+  // Move selection: and focus: by one step, wrapping around the open boards.
   const step = (delta: number) => {
     if (count === 0) return;
     selectIndex(((selectedIndex + delta) % count + count) % count);

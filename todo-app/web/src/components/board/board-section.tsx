@@ -133,7 +133,7 @@ export function BoardSectionColumn({
       )}
     >
       <header className="flex flex-col gap-1.5 px-0.5">
-        {/* Row 1 — column controls: drag grip, icon chip, count badge, menu. */}
+        {/* Row 1: column controls: drag grip, icon chip, count badge, menu. */}
         <div className="flex items-center gap-1.5">
           <button
             ref={setActivatorNodeRef}
@@ -160,7 +160,7 @@ export function BoardSectionColumn({
           />
         </div>
 
-        {/* Row 2 — the title spans the full column width, so it keeps many more
+        {/* Row 2: the title spans the full column width, so it keeps many more
             letters before truncating; the rename editor takes the same slot. */}
         {editing ? (
           <SectionTitleEditor
