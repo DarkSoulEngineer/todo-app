@@ -8,15 +8,15 @@ import type { Task } from "@/lib/domain/types";
 import { deriveStatus, describeDue } from "@/lib/domain/status";
 import { useNow } from "@/hooks/use-now";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "./reference-mobile-bottom-nav";
-import { Avatar, Pill, ProgressRing, ReferenceTaskInput, resolveReferenceTask, ScreenHeader, statusLabelFor, SurfaceCard } from "./reference-primitives";
+import { Pill, ProgressRing, ReferenceTaskInput, resolveReferenceTask, ScreenHeader, statusLabelFor, SurfaceCard } from "./reference-primitives";
 import { useReferenceTheme, type ReferenceColors, type ReferenceType, referenceRadii, referenceSpacing } from "../reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { MobileSearchField } from "@/components/ui/mobile-top-bar";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
 
-type AgendaFilter = "None" | "Today" | "Upcoming" | "Overdue" | "Completed" | "Assigned";
+type AgendaFilter = "None" | "Today" | "Upcoming" | "Overdue" | "Completed";
 
-const AGENDA_FILTERS: AgendaFilter[] = ["None", "Today", "Upcoming", "Overdue", "Completed", "Assigned"];
+const AGENDA_FILTERS: AgendaFilter[] = ["None", "Today", "Upcoming", "Overdue", "Completed"];
 
 export interface ReferenceMyTasksScreenProps {
   tasks: ReferenceTaskInput[];
@@ -45,7 +45,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
     const needle = query.trim().toLowerCase();
     return resolved.filter(({ task, boardLabel, projectLabel }) => {
       if (!needle) return true;
-      const haystack = [task.title, task.description, task.category ?? "", boardLabel ?? "", projectLabel ?? "", task.assignee?.name ?? "", ...(task.tags ?? [])].join(" ").toLowerCase();
+      const haystack = [task.title, task.description, task.category ?? "", boardLabel ?? "", projectLabel ?? "", ...(task.tags ?? [])].join(" ").toLowerCase();
       return haystack.includes(needle);
     });
   }, [query, resolved]);
@@ -60,7 +60,6 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
   const visible = useMemo(() => {
     const filtered = matching.filter(({ task }) => {
       if (filter === "None") return !task.completed && !task.canceled;
-      if (filter === "Assigned") return Boolean(task.assignee) && !task.completed && !task.canceled;
       if (filter === "Completed") return task.completed;
       if (filter === "Overdue") return deriveStatus(task, now) === "overdue";
       if (filter === "Upcoming") return !task.completed && !task.canceled && (!task.dueAt || (isValid(parseISO(task.dueAt)) && parseISO(task.dueAt).getTime() >= now.getTime()));
@@ -87,7 +86,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
         moreIcon="funnel-outline"
         moreLabel="Filter tasks"
         showThemeToggle={false}
-        search={showSearch ? <MobileSearchField value={query} onChangeText={setQuery} placeholder="Search tasks, tags or people" accessibilityLabel="Search my tasks" /> : null}
+        search={showSearch ? <MobileSearchField value={query} onChangeText={setQuery} placeholder="Search tasks or tags" accessibilityLabel="Search my tasks" /> : null}
       />
       <OptionSheet
         visible={filterMenu}
@@ -117,7 +116,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
           </SurfaceCard>
         ) : null}
 
-        <View style={styles.scheduleHeading}><View style={styles.headingTitle}><Ionicons name="calendar-outline" size={21} color={colors.primary} /><Text style={[type.title, { fontSize: 18 }]}>{filter === "None" ? "All tasks" : filter === "Today" ? "Today's tasks" : filter === "Assigned" ? "Assigned tasks" : `${filter} tasks`}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={sortDirection === "asc" ? "Sort by due time, earliest first" : "Sort by due time, latest first"} onPress={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")} style={styles.sortButton}><Text style={[type.body, { color: colors.muted }]}>{sortDirection === "asc" ? "Earliest first" : "Latest first"}</Text><Ionicons name={sortDirection === "asc" ? "arrow-up-outline" : "arrow-down-outline"} size={15} color={colors.muted} /></Pressable></View>
+        <View style={styles.scheduleHeading}><View style={styles.headingTitle}><Ionicons name="calendar-outline" size={21} color={colors.primary} /><Text style={[type.title, { fontSize: 18 }]}>{filter === "None" ? "All tasks" : filter === "Today" ? "Today's tasks" : `${filter} tasks`}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={sortDirection === "asc" ? "Sort by due time, earliest first" : "Sort by due time, latest first"} onPress={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")} style={styles.sortButton}><Text style={[type.body, { color: colors.muted }]}>{sortDirection === "asc" ? "Earliest first" : "Latest first"}</Text><Ionicons name={sortDirection === "asc" ? "arrow-up-outline" : "arrow-down-outline"} size={15} color={colors.muted} /></Pressable></View>
         <View style={{ gap: referenceSpacing.sm }}>{visible.length ? visible.map((item, index) => <ScheduleCard key={item.task.id} item={item} index={index} now={now} onPress={() => onTaskPress?.(item.task, item.projectId)} onComplete={() => onToggleComplete?.(item.task)} />) : <EmptyAgendaState filtered={Boolean(query)} />}</View>
       </ScrollView>
       <ReferenceMobileBottomNav active={activeTab} onNavigate={onNavigate} />
@@ -128,7 +127,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
 function ScheduleCard({ item, index, now, onPress, onComplete }: { item: ReturnType<typeof resolveReferenceTask>; index: number; now: Date; onPress: () => void; onComplete: () => void }) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
-  const { task, assignee } = item;
+  const { task } = item;
   const status = deriveStatus(task, now);
   const completed = status === "completed";
   const overdue = status === "overdue";
@@ -143,7 +142,7 @@ function ScheduleCard({ item, index, now, onPress, onComplete }: { item: ReturnT
     <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onPress} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: referenceRadii.md, backgroundColor: pressed ? colors.primaryFixed : "transparent" }]} />
     <View pointerEvents="none" style={[styles.taskRail, { backgroundColor: rail }]} />
     <View pointerEvents="none" style={styles.taskTop}><Text style={[type.bodyStrong, { color: overdue ? colors.error : completed ? colors.muted : colors.primary }]}><Ionicons name={overdue ? "timer-outline" : "time-outline"} size={15} /> {overdue && dueTime ? `${dueTime} • Past due` : dueTime ?? "No due time"}</Text><View style={styles.taskPills}><Pill label={task.priority === "high" ? "High Priority" : task.priority === "medium" ? "Medium" : "Low"} tone={task.priority === "high" ? "purple" : "neutral"} /><Pill label={label} tone={completed ? "success" : overdue ? "error" : "primary"} icon={completed ? "checkmark" : undefined} /></View></View>
-    <View pointerEvents="box-none" style={styles.taskMain}><Pressable accessibilityRole="checkbox" aria-checked={task.completed} accessibilityState={{ checked: task.completed }} accessibilityLabel={`${completed ? "Mark incomplete" : "Complete"} ${title}`} onPress={onComplete} style={styles.checkboxHit}><View style={[styles.checkbox, completed && { backgroundColor: colors.success, borderColor: colors.success }]}>{completed ? <Ionicons name="checkmark" size={15} color={colors.onPrimary} /> : null}</View></Pressable><View pointerEvents="none" style={{ flex: 1, minWidth: 0 }}><Text style={[type.title, { fontSize: 16, lineHeight: 21, textDecorationLine: completed ? "line-through" : "none", color: completed ? colors.muted : colors.text }]} numberOfLines={2}>{title}</Text>{meta ? <Text style={[type.body, { color: colors.muted, marginTop: 3 }]} numberOfLines={1}>{meta}</Text> : null}</View>{assignee ? <View pointerEvents="none"><Avatar person={assignee} size={34} /></View> : null}</View>
+    <View pointerEvents="box-none" style={styles.taskMain}><Pressable accessibilityRole="checkbox" aria-checked={task.completed} accessibilityState={{ checked: task.completed }} accessibilityLabel={`${completed ? "Mark incomplete" : "Complete"} ${title}`} onPress={onComplete} style={styles.checkboxHit}><View style={[styles.checkbox, completed && { backgroundColor: colors.success, borderColor: colors.success }]}>{completed ? <Ionicons name="checkmark" size={15} color={colors.onPrimary} /> : null}</View></Pressable><View pointerEvents="none" style={{ flex: 1, minWidth: 0 }}><Text style={[type.title, { fontSize: 16, lineHeight: 21, textDecorationLine: completed ? "line-through" : "none", color: completed ? colors.muted : colors.text }]} numberOfLines={2}>{title}</Text>{meta ? <Text style={[type.body, { color: colors.muted, marginTop: 3 }]} numberOfLines={1}>{meta}</Text> : null}</View></View>
     <View pointerEvents="none" style={styles.taskFooter}><View style={styles.footerMeta}><Ionicons name={completed ? "checkmark-circle-outline" : "ellipse-outline"} size={15} color={completed ? colors.success : colors.muted} /><Text style={[type.body, { color: completed ? colors.success : colors.muted }]}>{completed ? "Completed" : label}</Text>{task.subtasks.length ? <><Ionicons name="checkmark-done-outline" size={15} color={colors.muted} /><Text style={[type.body, { color: colors.muted }]}>{doneSubtasks}/{task.subtasks.length}</Text></> : null}{item.attachmentCount ? <><Ionicons name="attach-outline" size={15} color={colors.muted} /><Text style={[type.body, { color: colors.muted }]}>{item.attachmentCount} file{item.attachmentCount === 1 ? "" : "s"}</Text></> : null}</View><Text style={[type.body, { color: overdue ? colors.error : colors.muted }]}>{dueInfo?.label ?? "No due date"}</Text></View>
   </View>;
 }

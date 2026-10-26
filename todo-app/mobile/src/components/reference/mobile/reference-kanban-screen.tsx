@@ -7,7 +7,7 @@ import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { getTaskSectionId } from "@/lib/domain/sections";
 import { useNow } from "@/hooks/use-now";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "./reference-mobile-bottom-nav";
-import { Avatar, Pill, ReferenceTaskInput, resolveReferenceTask, ScreenHeader } from "./reference-primitives";
+import { Pill, ReferenceTaskInput, resolveReferenceTask, ScreenHeader } from "./reference-primitives";
 import { useReferenceTheme, type ReferenceColors, type ReferenceType, referenceRadii, referenceSpacing } from "../reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 
@@ -67,14 +67,13 @@ export function ReferenceKanbanScreen({
   const styles = createStyles(colors, type);
   const now = useNow();
   const [query, setQuery] = useState("");
-  const [assignedOnly, setAssignedOnly] = useState(false);
   const searchRef = useRef<ComponentRef<typeof TextInput>>(null);
   const resolved = useMemo(() => tasks.map((task) => resolveReferenceTask(task)), [tasks]);
   const hasUnsortedTasks = useMemo(() => resolved.some(({ task }) => !task.sectionId), [resolved]);
   const buckets = useMemo(() => {
     const visibleSections = sections.filter((section) => !section.hidden);
-    // Keep unassigned tasks visible even when the persisted board has no
-    // sections (or has sections alongside unassigned tasks).
+    // Keep tasks without a section visible even when the persisted board has
+    // no sections (or has sections alongside those tasks).
     if (visibleSections.length === 0 || hasUnsortedTasks) {
       return [...visibleSections, { id: UNSORTED_SECTION_ID, title: "Unsorted" }];
     }
@@ -109,12 +108,11 @@ export function ReferenceKanbanScreen({
       : [];
 
     const needle = query.trim().toLowerCase();
-    if (needle) list = list.filter(({ task, boardLabel, sectionLabel }) => [task.title, task.description, task.category ?? "", boardLabel ?? "", sectionLabel ?? "", task.assignee?.name ?? "", ...(task.tags ?? [])].join(" ").toLowerCase().includes(needle));
-    if (assignedOnly) list = list.filter(({ task }) => Boolean(task.assignee));
+    if (needle) list = list.filter(({ task, boardLabel, sectionLabel }) => [task.title, task.description, task.category ?? "", boardLabel ?? "", sectionLabel ?? "", ...(task.tags ?? [])].join(" ").toLowerCase().includes(needle));
     if (filter === "High Priority") list = list.filter(({ task }) => task.priority === "high");
     if (filter === "Due Today") list = list.filter(({ task }) => task.dueAt ? new Date(task.dueAt).toDateString() === now.toDateString() : false);
     return list;
-  }, [activeSection, assignedOnly, buckets, filter, now, query, resolved]);
+  }, [activeSection, buckets, filter, now, query, resolved]);
   const emptyMessage = buckets.length === 0
     ? "No sections available."
     : activeSection
@@ -136,7 +134,7 @@ export function ReferenceKanbanScreen({
             <Text style={[type.caption, { color: colors.muted }]}> done</Text>
           </View>
         </View>
-        <View style={styles.searchRow}><View style={styles.searchBox}><Ionicons name="search-outline" size={18} color={colors.muted} /><TextInput ref={searchRef} value={query} onChangeText={setQuery} placeholder="Search this board" placeholderTextColor={colors.muted} accessibilityLabel="Search board tasks" style={[type.body, styles.searchInput]} />{query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear board search" onPress={() => setQuery("")} style={styles.clearSearch}><Ionicons name="close-circle" size={18} color={colors.muted} /></Pressable> : null}</View><Pressable accessibilityRole="switch" aria-checked={assignedOnly} accessibilityState={{ checked: assignedOnly }} accessibilityLabel="Show assigned tasks only" onPress={() => setAssignedOnly((current) => !current)} style={[styles.assignedButton, assignedOnly && styles.assignedButtonActive]}><Ionicons name="person-outline" size={16} color={assignedOnly ? colors.primary : colors.muted} /><Text style={[type.caption, { color: assignedOnly ? colors.primary : colors.muted, fontWeight: "700" }]}>Assigned</Text></Pressable></View>
+        <View style={styles.searchRow}><View style={styles.searchBox}><Ionicons name="search-outline" size={18} color={colors.muted} /><TextInput ref={searchRef} value={query} onChangeText={setQuery} placeholder="Search this board" placeholderTextColor={colors.muted} accessibilityLabel="Search board tasks" style={[type.body, styles.searchInput]} />{query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear board search" onPress={() => setQuery("")} style={styles.clearSearch}><Ionicons name="close-circle" size={18} color={colors.muted} /></Pressable> : null}</View></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bucketTabs}>
           {buckets.map((section) => {
             const selected = section.id === selectedSectionId;
@@ -157,7 +155,7 @@ export function ReferenceKanbanScreen({
         </View>
         <View style={{ gap: referenceSpacing.sm }}>
            {activeTasks.map((item) => <KanbanCard key={item.task.id} item={item} now={now} selected={selectedTaskId === item.task.id} onPress={() => onTaskPress?.(item.task)} onMenu={onTaskMenu ? () => onTaskMenu(item.task) : undefined} onToggle={onToggleComplete ? () => onToggleComplete(item.task) : undefined} />)}
-           {activeTasks.length === 0 ? <View style={styles.emptyState}><View style={styles.emptyIcon}><Ionicons name={query || assignedOnly ? "search-outline" : "layers-outline"} size={22} color={colors.primary} /></View><Text style={[type.section, { fontSize: 16 }]}>{query || assignedOnly ? "No tasks match" : "No tasks in this section"}</Text><Text style={[type.body, { color: colors.muted, textAlign: "center" }]}>{query || assignedOnly ? "Try a different search or turn off the assigned filter." : emptyMessage}</Text><Pressable accessibilityRole="button" accessibilityLabel="Add a task" onPress={() => onAddTask?.(activeSection?.id === UNSORTED_SECTION_ID ? undefined : activeSection?.id)} style={styles.emptyAction}><Ionicons name="add" size={17} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Add a task</Text></Pressable></View> : null}
+           {activeTasks.length === 0 ? <View style={styles.emptyState}><View style={styles.emptyIcon}><Ionicons name={query ? "search-outline" : "layers-outline"} size={22} color={colors.primary} /></View><Text style={[type.section, { fontSize: 16 }]}>{query ? "No tasks match" : "No tasks in this section"}</Text><Text style={[type.body, { color: colors.muted, textAlign: "center" }]}>{query ? "Try a different search." : emptyMessage}</Text><Pressable accessibilityRole="button" accessibilityLabel="Add a task" onPress={() => onAddTask?.(activeSection?.id === UNSORTED_SECTION_ID ? undefined : activeSection?.id)} style={styles.emptyAction}><Ionicons name="add" size={17} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Add a task</Text></Pressable></View> : null}
         </View>
       </ScrollView>
       <Pressable accessibilityRole="button" accessibilityLabel={`Add task to ${activeSection?.title ?? "this section"}`} onPress={() => onAddTask?.(activeSection?.id === UNSORTED_SECTION_ID ? undefined : activeSection?.id)} style={styles.fab}><Ionicons name="add" size={31} color={colors.onPrimary} /></Pressable>
@@ -177,7 +175,7 @@ function getDisplayedTaskSectionId(task: Task, sections: BoardSection[], now: Da
 function KanbanCard({ item, now, selected, onPress, onMenu, onToggle }: { item: ReturnType<typeof resolveReferenceTask>; now: Date; selected: boolean; onPress: () => void; onMenu?: () => void; onToggle?: () => void }) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
-  const { task, assignee } = item;
+  const { task } = item;
   const openSurface = <Pressable accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} onPress={onPress} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: referenceRadii.md, backgroundColor: pressed ? colors.primaryFixed : "transparent" }]} />;
   const status = deriveStatus(task, now);
   const overdue = status === "overdue";
@@ -186,12 +184,12 @@ function KanbanCard({ item, now, selected, onPress, onMenu, onToggle }: { item: 
   const label = item.sectionLabel ?? item.tags?.[0] ?? item.boardLabel;
   const due = describeDue(task.dueAt, now);
 
-   if (blocked) return <View style={styles.blockedCard}>{openSurface}<View pointerEvents="box-none" style={styles.blockedTop}><View pointerEvents="none">{label ? <Pill label={label} /> : null}</View>{onMenu ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onMenu(); }} style={styles.menu}><Ionicons name="ellipsis-vertical" size={18} color={colors.muted} /></Pressable> : <Ionicons name="lock-closed-outline" size={16} color={colors.muted} />}</View><Text pointerEvents="none" style={[type.title, { fontSize: 16, color: colors.muted }]} numberOfLines={2}>{task.title}</Text><View pointerEvents="none" style={styles.blockedFooter}><Text style={[type.caption, { color: colors.muted }]}>{task.canceled ? "Canceled" : "Blocked"}</Text>{assignee ? <View pointerEvents="none"><Avatar person={assignee} size={26} /></View> : null}</View></View>;
+   if (blocked) return <View style={styles.blockedCard}>{openSurface}<View pointerEvents="box-none" style={styles.blockedTop}><View pointerEvents="none">{label ? <Pill label={label} /> : null}</View>{onMenu ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onMenu(); }} style={styles.menu}><Ionicons name="ellipsis-vertical" size={18} color={colors.muted} /></Pressable> : <Ionicons name="lock-closed-outline" size={16} color={colors.muted} />}</View><Text pointerEvents="none" style={[type.title, { fontSize: 16, color: colors.muted }]} numberOfLines={2}>{task.title}</Text><View pointerEvents="none" style={styles.blockedFooter}><Text style={[type.caption, { color: colors.muted }]}>{task.canceled ? "Canceled" : "Blocked"}</Text></View></View>;
 
   const done = task.subtasks.filter((subtask) => subtask.done).length;
     return <View style={[styles.kanbanCard, selected && styles.selectedCard]}>{openSurface}
     <View pointerEvents="none" style={[styles.cardRail, { backgroundColor: rail }]} />
-    <View pointerEvents="box-none" style={styles.cardContent}><View pointerEvents="box-none" style={styles.cardTop}><View pointerEvents="none" style={styles.tagRow}>{label ? <Pill label={label} tone={overdue ? "error" : "neutral"} /> : null}<Pill label={overdue ? "Overdue" : task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Low"} tone={overdue ? "error" : task.priority === "high" ? "warning" : "neutral"} icon={task.priority === "high" ? "flag" : undefined} /></View>{onMenu ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onMenu(); }} style={styles.menu}><Ionicons name="ellipsis-vertical" size={18} color={colors.muted} /></Pressable> : null}</View><Text pointerEvents="none" style={[type.title, { fontSize: 17, lineHeight: 22 }]} numberOfLines={2}>{task.title}</Text>{task.subtasks.length > 0 ? <View pointerEvents="none" style={styles.progressBlock}><View style={styles.progressLabels}><Text style={[type.body, { color: colors.muted }]}><Ionicons name="checkmark-done-outline" size={14} color={colors.primary} /> Checklist Items</Text><Text style={type.bodyStrong}>{done}/{task.subtasks.length} ({Math.round((done / task.subtasks.length) * 100)}%)</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.round((done / task.subtasks.length) * 100)}%` }]} /></View></View> : null}<View pointerEvents="box-none" style={styles.cardFooter}><View pointerEvents="none" style={styles.duePill}><Ionicons name={due?.overdue ? "calendar-outline" : "time-outline"} size={14} color={due?.overdue ? colors.error : colors.primary} /><Text style={[type.caption, { color: due?.overdue ? colors.error : colors.primary }]}>{due?.label ?? "No due date"}</Text></View><View pointerEvents="box-none" style={styles.avatarAction}><Pressable accessibilityRole="checkbox" aria-checked={task.completed} accessibilityState={{ checked: task.completed }} accessibilityLabel={`${task.completed ? "Mark incomplete" : "Complete"} ${task.title}`} onPress={(event) => { event.stopPropagation(); onToggle?.(); }} style={styles.cardCheck}>{task.completed ? <Ionicons name="checkmark" size={17} color={colors.primary} /> : null}</Pressable>{assignee ? <View pointerEvents="none"><Avatar person={assignee} size={29} /></View> : null}</View></View></View>
+    <View pointerEvents="box-none" style={styles.cardContent}><View pointerEvents="box-none" style={styles.cardTop}><View pointerEvents="none" style={styles.tagRow}>{label ? <Pill label={label} tone={overdue ? "error" : "neutral"} /> : null}<Pill label={overdue ? "Overdue" : task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Low"} tone={overdue ? "error" : task.priority === "high" ? "warning" : "neutral"} icon={task.priority === "high" ? "flag" : undefined} /></View>{onMenu ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onMenu(); }} style={styles.menu}><Ionicons name="ellipsis-vertical" size={18} color={colors.muted} /></Pressable> : null}</View><Text pointerEvents="none" style={[type.title, { fontSize: 17, lineHeight: 22 }]} numberOfLines={2}>{task.title}</Text>{task.subtasks.length > 0 ? <View pointerEvents="none" style={styles.progressBlock}><View style={styles.progressLabels}><Text style={[type.body, { color: colors.muted }]}><Ionicons name="checkmark-done-outline" size={14} color={colors.primary} /> Checklist Items</Text><Text style={type.bodyStrong}>{done}/{task.subtasks.length} ({Math.round((done / task.subtasks.length) * 100)}%)</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.round((done / task.subtasks.length) * 100)}%` }]} /></View></View> : null}<View pointerEvents="box-none" style={styles.cardFooter}><View pointerEvents="none" style={styles.duePill}><Ionicons name={due?.overdue ? "calendar-outline" : "time-outline"} size={14} color={due?.overdue ? colors.error : colors.primary} /><Text style={[type.caption, { color: due?.overdue ? colors.error : colors.primary }]}>{due?.label ?? "No due date"}</Text></View><View pointerEvents="box-none" style={styles.cardActions}><Pressable accessibilityRole="checkbox" aria-checked={task.completed} accessibilityState={{ checked: task.completed }} accessibilityLabel={`${task.completed ? "Mark incomplete" : "Complete"} ${task.title}`} onPress={(event) => { event.stopPropagation(); onToggle?.(); }} style={styles.cardCheck}>{task.completed ? <Ionicons name="checkmark" size={17} color={colors.primary} /> : null}</Pressable></View></View></View>
   </View>;
 }
 
@@ -204,8 +202,6 @@ function createStyles(colors: ReferenceColors, type: ReferenceType) { return Sty
   searchBox: { flex: 1, minHeight: 44, paddingHorizontal: 11, borderRadius: referenceRadii.md, backgroundColor: colors.surfaceLow, flexDirection: "row", alignItems: "center", gap: 7 },
   searchInput: { flex: 1, minWidth: 0, paddingVertical: 0, color: colors.text },
   clearSearch: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  assignedButton: { minHeight: 44, paddingHorizontal: 10, borderRadius: referenceRadii.md, backgroundColor: colors.surfaceLow, flexDirection: "row", alignItems: "center", gap: 5 },
-  assignedButtonActive: { backgroundColor: colors.primaryFixed },
   bucketTabs: { gap: 6, paddingVertical: 5 },
   bucketTab: { minHeight: 44, paddingHorizontal: 17, borderRadius: 24, backgroundColor: colors.surfaceLow, flexDirection: "row", alignItems: "center", gap: 7 },
   bucketTabActive: { backgroundColor: colors.primaryContainer },
@@ -237,7 +233,7 @@ function createStyles(colors: ReferenceColors, type: ReferenceType) { return Sty
   progressFill: { height: "100%", borderRadius: 4, backgroundColor: colors.primaryContainer },
   cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 1 },
   duePill: { minHeight: 32, paddingHorizontal: 9, borderRadius: 6, backgroundColor: colors.surfaceLow, flexDirection: "row", alignItems: "center", gap: 5 },
-  avatarAction: { flexDirection: "row", alignItems: "center", gap: 8 },
+  cardActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   cardCheck: { width: 44, height: 44, borderRadius: 6, borderWidth: 1, borderColor: colors.outline, alignItems: "center", justifyContent: "center" },
   blockedCard: { backgroundColor: colors.surfaceLow, borderWidth: 1, borderColor: colors.outlineVariant, borderRadius: referenceRadii.md, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1, minHeight: 130, padding: referenceSpacing.md, borderStyle: "dashed", gap: 10 },
   blockedTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

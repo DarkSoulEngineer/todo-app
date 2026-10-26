@@ -2,25 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { Circle, Svg } from "react-native-svg";
 import { format, isValid, parseISO } from "date-fns";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import type { Assignee, Task } from "@/lib/domain/types";
+import type { Task } from "@/lib/domain/types";
 import { deriveStatus } from "@/lib/domain/status";
 import { MobileTopBar, MobileTopBarAction } from "@/components/ui/mobile-top-bar";
 import { useReferenceTheme } from "../reference-theme";
 
-export interface ReferenceAssignee {
-  id?: string;
-  initials: string;
-  name: string;
-  subtitle?: string;
-  color?: string;
-}
-
 export interface ReferenceActivity {
-  initials: string;
-  name: string;
   message: string;
   time: string;
-  color?: string;
 }
 
 export interface ReferenceTaskDisplay {
@@ -30,7 +19,6 @@ export interface ReferenceTaskDisplay {
   boardLabel?: string;
   sectionLabel?: string;
   statusLabel?: string;
-  assignee?: ReferenceAssignee;
   tags?: string[];
   attachmentCount?: number;
   commentCount?: number;
@@ -44,36 +32,11 @@ export function isReferenceTaskDisplay(input: ReferenceTaskInput): input is Refe
   return typeof input === "object" && "task" in input;
 }
 
-function initialsFor(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-export function referenceAssigneeFor(assignee: Assignee): ReferenceAssignee {
-  return {
-    id: assignee.id,
-    name: assignee.name,
-    initials: assignee.initials ?? initialsFor(assignee.name),
-    subtitle: assignee.subtitle,
-    color: assignee.color,
-  };
-}
-
 function referenceActivityFor(event: Task["activity"][number]): ReferenceActivity {
-  const actor = event.actor;
-  const name = actor?.name ?? "Unknown";
   const createdAt = isValid(parseISO(event.createdAt)) ? parseISO(event.createdAt) : null;
   return {
-    initials: actor?.initials ?? initialsFor(name),
-    name,
     message: event.message,
     time: createdAt ? format(createdAt, "MMM d, h:mm a") : "Recently",
-    color: actor?.color,
   };
 }
 
@@ -87,7 +50,6 @@ export function resolveReferenceTask(input: ReferenceTaskInput, _index = 0): Ref
     tags: input.tags ?? [],
     attachmentCount: input.attachments?.length ?? 0,
     commentCount: 0,
-    assignee: input.assignee ? referenceAssigneeFor(input.assignee) : undefined,
     activity: (input.activity ?? []).map(referenceActivityFor),
   };
 }
@@ -98,15 +60,6 @@ export function statusLabelFor(task: Task, now = new Date()): string {
   if (status === "overdue") return "Overdue";
   if (status === "canceled") return "Canceled";
   return "Open";
-}
-
-export function Avatar({ person, size = 30 }: { person: ReferenceAssignee; size?: number }) {
-  const { colors, type } = useReferenceTheme();
-  return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: person.color ?? colors.primary }]}> 
-      <Text style={[type.micro, { color: person.color ? colors.onSurface : colors.onPrimary, fontSize: Math.max(9, size * 0.32) }]}>{person.initials}</Text>
-    </View>
-  );
 }
 
 export function IconButton({ icon, label, onPress, size = 44, color, style }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress?: () => void; size?: number; color?: string; style?: StyleProp<ViewStyle> }) {
@@ -183,7 +136,6 @@ export function ScreenHeader({ title, subtitle, onBack, onSearch, searchActive =
 }
 
 const styles = StyleSheet.create({
-  avatar: { alignItems: "center", justifyContent: "center" },
   iconButton: { alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, backgroundColor: "transparent" },
   pill: { minHeight: 32, paddingHorizontal: 9, borderRadius: 9999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   ringLabel: { position: "absolute", alignItems: "center", justifyContent: "center" },

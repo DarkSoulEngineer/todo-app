@@ -5,30 +5,27 @@ import { addDays, addWeeks, format, isValid, parseISO } from "date-fns";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { Attachment, Assignee, Priority, Subtask, TaskDraft } from "@/lib/domain/types";
+import type { Attachment, Priority, Subtask, TaskDraft } from "@/lib/domain/types";
 import { useNow } from "@/hooks/use-now";
 import { useTasksContext } from "@/providers/tasks-provider";
 import { boardColor } from "@/lib/domain/boards";
-import { Avatar, IconButton, Pill, ReferenceAssignee, SurfaceCard } from "./reference-primitives";
+import { IconButton, Pill, SurfaceCard } from "./reference-primitives";
 import { useReferenceTheme, type ReferenceColors, referenceRadii, referenceSpacing } from "../reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 
 type ReferencePriority = Priority;
 
-const DEFAULT_LOCAL_ASSIGNEE: ReferenceAssignee = { id: "local-user", name: "You", initials: "YO", subtitle: "Local workspace" };
-
 export interface ReferenceNewTaskScreenProps {
   initialDraft?: Partial<TaskDraft>;
   boardLabel?: string;
   sectionLabel?: string;
-  assignee?: ReferenceAssignee;
   initialTags?: string[];
   onCancel?: () => void;
   onSubmit: (draft: TaskDraft, attachments: Attachment[]) => void;
   onChangeBoard?: () => void;
 }
 
-export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current board", sectionLabel = "Unscheduled", assignee: initialAssignee, initialTags = [], onCancel, onSubmit, onChangeBoard }: ReferenceNewTaskScreenProps) {
+export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current board", sectionLabel = "Unscheduled", initialTags = [], onCancel, onSubmit, onChangeBoard }: ReferenceNewTaskScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors, type, toggle, scheme } = useReferenceTheme();
   const styles = createStyles(colors);
@@ -43,7 +40,6 @@ export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current boa
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => initialDraft?.subtasks?.map((subtask) => ({ ...subtask })) ?? []);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [tags, setTags] = useState(initialDraft?.tags ?? initialTags);
-  const [assignee, setAssignee] = useState<ReferenceAssignee | null>(initialAssignee ?? null);
   const [category, setCategory] = useState<string | null>(initialDraft?.category ?? null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [pickerMode, setPickerMode] = useState<"date" | "time" | null>(null);
@@ -51,16 +47,13 @@ export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current boa
   const tomorrow = addDays(now, 1);
   const tomorrowSelected = due?.toDateString() === tomorrow.toDateString();
   const done = subtasks.filter((subtask) => subtask.done).length;
-  const assigned = assignee !== null;
-  const toggleAssignee = () => setAssignee((current) => (current ? null : DEFAULT_LOCAL_ASSIGNEE));
-  const toAssignee = (): Assignee | null => assignee ? { id: assignee.id ?? "local-user", name: assignee.name, initials: assignee.initials, subtitle: assignee.subtitle, color: assignee.color } : null;
   const submit = () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setTitleError(true);
       return;
     }
-     onSubmit({ title: trimmedTitle, description: description.trim(), dueAt, priority, category, subtasks, tags, assignee: toAssignee() }, attachments);
+     onSubmit({ title: trimmedTitle, description: description.trim(), dueAt, priority, category, subtasks, tags }, attachments);
   };
   const addSubtask = () => {
     if (!subtaskTitle.trim()) return;
@@ -101,7 +94,7 @@ export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current boa
           <SurfaceCard style={styles.boardCard}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitle}><Ionicons name="layers-outline" size={18} color={colors.primary} /><View><Text style={type.bodyStrong}>Board / category</Text><Text style={[type.caption, { color: colors.muted }]}>Choose where this task belongs</Text></View></View>
-              <Pill label={selectedBoard?.label ?? "Unassigned"} tone={selectedBoard ? "primary" : "neutral"} />
+              <Pill label={selectedBoard?.label ?? "None"} tone={selectedBoard ? "primary" : "neutral"} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.boardOptions}>
               <Pressable accessibilityRole="button" aria-pressed={category === null} accessibilityState={{ selected: category === null }} onPress={() => setCategory(null)} style={[styles.boardOption, category === null && styles.boardOptionSelected]}>
@@ -124,7 +117,6 @@ export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current boa
 
         <SurfaceCard style={styles.sectionCard}><View style={styles.sectionHeader}><View style={styles.sectionTitle}><Ionicons name="flag-outline" size={18} color={colors.secondary} /><Text style={type.bodyStrong}>Priority Level</Text></View><Text style={[type.caption, { color: priority === "high" ? colors.error : colors.muted }]}><Text style={styles.priorityDot}>●</Text> {priority === "high" ? "High" : priority === "medium" ? "Medium" : "Low"}</Text></View><View style={styles.priorityBar}>{(["low", "medium", "high"] as ReferencePriority[]).map((value) => <Pressable key={value} accessibilityRole="button" aria-pressed={priority === value} accessibilityState={{ selected: priority === value }} onPress={() => setPriority(value)} style={[styles.priorityOption, priority === value && styles.prioritySelected]}><Text style={[type.caption, { color: priority === value ? colors.text : colors.muted, fontWeight: priority === value ? "700" : "400" }]}>{value[0].toUpperCase() + value.slice(1)}</Text></Pressable>)}</View></SurfaceCard>
 
-        <SurfaceCard style={styles.sectionCard}><View style={styles.sectionHeader}><Text style={type.bodyStrong}>Assignee</Text><Pressable accessibilityRole="button" accessibilityLabel={assigned ? "Set assignee to unassigned" : "Assign task to me"} onPress={toggleAssignee}><Text style={[type.caption, { color: colors.primary, fontWeight: "700" }]}>{assigned ? "Set unassigned" : "Assign me"}</Text></Pressable></View><Pressable accessibilityRole="button" aria-pressed={assigned} accessibilityState={{ checked: assigned }} accessibilityLabel={assigned ? "Unassign task" : "Assign task to local user"} onPress={toggleAssignee} style={styles.assigneeRow}>{assignee ? <Avatar person={assignee} size={38} /> : <View style={styles.unassignedAvatar}><Ionicons name="person-outline" size={18} color={colors.muted} /></View>}<View style={{ flex: 1, minWidth: 0 }}><Text style={type.bodyStrong}>{assignee?.name ?? "Unassigned"}</Text><Text style={[type.caption, { color: colors.muted }]} numberOfLines={1}>{assignee?.subtitle ?? "Tap to assign this task to yourself"}</Text></View><View style={styles.assigneeAction}><Ionicons name={assigned ? "person-remove-outline" : "person-add-outline"} size={19} color={colors.primary} /></View></Pressable></SurfaceCard>
 
         <SurfaceCard style={styles.sectionCard}><View style={styles.sectionHeader}><View style={styles.sectionTitle}><Ionicons name="pricetag-outline" size={18} color={colors.success} /><Text style={type.bodyStrong}>Category Tags</Text></View><Text style={[type.caption, { color: colors.outline }]}>{tags.length} selected</Text></View><View style={styles.tags}>{tags.map((tag, index) => <Pressable key={tag} accessibilityRole="button" onPress={() => setTags((current) => current.filter((item) => item !== tag))} style={[styles.tag, { backgroundColor: index % 2 ? colors.primaryFixed : colors.secondaryFixed }]}><View style={[styles.tagDot, { backgroundColor: index % 2 ? colors.primary : colors.secondary }]} /><Text style={type.caption}>{tag}</Text><Ionicons name="close" size={14} color={colors.muted} /></Pressable>)}{["Operations", "QA"].map((tag) => <Pressable key={tag} accessibilityRole="button" onPress={() => setTags((current) => current.includes(tag) ? current : [...current, tag])} style={[styles.tag, { backgroundColor: colors.surfaceLow }]}><Text style={[type.caption, { color: colors.muted }]}>{tag}</Text></Pressable>)}<Pressable accessibilityRole="button" onPress={() => setTags((current) => current.includes("New tag") ? current : [...current, "New tag"])} style={[styles.tag, { backgroundColor: colors.surface }]}><Ionicons name="add" size={14} color={colors.primary} /><Text style={[type.caption, { color: colors.primary }]}>Tag</Text></Pressable></View></SurfaceCard>
 
@@ -165,9 +157,6 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   priorityBar: { padding: 4, borderRadius: 8, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 2 },
   priorityOption: { minHeight: 44, flex: 1, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   prioritySelected: { backgroundColor: colors.card, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 5, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  assigneeRow: { minHeight: 54, padding: 6, borderRadius: 8, backgroundColor: colors.surfaceLow, flexDirection: "row", alignItems: "center", gap: 8 },
-  unassignedAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  assigneeAction: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   tag: { minHeight: 32, paddingHorizontal: 9, borderRadius: referenceRadii.pill, flexDirection: "row", alignItems: "center", gap: 5 },
   tagDot: { width: 6, height: 6, borderRadius: 3 },

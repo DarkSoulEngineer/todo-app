@@ -6,7 +6,7 @@ import { useReferenceTheme } from "@/components/reference/reference-theme";
 import { useTasksContext } from "@/providers/tasks-provider";
 import { makeId } from "@/lib/utils/id";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
-import type { Assignee, Priority } from "@/lib/domain/types";
+import type { Priority } from "@/lib/domain/types";
 
 type TaskOrigin = "reference-board" | "my-tasks" | "calendar" | "desktop";
 
@@ -46,7 +46,7 @@ export default function TaskInspectorRoute() {
 
   const appendActivity = (message: string, type = "edit") => {
     if (!id) return;
-    api.appendTaskActivity(id, { id: makeId(8), type, message, createdAt: new Date().toISOString(), actor: { id: "local-user", name: "You", initials: "YO" } });
+    api.appendTaskActivity(id, { id: makeId(8), type, message, createdAt: new Date().toISOString() });
   };
 
   return (
@@ -70,7 +70,6 @@ export default function TaskInspectorRoute() {
         if (draft.priority !== task.priority) changes.push("priority");
         if (JSON.stringify(draft.subtasks) !== JSON.stringify(task.subtasks)) changes.push("checklist");
         if (JSON.stringify(draft.tags ?? []) !== JSON.stringify(task.tags ?? [])) changes.push("tags");
-        if (JSON.stringify(draft.assignee ?? null) !== JSON.stringify(task.assignee ?? null)) changes.push("assignee");
         api.updateTask(task.id, draft);
         if (changes.length) appendActivity(`Updated ${changes.join(", ")}`);
         returnToOrigin();
@@ -82,9 +81,6 @@ export default function TaskInspectorRoute() {
         } else if (property === "dueDate" && (value === null || typeof value === "string")) {
           api.setTaskDueAt(task.id, value);
           appendActivity(value ? "Set a due date" : "Removed the due date");
-        } else if (property === "assignee" && (value === null || typeof value === "object")) {
-          api.patchTask(task.id, { assignee: value as Assignee | null });
-          appendActivity(value ? `Assigned to ${(value as Assignee).name}` : "Removed assignee");
         } else if (property === "status" && (value === "completed" || value === "canceled" || value === "open")) {
           api.setTaskStatus(task.id, value);
           appendActivity(value === "open" ? "Reopened task" : value === "completed" ? "Completed task" : "Canceled task", "status");

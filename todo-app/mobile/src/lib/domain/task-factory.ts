@@ -1,13 +1,6 @@
 import { makeId } from "@/lib/utils/id";
 import { isValid, parseISO } from "date-fns";
-import type {
-  ActivityEvent,
-  Assignee,
-  Attachment,
-  Subtask,
-  Task,
-  TaskDraft,
-} from "@/lib/domain/types";
+import type { ActivityEvent, Attachment, Subtask, Task, TaskDraft } from "@/lib/domain/types";
 import { detectStatusFromText } from "@/lib/domain/status-keywords";
 
 export function normalizeTags(tags: readonly unknown[] | undefined): string[] {
@@ -22,24 +15,6 @@ export function normalizeTags(tags: readonly unknown[] | undefined): string[] {
     result.push(value);
   }
   return result;
-}
-
-export function normalizeAssignee(value: unknown): Assignee | null {
-  if (typeof value !== "object" || value === null) return null;
-  const record = value as Record<string, unknown>;
-  if (typeof record.name !== "string" || !record.name.trim()) return null;
-  const assignee: Assignee = {
-    id: typeof record.id === "string" && record.id ? record.id : makeId(8),
-    name: record.name,
-  };
-  for (const key of ["initials", "email", "avatarUrl", "subtitle", "color"] as const) {
-    if (typeof record[key] === "string") assignee[key] = record[key];
-  }
-  return assignee;
-}
-
-export function cloneAssignee(assignee: Assignee | null | undefined): Assignee | null {
-  return normalizeAssignee(assignee);
 }
 
 export function normalizeAttachment(value: unknown): Attachment | null {
@@ -84,7 +59,6 @@ export function normalizeActivityEvent(value: unknown): ActivityEvent | null {
     type: record.type,
     message: record.message,
     createdAt: record.createdAt,
-    actor: normalizeAssignee(record.actor),
   };
 }
 
@@ -96,7 +70,6 @@ export function cloneTask(task: Task): Task {
   return {
     ...task,
     subtasks: (task.subtasks ?? []).map((subtask: Subtask) => ({ ...subtask })),
-    assignee: cloneAssignee(task.assignee),
     tags: [...(task.tags ?? [])],
     attachments: (task.attachments ?? [])
       .map(cloneAttachment)
@@ -133,9 +106,6 @@ export function applyTaskPatch(task: Task, patch: unknown): Task {
         done: subtask.done as boolean,
       }));
   }
-  if (Object.prototype.hasOwnProperty.call(record, "assignee")) {
-    next.assignee = normalizeAssignee(record.assignee);
-  }
   if (Array.isArray(record.tags)) next.tags = normalizeTags(record.tags);
   return next;
 }
@@ -163,7 +133,6 @@ export function createTask(draft: TaskDraft): Task {
       title: subtask.title.trim(),
       done: subtask.done,
     })),
-    assignee: cloneAssignee(draft.assignee),
     tags: normalizeTags(draft.tags),
     attachments: [],
     activity: [],
@@ -193,7 +162,6 @@ export function applyDraft(task: Task, draft: TaskDraft): Task {
       title: subtask.title.trim(),
       done: subtask.done,
     })),
-    assignee: draft.assignee === undefined ? cloneAssignee(task.assignee) : cloneAssignee(draft.assignee),
     tags: draft.tags === undefined ? [...task.tags] : normalizeTags(draft.tags),
     updatedAt: new Date().toISOString(),
   };

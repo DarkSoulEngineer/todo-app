@@ -43,7 +43,7 @@ import {
   windowStartFromPreset,
 } from "@/lib/features/insights-filters";
 import type { Board } from "@/lib/domain/boards";
-import type { Assignee, BoardSection, Priority, Subtask, Task, TaskDraft } from "@/lib/domain/types";
+import type { BoardSection, Priority, Subtask, Task, TaskDraft } from "@/lib/domain/types";
 
 export function IconButton({
   icon,
@@ -158,7 +158,6 @@ export function TaskCard({
            {due && !task.canceled ? <View accessible accessibilityLabel={`Due ${due.title}`} style={styles.metaItem}><Ionicons name="time-outline" size={14} color={due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground} /><Text style={{ color: due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{due.label}</Text></View> : null}
             {board && boardTone ? <Chip label={board.label} color={boardTone.dot} /> : null}
             {(task.tags ?? []).slice(0, 2).map((tag) => <Chip key={tag} label={tag} color={theme.colors.primary} />)}
-            {task.assignee ? <View accessible accessibilityLabel={`Assigned to ${task.assignee.name}`} style={styles.metaItem}><Ionicons name="person-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{task.assignee.name}</Text></View> : null}
             {task.subtasks.length > 0 ? <View style={styles.metaItem}><Ionicons name="list-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{doneSubtasks}/{task.subtasks.length}</Text></View> : null}
          </View>
          {task.subtasks.length > 0 ? <View accessible accessibilityLabel={`Checklist: ${doneSubtasks} of ${task.subtasks.length} complete`} style={[{ borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginTop: 10, gap: 6 }, { borderTopColor: theme.colors.border }]}>
@@ -224,7 +223,6 @@ function TaskEditorForm({
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [category, setCategory] = useState<string | null>(() => task?.category ?? null);
-  const [assigneeName, setAssigneeName] = useState(() => task?.assignee?.name ?? "");
   const [sectionId, setSectionId] = useState<string | null>(() => task?.sectionId ?? null);
   const [dueAt, setDueAt] = useState<string | null>(() => task?.dueAt ?? initialDueAt ?? null);
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => task?.subtasks.map((item) => ({ ...item })) ?? []);
@@ -239,11 +237,7 @@ function TaskEditorForm({
       setTitleError("Give your task a title.");
       return;
     }
-    const trimmedAssignee = assigneeName.trim();
-    const nextAssignee: Assignee | null = trimmedAssignee
-      ? { ...(task?.assignee ?? { id: "local-user" }), name: trimmedAssignee, initials: trimmedAssignee.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() }
-      : null;
-    onSave({ title: trimmed, description: description.trim(), dueAt, priority, category, subtasks: subtasks.map((item) => ({ ...item, title: item.title.trim() })).filter((item) => item.title.length > 0), assignee: nextAssignee }, sectionId);
+    onSave({ title: trimmed, description: description.trim(), dueAt, priority, category, subtasks: subtasks.map((item) => ({ ...item, title: item.title.trim() })).filter((item) => item.title.length > 0) }, sectionId);
   };
   const updateDate = (date: Date) => setDueAt(date.toISOString());
   const addSubtaskLocal = () => {
@@ -267,8 +261,6 @@ function TaskEditorForm({
               <View style={styles.wrapRow}>{PRIORITY_ORDER.map((item) => <Chip key={item} label={PRIORITY_META[item].label} active={priority === item} color={PRIORITY_META[item].dot} onPress={() => setPriority(item)} />)}</View>
                <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapRow}>{boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; })}</ScrollView>
-               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>ASSIGNEE</Text>
-               <View style={styles.addSubtask}><Ionicons name="person-outline" size={17} color={theme.colors.mutedForeground} /><TextInput value={assigneeName} onChangeText={setAssigneeName} placeholder="Name or email" placeholderTextColor={theme.colors.mutedForeground} style={[styles.subtaskInput, { flex: 1, color: theme.colors.foreground }]} />{assigneeName ? <IconButton size={36} icon="close-circle-outline" label="Remove assignee" onPress={() => setAssigneeName("")} /> : null}</View>
                <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>WHEN</Text>
               <View style={styles.dateRow}><Button variant="secondary" label={dueAt ? format(dateValue, "MMM d") : "No deadline"} onPress={() => setPicker("date")} style={{ flex: 1 }} /><Button variant="secondary" label={dueAt ? format(dateValue, "h:mm a") : "Set time"} onPress={() => setPicker("time")} style={{ flex: 1 }} /><Button size="icon" variant="ghost" accessibilityLabel="Clear due date" onPress={() => setDueAt(null)}><Ionicons name="close-circle-outline" size={20} color={theme.colors.mutedForeground} /></Button></View>
               {picker ? <DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /> : null}
@@ -355,12 +347,6 @@ export function BoardCard({ label, count, completed, createdAt, overdue = 0, due
                 <Text style={[styles.boardCardNewAlertText, { color: theme.scheme === "dark" ? "#38bdf8" : "#0284c7" }]}>{dueSoon} due soon</Text>
               </View>
             ) : null}
-          </View>
-          <View style={styles.boardCardNewAvatars}>
-            <View style={[styles.boardCardNewAvatar, { backgroundColor: "#ec4899" }]}><Text style={styles.boardCardNewAvatarText}>A</Text></View>
-            <View style={[styles.boardCardNewAvatar, { backgroundColor: "#3b82f6", marginLeft: -6 }]}><Text style={styles.boardCardNewAvatarText}>J</Text></View>
-            <View style={[styles.boardCardNewAvatar, { backgroundColor: "#14b8a6", marginLeft: -6 }]}><Text style={styles.boardCardNewAvatarText}>R</Text></View>
-            <View style={[styles.boardCardNewAvatarCount, { backgroundColor: theme.colors.secondary, marginLeft: -6 }]}><Text style={[styles.boardCardNewAvatarCountText, { color: theme.colors.foreground }]}>+6</Text></View>
           </View>
         </View>
       </Pressable>
@@ -607,11 +593,6 @@ const styles = StyleSheet.create({
   boardCardNewAlertsLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   boardCardNewAlertItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   boardCardNewAlertText: { fontSize: 11, fontWeight: "500" },
-  boardCardNewAvatars: { flexDirection: "row", alignItems: "center" },
-  boardCardNewAvatar: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(0,0,0,0.1)" },
-  boardCardNewAvatarText: { color: "#fff", fontSize: 9, fontWeight: "600" },
-  boardCardNewAvatarCount: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(0,0,0,0.1)" },
-  boardCardNewAvatarCountText: { fontSize: 9, fontWeight: "600" },
   boardCardNewFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   boardCardNewFooterLeft: { flexDirection: "row", alignItems: "center", gap: 16 },
   boardCardNewFooterBtn: { flexDirection: "row", alignItems: "center", gap: 6 },

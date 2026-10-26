@@ -11,17 +11,6 @@ export interface Subtask {
   done: boolean;
 }
 
-/** A person assigned to a task. */
-export interface Assignee {
-  id: string;
-  name: string;
-  initials?: string;
-  email?: string;
-  avatarUrl?: string;
-  subtitle?: string;
-  color?: string;
-}
-
 /** A file or link attached to a task. */
 export interface Attachment {
   id: string;
@@ -37,7 +26,6 @@ export interface ActivityEvent {
   type: string;
   message: string;
   createdAt: string;
-  actor?: Assignee | null;
 }
 
 export interface Task {
@@ -57,7 +45,6 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
-  assignee: Assignee | null;
   tags: string[];
   attachments: Attachment[];
   activity: ActivityEvent[];
@@ -101,7 +88,7 @@ export interface Workspace {
 export type TaskPatch = Partial<
   Pick<
     Task,
-    "title" | "description" | "dueAt" | "priority" | "category" | "subtasks" | "sectionId" | "assignee" | "tags"
+    "title" | "description" | "dueAt" | "priority" | "category" | "subtasks" | "sectionId" | "tags"
   >
 >;
 
@@ -113,8 +100,6 @@ export interface TaskDraft {
   priority: Priority;
   category: string | null;
   subtasks: Subtask[];
-  /** Optional so existing form callers remain source-compatible. */
-  assignee?: Assignee | null;
   /** Optional so existing form callers remain source-compatible. */
   tags?: string[];
 }

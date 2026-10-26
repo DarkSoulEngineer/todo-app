@@ -2,15 +2,7 @@ import { isValid, parseISO } from "date-fns";
 import { defaultBoards, normalizeBoards } from "@/lib/domain/boards";
 import { isCategoryId } from "@/lib/domain/categories";
 import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/domain/sections";
-import type {
-  ActivityEvent,
-  Assignee,
-  Attachment,
-  Priority,
-  Subtask,
-  Task,
-  Workspace,
-} from "@/lib/domain/types";
+import type { ActivityEvent, Attachment, Priority, Subtask, Task, Workspace } from "@/lib/domain/types";
 import { makeId } from "@/lib/utils/id";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high"];
@@ -47,19 +39,6 @@ function optionalString(record: Record<string, unknown>, key: string): string | 
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-function normalizeAssignee(value: unknown): Assignee | null {
-  if (typeof value !== "object" || value === null) return null;
-  const record = value as Record<string, unknown>;
-  const name = optionalString(record, "name");
-  if (!name) return null;
-  const assignee: Assignee = { id: asString(record.id) || makeId(8), name };
-  for (const key of ["initials", "email", "avatarUrl", "subtitle", "color"] as const) {
-    const item = optionalString(record, key);
-    if (item) assignee[key] = item;
-  }
-  return assignee;
-}
-
 function normalizeAttachment(value: unknown): Attachment | null {
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
@@ -87,7 +66,6 @@ function normalizeActivityEvent(value: unknown): ActivityEvent | null {
     type,
     message,
     createdAt,
-    actor: normalizeAssignee(record.actor),
   };
 }
 
@@ -146,7 +124,6 @@ function normalizeTask(value: unknown): Task | null {
     createdAt,
     updatedAt: normalizeDate(record.updatedAt) ?? createdAt,
     completedAt: completed ? normalizeDate(record.completedAt) : null,
-    assignee: normalizeAssignee(record.assignee),
     tags: normalizeTags(record.tags),
     attachments,
     activity,

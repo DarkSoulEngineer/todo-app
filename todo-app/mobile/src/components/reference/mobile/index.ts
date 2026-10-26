@@ -8,4 +8,4 @@ export { ReferenceTaskInspectorScreen } from "./reference-task-inspector-screen"
 export type { ReferenceTaskInspectorScreenProps } from "./reference-task-inspector-screen";
 export { ReferenceNewTaskScreen } from "./reference-new-task-screen";
 export type { ReferenceNewTaskScreenProps } from "./reference-new-task-screen";
-export type { ReferenceActivity, ReferenceAssignee, ReferenceTaskDisplay, ReferenceTaskInput } from "./reference-primitives";
+export type { ReferenceActivity, ReferenceTaskDisplay, ReferenceTaskInput } from "./reference-primitives";

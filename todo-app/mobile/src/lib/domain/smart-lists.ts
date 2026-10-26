@@ -208,7 +208,7 @@ export function groupForListBySection(
     else buckets.set(key, [task]);
   }
 
-  // Order: custom sections first (in board order), then status sections in board order, then unassigned
+  // Order: custom sections first (in board order), then status sections in board order, then tasks without a section
   const orderedSectionIds = [
     ...sections.filter(isCustomSection).map((s) => s.id),
     ...sections.filter((s) => s.status).map((s) => s.id),

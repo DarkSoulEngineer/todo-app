@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import type { Assignee, BoardSection, Task } from "@/lib/domain/types";
+import type { BoardSection, Task } from "@/lib/domain/types";
 import { useReferenceTheme, type ReferenceColors } from "@/components/reference/reference-theme";
 
 export type ReferenceInspectorMode = "right" | "bottom";
@@ -55,13 +55,6 @@ const iconRailItems = [
   { icon: "calendar-outline" as const, label: "Calendar" },
   { icon: "bar-chart-outline" as const, label: "Analytics" },
 ];
-
-function initialsFor(person: Assignee): string {
-  if (person.initials) return person.initials;
-  const words = person.name.trim().split(/\s+/).filter(Boolean);
-  const derived = words.slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("");
-  return derived || "?";
-}
 
 function displayDate(value: string | null): string {
   if (!value) return "No due date";
@@ -215,9 +208,6 @@ function TaskCard({ task, selected, onSelect, onComplete, onOpenInspector }: { t
           {task.subtasks.length > 0 ? <Text style={styles.cardMeta}>{completedSubtasks}/{task.subtasks.length} checklist</Text> : null}
         </View>
         <View style={styles.cardFooter}>
-          <View accessibilityLabel={task.assignee ? `Assigned to ${task.assignee.name}` : "Unassigned"} style={[styles.avatar, !task.assignee && styles.avatarUnassigned]}>
-            {task.assignee ? <Text style={styles.avatarText}>{initialsFor(task.assignee)}</Text> : <Ionicons name="person-outline" size={11} color={colors.muted} />}
-          </View>
           <Text style={[styles.dueChip, isPastDue(task.dueAt) && !task.completed && styles.dueChipPast]}>{hasDueDate ? displayDate(task.dueAt) : "No due date"}</Text>
         </View>
       </View>
@@ -236,7 +226,7 @@ function Inspector({ task, mode, onClose, onModeChange, onSave, onDiscard }: { t
   const styles = createStyles(colors);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
-  return <View style={[styles.inspector, mode === "bottom" && styles.inspectorBottom]}><View style={styles.inspectorHeader}><View><Text style={styles.inspectorEyebrow}>TASK INSPECTOR</Text><Text style={styles.inspectorTitle}>Details</Text></View><View style={styles.inspectorActions}><Text style={styles.savedStamp}>Local workspace</Text><IconButton icon={mode === "right" ? "chevron-down-outline" : "chevron-forward-outline"} label={mode === "right" ? "Dock inspector bottom" : "Dock inspector right"} compact onPress={() => onModeChange(mode === "right" ? "bottom" : "right")} /><IconButton icon="close-outline" label="Close inspector" compact onPress={onClose} /></View></View><ScrollView style={styles.inspectorScroll} contentContainerStyle={styles.inspectorContent}><View style={styles.inspectorSection}><Text style={styles.inspectorLabel}>Title</Text><TextInput value={title} onChangeText={setTitle} style={styles.inspectorInput} placeholderTextColor={colors.muted} /></View><View style={styles.inspectorSection}><Text style={styles.inspectorLabel}>Notes</Text><TextInput value={description} onChangeText={setDescription} multiline textAlignVertical="top" style={[styles.inspectorInput, styles.notesInput]} placeholder="Add a note" placeholderTextColor={colors.muted} /></View><View style={styles.inspectorGrid}><InspectorDetail icon="flag-outline" label="Priority" value={task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Normal"} /><InspectorDetail icon="calendar-outline" label="Due date" value={displayDate(task.dueAt)} /><InspectorDetail icon="list-outline" label="Checklist" value={`${task.subtasks.filter((subtask) => subtask.done).length}/${task.subtasks.length}`} /><InspectorDetail icon="person-outline" label="Assignee" value={task.assignee?.name ?? "Unassigned"} /></View><View style={styles.inspectorCallout}><Ionicons name="information-circle-outline" size={16} color={colors.primaryContainer} /><Text style={styles.calloutText}>Changes stay local until you save this task.</Text></View></ScrollView><View style={styles.inspectorFooter}><Pressable accessibilityRole="button" onPress={onDiscard} style={styles.discardButton}><Text style={styles.discardText}>Discard</Text></Pressable><Pressable accessibilityRole="button" onPress={() => onSave(title, description)} style={styles.saveButton}><Ionicons name="checkmark" size={15} color={colors.onPrimary} /><Text style={styles.saveText}>Save changes</Text></Pressable></View></View>;
+  return <View style={[styles.inspector, mode === "bottom" && styles.inspectorBottom]}><View style={styles.inspectorHeader}><View><Text style={styles.inspectorEyebrow}>TASK INSPECTOR</Text><Text style={styles.inspectorTitle}>Details</Text></View><View style={styles.inspectorActions}><Text style={styles.savedStamp}>Local workspace</Text><IconButton icon={mode === "right" ? "chevron-down-outline" : "chevron-forward-outline"} label={mode === "right" ? "Dock inspector bottom" : "Dock inspector right"} compact onPress={() => onModeChange(mode === "right" ? "bottom" : "right")} /><IconButton icon="close-outline" label="Close inspector" compact onPress={onClose} /></View></View><ScrollView style={styles.inspectorScroll} contentContainerStyle={styles.inspectorContent}><View style={styles.inspectorSection}><Text style={styles.inspectorLabel}>Title</Text><TextInput value={title} onChangeText={setTitle} style={styles.inspectorInput} placeholderTextColor={colors.muted} /></View><View style={styles.inspectorSection}><Text style={styles.inspectorLabel}>Notes</Text><TextInput value={description} onChangeText={setDescription} multiline textAlignVertical="top" style={[styles.inspectorInput, styles.notesInput]} placeholder="Add a note" placeholderTextColor={colors.muted} /></View><View style={styles.inspectorGrid}><InspectorDetail icon="flag-outline" label="Priority" value={task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Normal"} /><InspectorDetail icon="calendar-outline" label="Due date" value={displayDate(task.dueAt)} /><InspectorDetail icon="list-outline" label="Checklist" value={`${task.subtasks.filter((subtask) => subtask.done).length}/${task.subtasks.length}`} /></View><View style={styles.inspectorCallout}><Ionicons name="information-circle-outline" size={16} color={colors.primaryContainer} /><Text style={styles.calloutText}>Changes stay local until you save this task.</Text></View></ScrollView><View style={styles.inspectorFooter}><Pressable accessibilityRole="button" onPress={onDiscard} style={styles.discardButton}><Text style={styles.discardText}>Discard</Text></Pressable><Pressable accessibilityRole="button" onPress={() => onSave(title, description)} style={styles.saveButton}><Ionicons name="checkmark" size={15} color={colors.onPrimary} /><Text style={styles.saveText}>Save changes</Text></Pressable></View></View>;
 }
 
 function InspectorDetail({ icon, label, value }: { icon: React.ComponentProps<typeof Ionicons>["name"]; label: string; value: string }) { const { colors } = useReferenceTheme(); const styles = createStyles(colors); return <View style={styles.inspectorDetail}><Ionicons name={icon} size={16} color={colors.muted} /><View><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailValue}>{value}</Text></View></View>; }
@@ -339,10 +329,7 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   cardMetaRow: { flexDirection: "row", gap: 10, paddingLeft: 23, paddingTop: 4 },
   cardMeta: { color: colors.onSurfaceVariant, fontSize: 11, lineHeight: 14, fontFamily: "Inter" },
   cardFooter: { flexDirection: "row", alignItems: "center", paddingTop: 10 },
-  avatar: { width: 20, height: 20, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: colors.secondaryContainer },
-  avatarUnassigned: { backgroundColor: colors.surfaceContainerLow, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.outlineVariant },
-  avatarText: { color: colors.onSecondary, fontSize: 8, fontWeight: "600" },
-  dueChip: { marginLeft: 7, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, color: colors.onSurfaceVariant, backgroundColor: colors.surfaceContainerLow, fontSize: 10, fontFamily: "Inter" },
+  dueChip: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, color: colors.onSurfaceVariant, backgroundColor: colors.surfaceContainerLow, fontSize: 10, fontFamily: "Inter" },
   dueChipPast: { color: colors.error, backgroundColor: colors.errorContainer },
   emptyColumn: { alignItems: "center", justifyContent: "center", minHeight: 100, gap: 6 },
   emptyColumnText: { color: colors.muted, fontSize: 11, fontFamily: "Inter" },
