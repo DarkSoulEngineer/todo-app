@@ -5,11 +5,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
 import { describeDue } from "@/lib/domain/status";
 import { detectCardTheme } from "@/lib/features/card-themes";
+import { boardColor, type Board } from "@/lib/domain/boards";
 import type { Task } from "@/lib/domain/types";
 import { useMobileBoardColors } from "./mobile-board-colors";
 
 interface Props {
   task: Task;
+  board?: Board;
   now: Date;
   compact?: boolean;
   zoom?: number;
@@ -24,7 +26,7 @@ interface Props {
   onToggleSubtask: (subtaskId: string) => void;
 }
 
-export function MobileColumnTaskCard({ task, now, compact, zoom = 1, selected, selectionMode, showCheckbox = true, onPress, onMenu, onComplete, onMoveLeft, onMoveRight, onToggleSubtask }: Props) {
+export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, showCheckbox = true, onPress, onMenu, onComplete, onMoveLeft, onMoveRight, onToggleSubtask }: Props) {
   const c = useMobileBoardColors();
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -34,6 +36,7 @@ export function MobileColumnTaskCard({ task, now, compact, zoom = 1, selected, s
   const accent = task.canceled ? c.mutedForeground : task.completed ? c.success : due?.overdue ? c.destructive : cardTheme?.accent ?? c.primary;
   const priorityColor = task.priority === "low" ? c.info : task.priority === "high" ? "#F97316" : "#F59E0B";
   const priorityInk = theme.scheme === "light" ? task.priority === "high" ? "#9A3412" : task.priority === "medium" ? c.warning : c.info : priorityColor;
+  const tagTone = board ? boardColor(board.color) : null;
   const settled = task.completed || task.canceled;
   const checkboxVisible = showCheckbox || selectionMode;
   const checkboxLabel = selectionMode ? `${selected ? "Deselect" : "Select"} ${task.title}` : `${task.completed ? "Reopen" : "Complete"} ${task.title}`;
@@ -53,6 +56,7 @@ export function MobileColumnTaskCard({ task, now, compact, zoom = 1, selected, s
     {!compact && task.description ? <Pressable accessibilityRole="button" accessibilityLabel={`Edit notes for ${task.title}`} onPress={onPress}><Text numberOfLines={2} style={[styles.description, { color: c.mutedForeground, fontSize: 12 * zoom, lineHeight: 18 * zoom }]}>{task.description}</Text></Pressable> : null}
     {!compact ? <View style={styles.meta}>
       {due && !task.canceled ? <View style={[styles.pill, { backgroundColor: due.overdue ? `${c.destructive}18` : c.secondary, borderColor: due.overdue ? `${c.destructive}44` : c.border }]}><Text style={[styles.pillText, { color: due.overdue ? c.destructive : c.mutedForeground }]}>{due.label}</Text></View> : null}
+      {board && tagTone ? <View style={[styles.pill, { backgroundColor: tagTone.tint, borderColor: tagTone.ring }]}><View style={[styles.tagDot, { backgroundColor: tagTone.dot }]} /><Text style={[styles.pillText, { color: tagTone.ink }]}>{board.label}</Text></View> : null}
       <View style={[styles.pill, { backgroundColor: `${priorityColor}12`, borderColor: `${priorityColor}44` }]}><Text style={[styles.pillText, { color: priorityInk, textTransform: "capitalize" }]}>{task.priority}</Text></View>
       {settled ? <View style={[styles.pill, { borderColor: c.border }]}><Text style={[styles.pillText, { color: task.canceled ? c.mutedForeground : c.success }]}>{task.canceled ? "Canceled" : "Done"}</Text></View> : null}
       {task.subtasks.length ? <Pressable accessibilityRole="button" accessibilityLabel={`Checklist for ${task.title}`} aria-expanded={expanded} onPress={() => setExpanded(!expanded)} style={[styles.pill, styles.checklistToggle, { borderColor: c.border }]}><Ionicons name="list-outline" size={12} color={c.mutedForeground} /><Text style={[styles.pillText, { color: c.mutedForeground }]}>{done}/{task.subtasks.length}</Text><Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={11} color={c.mutedForeground} /></Pressable> : null}
@@ -66,6 +70,6 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: 9, overflow: "hidden", padding: 9 },
   topRow: { flexDirection: "row", alignItems: "flex-start", gap: 2 }, titleArea: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center" }, checkbox: { width: 36, height: 44, alignItems: "center", justifyContent: "center", flexShrink: 0 }, title: { fontWeight: "600", letterSpacing: -0.2 },
   actions: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", flexShrink: 0, gap: 2 }, action: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 7 },
-  description: { marginTop: 6, marginBottom: 9 }, meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 4 }, pill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 6, minHeight: 19, flexDirection: "row", alignItems: "center", gap: 4 }, pillText: { fontSize: 10, lineHeight: 15, fontWeight: "500" }, checklistToggle: { marginLeft: "auto", minHeight: 44 },
+  description: { marginTop: 6, marginBottom: 9 }, meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 4 }, pill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 6, minHeight: 19, flexDirection: "row", alignItems: "center", gap: 4 }, tagDot: { width: 6, height: 6, borderRadius: 3 }, pillText: { fontSize: 10, lineHeight: 15, fontWeight: "500" }, checklistToggle: { marginLeft: "auto", minHeight: 44 },
   checklist: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, marginTop: 8, gap: 2 }, subtask: { flexDirection: "row", alignItems: "center", minHeight: 44, gap: 7 }, rail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 1, opacity: 0.3 },
 });

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getTaskSectionId } from "@/lib/domain/sections";
+import type { Board } from "@/lib/domain/boards";
 import type { BoardSection, Task } from "@/lib/domain/types";
 import { useMobileBoardColors } from "./mobile-board-colors";
 import { MobileColumnTaskCard } from "./mobile-column-task-card";
@@ -9,6 +10,7 @@ import { MobileColumnTaskCard } from "./mobile-column-task-card";
 export interface MobileTaskColumnsProps {
   tasks: Task[];
   sections: BoardSection[];
+  boards: Board[];
   now: Date;
   hiddenSections: BoardSection[];
   selectionMode: boolean;
@@ -35,6 +37,7 @@ const UNSORTED = "__unsorted";
 export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const c = useMobileBoardColors();
   const zoom = props.zoom;
+  const boardsById = useMemo(() => new Map(props.boards.map((board) => [board.id, board])), [props.boards]);
   const [selectedId, setSelectedId] = useState<string>();
   const carousel = useRef<ComponentRef<typeof ScrollView>>(null);
   const columnWidth = (props.compact ? 260 : 288) * zoom;
@@ -69,7 +72,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
     props.onMove(task, target.id === UNSORTED ? null : target.id);
   };
   const cards = (section: { id: string; title: string }, index: number) => <>
-    {(grouped.get(section.id) ?? []).map((task) => <MobileColumnTaskCard key={task.id} task={task} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} showCheckbox={props.showCheckboxes} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onLongPress(task)} onComplete={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onComplete(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />)}
+    {(grouped.get(section.id) ?? []).map((task) => <MobileColumnTaskCard key={task.id} task={task} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} showCheckbox={props.showCheckboxes} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onLongPress(task)} onComplete={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onComplete(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />)}
     {!(grouped.get(section.id)?.length) ? <Text style={[styles.empty, { color: c.mutedForeground, borderColor: c.border }]}>No cards here yet</Text> : null}
   </>;
   const addCard = (section: { id: string; title: string }) => <Pressable accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id === UNSORTED ? null : section.id)} style={styles.add}><Ionicons name="add" size={18} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 13 }}>Add card</Text></Pressable>;
