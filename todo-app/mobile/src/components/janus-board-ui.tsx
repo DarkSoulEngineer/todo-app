@@ -307,30 +307,93 @@ function TaskEditorForm({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={closeEditor}>
       <View style={[styles.modalBackdrop, { backgroundColor: theme.colors.overlay }]}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalKeyboard}>
-          <View style={[styles.editor, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, shadowColor: theme.colors.shadow, shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: -6 }, elevation: 12 }]}>
-             <View style={styles.editorHeader}><Text style={[styles.editorTitle, { color: theme.colors.foreground }]}>{task ? "Task details" : "New task"}</Text><IconButton icon="close" label="Close task editor" onPress={closeEditor} /></View>
-             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
-               <Input autoFocus={!task} value={title} onChangeText={(value) => { setTitle(value); if (titleError) setTitleError(null); }} placeholder="What needs doing?" returnKeyType="next" accessibilityLabel="Task title" accessibilityHint="Required" style={titleError ? { borderColor: theme.colors.destructive } : undefined} />
-               {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
-               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>
-              <TextInput value={description} onChangeText={setDescription} placeholder="Add a little context" placeholderTextColor={theme.colors.mutedForeground} multiline style={[styles.textArea, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]} />
-              <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
-              <View style={styles.wrapRow}>{PRIORITY_ORDER.map((item) => <Chip key={item} label={PRIORITY_META[item].label} active={priority === item} color={PRIORITY_META[item].dot} onPress={() => setPriority(item)} />)}</View>
-               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
-               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapRow}>{boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; })}</ScrollView>
-               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>WHEN</Text>
-              <View style={styles.dateRow}><Button variant="secondary" label={dueAt ? format(dateValue, "MMM d") : "No deadline"} onPress={() => setPicker("date")} style={{ flex: 1 }} /><Button variant="secondary" label={dueAt ? format(dateValue, "h:mm a") : "Set time"} onPress={() => setPicker("time")} style={{ flex: 1 }} /><Button size="icon" variant="ghost" accessibilityLabel="Clear due date" onPress={() => setDueAt(null)}><Ionicons name="close-circle-outline" size={20} color={theme.colors.mutedForeground} /></Button></View>
-              {picker ? <DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /> : null}
-              <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrapRow}><Chip label="Unsorted" active={!sectionId} onPress={() => setSectionId(null)} />{sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}</ScrollView>
-              <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>SUBTASKS</Text>
-               {subtasks.map((subtask, index) => <View key={subtask.id} style={styles.subtaskRow}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.subtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><Input value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.subtaskInput, { flex: 1, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><IconButton size={36} icon="trash-outline" label={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} tone="danger" /></View>)}
-              <View style={styles.addSubtask}><TextInput value={subtaskTitle} onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a subtask" placeholderTextColor={theme.colors.mutedForeground} style={[styles.subtaskInput, { color: theme.colors.foreground, borderColor: theme.colors.border, backgroundColor: theme.colors.input }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add subtask" onPress={addSubtaskLocal}><Ionicons name="add" size={19} color={theme.colors.primary} /></Button></View>
-               {task ? null : <Button label="Add task" onPress={save} style={{ marginTop: 18 }} />}
-              {task ? <View style={styles.editorActions}><Button variant="soft" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} /><Button variant="ghost" label="Delete" onPress={onDelete ?? (() => undefined)} /></View> : null}
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.taskEditorKeyboard}>
+          <View style={[styles.taskEditorSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, shadowColor: theme.colors.shadow }]}>
+            <View style={[styles.taskEditorHandle, { backgroundColor: theme.colors.borderStrong }]} />
+            <View style={styles.taskEditorHeader}>
+              <View style={styles.taskEditorHeaderCopy}>
+                <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task details" : "New task"}</Text>
+                <Text style={[styles.taskEditorSubtitle, { color: theme.colors.mutedForeground }]}>{task ? "Changes save automatically" : "Start with a title. Details can wait."}</Text>
+              </View>
+              <IconButton icon="close" label="Close task editor" onPress={closeEditor} size={40} />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} style={styles.taskEditorScroll} contentContainerStyle={styles.taskEditorContent}>
+              <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
+              <TextInput
+                autoFocus={!task}
+                value={title}
+                onChangeText={(value) => { setTitle(value); if (titleError) setTitleError(null); }}
+                placeholder="What needs doing?"
+                placeholderTextColor={theme.colors.mutedForeground}
+                returnKeyType="next"
+                accessibilityLabel="Task title"
+                accessibilityHint="Required"
+                style={[styles.taskEditorTitleInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: titleError ? theme.colors.destructive : theme.colors.border }]}
+              />
+              {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
+              <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Add a little context"
+                placeholderTextColor={theme.colors.mutedForeground}
+                multiline
+                style={[styles.taskEditorNotes, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
+              />
+              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>
+                <View style={styles.taskEditorSectionHeader}>
+                  <View style={[styles.taskEditorSectionIcon, { backgroundColor: theme.colors.primarySoft }]}><Ionicons name="options-outline" size={15} color={theme.colors.primary} /></View>
+                  <Text style={[styles.taskEditorSectionTitle, { color: theme.colors.foreground }]}>Organize</Text>
+                </View>
+                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
+                <View style={styles.wrapRow}>{PRIORITY_ORDER.map((item) => <Chip key={item} label={PRIORITY_META[item].label} active={priority === item} color={PRIORITY_META[item].dot} onPress={() => setPriority(item)} />)}</View>
+                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; })}</ScrollView>
+                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}><Chip label="Unsorted" active={!sectionId} onPress={() => setSectionId(null)} />{sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}</ScrollView>
+              </View>
+              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>
+                <View style={styles.taskEditorSectionHeader}>
+                  <View style={[styles.taskEditorSectionIcon, { backgroundColor: theme.colors.infoSoft }]}><Ionicons name="calendar-outline" size={15} color={theme.colors.info} /></View>
+                  <Text style={[styles.taskEditorSectionTitle, { color: theme.colors.foreground }]}>Schedule</Text>
+                  <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>OPTIONAL</Text>
+                </View>
+                <View style={styles.taskEditorDateRow}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due ${format(dateValue, "MMMM d, yyyy")}` : "Set due date"} onPress={() => setPicker("date")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}>
+                    <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
+                    <Text style={[styles.taskEditorDateText, { color: theme.colors.foreground }]} numberOfLines={1}>{dueAt ? format(dateValue, "MMM d") : "Pick a date"}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due at ${format(dateValue, "h:mm a")}` : "Set due time"} onPress={() => setPicker("time")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}>
+                    <Ionicons name="time-outline" size={16} color={theme.colors.primary} />
+                    <Text style={[styles.taskEditorDateText, { color: theme.colors.foreground }]} numberOfLines={1}>{dueAt ? format(dateValue, "h:mm a") : "Set time"}</Text>
+                  </Pressable>
+                  {dueAt ? <Pressable accessibilityRole="button" accessibilityLabel="Clear due date" onPress={() => setDueAt(null)} style={({ pressed }) => [styles.taskEditorClearDue, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}><Ionicons name="close" size={18} color={theme.colors.mutedForeground} /></Pressable> : null}
+                </View>
+                {picker ? <View style={styles.taskEditorPicker}><DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /></View> : null}
+              </View>
+              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>
+                <View style={styles.taskEditorSectionHeader}>
+                  <View style={[styles.taskEditorSectionIcon, { backgroundColor: theme.colors.successSoft }]}><Ionicons name="checkbox-outline" size={15} color={theme.colors.success} /></View>
+                  <Text style={[styles.taskEditorSectionTitle, { color: theme.colors.foreground }]}>Checklist</Text>
+                  {subtasks.length ? <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>{subtasks.filter((item) => item.done).length}/{subtasks.length} DONE</Text> : null}
+                </View>
+                {subtasks.length ? <View style={[styles.taskEditorChecklist, { borderColor: theme.colors.border, backgroundColor: theme.colors.input }]}>{subtasks.map((subtask, index) => <View key={subtask.id} style={[styles.taskEditorSubtaskRow, index > 0 ? { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.taskEditorSubtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><TextInput value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} placeholderTextColor={theme.colors.mutedForeground} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.taskEditorSubtaskInput, { color: theme.colors.foreground, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} style={({ pressed }) => [styles.taskEditorSubtaskDelete, { opacity: pressed ? 0.6 : 1 }]}><Ionicons name="trash-outline" size={17} color={theme.colors.mutedForeground} /></Pressable></View>)}</View> : null}
+                <View style={styles.taskEditorAddSubtask}><TextInput value={subtaskTitle} onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a step" placeholderTextColor={theme.colors.mutedForeground} returnKeyType="done" style={[styles.taskEditorAddSubtaskInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add subtask" onPress={addSubtaskLocal}><Ionicons name="add" size={19} color={theme.colors.primary} /></Button></View>
+              </View>
             </ScrollView>
+            <View style={[styles.taskEditorFooter, { borderTopColor: theme.colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+              {task ? (
+                <View style={styles.taskEditorFooterActions}>
+                  <Button variant="secondary" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} style={styles.taskEditorFooterPrimary} />
+                  <Button variant="ghost" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={styles.taskEditorDeleteButton}>
+                    <Ionicons name="trash-outline" size={17} color={theme.colors.destructive} />
+                    <Text style={{ color: theme.colors.destructive, fontSize: 14, fontWeight: "600" }}>Delete</Text>
+                  </Button>
+                </View>
+              ) : (
+                <Button label="Add task" onPress={save} />
+              )}
+            </View>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -657,6 +720,41 @@ const styles = StyleSheet.create({
   boardCardNewFooterBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
   boardCardNewFooterBtnText: { fontSize: 12 },
   boardCardNewRemoveText: { fontSize: 12, fontWeight: "500" },
+  taskEditorKeyboard: { width: "100%", maxWidth: 620, maxHeight: "94%", alignSelf: "center" },
+  taskEditorSheet: { width: "100%", maxHeight: "100%", paddingTop: 10, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: StyleSheet.hairlineWidth, shadowOpacity: 1, shadowRadius: 22, shadowOffset: { width: 0, height: -8 }, elevation: 16 },
+  taskEditorHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
+  taskEditorHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 18, paddingBottom: 4 },
+  taskEditorHeaderCopy: { flex: 1, minWidth: 0 },
+  taskEditorTitle: { fontSize: 24, lineHeight: 30, fontWeight: "700", letterSpacing: -0.3 },
+  taskEditorSubtitle: { fontSize: 12, lineHeight: 17, marginTop: 2 },
+  taskEditorScroll: { flexShrink: 1, minHeight: 0 },
+  taskEditorContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 20 },
+  taskEditorLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.2, marginTop: 16, marginBottom: 7 },
+  taskEditorTitleInput: { height: 58, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 0, fontSize: 20, lineHeight: 26, fontWeight: "700", textAlignVertical: "center" },
+  taskEditorNotes: { minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, fontSize: 14, lineHeight: 20, textAlignVertical: "top" },
+  taskEditorSection: { marginTop: 18, borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, padding: 14 },
+  taskEditorSectionHeader: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 2 },
+  taskEditorSectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  taskEditorSectionTitle: { flex: 1, fontSize: 14, fontWeight: "700" },
+  taskEditorSectionMeta: { fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  taskEditorInlineLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.1, marginTop: 14, marginBottom: 7 },
+  taskEditorChipRow: { flexDirection: "row", gap: 8, paddingRight: 4, paddingBottom: 2 },
+  taskEditorDateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
+  taskEditorDateField: { flex: 1, minHeight: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
+  taskEditorDateText: { flex: 1, fontSize: 13, fontWeight: "600" },
+  taskEditorClearDue: { width: 44, height: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  taskEditorPicker: { marginTop: 10 },
+  taskEditorChecklist: { marginTop: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, overflow: "hidden" },
+  taskEditorSubtaskRow: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 48, paddingLeft: 12, paddingRight: 4 },
+  taskEditorSubtaskCheck: { width: 21, height: 21, borderRadius: 7, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  taskEditorSubtaskInput: { flex: 1, fontSize: 14, lineHeight: 19, paddingVertical: 8, paddingHorizontal: 0 },
+  taskEditorSubtaskDelete: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  taskEditorAddSubtask: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  taskEditorAddSubtaskInput: { flex: 1, height: 42, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 },
+  taskEditorFooter: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingTop: 12 },
+  taskEditorFooterActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  taskEditorFooterPrimary: { flex: 1 },
+  taskEditorDeleteButton: { height: 44, paddingHorizontal: 14, borderRadius: 16 },
   chip: { minHeight: 44, paddingHorizontal: 12, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" },
   dot: { width: 7, height: 7, borderRadius: 4 },
   taskPressable: { marginBottom: 10 }, taskCard: { borderRadius: 16, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 2 }, taskTopline: { flexDirection: "row", alignItems: "flex-start", gap: 10 }, check: { width: 23, height: 23, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center", marginTop: 1 }, taskTitle: { flex: 1, fontSize: 15, lineHeight: 21, fontWeight: "700" }, taskAction: { width: 44, height: 44, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center", marginTop: -10, marginRight: -6 }, priorityDot: { width: 7, height: 7, borderRadius: 4 }, priorityBadge: { minHeight: 28, paddingHorizontal: 9, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 6 }, statusBadge: { minHeight: 28, paddingHorizontal: 9, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 5 }, taskDescription: { fontSize: 13, lineHeight: 18, marginTop: 8, marginLeft: 33 }, metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 11, marginLeft: 33 }, metaItem: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "75%" }, modalBackdrop: { flex: 1, justifyContent: "flex-end" }, modalKeyboard: { maxHeight: "94%" }, editor: { borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingTop: 16, maxHeight: "100%" }, editorHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }, editorEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 1.3 }, editorTitle: { fontSize: 23, lineHeight: 28, fontWeight: "700", marginTop: 2 }, fieldLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 16, marginBottom: 7 }, textArea: { minHeight: 78, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, textAlignVertical: "top", fontSize: 14 }, wrapRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, dateRow: { flexDirection: "row", alignItems: "center", gap: 4 }, subtaskRow: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 44 }, subtaskCheck: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center" }, subtaskText: { flex: 1, fontSize: 14, lineHeight: 19 }, addSubtask: { flexDirection: "row", alignItems: "center", gap: 8 }, subtaskInput: { flex: 1, height: 42, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 }, editorActions: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 }, sheetTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 }, sheetDescription: { fontSize: 14, lineHeight: 20 }, option: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 14, borderBottomWidth: StyleSheet.hairlineWidth }, boardCard: { borderRadius: 20, padding: 14, minHeight: 150 }, boardCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 }, boardCardBody: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minHeight: 44 }, boardGlyph: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" }, boardCardCopy: { flex: 1 }, boardName: { fontSize: 16, fontWeight: "700" }, boardMeta: { fontSize: 12, marginTop: 4 }, boardCreated: { fontSize: 10, marginTop: 2 }, boardSignals: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 12 }, boardSignal: { fontSize: 11, fontWeight: "700", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 }, progressTrack: { height: 5, borderRadius: 3, marginTop: 14, overflow: "hidden" }, progressFill: { height: "100%", borderRadius: 3 }, progressLabel: { fontSize: 11, fontWeight: "600", marginTop: 6 }, insightSwitch: { flexDirection: "row", gap: 8 }, statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 }, stat: { width: "48%", minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: 17, padding: 13, overflow: "hidden" }, statAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 }, statValue: { fontSize: 24, fontWeight: "800" }, statLabel: { fontSize: 12, marginTop: 4, fontWeight: "600" }, insightCard: { borderRadius: 19, padding: 16 }, insightTitle: { fontSize: 16, fontWeight: "700", marginBottom: 14 }, chart: { height: 105, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 3 }, chartPoint: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 5 }, chartBar: { width: "42%", minWidth: 4, borderRadius: 4 }, chartLabel: { fontSize: 9 }, weekBars: { height: 84, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 7 }, weekBarItem: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 6 }, weekBar: { width: "58%", minWidth: 5, borderRadius: 5 }, barRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 11 }, barLabel: { width: 66, fontSize: 12, fontWeight: "600" }, barTrack: { flex: 1, height: 9, borderRadius: 6, overflow: "hidden" }, barFill: { height: "100%", borderRadius: 6 },

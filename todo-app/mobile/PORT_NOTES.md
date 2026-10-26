@@ -192,6 +192,8 @@ A modal/sheet (`Modal` + `KeyboardAvoidingView`) used for create and edit:
 
 - Existing tasks open as **Task details**; new tasks open as **New task**. There is
   no eyebrow label above the title.
+- The sheet has a fixed header and footer, a scrollable body, and grouped
+  **Organize**, **Schedule**, and **Checklist** panels.
 - Title (required), description, due date/time (`DateTimePicker`), priority chips,
   board chips, list picker, subtask add/toggle/remove.
 - Creating uses the **Add task** button → `addTask(draft)`.
