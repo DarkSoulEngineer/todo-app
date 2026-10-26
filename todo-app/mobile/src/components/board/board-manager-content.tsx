@@ -1,14 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format, isValid, parseISO } from "date-fns";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import { IconButton } from "@/components/janus-board-ui";
+import { ScreenHeader } from "@/components/reference/mobile/reference-primitives";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { MobileSearchField, MobileTopBarAction } from "@/components/ui/mobile-top-bar";
 import { useTheme } from "@/providers/theme-provider";
 import { getTaskMetrics, type TaskMetrics } from "@/lib/data/manager-state";
 import type { JanusProject } from "@/lib/domain/projects";
+import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
 
 interface Props {
   projects: JanusProject[];
@@ -38,27 +42,28 @@ interface Props {
 const serif = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, serif" });
 
 export function BoardManagerContent(props: Props) {
-  const { theme, setPreference } = useTheme();
+  const { theme } = useTheme();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
+  const [showSearch, setShowSearch] = useState(false);
   return <>
-    <View style={[styles.header, { backgroundColor: c.card, borderBottomColor: c.border, paddingTop: insets.top + 8 }]}>
-      <View style={styles.identity}><Text style={[styles.brand, { color: c.foreground }]}>Janus</Text><Text style={[styles.subtitle, { color: c.mutedForeground }]}>Focused task manager</Text></View>
-
-    </View>
-    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110, paddingLeft: Math.max(insets.left, 18), paddingRight: Math.max(insets.right, 18) }]}>
-      <Text style={[styles.breadcrumb, { color: c.primary }]}>HOME <Text style={{ color: c.borderStrong }}>/</Text> BOARDS</Text>
-      <Text accessibilityRole="header" style={[styles.title, { color: c.foreground, fontFamily: serif }]}>Board manager</Text>
-      <Text style={[styles.intro, { color: c.mutedForeground }]}>All your boards in one place.</Text>
-      <View style={styles.actions}>
-        <Button variant="outline" label="Import board" onPress={props.onImport} style={styles.mainAction}><Ionicons name="push-outline" size={17} color={c.mutedForeground} /><Text style={{ color: c.secondaryForeground, fontWeight: "500" }}>Import board</Text></Button>
-        <Button label="New board" onPress={props.onCreate} style={styles.mainAction}><Ionicons name="add" size={21} color={c.primaryForeground} /><Text style={{ color: c.primaryForeground, fontWeight: "600" }}>New board</Text></Button>
-      </View>
-      <View style={styles.searchRow}>
-        <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border }]}><Ionicons name="search-outline" size={19} color={c.mutedForeground} /><TextInput value={props.query} onChangeText={props.onQuery} placeholder="Search boards" accessibilityLabel="Search boards" placeholderTextColor={c.mutedForeground} style={[styles.searchInput, { color: c.foreground }]} />{props.query ? <IconButton icon="close-circle-outline" label="Clear search" onPress={() => props.onQuery("")} size={36} /> : null}</View>
-        <Button variant="outline" label={props.editing ? "Done" : "Rearrange"} onPress={() => props.onEdit(!props.editing)} disabled={!props.ready || (!props.editing && props.totalBoards < 2)} style={styles.arrange}><Ionicons name={props.editing ? "checkmark" : "reorder-three-outline"} size={18} color={c.mutedForeground} /><Text style={{ color: c.secondaryForeground, fontSize: 12 }}>{props.editing ? "Done" : "Rearrange"}</Text></Button>
-      </View>
-      <View style={styles.sectionHeader}><View style={styles.sectionCopy}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>YOUR BOARDS</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{props.totalBoards} active</Text></View></View>
+    <ScreenHeader
+      title="Janus"
+      subtitle="Focused task manager"
+      onSearch={() => setShowSearch(prev => !prev)}
+      searchActive={showSearch}
+      showThemeToggle={false}
+      actions={<>
+        <MobileTopBarAction icon="download-outline" label="Import board" onPress={props.onImport} />
+        <MobileTopBarAction icon="add" label="New board" onPress={props.onCreate} style={[styles.newBoardButton, { backgroundColor: c.card, borderColor: c.border }]} />
+      </>}
+      search={showSearch ? <MobileSearchField value={props.query} onChangeText={props.onQuery} placeholder="Search boards" accessibilityLabel="Search boards" /> : null}
+    />
+    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
+      <View style={[styles.sectionHeader, styles.firstSectionHeader]}><View style={styles.sectionCopy}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>YOUR BOARDS</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{props.totalBoards} active</Text></View><Button variant="outline" label={props.editing ? "Done" : "Rearrange"} onPress={() => props.onEdit(!props.editing)} disabled={!props.ready || (!props.editing && props.totalBoards < 2)} style={styles.arrange}>
+        <Ionicons name={props.editing ? "checkmark" : "reorder-three-outline"} size={18} color={c.mutedForeground} />
+        <Text style={{ color: c.secondaryForeground, fontSize: 12 }}>{props.editing ? "Done" : "Rearrange"}</Text>
+      </Button></View>
       {props.editing ? <Text style={[styles.editHint, { color: c.primary }]}>Use the arrows to arrange your boards.</Text> : null}
       {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View style={styles.boards}>{props.projects.map((project, index) => <ManagerCard key={project.id} project={project} accent={index % 2 ? "#EC4899" : c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />)}</View>}
       {props.closedProjects.length ? <>
@@ -130,12 +135,11 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
 }
 
 const styles = StyleSheet.create({
-  header: { minHeight: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingBottom: 10, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  identity: { flex: 1 }, brand: { fontSize: 17, fontWeight: "700", letterSpacing: -0.5 }, subtitle: { fontSize: 11, marginTop: 5 },
+  newBoardButton: { width: 44, height: 44, borderRadius: 7, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   themeSwitch: { flexDirection: "row", borderWidth: 1, borderRadius: 10, padding: 2 }, themeButton: { width: 44, height: 44, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  content: { width: "100%", maxWidth: 680, alignSelf: "center", paddingTop: 24 }, breadcrumb: { fontSize: 10, fontWeight: "700", letterSpacing: 0.8 }, title: { fontSize: 34, fontWeight: "400", letterSpacing: -1.2, marginTop: 10 }, intro: { fontSize: 13, lineHeight: 21, marginTop: 10 }, actions: { flexDirection: "row", gap: 10, marginTop: 24 }, mainAction: { flex: 1, height: 44, borderRadius: 14, paddingHorizontal: 8 },
-  searchRow: { flexDirection: "row", gap: 8, marginTop: 20 }, search: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 13, paddingLeft: 12, minHeight: 44 }, searchInput: { flex: 1, minWidth: 0, fontSize: 13, paddingVertical: 10 }, arrange: { paddingHorizontal: 10, borderRadius: 13 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 22, marginBottom: 12 }, sectionCopy: { flexDirection: "row", alignItems: "center", gap: 10 }, sectionTitle: { fontSize: 14, fontWeight: "700", letterSpacing: 0.7 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },
+  content: mobileContentStyle,
+  arrange: { paddingHorizontal: 10, borderRadius: 13 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 22, marginBottom: 12 }, firstSectionHeader: { marginTop: 0 }, sectionCopy: { flexDirection: "row", alignItems: "center", gap: 10 }, sectionTitle: { fontSize: 14, fontWeight: "700", letterSpacing: 0.7 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },
   board: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 17, paddingTop: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }, cardHeader: { flexDirection: "row", alignItems: "flex-start" }, cardTitleArea: { flex: 1, paddingVertical: 4, minHeight: 44 }, boardTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.4 }, closedBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5, height: 20, paddingHorizontal: 6, borderWidth: 1, borderRadius: 7 }, created: { fontSize: 12, marginTop: 4 }, pin: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -10, marginTop: -5 }, reorder: { flexDirection: "row", gap: 8, marginTop: 12 },
   progressArea: { paddingTop: 18, paddingBottom: 8 }, progressMeta: { flexDirection: "row", alignItems: "center", gap: 16 }, inline: { flexDirection: "row", alignItems: "center", gap: 5 }, percent: { marginLeft: "auto", fontSize: 12, fontWeight: "600" }, track: { height: 6, borderRadius: 5, marginTop: 8, overflow: "hidden" }, signals: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, minHeight: 47, paddingVertical: 9 }, avatars: { flexDirection: "row", alignItems: "center", marginLeft: "auto", paddingLeft: 5 }, avatar: { width: 23, height: 23, borderRadius: 12, borderWidth: 2, marginLeft: -5, alignItems: "center", justifyContent: "center" }, avatarText: { color: "#FFFFFF", fontSize: 9, fontWeight: "700" },
   cardFooter: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, gap: 12, marginTop: 4, minHeight: 45 }, cardAction: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 5 },

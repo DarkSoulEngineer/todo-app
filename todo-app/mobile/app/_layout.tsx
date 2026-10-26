@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native";
+import { PreferencesProvider } from "@/providers/preferences-provider";
 import { TasksProvider } from "@/providers/tasks-provider";
 import { ThemeProvider, useTheme } from "@/providers/theme-provider";
 import { ToastProvider } from "@/providers/toast-provider";
@@ -22,9 +23,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <TasksProvider>
-          <ToastProvider>
-            <RootLayoutInner />
-          </ToastProvider>
+          <PreferencesProvider>
+            <ToastProvider>
+              <RootLayoutInner />
+            </ToastProvider>
+          </PreferencesProvider>
         </TasksProvider>
       </ThemeProvider>
     </SafeAreaProvider>

@@ -2,9 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Circle, Svg } from "react-native-svg";
 import { format, isValid, parseISO } from "date-fns";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Assignee, Task } from "@/lib/domain/types";
 import { deriveStatus } from "@/lib/domain/status";
+import { MobileTopBar, MobileTopBarAction } from "@/components/ui/mobile-top-bar";
 import { useReferenceTheme } from "../reference-theme";
 
 export interface ReferenceAssignee {
@@ -25,6 +25,7 @@ export interface ReferenceActivity {
 
 export interface ReferenceTaskDisplay {
   task: Task;
+  projectId?: string;
   projectLabel?: string;
   boardLabel?: string;
   sectionLabel?: string;
@@ -160,18 +161,24 @@ export function SurfaceCard({ children, style }: { children: React.ReactNode; st
   return <View style={[card, style]}>{children}</View>;
 }
 
-export function ScreenHeader({ title, subtitle, onBack, onSearch, onNotifications, onMore, showThemeToggle = true }: { title: string; subtitle?: string; onBack?: () => void; onSearch?: () => void; onNotifications?: () => void; onMore?: () => void; showThemeToggle?: boolean }) {
-  const { colors, type, toggle, scheme } = useReferenceTheme();
-  const insets = useSafeAreaInsets();
+export function ScreenHeader({ title, subtitle, onBack, onSearch, searchActive = false, onNotifications, onMore, onAdd, moreIcon = "ellipsis-horizontal", moreLabel = "More options", showThemeToggle = true, actions, search }: { title: string; subtitle?: string; onBack?: () => void; onSearch?: () => void; searchActive?: boolean; onNotifications?: () => void; onMore?: () => void; onAdd?: () => void; moreIcon?: keyof typeof Ionicons.glyphMap; moreLabel?: string; showThemeToggle?: boolean; actions?: React.ReactNode; search?: React.ReactNode }) {
+  const { toggle, scheme } = useReferenceTheme();
+  const hasActions = Boolean(onSearch || onAdd || onNotifications || showThemeToggle || onMore || actions);
   return (
-    <View style={[styles.screenHeader, { backgroundColor: colors.surfaceContainerLowest, borderBottomColor: colors.outlineVariant, paddingTop: insets.top + 8 }]}>
-      {onBack ? <IconButton icon="chevron-back" label="Go back" onPress={onBack} /> : <View style={{ width: 8 }} />}
-      <View style={styles.headerCopy}>
-  {subtitle ? <Text style={[type.caption, { color: colors.muted }]}>{subtitle}</Text> : null}
-  <Text style={[type.title, { fontSize: 19 }]} numberOfLines={1}>{title}</Text>
-</View>
-      <View style={styles.headerActions}>{onSearch ? <IconButton icon="search-outline" label="Search" onPress={onSearch} /> : null}{onNotifications ? <IconButton icon="notifications-outline" label="Notifications" onPress={onNotifications} /> : null}{showThemeToggle ? <IconButton icon={scheme === "dark" ? "sunny-outline" : "moon-outline"} label={scheme === "dark" ? "Use light theme" : "Use dark theme"} onPress={toggle} /> : null}{onMore ? <IconButton icon="ellipsis-horizontal" label="More options" onPress={onMore} /> : null}</View>
-    </View>
+    <MobileTopBar
+      title={title}
+      subtitle={subtitle}
+      leading={onBack ? <MobileTopBarAction icon="chevron-back" label="Go back" onPress={onBack} /> : undefined}
+      actions={hasActions ? <>
+        {onSearch ? <MobileTopBarAction icon="search-outline" label="Search" onPress={onSearch} active={searchActive} /> : null}
+        {onAdd ? <MobileTopBarAction icon="add-outline" label="New task" onPress={onAdd} /> : null}
+        {onNotifications ? <MobileTopBarAction icon="notifications-outline" label="Notifications" onPress={onNotifications} /> : null}
+        {showThemeToggle ? <MobileTopBarAction icon={scheme === "dark" ? "sunny-outline" : "moon-outline"} label={scheme === "dark" ? "Use light theme" : "Use dark theme"} onPress={toggle} /> : null}
+        {onMore ? <MobileTopBarAction icon={moreIcon} label={moreLabel} onPress={onMore} /> : null}
+        {actions}
+      </> : undefined}
+      search={search}
+    />
   );
 }
 
@@ -180,7 +187,4 @@ const styles = StyleSheet.create({
   iconButton: { alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, backgroundColor: "transparent" },
   pill: { minHeight: 32, paddingHorizontal: 9, borderRadius: 9999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   ringLabel: { position: "absolute", alignItems: "center", justifyContent: "center" },
-  screenHeader: { minHeight: 68, paddingHorizontal: 14, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 8 },
-  headerCopy: { flex: 1, minWidth: 0 },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 4 },
 });

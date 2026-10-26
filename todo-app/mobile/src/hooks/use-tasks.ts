@@ -245,6 +245,25 @@ export function useTasks(): TasksApi {
     setLiveTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
   }, [setLiveTasks]);
 
+  /**
+   * Project actions can happen before the persistence effect gets a turn (for
+   * example, after editing a task and immediately opening the board manager).
+   * Fold the live workspace into the registry first so switching, duplicating,
+   * importing, or removing a project never drops the latest edit.
+   */
+  const registryWithLiveWorkspace = useCallback((): ProjectsState | null => {
+    const registry = projectsRef.current;
+    const activeId = activeIdRef.current;
+    if (!registry || !activeId) return registry;
+    const next = withWorkspace(registry, activeId, {
+      tasks: tasksRef.current,
+      sections: sectionsRef.current,
+      boards: boardsRef.current,
+    });
+    projectsRef.current = next;
+    return next;
+  }, []);
+
   const [taskHistory, setTaskHistory] = useState<Record<string, Task[]>>({});
 
   /** Pushes the current version of one task onto its revert stack (last 10). */
@@ -257,6 +276,36 @@ export function useTasks(): TasksApi {
       [id]: [clone, ...(prev[id] ?? [])].slice(0, 10),
     }));
   }, []);
+
+  /**
+   * Updates a task in the active board when possible, otherwise in whichever
+   * project owns it. Cross-board overviews (My Tasks, Calendar) rely on this so
+   * completing or rescheduling a task never silently targets the wrong board.
+   */
+  const updateTaskAnywhere = useCallback((id: string, updater: (task: Task) => Task) => {
+    if (tasksRef.current.some((task) => task.id === id)) {
+      recordTask(id);
+      updateById(id, updater);
+      return;
+    }
+    const registry = registryWithLiveWorkspace();
+    if (!registry) return;
+    const stamp = new Date().toISOString();
+    let found = false;
+    const projects = registry.projects.map((project) => {
+      const index = project.workspace.tasks.findIndex((task) => task.id === id);
+      if (index === -1) return project;
+      found = true;
+      const nextTasks = project.workspace.tasks.slice();
+      nextTasks[index] = updater(nextTasks[index]);
+      return { ...project, updatedAt: stamp, workspace: { ...project.workspace, tasks: nextTasks } };
+    });
+    if (!found) return;
+    const next = { ...registry, projects };
+    projectsRef.current = next;
+    setProjectsState(next);
+    saveQueueRef.current = saveQueueRef.current.then(() => saveProjects(next));
+  }, [recordTask, registryWithLiveWorkspace, updateById]);
 
   const canRevertTask = useCallback(
     (id: string) => (taskHistory[id]?.length ?? 0) > 0,
@@ -353,8 +402,7 @@ export function useTasks(): TasksApi {
 
   const toggleComplete = useCallback(
     (id: string) => {
-      recordTask(id);
-      updateById(id, (task) => {
+      updateTaskAnywhere(id, (task) => {
         const completed = !task.completed;
         return {
           ...task,
@@ -365,7 +413,7 @@ export function useTasks(): TasksApi {
         };
       });
     },
-    [recordTask, updateById],
+    [updateTaskAnywhere],
   );
 
   const toggleCancel = useCallback(
@@ -458,10 +506,9 @@ export function useTasks(): TasksApi {
 
   const setTaskDueAt = useCallback(
     (id: string, dueAt: string | null) => {
-      recordTask(id);
-      updateById(id, (task) => ({ ...task, dueAt, updatedAt: new Date().toISOString() }));
+      updateTaskAnywhere(id, (task) => ({ ...task, dueAt, updatedAt: new Date().toISOString() }));
     },
-    [recordTask, updateById],
+    [updateTaskAnywhere],
   );
 
   const setTaskSectionId = useCallback(
@@ -772,25 +819,6 @@ export function useTasks(): TasksApi {
     setTasks(active.workspace.tasks);
     setSections(active.workspace.sections);
     setBoards(active.workspace.boards);
-  }, []);
-
-  /**
-   * Project actions can happen before the persistence effect gets a turn (for
-   * example, after editing a task and immediately opening the board manager).
-   * Fold the live workspace into the registry first so switching, duplicating,
-   * importing, or removing a project never drops the latest edit.
-   */
-  const registryWithLiveWorkspace = useCallback((): ProjectsState | null => {
-    const registry = projectsRef.current;
-    const activeId = activeIdRef.current;
-    if (!registry || !activeId) return registry;
-    const next = withWorkspace(registry, activeId, {
-      tasks: tasksRef.current,
-      sections: sectionsRef.current,
-      boards: boardsRef.current,
-    });
-    projectsRef.current = next;
-    return next;
   }, []);
 
   const switchProject = useCallback(

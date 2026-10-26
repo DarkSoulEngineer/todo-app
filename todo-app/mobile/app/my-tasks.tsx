@@ -1,9 +1,20 @@
 import { router } from "expo-router";
-import { ReferenceMyTasksScreen, type ReferenceMobileTab } from "@/components/reference/mobile";
-import { useTasksContext } from "@/providers/tasks-provider";
+import { useMemo } from "react";
+import { ReferenceMyTasksScreen, type ReferenceMobileTab, type ReferenceTaskDisplay } from "@/components/reference/mobile";
+import { useAllBoardTasks } from "@/hooks/use-all-board-tasks";
 
 export default function MyTasksRoute() {
-  const api = useTasksContext();
+  const { api, entries } = useAllBoardTasks();
+  const tasks = useMemo<ReferenceTaskDisplay[]>(
+    () =>
+      entries.map(({ task, projectId, projectName, boards }) => ({
+        task,
+        projectId,
+        projectLabel: projectName,
+        boardLabel: boards.find((board) => board.id === task.category)?.label,
+      })),
+    [entries],
+  );
 
   const navigate = (tab: ReferenceMobileTab) => {
     if (tab === "my-tasks") return;
@@ -14,12 +25,14 @@ export default function MyTasksRoute() {
 
   return (
     <ReferenceMyTasksScreen
-      tasks={api.tasks}
+      tasks={tasks}
       boardName={api.currentProjectName}
-      onTaskPress={(task) => router.push({ pathname: "/task/[id]", params: { id: task.id, origin: "my-tasks" } })}
+      onTaskPress={(_, projectId) => {
+        const boardId = projectId ?? api.currentProjectId;
+        if (boardId) router.push(`/board/${boardId}`);
+      }}
       onToggleComplete={(task) => api.toggleComplete(task.id)}
-      onCreateTask={() => router.push({ pathname: "/task/new", params: { origin: "my-tasks" } })}
-       onReviewAttention={() => router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/")}
+      onReviewAttention={() => router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/")}
       onRescheduleAttention={() => router.replace("/calendar")}
       onNavigate={navigate}
       activeTab="my-tasks"
