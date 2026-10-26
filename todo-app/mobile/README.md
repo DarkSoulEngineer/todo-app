@@ -80,6 +80,8 @@ Interacting with a ribbon control resets its auto-hide timer.
   react-native-web.
 - Canceling a card creates or reuses a custom **Canceled** list, unhides it if
   needed, and moves the card into it. Restoring a card moves it out again.
+- Editing an existing card auto-saves and closes with the X button; new cards use
+  the **Add task** button.
 - The app is local and single-user. It has no assignees, avatars, user names,
   emails, or multiuser identity fields.
 

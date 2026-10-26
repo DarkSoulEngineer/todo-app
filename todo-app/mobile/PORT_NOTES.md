@@ -190,9 +190,14 @@ following the theme. Global background color from the theme.
 
 A modal/sheet (`Modal` + `KeyboardAvoidingView`) used for create and edit:
 
+- Existing tasks open as **Task details**; new tasks open as **New task**. There is
+  no eyebrow label above the title.
 - Title (required), description, due date/time (`DateTimePicker`), priority chips,
   board chips, list picker, subtask add/toggle/remove.
-- Save → `addTask(draft)` or `updateTask(task.id, draft)`.
+- Creating uses the **Add task** button → `addTask(draft)`.
+- Editing auto-saves through `updateTask(task.id, draft)` after a short debounce,
+  flushes any pending change when the sheet closes, and has no **Save changes**
+  button.
 - Delete + Cancel task actions for existing tasks. Canceling also moves the card
   into the **Canceled** list; restoring moves it out.
 - Accept an optional initial due date when creating from a calendar day.

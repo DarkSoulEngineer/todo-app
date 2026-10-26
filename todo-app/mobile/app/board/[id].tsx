@@ -174,6 +174,14 @@ export default function WorkspaceScreen() {
     else { const task = api.addTask(draft); const targetSectionId = sectionId ?? initialSectionId; if (targetSectionId) saveTaskSection(task.id, targetSectionId); toast.success("Task added", { description: draft.title }); }
     setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null);
   };
+  const autoSaveTask = (draft: TaskDraft, sectionId: string | null) => {
+    if (!editorTask) return;
+    const liveTask = tasks.find((task) => task.id === editorTask.id);
+    if (!liveTask) return;
+    api.updateTask(liveTask.id, draft);
+    const currentSectionId = getTaskSectionId(liveTask, sections, now) ?? null;
+    if (sectionId !== currentSectionId) saveTaskSection(liveTask.id, sectionId);
+  };
   const createFilterTag = (label: string) => {
     if (boards.some((board) => board.label.toLowerCase() === label.toLowerCase())) {
       toast.error("Tag already exists", { description: label });
@@ -315,7 +323,7 @@ export default function WorkspaceScreen() {
         </ScrollView>}
       </View>
       <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} />
-       <TaskEditor visible={editorVisible} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />
+       <TaskEditor visible={editorVisible} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />
        <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}
        <TaskActions task={taskAction} tasks={visibleTasks} sections={sections} now={now} onClose={() => setTaskAction(null)} onComplete={() => { if (taskAction) api.toggleComplete(taskAction.id); setTaskAction(null); }} onCancel={() => { if (taskAction) api.toggleCancel(taskAction.id); setTaskAction(null); }} onDelete={() => { if (taskAction) { const before = api.snapshot(); api.deleteTask(taskAction.id); setTaskAction(null); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } }} onMove={(sectionId) => { if (taskAction) moveTaskToSection(taskAction, sectionId); setTaskAction(null); }} onMoveUp={() => { if (taskAction) reorderTask(taskAction, "up"); setTaskAction(null); }} onMoveDown={() => { if (taskAction) reorderTask(taskAction, "down"); setTaskAction(null); }} />

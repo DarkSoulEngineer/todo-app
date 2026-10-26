@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, isValid, parseISO } from "date-fns";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Svg } from "react-native-svg";
 import {
   KeyboardAvoidingView,
@@ -179,6 +179,7 @@ export function TaskEditor({
   sections,
   onClose,
   onSave,
+  onAutoSave,
   onDelete,
   onCancelTask,
 }: {
@@ -189,11 +190,12 @@ export function TaskEditor({
   sections: BoardSection[];
   onClose: () => void;
   onSave: (draft: TaskDraft, sectionId: string | null) => void;
+  onAutoSave?: (draft: TaskDraft, sectionId: string | null) => void;
   onDelete?: () => void;
   onCancelTask?: () => void;
 }) {
   const editorKey = `${visible ? "open" : "closed"}:${task?.id ?? "new"}:${initialDueAt ?? ""}`;
-  return <TaskEditorForm key={editorKey} visible={visible} task={task} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={onClose} onSave={onSave} onDelete={onDelete} onCancelTask={onCancelTask} />;
+  return <TaskEditorForm key={editorKey} visible={visible} task={task} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={onClose} onSave={onSave} onAutoSave={onAutoSave} onDelete={onDelete} onCancelTask={onCancelTask} />;
 }
 
 function TaskEditorForm({
@@ -204,6 +206,7 @@ function TaskEditorForm({
   sections,
   onClose,
   onSave,
+  onAutoSave,
   onDelete,
   onCancelTask,
 }: {
@@ -214,6 +217,7 @@ function TaskEditorForm({
   sections: BoardSection[];
   onClose: () => void;
   onSave: (draft: TaskDraft, sectionId: string | null) => void;
+  onAutoSave?: (draft: TaskDraft, sectionId: string | null) => void;
   onDelete?: () => void;
   onCancelTask?: () => void;
 }) {
@@ -230,15 +234,70 @@ function TaskEditorForm({
   const [titleError, setTitleError] = useState<string | null>(null);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
 
+  const autoSaveRef = useRef(onAutoSave);
+  useEffect(() => {
+    autoSaveRef.current = onAutoSave;
+  }, [onAutoSave]);
+  const savedSignatureRef = useRef<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dateValue = dueAt && isValid(parseISO(dueAt)) ? parseISO(dueAt) : new Date();
+  const buildDraft = useCallback((): TaskDraft => ({
+    title: title.trim(),
+    description: description.trim(),
+    dueAt,
+    priority,
+    category,
+    subtasks: subtasks.map((item) => ({ ...item, title: item.title.trim() })).filter((item) => item.title.length > 0),
+  }), [category, description, dueAt, priority, subtasks, title]);
   const save = () => {
-    const trimmed = title.trim();
-    if (!trimmed) {
+    if (!title.trim()) {
       setTitleError("Give your task a title.");
       return;
     }
-    onSave({ title: trimmed, description: description.trim(), dueAt, priority, category, subtasks: subtasks.map((item) => ({ ...item, title: item.title.trim() })).filter((item) => item.title.length > 0) }, sectionId);
+    onSave(buildDraft(), sectionId);
   };
+  const flushAutoSave = () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    const autoSave = autoSaveRef.current;
+    if (!task || !autoSave || !title.trim()) return;
+    const draft = buildDraft();
+    const signature = JSON.stringify({ draft, sectionId });
+    if (signature === savedSignatureRef.current) return;
+    autoSave(draft, sectionId);
+    savedSignatureRef.current = signature;
+  };
+  const closeEditor = () => {
+    flushAutoSave();
+    onClose();
+  };
+  const cancelTask = () => {
+    flushAutoSave();
+    onCancelTask?.();
+  };
+  useEffect(() => {
+    const autoSave = autoSaveRef.current;
+    if (!task || !autoSave || !title.trim()) return;
+    const draft = buildDraft();
+    const signature = JSON.stringify({ draft, sectionId });
+    if (savedSignatureRef.current === null) {
+      savedSignatureRef.current = signature;
+      return;
+    }
+    if (signature === savedSignatureRef.current) return;
+    const timer = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      autoSave(draft, sectionId);
+      savedSignatureRef.current = signature;
+    }, 500);
+    autoSaveTimerRef.current = timer;
+    return () => {
+      clearTimeout(timer);
+      if (autoSaveTimerRef.current === timer) autoSaveTimerRef.current = null;
+    };
+  }, [buildDraft, sectionId, task, title]);
   const updateDate = (date: Date) => setDueAt(date.toISOString());
   const addSubtaskLocal = () => {
     if (!subtaskTitle.trim()) return;
@@ -246,11 +305,11 @@ function TaskEditorForm({
     setSubtaskTitle("");
   };
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={closeEditor}>
       <View style={[styles.modalBackdrop, { backgroundColor: theme.colors.overlay }]}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalKeyboard}>
           <View style={[styles.editor, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, shadowColor: theme.colors.shadow, shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: -6 }, elevation: 12 }]}>
-             <View style={styles.editorHeader}><View><Text style={[styles.editorEyebrow, { color: theme.colors.primary }]}>{task ? "REFINE TASK" : "NEW TASK"}</Text><Text style={[styles.editorTitle, { color: theme.colors.foreground }]}>{task ? "Edit task" : "New task"}</Text></View><IconButton icon="close" label="Close task editor" onPress={onClose} /></View>
+             <View style={styles.editorHeader}><Text style={[styles.editorTitle, { color: theme.colors.foreground }]}>{task ? "Task details" : "New task"}</Text><IconButton icon="close" label="Close task editor" onPress={closeEditor} /></View>
              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
                <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
                <Input autoFocus={!task} value={title} onChangeText={(value) => { setTitle(value); if (titleError) setTitleError(null); }} placeholder="What needs doing?" returnKeyType="next" accessibilityLabel="Task title" accessibilityHint="Required" style={titleError ? { borderColor: theme.colors.destructive } : undefined} />
@@ -269,8 +328,8 @@ function TaskEditorForm({
               <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>SUBTASKS</Text>
                {subtasks.map((subtask, index) => <View key={subtask.id} style={styles.subtaskRow}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.subtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><Input value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.subtaskInput, { flex: 1, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><IconButton size={36} icon="trash-outline" label={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} tone="danger" /></View>)}
               <View style={styles.addSubtask}><TextInput value={subtaskTitle} onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a subtask" placeholderTextColor={theme.colors.mutedForeground} style={[styles.subtaskInput, { color: theme.colors.foreground, borderColor: theme.colors.border, backgroundColor: theme.colors.input }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add subtask" onPress={addSubtaskLocal}><Ionicons name="add" size={19} color={theme.colors.primary} /></Button></View>
-               <Button label={task ? "Save changes" : "Add task"} onPress={save} style={{ marginTop: 18 }} />
-              {task ? <View style={styles.editorActions}><Button variant="soft" label={task.canceled ? "Restore task" : "Cancel task"} onPress={onCancelTask ?? (() => undefined)} /><Button variant="ghost" label="Delete" onPress={onDelete ?? (() => undefined)} /></View> : null}
+               {task ? null : <Button label="Add task" onPress={save} style={{ marginTop: 18 }} />}
+              {task ? <View style={styles.editorActions}><Button variant="soft" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} /><Button variant="ghost" label="Delete" onPress={onDelete ?? (() => undefined)} /></View> : null}
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
