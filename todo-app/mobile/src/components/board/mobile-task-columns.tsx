@@ -15,6 +15,8 @@ export interface MobileTaskColumnsProps {
   selectedTaskIds: Set<string>;
   focused: boolean;
   compact: boolean;
+  showCheckboxes: boolean;
+  showMoveArrows: boolean;
   onToggleSelect: (id: string) => void;
   onShowSection: (section: BoardSection) => void;
   onTask: (task: Task) => void;
@@ -66,17 +68,16 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
     props.onMove(task, target.id === UNSORTED ? null : target.id);
   };
   const cards = (section: { id: string; title: string }, index: number) => <>
-    {(grouped.get(section.id) ?? []).map((task) => <MobileColumnTaskCard key={task.id} task={task} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onLongPress(task)} onComplete={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onComplete(task.id)} onMoveLeft={!props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={!props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />)}
+    {(grouped.get(section.id) ?? []).map((task) => <MobileColumnTaskCard key={task.id} task={task} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} showCheckbox={props.showCheckboxes} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onLongPress(task)} onComplete={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onComplete(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />)}
     {!(grouped.get(section.id)?.length) ? <Text style={[styles.empty, { color: c.mutedForeground, borderColor: c.border }]}>No cards here yet</Text> : null}
   </>;
   const addCard = (section: { id: string; title: string }) => <Pressable accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id === UNSORTED ? null : section.id)} style={styles.add}><Ionicons name="add" size={18} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 13 }}>Add card</Text></Pressable>;
   const heading = (section: { id: string; title: string }) => <View style={styles.heading}>
     <View style={styles.columnTools}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Column options for ${section.title}`} disabled={section.id === UNSORTED} onPress={() => props.onSectionMenu(section as BoardSection)} style={styles.icon}><Ionicons name="reorder-four-outline" size={16} color={c.mutedForeground} /></Pressable>
-      <View style={{ flex: 1 }} /><Text style={[styles.count, { color: c.mutedForeground, borderColor: c.border, backgroundColor: c.card }]}>{grouped.get(section.id)?.length ?? 0}</Text>
+      <Text numberOfLines={1} style={[styles.columnTitle, { color: c.foreground, fontSize: 14 * zoom }]}>{section.title}</Text>
+      <Text style={[styles.count, { color: c.mutedForeground, borderColor: c.border, backgroundColor: c.card }]}>{grouped.get(section.id)?.length ?? 0}</Text>
       {section.id !== UNSORTED ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${section.title}`} onPress={() => props.onSectionMenu(section as BoardSection)} style={styles.icon}><Ionicons name="ellipsis-horizontal" size={16} color={c.mutedForeground} /></Pressable> : null}
     </View>
-    <Text numberOfLines={1} style={[styles.columnTitle, { color: c.foreground, fontSize: 14 * zoom }]}>{section.title}</Text>
     <View style={{ height: 2, backgroundColor: c.borderStrong, borderRadius: 1 }} />
   </View>;
 
@@ -103,7 +104,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0 }, carousel: { flex: 1, minHeight: 0 }, columns: { padding: 10, paddingBottom: 68, gap: 10, alignItems: "flex-start" },
-  column: { maxHeight: "100%", minHeight: 220, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingTop: 5 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, count: { fontSize: 11, borderWidth: 1, borderRadius: 10, paddingHorizontal: 5, marginRight: 5 }, columnTitle: { fontWeight: "600", paddingHorizontal: 1, marginBottom: 3 },
+  column: { maxHeight: "100%", minHeight: 220, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingTop: 5 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, count: { fontSize: 11, borderWidth: 1, borderRadius: 10, paddingHorizontal: 5, marginRight: 5 }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
   cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 7 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },
   addSection: { borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }, zoom: { position: "absolute", bottom: 9, right: 12, flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, padding: 3 }, zoomButton: { minWidth: 44, height: 44, alignItems: "center", justifyContent: "center" },
   hiddenRail: { flexGrow: 0, maxHeight: 44 }, hiddenContent: { paddingHorizontal: 12, paddingVertical: 5, gap: 7 }, hiddenChip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderRadius: 8 }, tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { flex: 1, minHeight: 0, margin: 10, marginBottom: 68, paddingHorizontal: 8, borderWidth: 1, borderRadius: 12 },

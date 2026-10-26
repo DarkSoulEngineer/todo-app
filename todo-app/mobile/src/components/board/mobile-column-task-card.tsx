@@ -15,6 +15,7 @@ interface Props {
   zoom?: number;
   selected: boolean;
   selectionMode: boolean;
+  showCheckbox?: boolean;
   onPress: () => void;
   onMenu: () => void;
   onComplete: () => void;
@@ -23,7 +24,7 @@ interface Props {
   onToggleSubtask: (subtaskId: string) => void;
 }
 
-export function MobileColumnTaskCard({ task, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onComplete, onMoveLeft, onMoveRight, onToggleSubtask }: Props) {
+export function MobileColumnTaskCard({ task, now, compact, zoom = 1, selected, selectionMode, showCheckbox = true, onPress, onMenu, onComplete, onMoveLeft, onMoveRight, onToggleSubtask }: Props) {
   const c = useMobileBoardColors();
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -34,14 +35,16 @@ export function MobileColumnTaskCard({ task, now, compact, zoom = 1, selected, s
   const priorityColor = task.priority === "low" ? c.info : task.priority === "high" ? "#F97316" : "#F59E0B";
   const priorityInk = theme.scheme === "light" ? task.priority === "high" ? "#9A3412" : task.priority === "medium" ? c.warning : c.info : priorityColor;
   const settled = task.completed || task.canceled;
-  const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: () => void, checked?: boolean) => <Pressable key={label} accessibilityRole={checked === undefined ? "button" : "checkbox"} accessibilityLabel={label} aria-checked={checked} onPress={handler} style={({ pressed }) => [styles.action, name === "checkmark" && { borderWidth: 1, borderColor: c.border }, { opacity: pressed ? 0.5 : 1, backgroundColor: checked ? `${c.success}20` : "transparent" }]}><Ionicons name={name} size={15} color={checked ? c.success : c.mutedForeground} /></Pressable>;
+  const checkboxVisible = showCheckbox || selectionMode;
+  const checkboxLabel = selectionMode ? `${selected ? "Deselect" : "Select"} ${task.title}` : `${task.completed ? "Reopen" : "Complete"} ${task.title}`;
+  const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: () => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={handler} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.5 : 1 }]}><Ionicons name={name} size={15} color={c.mutedForeground} /></Pressable>;
 
   return <View testID={`kanban-card-${task.id}`} style={[styles.card, { backgroundColor: c.card, borderColor: selected ? c.primary : `${accent}55`, borderLeftColor: accent }]}>
     <LinearGradient pointerEvents="none" colors={["transparent", task.priority === "high" ? "#F9731618" : task.priority === "medium" ? "#F59E0B18" : `${cardTheme?.accent ?? c.info}10`]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
     <View style={styles.topRow}>
-      <Pressable accessibilityRole={selectionMode ? "checkbox" : "button"} accessibilityLabel={task.title} aria-checked={selectionMode ? selected : undefined} onPress={onPress} onLongPress={onMenu} style={styles.titleArea}><Text numberOfLines={2} style={[styles.title, { fontSize: 13 * zoom, lineHeight: 18 * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{selectionMode ? `${selected ? "☑" : "☐"} ` : ""}{task.title}</Text></Pressable>
+      {checkboxVisible ? <Pressable accessibilityRole="checkbox" accessibilityLabel={checkboxLabel} aria-checked={selectionMode ? selected : task.completed} onPress={onComplete} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selectionMode ? selected ? "checkbox" : "square-outline" : task.completed ? "checkbox" : task.canceled ? "close-circle-outline" : "square-outline"} size={20} color={selectionMode ? selected ? c.primary : c.mutedForeground : task.completed ? c.success : c.mutedForeground} /></Pressable> : null}
+      <Pressable accessibilityRole={selectionMode ? "checkbox" : "button"} accessibilityLabel={task.title} aria-checked={selectionMode ? selected : undefined} onPress={onPress} onLongPress={onMenu} style={styles.titleArea}><Text numberOfLines={2} style={[styles.title, { fontSize: 13 * zoom, lineHeight: 18 * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{task.title}</Text></Pressable>
       <View style={styles.actions}>
-        {action("checkmark", `${selectionMode ? selected ? "Deselect" : "Select" : task.completed ? "Reopen" : "Complete"} ${task.title}`, onComplete, selectionMode ? selected : task.completed)}
         {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}
         {onMoveRight ? action("arrow-forward", `Move ${task.title} to next column`, onMoveRight) : null}
         {action("ellipsis-horizontal", `Actions for ${task.title}`, onMenu)}
@@ -61,8 +64,8 @@ export function MobileColumnTaskCard({ task, now, compact, zoom = 1, selected, s
 
 const styles = StyleSheet.create({
   card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: 9, overflow: "hidden", padding: 9 },
-  topRow: { gap: 2 }, titleArea: { minWidth: 0, minHeight: 44, justifyContent: "center" }, title: { fontWeight: "600", letterSpacing: -0.2 },
-  actions: { flexDirection: "row", alignItems: "center", alignSelf: "flex-end", gap: 2 }, action: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 7 },
+  topRow: { flexDirection: "row", alignItems: "flex-start", gap: 2 }, titleArea: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center" }, checkbox: { width: 36, height: 44, alignItems: "center", justifyContent: "center", flexShrink: 0 }, title: { fontWeight: "600", letterSpacing: -0.2 },
+  actions: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", flexShrink: 0, gap: 2 }, action: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 7 },
   description: { marginTop: 6, marginBottom: 9 }, meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 4 }, pill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 6, minHeight: 19, flexDirection: "row", alignItems: "center", gap: 4 }, pillText: { fontSize: 10, lineHeight: 15, fontWeight: "500" }, checklistToggle: { marginLeft: "auto", minHeight: 44 },
   checklist: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, marginTop: 8, gap: 2 }, subtask: { flexDirection: "row", alignItems: "center", minHeight: 44, gap: 7 }, rail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 1, opacity: 0.3 },
 });
