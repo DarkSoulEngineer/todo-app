@@ -164,8 +164,8 @@ export function ScreenHeader({ title, subtitle, onBack, onSearch, onNotification
   const { colors, type, toggle, scheme } = useReferenceTheme();
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.screenHeader, { backgroundColor: colors.surface, borderBottomColor: colors.outlineVariant, paddingTop: insets.top + 4 }]}>
-      {onBack ? <IconButton icon="chevron-back" label="Go back" onPress={onBack} /> : <View style={{ width: 12 }} />}
+    <View style={[styles.screenHeader, { backgroundColor: colors.surfaceContainerLowest, borderBottomColor: colors.outlineVariant, paddingTop: insets.top + 8 }]}>
+      {onBack ? <IconButton icon="chevron-back" label="Go back" onPress={onBack} /> : <View style={{ width: 8 }} />}
       <View style={styles.headerCopy}><Text style={[type.caption, { color: colors.muted }]}>{subtitle ?? "Workspace"}</Text><Text style={[type.title, { fontSize: 19 }]} numberOfLines={1}>{title}</Text></View>
       <View style={styles.headerActions}>{onSearch ? <IconButton icon="search-outline" label="Search" onPress={onSearch} /> : null}{onNotifications ? <IconButton icon="notifications-outline" label="Notifications" onPress={onNotifications} /> : null}<IconButton icon={scheme === "dark" ? "sunny-outline" : "moon-outline"} label={scheme === "dark" ? "Use light theme" : "Use dark theme"} onPress={toggle} />{onMore ? <IconButton icon="ellipsis-horizontal" label="More options" onPress={onMore} /> : null}</View>
     </View>
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   iconButton: { alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, backgroundColor: "transparent" },
   pill: { minHeight: 32, paddingHorizontal: 9, borderRadius: 9999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   ringLabel: { position: "absolute", alignItems: "center", justifyContent: "center" },
-  screenHeader: { minHeight: 68, paddingHorizontal: 12, paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "transparent", flexDirection: "row", alignItems: "center", gap: 8 },
+  screenHeader: { minHeight: 68, paddingHorizontal: 14, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 8 },
   headerCopy: { flex: 1, minWidth: 0 },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 2 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 4 },
 });

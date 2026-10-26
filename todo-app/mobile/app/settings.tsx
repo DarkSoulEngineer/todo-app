@@ -80,8 +80,8 @@ export default function SettingsRoute() {
   return (
     <View style={styles.root}>
       <ThemeAtmosphere />
+      <ScreenHeader title="Settings" subtitle={api.currentProjectName || "Workspace"} onBack={() => router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/")} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 112 }]}> 
-        <ScreenHeader title="Settings" subtitle={api.currentProjectName || "Workspace"} onBack={() => router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/")} />
         <View style={styles.headingRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={type.title}>Preferences &amp; data</Text>

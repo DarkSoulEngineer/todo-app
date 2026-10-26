@@ -17,6 +17,7 @@ import { useTheme } from "@/providers/theme-provider";
 import { useToast } from "@/providers/toast-provider";
 import { boardColor } from "@/lib/domain/boards";
 import { BulkSelectionToolbar } from "@/components/board/bulk-selection-toolbar";
+import { MobileBoardBottomNav } from "@/components/board/mobile-board-bottom-nav";
 import { MobileTaskColumns } from "@/components/board/mobile-task-columns";
 import { MobileBoardRibbon } from "@/components/board/mobile-board-ribbon";
 import { PRIORITY_META, PRIORITY_ORDER, SORT_OPTIONS } from "@/lib/domain/constants";
@@ -283,7 +284,7 @@ export default function WorkspaceScreen() {
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <ThemeAtmosphere />
-      <View style={{ flex: 1, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
+      <View style={{ flex: 1, paddingBottom: 68 + insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
         <MobileBoardRibbon selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onSample={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showCheckboxes={showCheckboxes} onShowCheckboxes={() => setShowCheckboxes(!showCheckboxes)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
           {actionsContent}
         </MobileBoardRibbon>
@@ -293,6 +294,7 @@ export default function WorkspaceScreen() {
           {mode === "list" ? <ListView tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={setCalendarDay} tasks={visibleTasks} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
       </View>
+      <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} />
        <TaskEditor visible={editorVisible} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />
        <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}
@@ -334,10 +336,6 @@ function ListView({ tasks, boards, now, hasRefinements, onTask, onClear }: { tas
     return [...groups.entries()];
   }, [tasks]);
   return <View>
-    <View style={{ marginBottom: 18 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Ionicons name="pulse-outline" size={19} color={theme.colors.primary} /><Text style={[styles.sectionTitle, { color: theme.colors.foreground }]}>Activity</Text></View>
-      <Text style={{ color: theme.colors.mutedForeground, fontSize: 13, lineHeight: 19, marginTop: 4 }}>Recent activity on the board, newest first.</Text>
-    </View>
     {groupedByDay.length === 0 ? <View style={{ borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderColor: theme.colors.border, backgroundColor: theme.colors.card, borderRadius: 18, paddingHorizontal: 20, paddingVertical: 30, alignItems: "center" }}><Ionicons name={hasRefinements ? "search-outline" : "pulse-outline"} size={25} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.foreground, fontSize: 16, fontWeight: "700", marginTop: 9 }}>{hasRefinements ? "No matching activity" : "No changes yet"}</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 13, textAlign: "center", lineHeight: 19, marginTop: 5 }}>{hasRefinements ? "Try a different search or clear the current board filter." : "Activity will appear here as tasks are added and updated."}</Text>{hasRefinements ? <Button variant="soft" label="Clear search and filters" onPress={onClear} style={{ marginTop: 14 }} /> : null}</View> : groupedByDay.map(([day, entries]) => <View key={day} style={{ marginBottom: 18 }}><Text style={[styles.groupTitle, { color: theme.colors.mutedForeground, fontSize: 11, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 }]}>{day}</Text>{entries.map((task) => {
       const stamp = task.updatedAt || task.createdAt;
       const status = deriveStatus(task, now);

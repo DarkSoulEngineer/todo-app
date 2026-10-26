@@ -27,7 +27,6 @@ export default function BoardManagerScreen() {
   const [closedPromptProject, setClosedPromptProject] = useState<JanusProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<JanusProject | null>(null);
   const [renameTarget, setRenameTarget] = useState<JanusProject | null>(null);
-  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
@@ -157,7 +156,6 @@ export default function BoardManagerScreen() {
     const id = duplicateProject(project.id);
     if (id) { toast.success("Board duplicated"); router.push(`/board/${id}`); }
   };
-  const activeProject = liveProjects.find((project) => project.id === currentProjectId);
   const navigate = (tab: ReferenceMobileTab) => {
     if (tab === "my-tasks") router.replace("/my-tasks");
     else if (tab === "calendar") router.replace("/calendar");
@@ -166,7 +164,7 @@ export default function BoardManagerScreen() {
 
   return <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
     <ThemeAtmosphere />
-    <BoardManagerContent projects={displayProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onMore={() => setWorkspaceMenuOpen(true)} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
+    <BoardManagerContent projects={displayProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
     <ReferenceMobileBottomNav active="boards" onNavigate={navigate} />
     <Sheet visible={showCreate} onClose={() => setShowCreate(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>New board</Text><Text style={{ color: theme.colors.mutedForeground, marginTop: 6 }}>Add sections and categories after creating the board.</Text><Input autoFocus value={newName} onChangeText={setNewName} placeholder="Board name" onSubmitEditing={create} style={{ marginTop: 12 }} /><Button label="Create board" onPress={create} disabled={!newName.trim()} style={{ marginTop: 14 }} /></Sheet>
     <OptionSheet visible={menuProject !== null} title={menuProject?.name ?? "Board actions"} options={menuProject ? [
@@ -189,11 +187,6 @@ export default function BoardManagerScreen() {
       { label: "Delete board", icon: "trash-outline" as const, destructive: true, onPress: () => deleteBoard(deleteTarget) },
       { label: "Keep it", icon: "close-outline" as const, onPress: () => undefined },
     ] : []} onClose={() => setDeleteTarget(null)} />
-    <OptionSheet visible={workspaceMenuOpen} title="Workspace options" options={[
-      { label: "New board", icon: "add-circle-outline", onPress: () => setShowCreate(true) },
-      { label: "Import board", icon: "cloud-upload-outline", onPress: importBoard },
-      ...(activeProject ? [{ label: "Export active board", icon: "share-outline" as const, onPress: () => saveProject(activeProject) }] : []),
-    ]} onClose={() => setWorkspaceMenuOpen(false)} />
     <TextEntrySheet visible={renameTarget !== null} title="Rename board" initialValue={renameTarget?.name ?? ""} placeholder="Board name" onClose={() => setRenameTarget(null)} onSubmit={(value) => { if (renameTarget) renameProject(renameTarget.id, value); setRenameTarget(null); }} />
   </View>;
 }
