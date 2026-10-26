@@ -5,6 +5,17 @@ import type { BoardSection, Task, TaskStatus } from "@/lib/domain/types";
 /** Order of the built-in, status-backed columns. */
 export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed", "canceled"];
 
+/** The list that canceled tasks are automatically moved into. */
+export const CANCELED_SECTION_TITLE = "Canceled";
+
+export function isCanceledSection(section: BoardSection): boolean {
+  return section.title.trim().toLowerCase() === CANCELED_SECTION_TITLE.toLowerCase();
+}
+
+export function findCanceledSection(sections: BoardSection[]): BoardSection | undefined {
+  return sections.find(isCanceledSection);
+}
+
 /**
  * A new board starts from scratch: no columns at all. The predefined
  * Upcoming/Overdue/Completed/Canceled layout is gone: the user adds their own

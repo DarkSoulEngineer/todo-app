@@ -96,7 +96,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
       if (columns[index]) setSelectedId(columns[index].id);
     }} style={styles.carousel} contentContainerStyle={styles.columns}>
       {columns.map((section, index) => <View key={section.id} testID={`kanban-column-${section.id}`} style={[styles.column, { width: columnWidth, backgroundColor: c.backgroundAlt, borderColor: c.border }]}>{heading(section)}<ScrollView testID={`kanban-column-scroll-${section.id}`} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.cardScroll} contentContainerStyle={styles.cards}>{cards(section, index)}</ScrollView>{addCard(section)}</View>)}
-      <Pressable accessibilityRole="button" accessibilityLabel="Add section" onPress={props.onAddSection} style={[styles.addSection, { width: columnWidth, borderColor: c.border }]}><Ionicons name="add" size={20} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground }}>Add section</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Add list" onPress={props.onAddSection} style={[styles.addSection, { width: columnWidth, borderColor: c.border }]}><Ionicons name="add" size={20} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground }}>Add list</Text></Pressable>
     </ScrollView>}
   </View>;
 }

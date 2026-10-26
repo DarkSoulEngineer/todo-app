@@ -3,7 +3,7 @@ import { addDays, addMonths, addWeeks, format, isSameDay, isSameMonth, parseISO,
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconButton, InsightsPanel, OptionSheet, TaskCard, TaskEditor, TextEntrySheet } from "@/components/janus-board-ui";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ export default function WorkspaceScreen() {
   const [sectionMenu, setSectionMenu] = useState<BoardSection | null>(null);
   const [projectSwitcherOpen, setProjectSwitcherOpen] = useState(false);
   const [renameSectionTarget, setRenameSectionTarget] = useState<BoardSection | null>(null);
+  const [deleteSectionTarget, setDeleteSectionTarget] = useState<BoardSection | null>(null);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [sectionTitle, setSectionTitle] = useState("");
   const [initialSectionId, setInitialSectionId] = useState<string | null>(null);
@@ -218,6 +219,17 @@ export default function WorkspaceScreen() {
       action: { label: "Undo", onPress: () => api.restore(before) },
     });
   };
+  const deleteList = () => {
+    const target = deleteSectionTarget;
+    if (!target) return;
+    const before = api.snapshot();
+    api.deleteSection(target.id);
+    setDeleteSectionTarget(null);
+    toast.success(`“${target.title}” deleted`, {
+      description: "Cards in this list were kept.",
+      action: { label: "Undo", onPress: () => api.restore(before) },
+    });
+  };
   const moveTaskToSection = (task: Task, sectionId: string | null) => {
     const target = sectionId === null ? null : sections.find((section) => section.id === sectionId);
     if (sectionId !== null && !target) return;
@@ -313,15 +325,23 @@ export default function WorkspaceScreen() {
        <OptionSheet visible={sortMenu} title="Sort tasks" options={SORT_OPTIONS.map((option) => ({ label: option.label, icon: sort === option.value ? "checkmark-circle" : "radio-button-off-outline", onPress: () => setSort(option.value) }))} onClose={() => setSortMenu(false)} />
         <OptionSheet visible={bulkSectionMenu} title="Move selected tasks" options={[{ label: "Move to Unsorted", icon: "file-tray-outline" as const, onPress: () => runBulkMove(null) }, ...sections.map((section) => ({ label: `Move to ${section.title}`, icon: "arrow-forward-outline" as const, onPress: () => runBulkMove(section.id) }))]} onClose={() => setBulkSectionMenu(false)} />
        <OptionSheet visible={bulkPriorityMenu} title="Set selected priority" options={PRIORITY_ORDER.map((priority) => ({ label: PRIORITY_META[priority].label, icon: "flag-outline" as const, onPress: () => runBulkPriority(priority) }))} onClose={() => setBulkPriorityMenu(false)} />
-       <OptionSheet visible={sectionMenu !== null} title={sectionMenu?.title ?? "Section"} options={sectionMenu ? [
-         ...(isCustomSection(sectionMenu) ? [{ label: "Rename section", icon: "pencil-outline" as const, onPress: () => setRenameSectionTarget(sectionMenu) }] : []),
-         { label: sectionMenu.hidden ? "Show section" : "Hide section", icon: sectionMenu.hidden ? "eye-outline" as const : "eye-off-outline" as const, onPress: () => toggleSectionVisibility(sectionMenu) },
-         ...(sections.findIndex((section) => section.id === sectionMenu.id) > 0 ? [{ label: "Move section left", icon: "arrow-back-outline" as const, onPress: () => moveSection(sectionMenu, "left") }] : []),
-         ...(sections.findIndex((section) => section.id === sectionMenu.id) < sections.length - 1 ? [{ label: "Move section right", icon: "arrow-forward-outline" as const, onPress: () => moveSection(sectionMenu, "right") }] : []),
-         ...(isCustomSection(sectionMenu) ? [{ label: "Delete section", icon: "trash-outline" as const, destructive: true, onPress: () => Alert.alert("Delete section?", "Tasks will return to their status section.", [{ text: "Keep", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => api.deleteSection(sectionMenu.id) }]) }] : []),
+       <OptionSheet visible={sectionMenu !== null} title={sectionMenu?.title ?? "List"} options={sectionMenu ? [
+         ...(isCustomSection(sectionMenu) ? [{ label: "Rename list", icon: "pencil-outline" as const, onPress: () => setRenameSectionTarget(sectionMenu) }] : []),
+         { label: sectionMenu.hidden ? "Show list" : "Hide list", icon: sectionMenu.hidden ? "eye-outline" as const : "eye-off-outline" as const, onPress: () => toggleSectionVisibility(sectionMenu) },
+         ...(sections.findIndex((section) => section.id === sectionMenu.id) > 0 ? [{ label: "Move list left", icon: "arrow-back-outline" as const, onPress: () => moveSection(sectionMenu, "left") }] : []),
+         ...(sections.findIndex((section) => section.id === sectionMenu.id) < sections.length - 1 ? [{ label: "Move list right", icon: "arrow-forward-outline" as const, onPress: () => moveSection(sectionMenu, "right") }] : []),
+         ...(isCustomSection(sectionMenu) ? [{ label: "Delete list", icon: "trash-outline" as const, destructive: true, onPress: () => setDeleteSectionTarget(sectionMenu) }] : []),
        ] : []} onClose={() => setSectionMenu(null)} />
-       <TextEntrySheet visible={renameSectionTarget !== null} title="Rename section" initialValue={renameSectionTarget?.title ?? ""} placeholder="Section name" onClose={() => setRenameSectionTarget(null)} onSubmit={(value) => { if (renameSectionTarget) api.renameSection(renameSectionTarget.id, value); setRenameSectionTarget(null); }} />
-      <Sheet visible={addSectionOpen} onClose={() => setAddSectionOpen(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>Add a section</Text><Text style={[styles.sheetCopy, { color: theme.colors.mutedForeground }]}>Use sections to shape this board around your flow.</Text><Input autoFocus value={sectionTitle} onChangeText={setSectionTitle} placeholder="e.g. In progress" onSubmitEditing={() => { if (sectionTitle.trim()) { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); } }} style={{ marginTop: 12 }} /><Button label="Add section" disabled={!sectionTitle.trim()} onPress={() => { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); }} style={{ marginTop: 14 }} /></Sheet>
+       <Sheet visible={deleteSectionTarget !== null} onClose={() => setDeleteSectionTarget(null)}>
+         <Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>Delete list?</Text>
+         <Text style={[styles.sheetCopy, { color: theme.colors.mutedForeground }]}>“{deleteSectionTarget?.title}” will be removed. Its cards will move to Unsorted or their status list.</Text>
+         <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+           <Button variant="outline" label="Keep list" onPress={() => setDeleteSectionTarget(null)} style={{ flex: 1 }} />
+           <Button variant="danger" label="Delete list" onPress={deleteList} style={{ flex: 1 }} />
+         </View>
+       </Sheet>
+       <TextEntrySheet visible={renameSectionTarget !== null} title="Rename list" initialValue={renameSectionTarget?.title ?? ""} placeholder="List name" onClose={() => setRenameSectionTarget(null)} onSubmit={(value) => { if (renameSectionTarget) api.renameSection(renameSectionTarget.id, value); setRenameSectionTarget(null); }} />
+      <Sheet visible={addSectionOpen} onClose={() => setAddSectionOpen(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>Add a list</Text><Text style={[styles.sheetCopy, { color: theme.colors.mutedForeground }]}>Use lists to shape this board around your flow.</Text><Input autoFocus value={sectionTitle} onChangeText={setSectionTitle} placeholder="e.g. In progress" onSubmitEditing={() => { if (sectionTitle.trim()) { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); } }} style={{ marginTop: 12 }} /><Button label="Add list" disabled={!sectionTitle.trim()} onPress={() => { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); }} style={{ marginTop: 14 }} /></Sheet>
        {calendarDay ? <Sheet visible onClose={() => setCalendarDay(null)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{format(calendarDay, "EEEE, MMM d")}</Text>{calendarTasks.length ? calendarTasks.map((task) => <TaskCard key={task.id} task={task} boards={boards} now={now} onPress={() => openEditor(task)} onComplete={() => api.toggleComplete(task.id)} onLongPress={() => setCalendarActionTask(task)} />) : <EmptyState icon="sunny-outline" title="A clear day" message="Nothing is due here yet." />}<Button variant="soft" label="Add task for this day" onPress={() => { const due = new Date(calendarDay); due.setHours(9, 0, 0, 0); setCalendarDay(null); addNewTask(due.toISOString()); }} style={{ marginTop: 6 }}><Ionicons name="add" size={18} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task for this day</Text></Button></Sheet> : null}
      </View>
   );

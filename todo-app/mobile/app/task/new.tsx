@@ -62,7 +62,7 @@ export default function NewTaskRoute() {
   return (
     <ReferenceNewTaskScreen
       boardLabel={api.currentProjectName || "Current board"}
-      sectionLabel={section?.title ?? "No section"}
+      sectionLabel={section?.title ?? "No list"}
       initialDraft={{ ...(dueAt ? { dueAt } : {}), ...(categoryId ? { category: categoryId } : {}) }}
       onCancel={returnToOrigin}
       onSubmit={(draft, attachments) => {

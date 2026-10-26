@@ -14,7 +14,12 @@ import {
   SAMPLE_BOARDS,
   SAMPLE_SECTIONS,
 } from "@/lib/data/sample";
-import { isCustomSection, isStatusSection } from "@/lib/domain/sections";
+import {
+  CANCELED_SECTION_TITLE,
+  findCanceledSection,
+  isCustomSection,
+  isStatusSection,
+} from "@/lib/domain/sections";
 import {
   activeProject,
   cloneProject,
@@ -241,6 +246,31 @@ export function useTasks(): TasksApi {
     setBoards(next);
   }, []);
 
+  /**
+   * Canceling a task always gives it a real "Canceled" list to live in. The
+   * list is custom (not status-backed) so it can still be renamed, hidden, or
+   * deleted like every other list on the board.
+   */
+  const ensureCanceledSection = useCallback((): BoardSection => {
+    const existing = findCanceledSection(sectionsRef.current);
+    if (existing) {
+      if (existing.hidden) {
+        setLiveSections((prev) =>
+          prev.map((section) =>
+            section.id === existing.id ? { ...section, hidden: false } : section,
+          ),
+        );
+      }
+      return existing;
+    }
+    const section: BoardSection = {
+      id: `custom-${makeId(8)}`,
+      title: CANCELED_SECTION_TITLE,
+    };
+    setLiveSections((prev) => [...prev, section]);
+    return section;
+  }, [setLiveSections]);
+
   const updateById = useCallback((id: string, updater: (task: Task) => Task) => {
     setLiveTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
   }, [setLiveTasks]);
@@ -402,13 +432,17 @@ export function useTasks(): TasksApi {
 
   const toggleComplete = useCallback(
     (id: string) => {
+      const canceledSection = findCanceledSection(sectionsRef.current);
       updateTaskAnywhere(id, (task) => {
         const completed = !task.completed;
+        const leaveCanceledList =
+          completed && task.sectionId !== null && task.sectionId === canceledSection?.id;
         return {
           ...task,
           completed,
           canceled: completed ? false : task.canceled,
           completedAt: completed ? new Date().toISOString() : null,
+          sectionId: leaveCanceledList ? null : task.sectionId,
           updatedAt: new Date().toISOString(),
         };
       });
@@ -418,19 +452,33 @@ export function useTasks(): TasksApi {
 
   const toggleCancel = useCallback(
     (id: string) => {
+      const current = tasksRef.current.find((task) => task.id === id);
+      if (!current) return;
       recordTask(id);
+      const canceling = !current.canceled;
+      const canceledSection = canceling
+        ? ensureCanceledSection()
+        : findCanceledSection(sectionsRef.current);
       updateById(id, (task) => {
-        const canceled = !task.canceled;
+        const restoreFromCanceledList =
+          !canceling && task.sectionId !== null && task.sectionId === canceledSection?.id;
         return {
           ...task,
-          canceled,
-          completed: canceled ? false : task.completed,
-          completedAt: canceled ? null : task.completedAt,
+          canceled: canceling,
+          completed: canceling ? false : task.completed,
+          completedAt: canceling ? null : task.completedAt,
+          sectionId: canceling
+            ? canceledSection && isCustomSection(canceledSection)
+              ? canceledSection.id
+              : null
+            : restoreFromCanceledList
+              ? null
+              : task.sectionId,
           updatedAt: new Date().toISOString(),
         };
       });
     },
-    [recordTask, updateById],
+    [ensureCanceledSection, recordTask, updateById],
   );
 
   const toggleSubtask = useCallback(
@@ -475,9 +523,16 @@ export function useTasks(): TasksApi {
 
   const setTaskStatus = useCallback(
     (id: string, status: "completed" | "canceled" | "open") => {
+      if (!tasksRef.current.some((task) => task.id === id)) return;
+      const canceledSection =
+        status === "canceled"
+          ? ensureCanceledSection()
+          : findCanceledSection(sectionsRef.current);
       recordTask(id);
       updateById(id, (task) => {
         const stamp = new Date().toISOString();
+        const inCanceledList =
+          task.sectionId !== null && task.sectionId === canceledSection?.id;
         if (status === "completed") {
           return {
             ...task,
@@ -494,14 +549,24 @@ export function useTasks(): TasksApi {
             completed: false,
             canceled: true,
             completedAt: null,
-            sectionId: null,
+            sectionId:
+              canceledSection && isCustomSection(canceledSection)
+                ? canceledSection.id
+                : null,
             updatedAt: stamp,
           };
         }
-        return { ...task, completed: false, canceled: false, completedAt: null, updatedAt: stamp };
+        return {
+          ...task,
+          completed: false,
+          canceled: false,
+          completedAt: null,
+          sectionId: inCanceledList ? null : task.sectionId,
+          updatedAt: stamp,
+        };
       });
     },
-    [updateById, recordTask],
+    [ensureCanceledSection, updateById, recordTask],
   );
 
   const setTaskDueAt = useCallback(
