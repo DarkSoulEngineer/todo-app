@@ -38,7 +38,7 @@ export function MobileBoardSettingsSheet({ visible, onClose, maximized, onSwitch
   const action = (icon: keyof typeof Ionicons.glyphMap, label: string, onPress: () => void, destructive = false) => <Button key={label} variant="outline" size="lg" label={label} onPress={onPress} style={styles.action}><Ionicons name={icon} size={19} color={destructive ? c.destructive : c.mutedForeground} /><Text style={{ color: destructive ? c.destructive : c.foreground, fontSize: 14, fontWeight: "600" }}>{label}</Text></Button>;
   return <Sheet visible={visible} onClose={onClose}>
     <Text style={[styles.title, { color: c.foreground }]}>Board settings</Text>
-    <Text style={[styles.copy, { color: c.mutedForeground }]}>Appearance and window actions live here. Your board ribbon stays at the top.</Text>
+    <Text style={[styles.copy, { color: c.mutedForeground }]}>{maximized ? "The top ribbon is hidden while maximized. Restore the toolbar to bring it back." : "Appearance and window actions live here. Your board ribbon stays at the top."}</Text>
     <Text style={[styles.label, { color: c.secondaryForeground }]}>APPEARANCE</Text>
     <View style={[styles.segment, { backgroundColor: c.secondary, borderColor: c.border }]}>
       {APPEARANCE.map((option) => {
