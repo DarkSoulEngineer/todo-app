@@ -11,6 +11,8 @@ them instead of re-implementing storage or task rules.
 - `@expo/vector-icons` (Ionicons), `date-fns`, `expo-haptics`,
   `expo-linear-gradient`, `react-native-svg`, `@react-native-community/datetimepicker`
 - No Tailwind. Use `StyleSheet` + theme tokens.
+- All bottom-sheet modals share `mobileModalMaxWidth` (620): full width on
+  phones, centered with a capped width on tablets and web.
 
 ## Current behavior
 

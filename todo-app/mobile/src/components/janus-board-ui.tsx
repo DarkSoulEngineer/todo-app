@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
+import { mobileModalMaxWidth } from "@/theme/layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -720,7 +721,7 @@ const styles = StyleSheet.create({
   boardCardNewFooterBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
   boardCardNewFooterBtnText: { fontSize: 12 },
   boardCardNewRemoveText: { fontSize: 12, fontWeight: "500" },
-  taskEditorKeyboard: { width: "100%", maxWidth: 620, maxHeight: "94%", alignSelf: "center" },
+  taskEditorKeyboard: { width: "100%", maxWidth: mobileModalMaxWidth, maxHeight: "94%", alignSelf: "center" },
   taskEditorSheet: { width: "100%", maxHeight: "100%", paddingTop: 10, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: StyleSheet.hairlineWidth, shadowOpacity: 1, shadowRadius: 22, shadowOffset: { width: 0, height: -8 }, elevation: 16 },
   taskEditorHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   taskEditorHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 18, paddingBottom: 4 },

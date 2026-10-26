@@ -9,3 +9,6 @@ export const mobileContentStyle = {
 
 /** Clearance above the floating bottom navigation. */
 export const mobileBottomNavClearance = 112;
+
+/** Shared width for bottom-sheet modals on tablets and web. */
+export const mobileModalMaxWidth = 620;

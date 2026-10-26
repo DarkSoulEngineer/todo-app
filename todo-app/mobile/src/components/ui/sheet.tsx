@@ -1,6 +1,7 @@
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
+import { mobileModalMaxWidth } from "@/theme/layout";
 
 export function Sheet({ visible, onClose, children, style }: { visible: boolean; onClose: () => void; children: React.ReactNode; style?: ViewStyle }) {
   const { theme } = useTheme();
@@ -48,9 +49,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   keyboard: {
+    width: "100%",
+    maxWidth: mobileModalMaxWidth,
     maxHeight: "92%",
+    alignSelf: "center",
   },
   sheet: {
+    width: "100%",
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
     paddingTop: 10,
