@@ -68,7 +68,7 @@ export default function ReferenceBoardRoute() {
       <OptionSheet
         visible={projectSwitcherOpen}
         title="Switch board"
-        options={api.projects.map((project) => ({
+        options={api.projects.filter((project) => !project.closedAt).map((project) => ({
           label: project.name,
           icon: project.id === api.currentProjectId ? "checkmark-circle" : "layers-outline",
           onPress: () => api.switchProject(project.id),

@@ -3,7 +3,7 @@ import { addDays, addMonths, addWeeks, format, isSameDay, isSameMonth, parseISO,
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconButton, InsightsPanel, OptionSheet, TaskCard, TaskEditor, TextEntrySheet } from "@/components/janus-board-ui";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ import { boardColor } from "@/lib/domain/boards";
 import { BulkSelectionToolbar } from "@/components/board/bulk-selection-toolbar";
 import { MobileTaskColumns } from "@/components/board/mobile-task-columns";
 import { MobileBoardRibbon } from "@/components/board/mobile-board-ribbon";
-import { MobileBoardSettingsButton, MobileBoardSettingsSheet } from "@/components/board/mobile-board-settings";
 import { PRIORITY_META, PRIORITY_ORDER, SORT_OPTIONS } from "@/lib/domain/constants";
 import { deriveStatus, STATUS_LABELS } from "@/lib/domain/status";
 import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
@@ -44,11 +43,10 @@ export default function WorkspaceScreen() {
   const [mode, setMode] = useState<ViewMode>("board");
   const [query, setQuery] = useState("");
   const [compactCards, setCompactCards] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [showCheckboxes, setShowCheckboxes] = useState(true);
   const [showMoveArrows, setShowMoveArrows] = useState(false);
   const [focusedColumn, setFocusedColumn] = useState(false);
-  const [boardMinimized, setBoardMinimized] = useState(false);
-  const [boardMaximized, setBoardMaximized] = useState(false);
   const [sort, setSort] = useState<SortKey>("manual");
   const [boardFilter, setBoardFilter] = useState("all");
   const [filterMenu, setFilterMenu] = useState(false);
@@ -57,7 +55,6 @@ export default function WorkspaceScreen() {
   const [editorVisible, setEditorVisible] = useState(false);
   const [initialDueAt, setInitialDueAt] = useState<string | null>(null);
   const [taskAction, setTaskAction] = useState<Task | null>(null);
-  const [settingsMenu, setSettingsMenu] = useState(false);
   const [sortMenu, setSortMenu] = useState(false);
   const [sectionMenu, setSectionMenu] = useState<BoardSection | null>(null);
   const [projectSwitcherOpen, setProjectSwitcherOpen] = useState(false);
@@ -89,10 +86,12 @@ export default function WorkspaceScreen() {
       requestedProjectId.current = null;
       return;
     }
+    const routedProject = projects.find((project) => project.id === id);
+    if (!routedProject || routedProject.closedAt) return;
     if (requestedProjectId.current === id) return;
     requestedProjectId.current = id;
     switchProjectApi(id);
-  }, [currentProjectId, id, isLoading, projectIds, switchProjectApi]);
+  }, [currentProjectId, id, isLoading, projectIds, projects, switchProjectApi]);
 
   const visibleTasks = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -107,10 +106,9 @@ export default function WorkspaceScreen() {
       return sectionId === undefined || !hiddenSectionIds.has(sectionId);
     });
   }, [now, sections, visibleTasks]);
-  const completedCount = tasks.filter((task) => task.completed).length;
   const selectedTasks = useMemo(() => renderedBoardTasks.filter((task) => selectedTaskIds.has(task.id)), [renderedBoardTasks, selectedTaskIds]);
   const allVisibleSelected = renderedBoardTasks.length > 0 && renderedBoardTasks.every((task) => selectedTaskIds.has(task.id));
-  const enterSelectionMode = () => { setSelectionMode(true); setSelectedTaskIds(new Set()); };
+  const enterSelectionMode = () => { setMode("board"); setSelectionMode(true); setSelectedTaskIds(new Set()); };
   const exitSelectionMode = () => { setSelectionMode(false); setSelectedTaskIds(new Set()); };
   const toggleSelectedTask = (taskId: string) => {
     setSelectedTaskIds((current) => {
@@ -242,59 +240,64 @@ export default function WorkspaceScreen() {
     });
   };
 
-  if (isLoading || !id || !projects.some((project) => project.id === id)) return <View style={[styles.loading, { backgroundColor: theme.colors.background }]}><ActivityIndicator color={theme.colors.primary} /><Text style={{ color: theme.colors.mutedForeground }}>Loading your board…</Text></View>;
-  const activeProject = projects.find((project) => project.id === id);
+  const currentProject = projects.find((project) => project.id === id);
+  if (isLoading || !id || !currentProject) return <View style={[styles.loading, { backgroundColor: theme.colors.background }]}><ActivityIndicator color={theme.colors.primary} /><Text style={{ color: theme.colors.mutedForeground }}>Loading your board…</Text></View>;
+  if (currentProject.closedAt) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, backgroundColor: theme.colors.background }}>
+    <Ionicons name="archive-outline" size={42} color={theme.colors.mutedForeground} />
+    <Text accessibilityRole="header" style={{ color: theme.colors.foreground, fontSize: 22, fontWeight: "700", marginTop: 14 }}>Board closed</Text>
+    <Text style={{ color: theme.colors.mutedForeground, fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 8, maxWidth: 360 }}>“{currentProject.name}” is closed. Reopen it to view and edit its tasks.</Text>
+    <Button label="Reopen board" onPress={() => { if (api.reopenProject(currentProject.id)) toast.success("Board reopened"); }} style={{ marginTop: 22, alignSelf: "stretch", maxWidth: 320 }} />
+    <Button variant="outline" label="Back to boards" onPress={() => router.replace("/")} style={{ marginTop: 10, alignSelf: "stretch", maxWidth: 320 }} />
+  </View>;
+  const activeProject = currentProject;
   // `projects` is the persisted registry projection and may lag one render
   // behind the live task state. Exports must include the edits visible on this
   // screen, not only the last registry snapshot.
   const liveWorkspace = { tasks, sections, boards };
   const hasRefinements = query.trim().length > 0 || boardFilter !== "all";
-  const projectOptions = projects.map((project) => ({ label: project.name, icon: project.id === id ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => switchProject(project.id) }));
+  const projectOptions = projects.filter((project) => !project.closedAt).map((project) => ({ label: project.name, icon: project.id === id ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => switchProject(project.id) }));
+  const closeBoard = () => {
+    const projectId = activeProject.id;
+    if (!api.closeProject(projectId)) return;
+    toast.show("Board closed", {
+      description: "Reopen it anytime from Closed boards.",
+      action: { label: "Undo", onPress: () => api.reopenProject(projectId) },
+    });
+    router.replace("/");
+  };
   const calendarTasks = calendarDay ? visibleTasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), calendarDay)) : [];
-  const optionsContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
-    <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="swap-vertical-outline" label="Sort" onPress={() => setSortMenu(true)} /><OptionTool icon={selectionMode ? "checkmark-done-outline" : "checkbox-outline"} label={selectionMode ? "Done selecting" : "Select tasks"} selected={selectionMode} onPress={selectionMode ? exitSelectionMode : enterSelectionMode} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>BOARD</Text></View>
-    <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="add-circle-outline" label="Add section" onPress={() => setAddSectionOpen(true)} /><OptionTool icon="sparkles-outline" label="Load sample" onPress={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>CREATE</Text></View>
+  const actionsContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
+    <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="sparkles-outline" label="Load sample" onPress={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>CREATE</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="share-outline" label="Export JSON" onPress={() => { if (activeProject) void exportWorkspace(liveWorkspace, activeProject.name); }} /><OptionTool icon="document-text-outline" label="Export CSV" onPress={() => { if (activeProject) void exportWorkspaceCsv(liveWorkspace, activeProject.name); }} /><OptionTool icon="cloud-upload-outline" label="Import board" onPress={importBoard} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DATA</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="bookmark-outline" label="Save version" onPress={() => { api.createVersion(); toast.success("Version saved"); }} />{api.versions.length ? <OptionTool icon="return-down-back-outline" label={`Restore ${api.versions[0].label}`} onPress={() => { api.restoreVersion(api.versions[0].id); toast.success("Version restored"); }} /> : null}{api.versions.length ? <OptionTool icon="trash-outline" label={`Delete ${api.versions[0].label}`} tone="danger" onPress={() => { api.deleteVersion(api.versions[0].id); toast.success("Version deleted"); }} /> : null}</View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>VERSIONS</Text></View>
-    <View style={styles.optionToolGroup}><View style={styles.optionToolButtons}><OptionTool icon="checkmark-done-outline" label="Clear done" onPress={clearCompleted} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>TIDY UP</Text></View>
+    <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="checkmark-done-outline" label="Clear done" onPress={clearCompleted} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>TIDY UP</Text></View>
+    <View style={styles.optionToolGroup}><View style={styles.optionToolButtons}><OptionTool icon="swap-horizontal-outline" label="Switch board" onPress={() => setProjectSwitcherOpen(true)} /><OptionTool icon="archive-outline" label="Close board" onPress={closeBoard} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>BOARD</Text></View>
   </ScrollView>;
   const activeFilterBoard = boards.find((board) => board.id === boardFilter);
   const filterOptions = [{ label: "All boards", icon: boardFilter === "all" ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter("all"); setSelectedTaskIds(new Set()); } }, ...boards.map((board) => ({ label: board.label, icon: boardFilter === board.id ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter(board.id); setSelectedTaskIds(new Set()); } }))];
   const filtersContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
+    <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="swap-vertical-outline" label="Sort" onPress={() => setSortMenu(true)} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>SORT</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionActionRow}><Pressable accessibilityRole="button" accessibilityLabel={`Filter board: ${activeFilterBoard?.label ?? "All boards"}`} accessibilityHint="Opens a dropdown of boards to filter by." onPress={() => setFilterMenu(true)} style={[styles.optionDropdown, { borderColor: theme.colors.border, backgroundColor: theme.colors.input }]}>{activeFilterBoard ? <View style={[styles.optionToolDot, { backgroundColor: boardColor(activeFilterBoard.color).dot }]} /> : <Ionicons name="grid-outline" size={15} color={theme.colors.mutedForeground} />}<Text numberOfLines={1} style={[styles.optionDropdownLabel, { color: theme.colors.foreground }]}>{activeFilterBoard?.label ?? "All boards"}</Text><Ionicons name="chevron-down" size={15} color={theme.colors.mutedForeground} /></Pressable></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>FILTER</Text></View>
     <View style={[styles.optionToolGroup, styles.optionActionGroup, { borderColor: theme.colors.border }]}><View style={styles.optionActionRow}><Input value={quickAdd} onChangeText={setQuickAdd} onSubmitEditing={submitQuickAdd} placeholder="Quick add: tomorrow · !high" style={styles.optionInput} /><Button size="sm" label="Add" onPress={submitQuickAdd} disabled={!quickAdd.trim()} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>ACTIONS</Text></View>
   </ScrollView>;
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <ThemeAtmosphere />
-      {boardMinimized ? <View style={{ flex: 1, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12, paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}><Text accessibilityRole="header" style={{ color: theme.colors.foreground, fontSize: 18, fontWeight: "700", flex: 1 }}>Board minimized</Text><Button variant="outline" label="Boards" onPress={() => router.replace("/")} /></View>
-        <Text style={{ color: theme.colors.mutedForeground, fontSize: 13, lineHeight: 19, marginTop: 8 }}>Your board stays open. Tap its bar below to restore it.</Text>
-        <View style={{ flex: 1 }} />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Restore board" accessibilityHint="Reopens the board with its current view and filters." onPress={() => setBoardMinimized(false)} style={{ flex: 1, minHeight: 56, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8 }}><Ionicons name="albums-outline" size={20} color={theme.colors.primary} /><View style={{ flex: 1 }}><Text numberOfLines={1} style={{ color: theme.colors.foreground, fontSize: 14, fontWeight: "700" }}>{activeProject?.name ?? "Board"}</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12, marginTop: 3 }}>Restore board</Text></View></Pressable>
-          <IconButton icon="close" label="Close board" onPress={() => router.replace("/")} />
-        </View>
-      </View> : null}
-      {/* Keep the workspace mounted so minimizing preserves its view and local edits. */}
-      <View style={{ flex: 1, display: boardMinimized ? "none" : "flex", paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
-        <MobileBoardRibbon filters={filtersContent} maximized={boardMaximized} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onSample={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} onAddSection={() => setAddSectionOpen(true)} onClear={clearCompleted} completedCount={completedCount} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showCheckboxes={showCheckboxes} onShowCheckboxes={() => setShowCheckboxes(!showCheckboxes)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
-          {optionsContent}
+      <View style={{ flex: 1, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
+        <MobileBoardRibbon selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onSample={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showCheckboxes={showCheckboxes} onShowCheckboxes={() => setShowCheckboxes(!showCheckboxes)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
+          {actionsContent}
         </MobileBoardRibbon>
         {mode === "board" ? <View style={{ flex: 1, minHeight: 0 }}>
-          {selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} /> : null}
-          {hasRefinements && visibleTasks.length === 0 ? <ScrollView contentContainerStyle={[styles.surface, { paddingBottom: 76 }]}><WorkspaceEmptyState hasRefinements onCreate={() => addNewTask()} onClear={() => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); }} /></ScrollView> : <MobileTaskColumns key={id} tasks={visibleTasks} sections={sections} now={now} compact={compactCards} showCheckboxes={showCheckboxes} showMoveArrows={showMoveArrows} focused={focusedColumn} hiddenSections={sections.filter((section) => section.hidden)} selectionMode={selectionMode} selectedTaskIds={selectedTaskIds} onToggleSelect={toggleSelectedTask} onShowSection={toggleSectionVisibility} onTask={openEditor} onComplete={api.toggleComplete} onLongPress={setTaskAction} onMove={moveTaskToSection} onToggleSubtask={api.toggleSubtask} onAddTask={(sectionId) => addNewTask(null, sectionId)} onSectionMenu={setSectionMenu} onAddSection={() => setAddSectionOpen(true)} />}
+          {hasRefinements && visibleTasks.length === 0 ? <ScrollView contentContainerStyle={[styles.surface, { paddingBottom: 76 }]}><WorkspaceEmptyState hasRefinements onCreate={() => addNewTask()} onClear={() => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); }} /></ScrollView> : <MobileTaskColumns key={id} tasks={visibleTasks} sections={sections} now={now} compact={compactCards} zoom={zoom} showCheckboxes={showCheckboxes} showMoveArrows={showMoveArrows} focused={focusedColumn} hiddenSections={sections.filter((section) => section.hidden)} selectionMode={selectionMode} selectedTaskIds={selectedTaskIds} onToggleSelect={toggleSelectedTask} onShowSection={toggleSectionVisibility} onTask={openEditor} onComplete={api.toggleComplete} onLongPress={setTaskAction} onMove={moveTaskToSection} onToggleSubtask={api.toggleSubtask} onAddTask={(sectionId) => addNewTask(null, sectionId)} onSectionMenu={setSectionMenu} onAddSection={() => setAddSectionOpen(true)} />}
         </View> : <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.surface, { paddingBottom: 76 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {mode === "list" ? <ListView tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={setCalendarDay} tasks={visibleTasks} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
-        <MobileBoardSettingsButton onPress={() => setSettingsMenu(true)} />
       </View>
        <TaskEditor visible={editorVisible} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />
        <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}
        <TaskActions task={taskAction} tasks={visibleTasks} sections={sections} now={now} onClose={() => setTaskAction(null)} onComplete={() => { if (taskAction) api.toggleComplete(taskAction.id); setTaskAction(null); }} onCancel={() => { if (taskAction) api.toggleCancel(taskAction.id); setTaskAction(null); }} onDelete={() => { if (taskAction) { const before = api.snapshot(); api.deleteTask(taskAction.id); setTaskAction(null); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } }} onMove={(sectionId) => { if (taskAction) moveTaskToSection(taskAction, sectionId); setTaskAction(null); }} onMoveUp={() => { if (taskAction) reorderTask(taskAction, "up"); setTaskAction(null); }} onMoveDown={() => { if (taskAction) reorderTask(taskAction, "down"); setTaskAction(null); }} />
-      <MobileBoardSettingsSheet visible={settingsMenu} onClose={() => setSettingsMenu(false)} maximized={boardMaximized} onSwitchBoard={() => { setSettingsMenu(false); setTimeout(() => setProjectSwitcherOpen(true), 250); }} onMinimize={() => { Keyboard.dismiss(); setSettingsMenu(false); setBoardMinimized(true); }} onMaximize={() => { Keyboard.dismiss(); setSettingsMenu(false); setBoardMaximized(!boardMaximized); }} onCloseBoard={() => { setSettingsMenu(false); router.replace("/"); }} />
-      <OptionSheet visible={projectSwitcherOpen} title="Switch board" options={projectOptions} onClose={() => setProjectSwitcherOpen(false)} />
+       <OptionSheet visible={projectSwitcherOpen} title="Switch board" options={projectOptions} onClose={() => setProjectSwitcherOpen(false)} />
       <OptionSheet visible={filterMenu} title="Filter by board" options={filterOptions} onClose={() => setFilterMenu(false)} />
        <OptionSheet visible={sortMenu} title="Sort tasks" options={SORT_OPTIONS.map((option) => ({ label: option.label, icon: sort === option.value ? "checkmark-circle" : "radio-button-off-outline", onPress: () => setSort(option.value) }))} onClose={() => setSortMenu(false)} />
         <OptionSheet visible={bulkSectionMenu} title="Move selected tasks" options={[{ label: "Move to Unsorted", icon: "file-tray-outline" as const, onPress: () => runBulkMove(null) }, ...sections.map((section) => ({ label: `Move to ${section.title}`, icon: "arrow-forward-outline" as const, onPress: () => runBulkMove(section.id) }))]} onClose={() => setBulkSectionMenu(false)} />

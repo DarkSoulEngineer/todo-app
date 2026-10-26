@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { BoardManagerContent } from "@/components/board/board-manager-content";
 import { OptionSheet, TextEntrySheet } from "@/components/janus-board-ui";
 import { Button } from "@/components/ui/button";
@@ -20,10 +20,12 @@ export default function BoardManagerScreen() {
   const { theme } = useTheme();
   const toast = useToast();
   const api = useTasksContext();
-  const { projects, tasks, sections, boards, isLoading, currentProjectId, createProject, importProject, duplicateProject, renameProject, removeProject, switchProject } = api;
+  const { projects, tasks, sections, boards, isLoading, currentProjectId, createProject, importProject, duplicateProject, renameProject, removeProject, switchProject, closeProject, reopenProject } = api;
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [menuProject, setMenuProject] = useState<JanusProject | null>(null);
+  const [closedPromptProject, setClosedPromptProject] = useState<JanusProject | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<JanusProject | null>(null);
   const [renameTarget, setRenameTarget] = useState<JanusProject | null>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -58,10 +60,13 @@ export default function BoardManagerScreen() {
     const byId = new Map(liveProjects.map((project) => [project.id, project]));
     return boardLayoutOrder(resolvedLayout, boardIds).map((id) => byId.get(id)).filter((project): project is JanusProject => project !== undefined);
   }, [boardIds, liveProjects, resolvedLayout]);
-  const visibleProjects = useMemo(() => orderedProjects.filter((project) => project.name.toLowerCase().includes(query.trim().toLowerCase())), [orderedProjects, query]);
+  const openProjects = useMemo(() => orderedProjects.filter((project) => !project.closedAt), [orderedProjects]);
+  const closedProjects = useMemo(() => orderedProjects.filter((project) => project.closedAt), [orderedProjects]);
+  const visibleProjects = useMemo(() => openProjects.filter((project) => project.name.toLowerCase().includes(query.trim().toLowerCase())), [openProjects, query]);
+  const visibleClosedProjects = useMemo(() => closedProjects.filter((project) => project.name.toLowerCase().includes(query.trim().toLowerCase())), [closedProjects, query]);
   const activePins = useMemo(() => new Set([...pinnedIds].filter((id) => boardIds.includes(id))), [boardIds, pinnedIds]);
-  const displayProjects = editMode ? orderedProjects : [...visibleProjects.filter((project) => activePins.has(project.id)), ...visibleProjects.filter((project) => !activePins.has(project.id))];
-  const metrics = useMemo(() => getWorkspaceMetrics(liveProjects, now), [liveProjects, now]);
+  const displayProjects = editMode ? openProjects : [...visibleProjects.filter((project) => activePins.has(project.id)), ...visibleProjects.filter((project) => !activePins.has(project.id))];
+  const metrics = useMemo(() => getWorkspaceMetrics(openProjects, now), [openProjects, now]);
 
   useEffect(() => {
     if (!managerReady) return;
@@ -83,16 +88,39 @@ export default function BoardManagerScreen() {
   };
   const moveBoard = (id: string, direction: -1 | 1) => {
     if (!managerReady) return;
-    const from = resolvedLayout.order.indexOf(id);
-    const next = moveBoardInLayout(resolvedLayout, from, from + direction);
+    const order = resolvedLayout.order;
+    const from = order.indexOf(id);
+    if (from === -1) return;
+    // Closed boards are hidden from the arrange list, so step over them.
+    const closedIds = new Set(closedProjects.map((project) => project.id));
+    let to = from + direction;
+    while (to >= 0 && to < order.length && closedIds.has(order[to])) to += direction;
+    if (to < 0 || to >= order.length) return;
+    const next = moveBoardInLayout(resolvedLayout, from, to);
     if (next === resolvedLayout) return;
     setLayout(next);
     void saveManagerLayout(next);
   };
+  const reopenBoard = (project: JanusProject) => {
+    if (!reopenProject(project.id)) return;
+    router.push(`/board/${project.id}`);
+  };
+  const promptClosed = (project: JanusProject) => {
+    setClosedPromptProject(project);
+  };
   const openProject = (id: string) => {
-    if (!projects.some((project) => project.id === id)) return;
+    const project = projects.find((entry) => entry.id === id);
+    if (!project) return;
+    if (project.closedAt) { promptClosed(project); return; }
     switchProject(id);
     router.push(`/board/${id}`);
+  };
+  const closeBoard = (project: JanusProject) => {
+    if (!closeProject(project.id)) return;
+    toast.show("Board closed", {
+      description: "Reopen it anytime from Closed boards.",
+      action: { label: "Undo", onPress: () => reopenProject(project.id) },
+    });
   };
   const create = () => {
     if (!newName.trim()) return;
@@ -110,15 +138,16 @@ export default function BoardManagerScreen() {
     } catch { toast.error("Could not import that file", { description: "Choose a Janus JSON backup." }); }
   };
   const askDelete = (project: JanusProject) => {
+    setDeleteTarget(project);
+  };
+  const deleteBoard = (project: JanusProject) => {
     if (!managerReady) return;
-    Alert.alert("Delete board?", `“${project.name}” and its tasks will be removed.`, [{ text: "Keep it", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => {
-      if (!removeProject(project.id)) { toast.error("Keep at least one board"); return; }
-      const nextPins = new Set(pinnedIds); nextPins.delete(project.id);
-      setPinnedIds(nextPins); void saveManagerPins(nextPins);
-      const nextLayout = removeBoardFromLayout(resolvedLayout, project.id);
-      setLayout(nextLayout); void saveManagerLayout(nextLayout);
-      toast.success("Board deleted");
-    } }]);
+    if (!removeProject(project.id)) { toast.error("Keep at least one board"); return; }
+    const nextPins = new Set(pinnedIds); nextPins.delete(project.id);
+    setPinnedIds(nextPins); void saveManagerPins(nextPins);
+    const nextLayout = removeBoardFromLayout(resolvedLayout, project.id);
+    setLayout(nextLayout); void saveManagerLayout(nextLayout);
+    toast.success("Board deleted");
   };
   const saveProject = (project: JanusProject) => {
     void exportWorkspace(project.id === currentProjectId ? { tasks, sections, boards } : project.workspace, project.name)
@@ -137,16 +166,29 @@ export default function BoardManagerScreen() {
 
   return <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
     <ThemeAtmosphere />
-    <BoardManagerContent projects={displayProjects} totalBoards={projects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onMore={() => setWorkspaceMenuOpen(true)} onOpen={openProject} onPin={togglePin} onMove={moveBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
+    <BoardManagerContent projects={displayProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onMore={() => setWorkspaceMenuOpen(true)} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
     <ReferenceMobileBottomNav active="boards" onNavigate={navigate} />
     <Sheet visible={showCreate} onClose={() => setShowCreate(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>New board</Text><Text style={{ color: theme.colors.mutedForeground, marginTop: 6 }}>Add sections and categories after creating the board.</Text><Input autoFocus value={newName} onChangeText={setNewName} placeholder="Board name" onSubmitEditing={create} style={{ marginTop: 12 }} /><Button label="Create board" onPress={create} disabled={!newName.trim()} style={{ marginTop: 14 }} /></Sheet>
     <OptionSheet visible={menuProject !== null} title={menuProject?.name ?? "Board actions"} options={menuProject ? [
-      { label: "Open board", icon: "arrow-forward-circle-outline", onPress: () => openProject(menuProject.id) },
+      ...(menuProject.closedAt
+        ? [{ label: "Reopen board", icon: "refresh-outline" as const, onPress: () => reopenBoard(menuProject) }]
+        : [
+          { label: "Open board", icon: "arrow-forward-circle-outline" as const, onPress: () => openProject(menuProject.id) },
+          { label: "Close board", icon: "archive-outline" as const, onPress: () => closeBoard(menuProject) },
+        ]),
       { label: "Rename", icon: "pencil-outline", onPress: () => setRenameTarget(menuProject) },
-      { label: "Duplicate", icon: "copy-outline", onPress: () => duplicate(menuProject) },
+      ...(menuProject.closedAt ? [] : [{ label: "Duplicate", icon: "copy-outline" as const, onPress: () => duplicate(menuProject) }]),
       { label: "Export JSON", icon: "share-outline", onPress: () => saveProject(menuProject) },
       { label: "Delete board", icon: "trash-outline", destructive: true, onPress: () => askDelete(menuProject) },
     ] : []} onClose={() => setMenuProject(null)} />
+    <OptionSheet visible={closedPromptProject !== null} title={closedPromptProject ? `“${closedPromptProject.name}” is closed` : "Board closed"} options={closedPromptProject ? [
+      { label: "Reopen board", icon: "refresh-outline" as const, onPress: () => reopenBoard(closedPromptProject) },
+      { label: "Keep it closed", icon: "close-outline" as const, onPress: () => undefined },
+    ] : []} onClose={() => setClosedPromptProject(null)} />
+    <OptionSheet visible={deleteTarget !== null} title={deleteTarget ? `Delete “${deleteTarget.name}”?` : "Delete board?"} options={deleteTarget ? [
+      { label: "Delete board", icon: "trash-outline" as const, destructive: true, onPress: () => deleteBoard(deleteTarget) },
+      { label: "Keep it", icon: "close-outline" as const, onPress: () => undefined },
+    ] : []} onClose={() => setDeleteTarget(null)} />
     <OptionSheet visible={workspaceMenuOpen} title="Workspace options" options={[
       { label: "New board", icon: "add-circle-outline", onPress: () => setShowCreate(true) },
       { label: "Import board", icon: "cloud-upload-outline", onPress: importBoard },

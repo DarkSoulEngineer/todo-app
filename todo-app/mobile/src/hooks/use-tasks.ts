@@ -138,6 +138,10 @@ export interface TasksApi {
   duplicateProject: (id: string) => string | null;
   renameProject: (id: string, name: string) => void;
   switchProject: (id: string) => void;
+  /** Marks a board closed without deleting it. Closed boards can be reopened. */
+  closeProject: (id: string) => boolean;
+  /** Reopens a closed board and makes it the active board. */
+  reopenProject: (id: string) => boolean;
   /** Removes a board with its data. False when it is the last remaining board. */
   removeProject: (id: string) => boolean;
 }
@@ -863,6 +867,59 @@ export function useTasks(): TasksApi {
     [applyRegistry, registryWithLiveWorkspace],
   );
 
+  /** Marks a board closed; the current board falls back to the next open one. */
+  const closeProject = useCallback(
+    (id: string) => {
+      const registry = registryWithLiveWorkspace();
+      if (!registry) return false;
+      const target = registry.projects.find((project) => project.id === id);
+      if (!target || target.closedAt) return false;
+      const timestamp = new Date().toISOString();
+      const projects = registry.projects.map((project) =>
+        project.id === id
+          ? { ...project, closedAt: timestamp, updatedAt: timestamp }
+          : project,
+      );
+      const wasCurrent = registry.currentId === id;
+      const fallback = projects.find((project) => !project.closedAt);
+      applyRegistry(
+        {
+          ...registry,
+          projects,
+          currentId: wasCurrent && fallback ? fallback.id : registry.currentId,
+        },
+        wasCurrent && fallback !== undefined,
+      );
+      return true;
+    },
+    [applyRegistry, registryWithLiveWorkspace],
+  );
+
+  /** Clears the closed flag and activates the board. */
+  const reopenProject = useCallback(
+    (id: string) => {
+      const registry = registryWithLiveWorkspace();
+      if (!registry) return false;
+      const target = registry.projects.find((project) => project.id === id);
+      if (!target || !target.closedAt) return false;
+      const timestamp = new Date().toISOString();
+      applyRegistry(
+        {
+          ...registry,
+          currentId: id,
+          projects: registry.projects.map((project) =>
+            project.id === id
+              ? { ...project, closedAt: undefined, updatedAt: timestamp }
+              : project,
+          ),
+        },
+        true,
+      );
+      return true;
+    },
+    [applyRegistry, registryWithLiveWorkspace],
+  );
+
   /** Removes a board and its data; refuses to remove the last remaining board. */
   const removeProject = useCallback(
     (id: string) => {
@@ -942,6 +999,8 @@ export function useTasks(): TasksApi {
       duplicateProject,
       renameProject,
       switchProject,
+      closeProject,
+      reopenProject,
       removeProject,
     }),
     [
@@ -998,6 +1057,8 @@ export function useTasks(): TasksApi {
       duplicateProject,
       renameProject,
       switchProject,
+      closeProject,
+      reopenProject,
       removeProject,
     ],
   );

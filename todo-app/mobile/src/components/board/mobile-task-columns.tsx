@@ -17,6 +17,7 @@ export interface MobileTaskColumnsProps {
   compact: boolean;
   showCheckboxes: boolean;
   showMoveArrows: boolean;
+  zoom: number;
   onToggleSelect: (id: string) => void;
   onShowSection: (section: BoardSection) => void;
   onTask: (task: Task) => void;
@@ -33,7 +34,7 @@ const UNSORTED = "__unsorted";
 
 export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const c = useMobileBoardColors();
-  const [zoom, setZoom] = useState(1);
+  const zoom = props.zoom;
   const [selectedId, setSelectedId] = useState<string>();
   const carousel = useRef<ComponentRef<typeof ScrollView>>(null);
   const columnWidth = (props.compact ? 260 : 288) * zoom;
@@ -94,18 +95,13 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
       {columns.map((section, index) => <View key={section.id} testID={`kanban-column-${section.id}`} style={[styles.column, { width: columnWidth, backgroundColor: c.backgroundAlt, borderColor: c.border }]}>{heading(section)}<ScrollView testID={`kanban-column-scroll-${section.id}`} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.cardScroll} contentContainerStyle={styles.cards}>{cards(section, index)}</ScrollView>{addCard(section)}</View>)}
       <Pressable accessibilityRole="button" accessibilityLabel="Add section" onPress={props.onAddSection} style={[styles.addSection, { width: columnWidth, borderColor: c.border }]}><Ionicons name="add" size={20} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground }}>Add section</Text></Pressable>
     </ScrollView>}
-    <View style={[styles.zoom, { borderColor: c.border, backgroundColor: c.card }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Zoom out" disabled={zoom <= 0.7} onPress={() => setZoom((value) => Math.max(0.7, Math.round((value - 0.1) * 10) / 10))} style={styles.zoomButton}><Ionicons name="remove" size={16} color={c.mutedForeground} /></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Reset board zoom" onPress={() => setZoom(1)} style={styles.zoomButton}><Text style={{ color: c.mutedForeground, fontSize: 11 }}>{Math.round(zoom * 100)}%</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Zoom in" disabled={zoom >= 1.3} onPress={() => setZoom((value) => Math.min(1.3, Math.round((value + 0.1) * 10) / 10))} style={styles.zoomButton}><Ionicons name="add" size={16} color={c.mutedForeground} /></Pressable>
-    </View>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, minHeight: 0 }, carousel: { flex: 1, minHeight: 0 }, columns: { padding: 10, paddingBottom: 68, gap: 10, alignItems: "flex-start" },
+  root: { flex: 1, minHeight: 0 }, carousel: { flex: 1, minHeight: 0 }, columns: { padding: 10, gap: 10, alignItems: "flex-start" },
   column: { maxHeight: "100%", minHeight: 220, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingTop: 5 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, count: { fontSize: 11, borderWidth: 1, borderRadius: 10, paddingHorizontal: 5, marginRight: 5 }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
   cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 7 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },
-  addSection: { borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }, zoom: { position: "absolute", bottom: 9, right: 12, flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, padding: 3 }, zoomButton: { minWidth: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  hiddenRail: { flexGrow: 0, maxHeight: 44 }, hiddenContent: { paddingHorizontal: 12, paddingVertical: 5, gap: 7 }, hiddenChip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderRadius: 8 }, tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { flex: 1, minHeight: 0, margin: 10, marginBottom: 68, paddingHorizontal: 8, borderWidth: 1, borderRadius: 12 },
+  addSection: { borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  hiddenRail: { flexGrow: 0, maxHeight: 44 }, hiddenContent: { paddingHorizontal: 12, paddingVertical: 5, gap: 7 }, hiddenChip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderRadius: 8 }, tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { flex: 1, minHeight: 0, margin: 10, paddingHorizontal: 8, borderWidth: 1, borderRadius: 12 },
 });

@@ -35,6 +35,8 @@ export interface JanusProject {
   name: string;
   createdAt: string;
   updatedAt: string;
+  /** ISO timestamp when the board was closed (archived); absent while open. */
+  closedAt?: string;
   workspace: Workspace;
 }
 
@@ -141,13 +143,21 @@ function sanitizeRegistry(raw: unknown): ProjectsState | null {
       name: candidate.name.trim(),
       createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : nowIso(),
       updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : nowIso(),
+      closedAt: typeof candidate.closedAt === "string" ? candidate.closedAt : undefined,
       workspace,
     });
   }
-  const currentId =
+  const requestedId =
     typeof value.currentId === "string" && projects.some((project) => project.id === value.currentId)
       ? value.currentId
       : projects[0].id;
+  const requested = projects.find((project) => project.id === requestedId);
+  // Closed boards stay in the registry but must never hydrate as the app's
+  // working board when an open one exists.
+  const currentId =
+    requested && !requested.closedAt
+      ? requestedId
+      : (projects.find((project) => !project.closedAt)?.id ?? requestedId);
   return { version: PROJECTS_VERSION, currentId, projects };
 }
 

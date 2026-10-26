@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import type { ReactNode } from "react";
 import { useTheme } from "@/providers/theme-provider";
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
@@ -24,13 +25,14 @@ export interface BulkSelectionToolbarProps {
   style?: StyleProp<ViewStyle>;
 }
 
-type ActionTone = "neutral" | "success" | "danger" | "primary";
+type ActionTone = "neutral" | "success" | "danger";
 
 /**
- * Compact task actions for a board's mobile selection state.
+ * Bulk task actions for a board's mobile selection state.
  *
- * The component only presents actions. Parents own selection and mutation state
- * through the callbacks, so it can be used with either the board or list view.
+ * Laid out like the ribbon's other tool strips: one group of 48dp tools per
+ * action family, a 9px caption underneath, and hairline separators between
+ * groups. Parents own selection and mutation state through the callbacks.
  */
 export function BulkSelectionToolbar({
   selectionMode = true,
@@ -60,147 +62,40 @@ export function BulkSelectionToolbar({
   const taskWord = count === 1 ? "task" : "tasks";
   const actionDisabled = disabled || !hasSelection;
 
+  const group = (label: string, children: ReactNode) => (
+    <View key={label} style={[styles.group, { borderColor: theme.colors.border }]}>
+      <View style={styles.groupTools}>{children}</View>
+      <Text numberOfLines={1} style={[styles.caption, { color: theme.colors.mutedForeground }]}>{label}</Text>
+    </View>
+  );
+
   return (
-    <View
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.tools}
+      keyboardShouldPersistTaps="handled"
       accessibilityRole="toolbar"
       accessibilityLabel="Bulk task actions"
-      style={[
-        styles.toolbar,
-        {
-          backgroundColor: theme.colors.cardElevated,
-          borderColor: theme.colors.border,
-          shadowColor: theme.colors.shadow,
-        },
-        style,
-      ]}
+      style={style}
     >
-      {onClose ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close selection mode"
-          disabled={disabled}
-          hitSlop={4}
-          onPress={onClose}
-          style={({ pressed }) => [
-            styles.closeButton,
-            { backgroundColor: theme.colors.secondary, opacity: disabled ? 0.45 : pressed ? 0.65 : 1 },
-          ]}
-        >
-          <Ionicons name="close" size={20} color={theme.colors.foreground} />
-        </Pressable>
-      ) : null}
-
-      <View
-        accessibilityLabel={`${count} selected ${taskWord}`}
-        style={styles.summary}
-      >
-        <View style={[styles.countBadge, { backgroundColor: theme.colors.primarySoft }]}>
-          <Text style={[styles.countText, { color: theme.colors.primary }]}>{count}</Text>
-        </View>
-        <Text style={[theme.type.caption, styles.summaryText, { color: theme.colors.foreground }]} numberOfLines={1}>
-          {taskWord} selected
-        </Text>
-      </View>
-
-      <ScrollView
-        horizontal
-        contentContainerStyle={styles.actions}
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {onSelectAll ? (
-          <ToolbarAction
-            icon={allSelected ? "checkmark-done-outline" : "checkbox-outline"}
-            label={allSelected ? "Clear all" : "Select all"}
-            accessibilityLabel={allSelected ? "Clear all selected tasks" : "Select all visible tasks"}
-            onPress={allSelected && clearSelection ? clearSelection : onSelectAll}
-            tone="primary"
-            disabled={disabled}
-            selected={allSelected}
-          />
-        ) : null}
-        {clearSelection && !allSelected ? (
-          <ToolbarAction
-            icon="close-circle-outline"
-            label="Clear"
-            accessibilityLabel="Clear selected tasks"
-            onPress={clearSelection}
-            tone="neutral"
-            disabled={disabled || !hasSelection}
-          />
-        ) : null}
-        {onComplete ? (
-          <ToolbarAction
-            icon="checkmark-done-outline"
-            label="Complete"
-            accessibilityLabel={`Complete ${count} selected ${taskWord}`}
-            onPress={onComplete}
-            tone="success"
-            disabled={actionDisabled}
-          />
-        ) : null}
-        {onCancel ? (
-          <ToolbarAction
-            icon="remove-circle-outline"
-            label="Cancel"
-            accessibilityLabel={`Cancel ${count} selected ${taskWord}`}
-            onPress={onCancel}
-            tone="danger"
-            disabled={actionDisabled}
-          />
-        ) : null}
-        {onRestore ? (
-          <ToolbarAction
-            icon="refresh-outline"
-            label="Restore"
-            accessibilityLabel={`Restore ${count} selected ${taskWord}`}
-            onPress={onRestore}
-            tone="success"
-            disabled={actionDisabled}
-          />
-        ) : null}
-        {onMore ? (
-          <ToolbarAction
-            icon="ellipsis-horizontal"
-            label="More"
-            accessibilityLabel="More actions for selected tasks"
-            onPress={onMore}
-            tone="neutral"
-            disabled={disabled}
-          />
-        ) : null}
-        {onMove ? (
-          <ToolbarAction
-            icon="arrow-forward-outline"
-            label="Move"
-            accessibilityLabel="Move selected tasks"
-            onPress={onMove}
-            tone="neutral"
-            disabled={actionDisabled}
-          />
-        ) : null}
-        {onPriority ? (
-          <ToolbarAction
-            icon="flag-outline"
-            label="Priority"
-            accessibilityLabel="Set priority for selected tasks"
-            onPress={onPriority}
-            tone="neutral"
-            disabled={actionDisabled}
-          />
-        ) : null}
-        {onDelete ? (
-          <ToolbarAction
-            icon="trash-outline"
-            label="Delete"
-            accessibilityLabel={`Delete ${count} selected ${taskWord}`}
-            onPress={onDelete}
-            tone="danger"
-            disabled={actionDisabled}
-          />
-        ) : null}
-      </ScrollView>
-    </View>
+      {onClose || onSelectAll || clearSelection ? group(`${count} SELECTED`, <>
+        {onClose ? <ToolButton icon="close" label="Done" accessibilityLabel="Exit selection mode" onPress={onClose} disabled={disabled} /> : null}
+        {onSelectAll ? <ToolButton icon={allSelected ? "checkmark-done-outline" : "checkbox-outline"} label={allSelected ? "Clear all" : "Select all"} accessibilityLabel={allSelected ? "Clear all selected tasks" : "Select all visible tasks"} onPress={allSelected && clearSelection ? clearSelection : onSelectAll} selected={allSelected} disabled={disabled} /> : null}
+        {clearSelection ? <ToolButton icon="close-circle-outline" label="Clear" accessibilityLabel="Clear selected tasks" onPress={clearSelection} disabled={actionDisabled} /> : null}
+      </>) : null}
+      {onComplete || onCancel || onRestore ? group("STATUS", <>
+        {onComplete ? <ToolButton icon="checkmark-done-outline" label="Complete" accessibilityLabel={`Complete ${count} selected ${taskWord}`} onPress={onComplete} tone="success" disabled={actionDisabled} /> : null}
+        {onCancel ? <ToolButton icon="remove-circle-outline" label="Cancel" accessibilityLabel={`Cancel ${count} selected ${taskWord}`} onPress={onCancel} tone="danger" disabled={actionDisabled} /> : null}
+        {onRestore ? <ToolButton icon="refresh-outline" label="Restore" accessibilityLabel={`Restore ${count} selected ${taskWord}`} onPress={onRestore} tone="success" disabled={actionDisabled} /> : null}
+      </>) : null}
+      {onMore || onMove || onPriority || onDelete ? group("ORGANIZE", <>
+        {onMore ? <ToolButton icon="ellipsis-horizontal" label="More" accessibilityLabel="More actions for selected tasks" onPress={onMore} disabled={disabled} /> : null}
+        {onMove ? <ToolButton icon="arrow-forward-outline" label="Move" accessibilityLabel="Move selected tasks" onPress={onMove} disabled={actionDisabled} /> : null}
+        {onPriority ? <ToolButton icon="flag-outline" label="Priority" accessibilityLabel="Set priority for selected tasks" onPress={onPriority} disabled={actionDisabled} /> : null}
+        {onDelete ? <ToolButton icon="trash-outline" label="Delete" accessibilityLabel={`Delete ${count} selected ${taskWord}`} onPress={onDelete} tone="danger" disabled={actionDisabled} /> : null}
+      </>) : null}
+    </ScrollView>
   );
 }
 
@@ -214,12 +109,12 @@ export function BulkToolbar({ allVisibleSelected, allSelected, ...props }: BulkT
   return <BulkSelectionToolbar {...props} allSelected={allVisibleSelected ?? allSelected} />;
 }
 
-function ToolbarAction({
+function ToolButton({
   icon,
   label,
   accessibilityLabel,
   onPress,
-  tone,
+  tone = "neutral",
   disabled = false,
   selected = false,
 }: {
@@ -227,17 +122,18 @@ function ToolbarAction({
   label: string;
   accessibilityLabel: string;
   onPress: () => void;
-  tone: ActionTone;
+  tone?: ActionTone;
   disabled?: boolean;
   selected?: boolean;
 }) {
   const { theme } = useTheme();
-  const palette = {
-    neutral: { backgroundColor: theme.colors.secondary, color: theme.colors.secondaryForeground },
-    primary: { backgroundColor: theme.colors.primarySoft, color: theme.colors.accentForeground },
-    success: { backgroundColor: theme.colors.successSoft, color: theme.colors.success },
-    danger: { backgroundColor: theme.colors.destructiveSoft, color: theme.colors.destructive },
-  }[tone];
+  const color = selected
+    ? theme.colors.primary
+    : tone === "danger"
+      ? theme.colors.destructive
+      : tone === "success"
+        ? theme.colors.success
+        : theme.colors.mutedForeground;
 
   return (
     <Pressable
@@ -246,84 +142,44 @@ function ToolbarAction({
       accessibilityState={{ disabled, selected }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.action,
-        {
-          backgroundColor: palette.backgroundColor,
-          borderColor: theme.colors.border,
-          opacity: disabled ? 0.42 : pressed ? 0.68 : 1,
-        },
-      ]}
+      style={[styles.tool, { opacity: disabled ? 0.35 : 1 }]}
     >
-      <Ionicons name={icon} size={17} color={palette.color} />
-      <Text style={[theme.type.micro, styles.actionText, { color: palette.color }]}>{label}</Text>
+      <Ionicons name={icon} size={19} color={color} />
+      <Text numberOfLines={2} style={[styles.toolText, { color }]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  toolbar: {
-    minHeight: 60,
-    width: "100%",
+  tools: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-  },
-  summary: {
-    minWidth: 92,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-  countBadge: {
-    minWidth: 28,
-    height: 28,
-    paddingHorizontal: 7,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 999,
-  },
-  countText: {
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: "700",
-  },
-  summaryText: {
-    flexShrink: 1,
-  },
-  actions: {
-    flexGrow: 1,
-    alignItems: "center",
-    gap: 6,
-    paddingRight: 2,
-  },
-  action: {
-    minWidth: 44,
-    minHeight: 44,
     paddingHorizontal: 10,
+    paddingTop: 5,
+    paddingBottom: 4,
+  },
+  group: {
+    borderRightWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 5,
+    gap: 3,
+  },
+  groupTools: {
     flexDirection: "row",
+  },
+  tool: {
+    minWidth: 65,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
+    gap: 3,
+    paddingHorizontal: 6,
   },
-  actionText: {
-    fontWeight: "600",
+  toolText: {
+    fontSize: 10,
+    textAlign: "center",
+  },
+  caption: {
+    textAlign: "center",
+    fontSize: 9,
+    letterSpacing: 0.5,
   },
 });
