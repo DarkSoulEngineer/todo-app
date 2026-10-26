@@ -160,14 +160,17 @@ export function SurfaceCard({ children, style }: { children: React.ReactNode; st
   return <View style={[card, style]}>{children}</View>;
 }
 
-export function ScreenHeader({ title, subtitle, onBack, onSearch, onNotifications, onMore }: { title: string; subtitle?: string; onBack?: () => void; onSearch?: () => void; onNotifications?: () => void; onMore?: () => void }) {
+export function ScreenHeader({ title, subtitle, onBack, onSearch, onNotifications, onMore, showThemeToggle = true }: { title: string; subtitle?: string; onBack?: () => void; onSearch?: () => void; onNotifications?: () => void; onMore?: () => void; showThemeToggle?: boolean }) {
   const { colors, type, toggle, scheme } = useReferenceTheme();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.screenHeader, { backgroundColor: colors.surfaceContainerLowest, borderBottomColor: colors.outlineVariant, paddingTop: insets.top + 8 }]}>
       {onBack ? <IconButton icon="chevron-back" label="Go back" onPress={onBack} /> : <View style={{ width: 8 }} />}
-      <View style={styles.headerCopy}><Text style={[type.caption, { color: colors.muted }]}>{subtitle ?? "Workspace"}</Text><Text style={[type.title, { fontSize: 19 }]} numberOfLines={1}>{title}</Text></View>
-      <View style={styles.headerActions}>{onSearch ? <IconButton icon="search-outline" label="Search" onPress={onSearch} /> : null}{onNotifications ? <IconButton icon="notifications-outline" label="Notifications" onPress={onNotifications} /> : null}<IconButton icon={scheme === "dark" ? "sunny-outline" : "moon-outline"} label={scheme === "dark" ? "Use light theme" : "Use dark theme"} onPress={toggle} />{onMore ? <IconButton icon="ellipsis-horizontal" label="More options" onPress={onMore} /> : null}</View>
+      <View style={styles.headerCopy}>
+  {subtitle ? <Text style={[type.caption, { color: colors.muted }]}>{subtitle}</Text> : null}
+  <Text style={[type.title, { fontSize: 19 }]} numberOfLines={1}>{title}</Text>
+</View>
+      <View style={styles.headerActions}>{onSearch ? <IconButton icon="search-outline" label="Search" onPress={onSearch} /> : null}{onNotifications ? <IconButton icon="notifications-outline" label="Notifications" onPress={onNotifications} /> : null}{showThemeToggle ? <IconButton icon={scheme === "dark" ? "sunny-outline" : "moon-outline"} label={scheme === "dark" ? "Use light theme" : "Use dark theme"} onPress={toggle} /> : null}{onMore ? <IconButton icon="ellipsis-horizontal" label="More options" onPress={onMore} /> : null}</View>
     </View>
   );
 }

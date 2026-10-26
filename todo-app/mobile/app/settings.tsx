@@ -80,15 +80,12 @@ export default function SettingsRoute() {
   return (
     <View style={styles.root}>
       <ThemeAtmosphere />
-      <ScreenHeader title="Settings" subtitle={api.currentProjectName || "Workspace"} onBack={() => router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/")} />
+      <ScreenHeader title="Settings" showThemeToggle={false} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 112 }]}> 
-        <View style={styles.headingRow}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={type.title}>Preferences &amp; data</Text>
-            <Text style={[type.body, { color: colors.muted, marginTop: 3 }]}>Manage this device and the board you are viewing.</Text>
-          </View>
-          <View style={styles.headingIcon}><Ionicons name="settings-outline" size={22} color={colors.primary} /></View>
-        </View>
+
+
+
+
 
         <SurfaceCard style={styles.sectionCard}>
           <View style={styles.sectionHeader}>

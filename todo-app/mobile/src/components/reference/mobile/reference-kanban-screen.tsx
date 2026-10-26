@@ -125,7 +125,7 @@ export function ReferenceKanbanScreen({
     <View style={styles.root}>
       <ThemeAtmosphere />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 112 }]}> 
-        <ScreenHeader title={title} subtitle={subtitle} onSearch={() => { searchRef.current?.focus(); onSearch?.(); }} />
+        <ScreenHeader title={title} onSearch={() => { searchRef.current?.focus(); onSearch?.(); }} showThemeToggle={false} />
         <View style={styles.metricStrip}>
           {sprintLabel ? <Pill label={sprintLabel} tone="success" /> : <View />}
           <View style={styles.metricPill}>

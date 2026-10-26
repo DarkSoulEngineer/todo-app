@@ -80,7 +80,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
   return (
     <View style={styles.root}>
       <ThemeAtmosphere />
-      <ScreenHeader title="My tasks" subtitle={boardName ?? "Workspace"} onSearch={() => searchRef.current?.focus()} />
+      <ScreenHeader title="My tasks" onSearch={() => searchRef.current?.focus()} showThemeToggle={false} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 112 }]}> 
         <View style={styles.searchRow}><View style={styles.searchBox}><Ionicons name="search-outline" size={18} color={colors.muted} /><TextInput ref={searchRef} value={query} onChangeText={setQuery} placeholder="Search tasks, tags or people" placeholderTextColor={colors.muted} accessibilityLabel="Search my tasks" style={[type.body, styles.searchInput]} />{query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear task search" onPress={() => setQuery("")} style={styles.clearSearch}><Ionicons name="close-circle" size={18} color={colors.muted} /></Pressable> : null}</View><Pressable accessibilityRole="switch" aria-checked={assignedOnly} accessibilityState={{ checked: assignedOnly }} accessibilityLabel="Show assigned tasks only" onPress={() => setAssignedOnly((current) => !current)} style={[styles.assignedButton, assignedOnly && styles.assignedButtonActive]}><Ionicons name="person-outline" size={16} color={assignedOnly ? colors.primary : colors.muted} /><Text style={[type.caption, { color: assignedOnly ? colors.primary : colors.muted, fontWeight: "700" }]}>Assigned</Text></Pressable></View>
 

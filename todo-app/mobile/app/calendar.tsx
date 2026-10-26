@@ -55,7 +55,7 @@ export default function CalendarRoute() {
   return (
     <View style={styles.root}>
       <ThemeAtmosphere />
-      <ScreenHeader title="Calendar" subtitle={api.currentProjectName || "Workspace"} onBack={() => router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/")} />
+      <ScreenHeader title="Calendar" showThemeToggle={false} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 112 }]}> 
         <View style={styles.headingRow}>
           <View style={{ flex: 1 }}>

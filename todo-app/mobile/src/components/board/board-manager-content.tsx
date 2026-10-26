@@ -44,9 +44,7 @@ export function BoardManagerContent(props: Props) {
   return <>
     <View style={[styles.header, { backgroundColor: c.card, borderBottomColor: c.border, paddingTop: insets.top + 8 }]}>
       <View style={styles.identity}><Text style={[styles.brand, { color: c.foreground }]}>Janus</Text><Text style={[styles.subtitle, { color: c.mutedForeground }]}>Focused task manager</Text></View>
-      <View style={[styles.themeSwitch, { backgroundColor: c.secondary, borderColor: c.border }]}>
-        {(["light", "dark"] as const).map((scheme) => <Pressable key={scheme} accessibilityRole="button" accessibilityLabel={`Use ${scheme} theme`} aria-pressed={theme.scheme === scheme} accessibilityState={{ selected: theme.scheme === scheme }} onPress={() => setPreference(scheme)} style={[styles.themeButton, theme.scheme === scheme && { backgroundColor: c.cardElevated }]}><Ionicons name={scheme === "light" ? "sunny-outline" : "moon"} size={18} color={theme.scheme === scheme ? scheme === "light" ? "#D97706" : c.primary : c.mutedForeground} /></Pressable>)}
-      </View>
+
     </View>
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110, paddingLeft: Math.max(insets.left, 18), paddingRight: Math.max(insets.right, 18) }]}>
       <Text style={[styles.breadcrumb, { color: c.primary }]}>HOME <Text style={{ color: c.borderStrong }}>/</Text> BOARDS</Text>
