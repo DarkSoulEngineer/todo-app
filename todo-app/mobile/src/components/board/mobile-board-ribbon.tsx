@@ -7,6 +7,12 @@ import { useMobileBoardColors } from "./mobile-board-colors";
 
 const CONTROL_SIZE = 44;
 
+const TABS: { value: "home" | "options" | "filters"; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: "home", label: "Home", icon: "home-outline" },
+  { value: "options", label: "Options", icon: "options-outline" },
+  { value: "filters", label: "Filters", icon: "funnel-outline" },
+];
+
 interface Props {
   mode: ViewMode;
   onMode: (mode: ViewMode) => void;
@@ -29,17 +35,18 @@ interface Props {
   focused: boolean;
   onFocused: () => void;
   children: ReactNode;
+  filters: ReactNode;
 }
 
 export function MobileBoardRibbon(props: Props) {
   const c = useMobileBoardColors();
   const insets = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
-  const [tab, setTab] = useState<"home" | "options">("home");
+  const { fontScale, width } = useWindowDimensions();
+  const [tab, setTab] = useState<"home" | "options" | "filters">("home");
   const [searchOpen, setSearchOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [expanded, setExpanded] = useState(true);
-  const iconOnlyBoards = fontScale > 1.2;
+  const iconOnlyBoards = fontScale > 1.2 || width < 380;
   const searchVisible = searchOpen || props.query.length > 0;
   const hideAfterUse = () => { if (!pinned) setExpanded(false); };
   const icon = (name: keyof typeof Ionicons.glyphMap, label: string, onPress: () => void, selected = false) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} aria-pressed={selected} onPress={onPress} style={styles.icon}><View style={[styles.iconFace, selected && { backgroundColor: c.primary }]}>{label === "Board view" ? <View style={styles.columnsMark}>{[17, 12, 15].map((height, index) => <View key={index} style={[styles.columnMark, { height, borderColor: selected ? c.primaryForeground : c.mutedForeground }]} />)}</View> : <Ionicons name={name} size={19} color={selected ? c.primaryForeground : c.mutedForeground} />}</View></Pressable>;
@@ -49,6 +56,7 @@ export function MobileBoardRibbon(props: Props) {
     {icon("list-outline", "List view", () => { props.onMode("list"); hideAfterUse(); }, props.mode === "list")}
     {icon("albums-outline", "Board view", () => { props.onMode("board"); hideAfterUse(); }, props.mode === "board")}
     {icon("calendar-outline", "Calendar view", () => { props.onMode("calendar"); hideAfterUse(); }, props.mode === "calendar")}
+    {icon("stats-chart-outline", "Insights view", () => { props.onMode("insights"); hideAfterUse(); }, props.mode === "insights")}
   </>);
 
   return props.maximized ? <View style={{ height: insets.top }} /> : <View style={{ paddingTop: insets.top, backgroundColor: c.card, borderTopWidth: 1, borderTopColor: c.primary, borderBottomWidth: 1, borderBottomColor: c.border }}>
@@ -60,7 +68,7 @@ export function MobileBoardRibbon(props: Props) {
     </View>
     {searchVisible ? <View style={styles.searchRow}><View style={[styles.search, { borderColor: c.borderStrong, backgroundColor: c.input }]}><Ionicons name="search-outline" size={16} color={c.mutedForeground} /><TextInput accessibilityLabel="Filter tasks, labels, assignees" value={props.query} onChangeText={props.onQuery} placeholder="Search tasks…" placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }]} />{props.query ? icon("close", "Clear search", () => props.onQuery("")) : null}</View></View> : null}
     <View style={[styles.tabRow, { borderColor: c.border }]}>
-      {(["home", "options"] as const).map((value) => <Pressable key={value} accessibilityRole="tab" accessibilityLabel={value === "home" ? "Home tools" : "Options tools"} aria-selected={tab === value} onPress={() => { setTab(value); setExpanded(true); }} style={[styles.tab, { borderBottomColor: tab === value ? c.primary : "transparent" }]}><Ionicons name={value === "home" ? "home-outline" : "filter-outline"} size={15} color={tab === value ? c.foreground : c.mutedForeground} /><Text style={{ color: tab === value ? c.foreground : c.mutedForeground, fontSize: 13 }}>{value === "home" ? "Home" : "Options"}</Text></Pressable>)}
+      {TABS.map((item) => <Pressable key={item.value} accessibilityRole="tab" accessibilityLabel={`${item.label} tools`} aria-selected={tab === item.value} onPress={() => { setTab(item.value); setExpanded(true); }} style={[styles.tab, { borderBottomColor: tab === item.value ? c.primary : "transparent" }]}><Ionicons name={item.icon} size={15} color={tab === item.value ? c.foreground : c.mutedForeground} /><Text style={{ color: tab === item.value ? c.foreground : c.mutedForeground, fontSize: 13 }}>{item.label}</Text></Pressable>)}
       <View style={styles.spacer} />
       <Pressable accessibilityRole="switch" accessibilityLabel={pinned ? "Unpin ribbon" : "Pin ribbon open"} accessibilityHint={pinned ? "The ribbon will auto-hide after you pick an option." : "The ribbon will stay open after you pick an option."} accessibilityState={{ checked: pinned }} onPress={() => { if (pinned) { setPinned(false); setExpanded(false); } else { setPinned(true); setExpanded(true); } }} style={styles.tabAction}>{pinned ? <MaterialCommunityIcons name="pin" size={18} color={c.primary} /> : <MaterialCommunityIcons name="pin-off-outline" size={18} color={c.mutedForeground} />}</Pressable>
     </View>
@@ -68,7 +76,7 @@ export function MobileBoardRibbon(props: Props) {
       <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("add", "New card", props.onNewTask)}{tool("add-outline", "Sample", props.onSample)}{props.mode === "board" ? tool("add-circle-outline", "Section", props.onAddSection) : null}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>CREATE</Text></View>
       <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("contract-outline", "Compact cards", props.onCompact, props.compact, props.mode !== "board")}{tool("reader-outline", "Focus column", props.onFocused, props.focused, props.mode !== "board")}{tool("swap-horizontal-outline", "Move arrows", props.onShowMoveArrows, props.showMoveArrows, props.mode !== "board")}{tool("checkbox-outline", "Show checkbox", props.onShowCheckboxes, props.showCheckboxes, props.mode !== "board")}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DISPLAY</Text></View>
       <View style={styles.toolGroup}><View style={styles.toolButtons}>{tool("checkmark-done-outline", "Clear done", props.onClear, false, props.completedCount === 0)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>TIDY UP</Text></View>
-    </ScrollView> : <View style={styles.options}><View style={styles.insightsTool}>{tool("stats-chart-outline", "Insights view", () => props.onMode("insights"), props.mode === "insights")}</View>{props.children}</View>) : null}
+    </ScrollView> : tab === "filters" ? props.filters : props.children) : null}
   </View>;
 }
 
@@ -83,8 +91,7 @@ const styles = StyleSheet.create({
   iconFace: { width: 36, height: 36, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   columnsMark: { flexDirection: "row", gap: 2, height: 17, alignItems: "flex-start" },
   columnMark: { width: 5, borderWidth: 1, borderRadius: 1 },
-  insightsTool: { alignSelf: "flex-start" },
   searchRow: { paddingHorizontal: 12, paddingBottom: 12 }, search: { width: "100%", minHeight: 48, borderWidth: 1, borderRadius: 9, paddingLeft: 12, flexDirection: "row", alignItems: "center", gap: 9 }, input: { flex: 1, minWidth: 0, minHeight: 48, fontSize: 14 },
-  tabRow: { flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, gap: 6 }, tab: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 10, borderBottomWidth: 1 }, tabAction: { width: CONTROL_SIZE, height: CONTROL_SIZE, alignItems: "center", justifyContent: "center", borderRadius: 7 },
-  tools: { flexDirection: "row", paddingHorizontal: 10, paddingBottom: 4, paddingTop: 5 }, toolGroup: { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 5, gap: 3 }, toolButtons: { flexDirection: "row" }, tool: { minWidth: 65, minHeight: 45, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 6 }, toolText: { fontSize: 10 }, caption: { textAlign: "center", fontSize: 9, letterSpacing: 0.5 }, options: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  tabRow: { flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, gap: 4 }, tab: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 8, borderBottomWidth: 1 }, tabAction: { width: CONTROL_SIZE, height: CONTROL_SIZE, alignItems: "center", justifyContent: "center", borderRadius: 7 },
+  tools: { flexDirection: "row", paddingHorizontal: 10, paddingBottom: 4, paddingTop: 5 }, toolGroup: { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 5, gap: 3 }, toolButtons: { flexDirection: "row" }, tool: { minWidth: 65, minHeight: 48, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 6 }, toolText: { fontSize: 10 }, caption: { textAlign: "center", fontSize: 9, letterSpacing: 0.5 },
 });
