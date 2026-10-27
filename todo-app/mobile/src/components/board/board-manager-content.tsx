@@ -133,7 +133,7 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
   const { theme } = useTheme();
   const c = theme.colors;
   // Overdue is a subset of open tasks: do not count it twice in the donut.
-  const slices = [{ label: "Completed", value: metrics.done, color: c.success }, { label: "Overdue", value: metrics.overdue, color: c.destructive }, { label: "Open (not overdue)", value: metrics.open - metrics.overdue, color: c.info }, { label: "Canceled", value: metrics.canceled, color: c.mutedForeground }];
+  const slices = [{ label: "Completed", value: metrics.done, color: c.success }, { label: "Overdue", value: metrics.overdue, color: c.destructive }, { label: "Open (not overdue)", value: metrics.open - metrics.overdue, color: c.info }, { label: "Canceled", value: metrics.canceled, color: c.primary }];
   const circumference = 2 * Math.PI * 48;
   const strokeWidth = 11;
   const segmentCount = slices.filter((slice) => slice.value > 0).length;
@@ -158,7 +158,21 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
         <View style={styles.donutLabel}><Text style={[styles.donutValue, { color: c.foreground }]}>{metrics.total}</Text><Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 5 }}>TASKS</Text></View>
       </View>
       <View style={styles.statsTotal}><View style={{ flexShrink: 1 }}><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={[styles.boardCount, { color: c.mutedForeground }]}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>
-        <View style={[styles.legend, { borderColor: c.border }]}>{slices.map((slice) => <View key={slice.label} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: slice.color }]} /><Text style={[styles.legendLabel, { color: c.secondaryForeground }]}>{slice.label}</Text><Text style={[styles.legendValue, { color: c.foreground }]}>{slice.value}</Text><Text style={[styles.legendPercent, { color: c.mutedForeground }]}>{metrics.total ? Math.round(slice.value / metrics.total * 100) : 0}%</Text></View>)}</View>
+        <View style={[styles.legend, { borderColor: c.border }]}>{slices.map((slice) => {
+          const share = metrics.total ? Math.max(0, Math.min(1, slice.value / metrics.total)) : 0;
+          const percent = Math.round(share * 100);
+          return <View key={slice.label} accessible accessibilityRole="progressbar" accessibilityLabel={slice.label} accessibilityValue={{ min: 0, max: 100, now: percent, text: `${slice.value} tasks, ${percent}%` }} style={styles.legendRow}>
+            <View style={styles.legendMeta}>
+              <View style={[styles.legendDot, { backgroundColor: slice.color }]} />
+              <Text style={[styles.legendLabel, { color: c.secondaryForeground }]}>{slice.label}</Text>
+              <Text style={[styles.legendValue, { color: slice.color }]}>{slice.value}</Text>
+              <Text style={[styles.legendPercent, { color: slice.color }]}>{percent}%</Text>
+            </View>
+            <View style={[styles.legendTrack, { backgroundColor: `${slice.color}18` }]}>
+              <View style={[styles.legendFill, { width: `${share * 100}%`, backgroundColor: slice.color }]} />
+            </View>
+          </View>;
+        })}</View>
       </View>
     </View>
   </View>;
@@ -187,9 +201,12 @@ const styles = StyleSheet.create({
   donutLabel: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" },
   donutValue: { fontSize: 38, fontWeight: "700", fontVariant: ["tabular-nums"] },
   legend: { gap: 16, alignSelf: "stretch", marginTop: 20, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth },
-  legendRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  legendRow: { gap: 8 },
+  legendMeta: { flexDirection: "row", alignItems: "center", gap: 10 },
+  legendTrack: { height: 9, borderRadius: 6, overflow: "hidden" },
+  legendFill: { height: "100%", borderRadius: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendLabel: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 19 },
-  legendValue: { fontSize: 16, textAlign: "right", fontVariant: ["tabular-nums"] },
-  legendPercent: { width: 38, textAlign: "right", fontSize: 12, fontVariant: ["tabular-nums"] },
+  legendValue: { fontSize: 16, fontWeight: "700", textAlign: "right", fontVariant: ["tabular-nums"] },
+  legendPercent: { width: 38, textAlign: "right", fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
 });

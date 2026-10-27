@@ -127,7 +127,7 @@ export function activeProject(state: ProjectsState): JanusProject {
 function sanitizeRegistry(raw: unknown): ProjectsState | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Partial<ProjectsState>;
-  if (!Array.isArray(value.projects) || value.projects.length === 0) return null;
+  if (!Array.isArray(value.projects)) return null;
   const projects: JanusProject[] = [];
   const seenIds = new Set<string>();
   for (const entry of value.projects) {
@@ -154,6 +154,9 @@ function sanitizeRegistry(raw: unknown): ProjectsState | null {
       workspace,
     });
   }
+  if (projects.length === 0) {
+    return { version: PROJECTS_VERSION, currentId: "", projects: [] };
+  }
   const requestedId =
     typeof value.currentId === "string" && projects.some((project) => project.id === value.currentId)
       ? value.currentId
@@ -173,7 +176,7 @@ function sanitizeRegistry(raw: unknown): ProjectsState | null {
  * 1. A valid current registry.
  * 2. A valid registry from an older release.
  * 3. Older single-workspace migration (wrapped into "My board").
- * 3. A fresh empty starter project.
+ * 4. A fresh empty registry.
  */
 export async function loadProjects(): Promise<ProjectsState> {
   try {
@@ -197,39 +200,47 @@ export async function loadProjects(): Promise<ProjectsState> {
   }
 
   const { workspace, hadData } = await loadWorkspace();
-  const migrated: JanusProject = {
-    id: makeId(),
-    name: DEFAULT_PROJECT_NAME,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    workspace,
-  };
-  const registry: ProjectsState = {
-    version: PROJECTS_VERSION,
-    currentId: migrated.id,
-    projects: [migrated],
-  };
-
   if (hadData) {
+    const migrated: JanusProject = {
+      id: makeId(),
+      name: DEFAULT_PROJECT_NAME,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+      workspace,
+    };
+    const registry: ProjectsState = {
+      version: PROJECTS_VERSION,
+      currentId: migrated.id,
+      projects: [migrated],
+    };
+
     try {
       const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY) ?? await AsyncStorage.getItem(STORAGE_KEY);
       if (legacy) await AsyncStorage.setItem(LEGACY_BACKUP_KEY, legacy);
     } catch {
       // No room for a backup: the legacy key itself is still the fallback.
     }
+
+    // Persist first, then retire the legacy key.
+    if (await saveProjects(registry)) {
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
+        await AsyncStorage.removeItem(LEGACY_PROJECTS_STORAGE_KEY);
+        await AsyncStorage.removeItem(LEGACY_BACKUP_KEY);
+      } catch {
+        // Storage unavailable: the registry wins on the next load anyway.
+      }
+    }
+    return registry;
   }
 
-  // Persist first, then retire the legacy key.
-  if (await saveProjects(registry)) {
-    try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
-      await AsyncStorage.removeItem(LEGACY_PROJECTS_STORAGE_KEY);
-      await AsyncStorage.removeItem(LEGACY_BACKUP_KEY);
-    } catch {
-      // Storage unavailable: the registry wins on the next load anyway.
-    }
-  }
+  const registry: ProjectsState = {
+    version: PROJECTS_VERSION,
+    currentId: "",
+    projects: [],
+  };
+  await saveProjects(registry);
   return registry;
 }
 

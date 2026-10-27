@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
+import { WelcomeScreen } from "@/components/setup/welcome-screen";
 import { useTasksContext } from "@/providers/tasks-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { useToast } from "@/providers/toast-provider";
@@ -77,6 +78,10 @@ export default function BoardManagerScreen() {
   useEffect(() => {
     if (managerReady && activePins.size !== pinnedIds.size) void saveManagerPins(activePins);
   }, [activePins, managerReady, pinnedIds.size]);
+
+  if (!isLoading && projects.length === 0) {
+    return <WelcomeScreen />;
+  }
 
   const togglePin = (id: string) => {
     if (!managerReady) return;

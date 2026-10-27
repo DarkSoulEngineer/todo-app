@@ -45,7 +45,7 @@ export function MobileBoardBottomNav({ mode, onMode, blurTarget }: MobileBoardBo
               onPress={() => onMode(tab.key)}
               style={({ pressed }) => [styles.item, { opacity: pressed ? 0.7 : 1 }]}
             >
-              <View style={[styles.icon, selected && styles.itemSelected]}>
+              <View style={styles.icon}>
                 {tab.customIcon === "board" ? (
                   <View style={styles.columnsMark}>
                     {[17, 12, 15].map((height, index) => (
@@ -112,9 +112,7 @@ function createStyles(colors: ReferenceColors) {
       alignItems: "center",
       justifyContent: "center",
     },
-    itemSelected: {
-      backgroundColor: colors.primaryFixed,
-    },
+    itemSelected: {},
     columnsMark: {
       flexDirection: "row",
       gap: 2,

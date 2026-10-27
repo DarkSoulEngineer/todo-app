@@ -412,7 +412,6 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, onA
   const { theme } = useTheme();
   const { calendarDefaultView, calendarWeekStart } = usePreferences();
   const [calendarMode, setCalendarMode] = useState<CalendarMode>(calendarDefaultView);
-  const unscheduled = tasks.filter((task) => !task.dueAt);
   const addForDay = (day: Date) => { const due = new Date(day); due.setHours(9, 0, 0, 0); onAddTask(due.toISOString()); };
   return <View>
     <CalendarPanel
@@ -434,10 +433,6 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, onA
       <View style={{ borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, backgroundColor: theme.colors.card, padding: 13 }}>
         <Button variant="soft" label={`Add for ${selectedDay ? format(selectedDay, "MMM d") : "today"}`} onPress={() => addForDay(selectedDay ?? now)}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>
       </View>
-    </View>
-    <View style={{ marginTop: 12 }}>
-      <SectionHeading title="Unscheduled" subtitle={unscheduled.length ? "Long press a task to choose a day." : "Every task has a due date."} right={<Text style={{ color: theme.colors.mutedForeground, fontSize: 12, fontWeight: "700" }}>{unscheduled.length}</Text>} style={{ marginBottom: 8 }} />
-      {unscheduled.length ? <View style={{ borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, borderStyle: "dashed", backgroundColor: theme.colors.backgroundAlt, padding: 13 }}>{unscheduled.slice(0, 4).map((task) => <Pressable key={task.id} onPress={() => onTask(task)} onLongPress={() => onTaskAction(task)} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border }}><View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: task.canceled ? theme.colors.mutedForeground : task.completed ? theme.colors.success : deriveStatus(task, now) === "overdue" ? theme.colors.destructive : task.priority === "high" ? theme.colors.warning : theme.colors.primary }} /><Text style={{ flex: 1, color: theme.colors.foreground, fontSize: 13, fontWeight: "600" }} numberOfLines={1}>{task.title}</Text><Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.mutedForeground} /></Pressable>)}</View> : null}
     </View>
   </View>;
 }

@@ -29,13 +29,13 @@ export function BottomNavIsland({ children, tabCount = 3, blurTarget }: { childr
       />
     </View>
     <View testID="navigation-island-surface" style={[styles.surface, { maxWidth: tabCount * 80 + 16, shadowColor: c.shadow }]}>
-      <BlurView intensity={40} tint={dark ? "dark" : "light"} blurTarget={blurTarget} blurMethod={blurTarget ? "dimezisBlurViewSdk31Plus" : "none"} style={[styles.glass, {
-        backgroundColor: dark ? "rgba(30, 26, 22, 0.20)" : "rgba(255, 255, 255, 0.20)",
-        borderColor: dark ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 255, 255, 0.72)",
+      <BlurView intensity={dark ? 38 : 40} tint={dark ? "dark" : "light"} blurTarget={blurTarget} blurMethod={blurTarget ? "dimezisBlurViewSdk31Plus" : "none"} style={[styles.glass, {
+        backgroundColor: dark ? "rgba(18, 15, 11, 0.68)" : "rgba(255, 255, 255, 0.28)",
+        borderColor: dark ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.72)",
       }]}>
         <LinearGradient
           pointerEvents="none"
-          colors={[`${c.background}80`, `${c.background}00`, `${c.background}00`, `${c.background}80`]}
+          colors={dark ? [`${c.background}D9`, `${c.background}1A`, `${c.background}1A`, `${c.background}D9`] : [`${c.background}80`, `${c.background}00`, `${c.background}00`, `${c.background}80`]}
           locations={[0, 0.24, 0.76, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}

@@ -194,17 +194,27 @@ export function useTasks(): TasksApi {
     void (async () => {
       const [registry, storedVersions] = await Promise.all([loadProjects(), loadVersions()]);
       if (cancelled) return;
-      const active = activeProject(registry);
       projectsRef.current = registry;
-      activeIdRef.current = active.id;
       setProjectsState(registry);
-      tasksRef.current = active.workspace.tasks;
-      sectionsRef.current = active.workspace.sections;
-      boardsRef.current = active.workspace.boards;
-      setTasks(active.workspace.tasks);
-      setSections(active.workspace.sections);
-      setBoards(active.workspace.boards);
       setVersions(storedVersions);
+      if (registry.projects.length > 0) {
+        const active = activeProject(registry);
+        activeIdRef.current = active.id;
+        tasksRef.current = active.workspace.tasks;
+        sectionsRef.current = active.workspace.sections;
+        boardsRef.current = active.workspace.boards;
+        setTasks(active.workspace.tasks);
+        setSections(active.workspace.sections);
+        setBoards(active.workspace.boards);
+      } else {
+        activeIdRef.current = "";
+        tasksRef.current = [];
+        sectionsRef.current = [];
+        boardsRef.current = [];
+        setTasks([]);
+        setSections([]);
+        setBoards([]);
+      }
       setIsLoading(false);
     })();
     return () => {
@@ -1042,14 +1052,25 @@ export function useTasks(): TasksApi {
     [applyRegistry, registryWithLiveWorkspace],
   );
 
-  /** Removes a board and its data; refuses to remove the last remaining board. */
+  /** Removes a board and its data. */
   const removeProject = useCallback(
     (id: string) => {
       const registry = registryWithLiveWorkspace();
-      if (!registry || registry.projects.length <= 1) return false;
+      if (!registry) return false;
       if (!registry.projects.some((project) => project.id === id)) return false;
       const projects = registry.projects.filter((project) => project.id !== id);
       const wasCurrent = registry.currentId === id;
+      if (projects.length === 0) {
+        applyRegistry(
+          {
+            ...registry,
+            projects,
+            currentId: "",
+          },
+          wasCurrent,
+        );
+        return true;
+      }
       applyRegistry(
         {
           ...registry,
