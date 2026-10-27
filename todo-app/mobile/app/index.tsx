@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { BlurTargetView } from "expo-blur";
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { BoardManagerContent } from "@/components/board/board-manager-content";
 import { OptionSheet, TextEntrySheet } from "@/components/janus-board-ui";
@@ -20,6 +21,7 @@ export default function BoardManagerScreen() {
   const { theme } = useTheme();
   const toast = useToast();
   const api = useTasksContext();
+  const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { projects, tasks, sections, boards, isLoading, currentProjectId, createProject, importProject, duplicateProject, renameProject, removeProject, switchProject, closeProject, reopenProject } = api;
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -162,9 +164,11 @@ export default function BoardManagerScreen() {
   };
 
   return <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+    <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
     <BoardManagerContent projects={displayProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
-    <ReferenceMobileBottomNav active="boards" onNavigate={navigate} />
+    </BlurTargetView>
+    <ReferenceMobileBottomNav active="boards" onNavigate={navigate} blurTarget={blurTarget} />
     <Sheet visible={showCreate} onClose={() => setShowCreate(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>New board</Text><Text style={{ color: theme.colors.mutedForeground, marginTop: 6 }}>Add lists and categories after creating the board.</Text><Input autoFocus value={newName} onChangeText={setNewName} placeholder="Board name" onSubmitEditing={create} style={{ marginTop: 12 }} /><Button variant="outline" label="Create board" onPress={create} disabled={!newName.trim()} style={{ marginTop: 14 }} /></Sheet>
     <OptionSheet visible={menuProject !== null} title={menuProject?.name ?? "Board actions"} options={menuProject ? [
       ...(menuProject.closedAt

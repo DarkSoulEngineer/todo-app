@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BlurTargetView } from "expo-blur";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ComponentRef } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OptionSheet, TaskCard, TaskEditor } from "@/components/janus-board-ui";
@@ -26,6 +27,7 @@ export default function TopTasksRoute() {
   const insets = useSafeAreaInsets();
   const now = useNow();
   const toast = useToast();
+  const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const [limit, setLimit] = useState<TopTasksLimit>(3);
   const [editing, setEditing] = useState<TaskTarget | null>(null);
   const [menu, setMenu] = useState<TaskTarget | null>(null);
@@ -63,6 +65,7 @@ export default function TopTasksRoute() {
   };
 
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
     <ScreenHeader title="Top Tasks" subtitle="Your next priorities across open boards" showThemeToggle={false} />
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
@@ -78,7 +81,8 @@ export default function TopTasksRoute() {
         <TaskCard task={entry.task} boards={entry.boards} now={now} onPress={() => openTask(entry)} onLongPress={() => setMenu({ projectId: entry.projectId, taskId: entry.task.id })} />
       </View>) : <EmptyState icon="checkmark-done-outline" title="Nothing needs your attention" message="There are no unfinished tasks across your open boards. Add a task from Home to get started." actionLabel="Go to Home" onAction={() => router.replace("/")} />}
     </ScrollView>
-    <ReferenceMobileBottomNav active="top-tasks" onNavigate={navigate} />
+    </BlurTargetView>
+    <ReferenceMobileBottomNav active="top-tasks" onNavigate={navigate} blurTarget={blurTarget} />
     <OptionSheet visible={Boolean(menuEntry)} title={menuEntry?.task.title ?? "Task actions"} onClose={() => setMenu(null)} options={menuEntry ? [
       { label: "Edit task", icon: "create-outline", onPress: () => openTask(menuEntry) },
       { label: "Complete task", icon: "checkmark-circle-outline", onPress: () => completeTask(menuEntry) },

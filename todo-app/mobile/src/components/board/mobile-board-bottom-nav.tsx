@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { BottomNavIsland } from "@/components/ui/bottom-nav-island";
+import { BottomNavIsland, type NavigationBlurTarget } from "@/components/ui/bottom-nav-island";
 import { useReferenceTheme, type ReferenceColors } from "../reference/reference-theme";
 import type { ViewMode } from "@/lib/domain/types";
 
@@ -24,14 +24,15 @@ const VIEW_TABS: ViewTabConfig[] = [
 interface MobileBoardBottomNavProps {
   mode: ViewMode;
   onMode: (mode: ViewMode) => void;
+  blurTarget?: NavigationBlurTarget;
 }
 
-export function MobileBoardBottomNav({ mode, onMode }: MobileBoardBottomNavProps) {
+export function MobileBoardBottomNav({ mode, onMode, blurTarget }: MobileBoardBottomNavProps) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors);
 
   return (
-    <BottomNavIsland>
+    <BottomNavIsland tabCount={4} blurTarget={blurTarget}>
       <View style={styles.row}>
         {VIEW_TABS.map((tab) => {
           const selected = tab.key === mode;
@@ -90,11 +91,11 @@ export function MobileBoardBottomNav({ mode, onMode }: MobileBoardBottomNavProps
 function createStyles(colors: ReferenceColors) {
   return StyleSheet.create({
     row: {
-      minHeight: 60,
+      minHeight: 56,
       paddingHorizontal: 4,
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-around",
+      justifyContent: "center",
     },
     item: {
       flex: 1,
@@ -105,8 +106,8 @@ function createStyles(colors: ReferenceColors) {
       gap: 3,
     },
     icon: {
-      width: 52,
-      height: 30,
+      width: 44,
+      height: 28,
       borderRadius: 14,
       alignItems: "center",
       justifyContent: "center",

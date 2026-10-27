@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BlurTargetView } from "expo-blur";
 import { addDays, format, isSameDay, parseISO, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CalendarPanel, type CalendarMode } from "@/components/calendar/calendar-panel";
@@ -35,6 +36,7 @@ import type { BoardSection, Priority, SortKey, Task, TaskDraft, ViewMode } from 
 
 export default function WorkspaceScreen() {
   const { theme } = useTheme();
+  const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const insets = useSafeAreaInsets();
   const now = useNow();
   const toast = useToast();
@@ -317,6 +319,7 @@ export default function WorkspaceScreen() {
   </ScrollView>;
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
       <ThemeAtmosphere />
       <View style={{ flex: 1, paddingBottom: 68 + insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
         <MobileBoardRibbon selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
@@ -328,7 +331,8 @@ export default function WorkspaceScreen() {
           {mode === "list" ? <ListView tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={setCalendarDay} tasks={visibleTasks} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
       </View>
-      <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} />
+      </BlurTargetView>
+      <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} blurTarget={blurTarget} />
        <TaskEditor visible={editorVisible} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />
        <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onComplete={() => { if (calendarActionTask) api.toggleComplete(calendarActionTask.id); setCalendarActionTask(null); }} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}

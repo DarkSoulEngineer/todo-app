@@ -75,6 +75,11 @@ async function setupRoute(openTasks = Array.from({ length: 12 }, (_, index) => t
   };
   const react = {
     useMemo: (factory) => factory(),
+    useRef(initial) {
+      const index = cursor++;
+      if (!(index in states)) states[index] = { current: initial };
+      return states[index];
+    },
     useState(initial) {
       const index = cursor++;
       if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
@@ -86,6 +91,7 @@ async function setupRoute(openTasks = Array.from({ length: 12 }, (_, index) => t
   const colors = new Proxy({}, { get: () => "#888888" });
   const { default: TopTasksRoute } = await load("../app/top-tasks.tsx", {
     react, "expo-router": { router: { replace: (path) => calls.push(path), push: (path) => calls.push(path) } },
+    "expo-blur": { BlurTargetView: "BlurTargetView" },
     "@expo/vector-icons": { Ionicons: "Ionicons" },
     "react-native": { ActivityIndicator: "Loading", Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", View: "View", StyleSheet: { create: (styles) => styles } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
@@ -106,6 +112,9 @@ async function setupRoute(openTasks = Array.from({ length: 12 }, (_, index) => t
 test("Top Tasks switches 3/10, excludes closed boards, and refills after completion", async () => {
   const { render, calls } = await setupRoute();
   let tree = render();
+  const target = find(tree, "BlurTargetView")[0];
+  assert.equal(find(target, "BottomNav").length, 0);
+  assert.equal(find(tree, "BottomNav")[0].props.blurTarget, target.props.ref);
   let cards = find(tree, "TaskCard");
   assert.equal(cards.length, 3);
   assert.equal(cards.some((card) => card.props.task.id === "closed-high"), false);

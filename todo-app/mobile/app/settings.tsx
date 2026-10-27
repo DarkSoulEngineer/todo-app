@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import { BlurTargetView } from "expo-blur";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState, type ComponentRef } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
@@ -43,6 +44,7 @@ const BACKUP_OPTIONS: { value: BackupScope; label: string; description: string; 
 
 export default function SettingsRoute() {
   const api = useTasksContext();
+  const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { preference, setPreference, savePreference } = useTheme();
   const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart, savePreferences } = usePreferences();
   const { colors, type } = useReferenceTheme();
@@ -118,6 +120,7 @@ export default function SettingsRoute() {
 
   return (
     <View style={styles.root}>
+      <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
       <ThemeAtmosphere />
       <ScreenHeader title="Settings" showThemeToggle={false} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
@@ -214,7 +217,8 @@ export default function SettingsRoute() {
           </SurfaceCard>
         </View>
       </ScrollView>
-      <ReferenceMobileBottomNav active="settings" onNavigate={navigate} />
+      </BlurTargetView>
+      <ReferenceMobileBottomNav active="settings" onNavigate={navigate} blurTarget={blurTarget} />
       <Sheet visible={saveOpen} onClose={() => { if (!busy) setSaveOpen(false); }}>
         <Text accessibilityRole="header" style={type.title}>Save backup</Text>
         <Text style={[type.caption, { color: colors.muted, marginBottom: 12 }]}>What would you like to download or save?</Text>

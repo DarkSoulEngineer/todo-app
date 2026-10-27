@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { BottomNavIsland } from "@/components/ui/bottom-nav-island";
+import { BottomNavIsland, type NavigationBlurTarget } from "@/components/ui/bottom-nav-island";
 import { useReferenceTheme, type ReferenceColors } from "../reference-theme";
 
 export type ReferenceMobileTab = "boards" | "top-tasks" | "settings";
@@ -11,11 +11,11 @@ const tabs: { key: ReferenceMobileTab; label: string; icon: keyof typeof Ionicon
   { key: "settings", label: "Settings", icon: "settings-outline", activeIcon: "settings" },
 ];
 
-export function ReferenceMobileBottomNav({ active = "boards", onNavigate }: { active?: ReferenceMobileTab; onNavigate?: (tab: ReferenceMobileTab) => void }) {
+export function ReferenceMobileBottomNav({ active = "boards", onNavigate, blurTarget }: { active?: ReferenceMobileTab; onNavigate?: (tab: ReferenceMobileTab) => void; blurTarget?: NavigationBlurTarget }) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors);
   return (
-    <BottomNavIsland>
+    <BottomNavIsland blurTarget={blurTarget}>
       <View style={styles.row}>
         {tabs.map((tab) => {
           const selected = tab.key === active;
@@ -32,9 +32,9 @@ export function ReferenceMobileBottomNav({ active = "boards", onNavigate }: { ac
 }
 
 function createStyles(colors: ReferenceColors) { return StyleSheet.create({
-  row: { minHeight: 60, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", justifyContent: "space-around" },
+  row: { minHeight: 56, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", justifyContent: "center" },
   item: { flex: 1, minHeight: 52, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", gap: 3 },
-  icon: { width: 52, height: 30, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  icon: { width: 44, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   itemSelected: { backgroundColor: colors.primaryFixed },
 });
 }
