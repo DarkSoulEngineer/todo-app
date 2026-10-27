@@ -63,6 +63,8 @@ export function MobileBoardRibbon(props: Props) {
   // Selection mode owns the Select tab. When it ends, fall back to the tab the
   // user was on before opening it without needing to sync state in an effect.
   const shownTab = resolveRibbonTab(props.mode, tab, previousTab, props.selecting);
+  const selectionActive = shownTab === "select";
+  const ribbonExpanded = expanded || selectionActive;
 
   const AUTO_HIDE_DELAY_MS = 4000;
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,12 +74,12 @@ export function MobileBoardRibbon(props: Props) {
       clearTimeout(hideTimerRef.current);
       hideTimerRef.current = null;
     }
-    if (!pinned && expanded) {
+    if (!pinned && expanded && !selectionActive) {
       hideTimerRef.current = setTimeout(() => {
         setExpanded(false);
       }, AUTO_HIDE_DELAY_MS);
     }
-  }, [expanded, pinned]);
+  }, [expanded, pinned, selectionActive]);
 
   useEffect(() => {
     resetHideTimer();
@@ -119,7 +121,7 @@ export function MobileBoardRibbon(props: Props) {
       <Pressable accessibilityRole="switch" accessibilityLabel={pinned ? "Unpin ribbon" : "Pin ribbon open"} accessibilityHint={pinned ? "The ribbon will auto-hide after some seconds of inactivity." : "The ribbon will stay open continuously."} accessibilityState={{ checked: pinned }} onPress={() => { if (pinned) { setPinned(false); resetHideTimer(); } else { setPinned(true); setExpanded(true); if (hideTimerRef.current) clearTimeout(hideTimerRef.current); } }} style={styles.tabAction}>{pinned ? <MaterialCommunityIcons name="pin" size={18} color={c.primary} /> : <MaterialCommunityIcons name="pin-off-outline" size={18} color={c.mutedForeground} />}</Pressable>
     </View>
     {searchVisible ? <View style={styles.searchRow}><View style={[styles.search, { borderColor: c.borderStrong, backgroundColor: c.input }]}><Ionicons name="search-outline" size={16} color={c.mutedForeground} /><TextInput accessibilityLabel="Filter tasks and labels" value={props.query} onChangeText={props.onQuery} placeholder="Search tasks…" placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }]} />{props.query ? icon("close", "Clear search", () => props.onQuery("")) : null}</View></View> : null}
-    {expanded ? (shownTab === "home" ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
+    {ribbonExpanded ? (shownTab === "home" ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
       <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("add", "New card", props.onNewTask)}{props.mode === "board" ? tool("add-circle-outline", "List", props.onAddSection) : null}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>CREATE</Text></View>
       {context.boardDisplay ? <>
         <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("contract-outline", "Compact cards", props.onCompact, props.compact)}{tool("reader-outline", "Focus column", props.onFocused, props.focused)}{tool("swap-horizontal-outline", "Move arrows", props.onShowMoveArrows, props.showMoveArrows)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DISPLAY</Text></View>
