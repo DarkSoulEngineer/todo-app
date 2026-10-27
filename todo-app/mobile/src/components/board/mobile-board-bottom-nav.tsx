@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomNavIsland } from "@/components/ui/bottom-nav-island";
 import { useReferenceTheme, type ReferenceColors } from "../reference/reference-theme";
 import type { ViewMode } from "@/lib/domain/types";
 
@@ -27,12 +27,11 @@ interface MobileBoardBottomNavProps {
 }
 
 export function MobileBoardBottomNav({ mode, onMode }: MobileBoardBottomNavProps) {
-  const insets = useSafeAreaInsets();
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors);
 
   return (
-    <View style={[styles.nav, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <BottomNavIsland>
       <View style={styles.row}>
         {VIEW_TABS.map((tab) => {
           const selected = tab.key === mode;
@@ -84,32 +83,15 @@ export function MobileBoardBottomNav({ mode, onMode }: MobileBoardBottomNavProps
           );
         })}
       </View>
-    </View>
+    </BottomNavIsland>
   );
 }
 
 function createStyles(colors: ReferenceColors) {
   return StyleSheet.create({
-    nav: {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      bottom: 0,
-      minHeight: 68,
-      paddingTop: 4,
-      backgroundColor: colors.surfaceContainerLowest,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.outlineVariant,
-      shadowColor: colors.shadow,
-      shadowOpacity: 1,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: -2 },
-      elevation: 8,
-      zIndex: 50,
-    },
     row: {
-      height: 60,
-      paddingHorizontal: 12,
+      minHeight: 60,
+      paddingHorizontal: 4,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-around",

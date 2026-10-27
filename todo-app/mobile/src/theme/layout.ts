@@ -1,4 +1,4 @@
-/** Shared content column for the four primary bottom-tab screens. */
+/** Shared content column for the three primary bottom-tab screens. */
 export const mobileContentStyle = {
   width: "100%",
   maxWidth: 600,

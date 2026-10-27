@@ -20,6 +20,7 @@ const mocks = {
   "./reference-primitives": { ScreenHeader: "ScreenHeader", Pill: "Pill", ProgressRing: "ProgressRing", SurfaceCard: "SurfaceCard", resolveReferenceTask: (input) => input.task ? input : { task: input } },
   "../reference-theme": { useReferenceTheme: () => ({ colors, type: {} }), referenceSpacing: {}, referenceRadii: {} },
   "@/components/ui/atmosphere": { ThemeAtmosphere: "Atmosphere" },
+  "@/components/ui/bottom-nav-island": { BottomNavIsland: "BottomNavIsland" },
   "@/components/ui/mobile-top-bar": { MobileSearchField: "SearchField" },
   "@/components/ui/section-heading": { SectionHeading: "SectionHeading" },
   "@/theme/layout": { mobileContentStyle: {}, mobileBottomNavClearance: 76 },
