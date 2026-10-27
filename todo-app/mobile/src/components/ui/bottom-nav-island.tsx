@@ -19,7 +19,7 @@ export function BottomNavIsland({ children, tabCount = 3, blurTarget }: { childr
     paddingLeft: Math.max(insets.left, 16),
     paddingRight: Math.max(insets.right, 16),
   }]}>
-    <View testID="navigation-content-fade" pointerEvents="none" style={styles.contentFade}>
+    <View testID="navigation-content-fade" pointerEvents="none" style={[styles.contentFade, { height: 32 + bottomGap }]}>
       <LinearGradient
         colors={[`${c.background}00`, `${c.background}40`, `${c.background}B3`]}
         locations={[0, 0.6, 1]}
@@ -27,7 +27,6 @@ export function BottomNavIsland({ children, tabCount = 3, blurTarget }: { childr
         end={{ x: 0.5, y: 1 }}
         style={styles.fadeEdge}
       />
-      <View style={{ flex: 1, backgroundColor: `${c.background}B3` }} />
     </View>
     <View testID="navigation-island-surface" style={[styles.surface, { maxWidth: tabCount * 80 + 16, shadowColor: c.shadow }]}>
       <BlurView intensity={40} tint={dark ? "dark" : "light"} blurTarget={blurTarget} blurMethod={blurTarget ? "dimezisBlurViewSdk31Plus" : "none"} style={[styles.glass, {
@@ -50,8 +49,8 @@ export function BottomNavIsland({ children, tabCount = 3, blurTarget }: { childr
 
 const styles = StyleSheet.create({
   position: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center", zIndex: 50 },
-  contentFade: { position: "absolute", top: -28, left: 0, right: 0, bottom: 0 },
-  fadeEdge: { height: 24 },
+  contentFade: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  fadeEdge: { flex: 1 },
   surface: { width: "100%", borderRadius: 26, shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   glass: { borderRadius: 26, overflow: "hidden", borderWidth: 1, paddingVertical: 4, paddingHorizontal: 4 },
 });

@@ -94,13 +94,14 @@ test("top and bottom fade into the page background without covering tab interact
   assert.equal(glass.props.children.at(-1), "Tabs");
 });
 
-test("all navigation islands share a smooth content fade above the bar instead of a hard cutoff", () => {
+test("all navigation islands use a short gradient bar instead of a full-height background slab", () => {
   for (const tabCount of [3, 4]) {
     const tree = BottomNavIsland({ children: "Tabs", tabCount });
     const fade = nodes(tree).find((node) => node.props?.testID === "navigation-content-fade");
     assert.equal(fade.props.pointerEvents, "none");
     const style = flatten(fade.props.style);
-    assert.ok(style.top < 0);
+    assert.equal(style.top, undefined);
+    assert.equal(style.height, 44);
     assert.equal(style.left, 0);
     assert.equal(style.right, 0);
     assert.equal(style.bottom, 0);
@@ -108,7 +109,8 @@ test("all navigation islands share a smooth content fade above the bar instead o
     assert.deepEqual(Array.from(edge.props.colors), [`${colors.background}00`, `${colors.background}40`, `${colors.background}B3`]);
     assert.equal(edge.props.start.y, 0);
     assert.equal(edge.props.end.y, 1);
-    assert.equal(flatten(edge.props.style).height, 24);
+    assert.equal(flatten(edge.props.style).flex, 1);
+    assert.equal(nodes(fade).filter((node) => node.type === "View").length, 1);
     assert.equal(nodes(fade).some((node) => node.type === "BlurView"), false);
   }
 });
