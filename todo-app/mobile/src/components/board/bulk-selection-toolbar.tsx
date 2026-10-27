@@ -48,7 +48,6 @@ export function BulkSelectionToolbar({
   onDelete,
   onMove,
   onPriority,
-  onClose,
   disabled = false,
   style,
 }: BulkSelectionToolbarProps) {
@@ -79,10 +78,9 @@ export function BulkSelectionToolbar({
       accessibilityLabel="Bulk task actions"
       style={style}
     >
-      {onClose || onSelectAll || clearSelection ? group(`${count} SELECTED`, <>
-        {onClose ? <ToolButton icon="close" label="Done" accessibilityLabel="Exit selection mode" onPress={onClose} disabled={disabled} /> : null}
-        {onSelectAll ? <ToolButton icon={allSelected ? "checkmark-done-outline" : "checkbox-outline"} label={allSelected ? "Clear all" : "Select all"} accessibilityLabel={allSelected ? "Clear all selected tasks" : "Select all visible tasks"} onPress={allSelected && clearSelection ? clearSelection : onSelectAll} selected={allSelected} disabled={disabled} /> : null}
-        {clearSelection ? <ToolButton icon="close-circle-outline" label="Clear" accessibilityLabel="Clear selected tasks" onPress={clearSelection} disabled={actionDisabled} /> : null}
+      {onSelectAll || clearSelection ? group(`${count} SELECTED`, <>
+        {onSelectAll ? <ToolButton icon={allSelected ? "checkmark-done-outline" : "checkbox-outline"} label="Select all" accessibilityLabel="Select all visible tasks" onPress={onSelectAll} selected={allSelected} disabled={disabled} /> : null}
+        {clearSelection ? <ToolButton icon="close-circle-outline" label="Unselect all" accessibilityLabel="Unselect all tasks" onPress={clearSelection} disabled={actionDisabled} /> : null}
       </>) : null}
       {onComplete || onCancel || onRestore ? group("STATUS", <>
         {onComplete ? <ToolButton icon="checkmark-done-outline" label="Complete" accessibilityLabel={`Complete ${count} selected ${taskWord}`} onPress={onComplete} tone="success" disabled={actionDisabled} /> : null}

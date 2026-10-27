@@ -3,6 +3,7 @@ import { makeId } from "@/lib/utils/id";
 import { BUILT_IN_BOARDS, type Board } from "@/lib/domain/boards";
 import type { BoardSection, Task, TaskDraft } from "@/lib/domain/types";
 import { createTask } from "@/lib/domain/task-factory";
+import { isCustomSection } from "@/lib/domain/sections";
 
 /** Sample boards: the six built-ins plus four custom boards, so loading the
  * example tasks demonstrates custom categories too. */
@@ -25,17 +26,13 @@ export const SAMPLE_SECTIONS: BoardSection[] = [
   { id: "sample-done", title: "Done" },
 ];
 
-/** Sorts the sample tasks into the sample columns: finished work to "Done", the
- * rest spread over the other two so every column has something in it. */
-export function distributeSampleTasks(tasks: Task[]): Task[] {
-  return tasks.map((task, index) => ({
+/** Randomly places samples in real, visible custom lists without changing status. */
+export function distributeSampleTasks(tasks: Task[], sections: BoardSection[] = SAMPLE_SECTIONS): Task[] {
+  const targets = sections.filter((section) => !section.hidden && isCustomSection(section));
+  if (!targets.length) throw new Error("Sample tasks need a visible custom list.");
+  return tasks.map((task) => ({
     ...task,
-    sectionId:
-      task.completed || task.canceled
-        ? "sample-done"
-        : index % 2 === 0
-          ? "sample-backlog"
-          : "sample-progress",
+    sectionId: targets[Math.floor(Math.random() * targets.length)].id,
   }));
 }
 

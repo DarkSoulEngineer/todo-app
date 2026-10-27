@@ -51,6 +51,23 @@ Persistence is device-local via AsyncStorage. The web app's keys are reused
 (`janus.projects.v1`, `janus.versions.v1`, theme under `janus.theme.v1`), so a
 JSON export from either client can be imported by the other.
 
+### Backups
+
+In **Settings → Data & backups → Save**, select **Preferences**, **Boards**, or
+**All**, then tap **Save file**. Preferences includes theme, default calendar view,
+and week start. Boards includes every board, list, and task as JSON.
+All creates one `janus-backup` JSON file containing both boards and preferences,
+even when there are no boards. Changes also save locally automatically.
+
+**Import** accepts preferences-only, boards-only, legacy single-board, and combined
+JSON backups. It adds imported boards and replaces only preferences included in the
+file. Both parts of a combined backup are validated before either is applied.
+CSV files cannot be imported as backups.
+
+On Android/iOS, select a destination in the share sheet to keep the exported file.
+On web, export starts a download. Run the backup codec checks with Node 24:
+`node --test tests/*.test.mjs`.
+
 ## Navigation
 
 The mobile app uses a shared ribbon top bar and a four-tab bottom navigation:

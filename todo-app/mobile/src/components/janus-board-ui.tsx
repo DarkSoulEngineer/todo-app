@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { boardColor } from "@/lib/domain/boards";
+import { getTaskSectionId } from "@/lib/domain/sections";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
 import { describeDue, deriveStatus, STATUS_LABELS } from "@/lib/domain/status";
 import { detectCardTheme } from "@/lib/features/card-themes";
@@ -229,7 +230,7 @@ function TaskEditorForm({
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [category, setCategory] = useState<string | null>(() => task?.category ?? null);
-  const [sectionId, setSectionId] = useState<string | null>(() => task?.sectionId ?? null);
+  const [sectionId, setSectionId] = useState<string | null>(() => task ? getTaskSectionId(task, sections, new Date()) ?? null : null);
   const [dueAt, setDueAt] = useState<string | null>(() => task?.dueAt ?? initialDueAt ?? null);
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => task?.subtasks.map((item) => ({ ...item })) ?? []);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -346,7 +347,7 @@ function TaskEditorForm({
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; })}</ScrollView>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}><Chip label="Unsorted" active={!sectionId} onPress={() => setSectionId(null)} />{sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}</ScrollView>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}</ScrollView>
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>SCHEDULE</Text>

@@ -13,8 +13,6 @@ import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 
 export type ReferenceKanbanFilter = "All" | "High Priority" | "Due Today";
 
-const UNSORTED_SECTION_ID = "__reference_unsorted__";
-
 export interface ReferenceKanbanScreenProps {
   tasks: ReferenceTaskInput[];
   sections?: BoardSection[];
@@ -69,16 +67,7 @@ export function ReferenceKanbanScreen({
   const [query, setQuery] = useState("");
   const searchRef = useRef<ComponentRef<typeof TextInput>>(null);
   const resolved = useMemo(() => tasks.map((task) => resolveReferenceTask(task)), [tasks]);
-  const hasUnsortedTasks = useMemo(() => resolved.some(({ task }) => !task.sectionId), [resolved]);
-  const buckets = useMemo(() => {
-    const visibleSections = sections.filter((section) => !section.hidden);
-    // Keep tasks without a section visible even when the persisted board has
-    // no sections (or has sections alongside those tasks).
-    if (visibleSections.length === 0 || hasUnsortedTasks) {
-      return [...visibleSections, { id: UNSORTED_SECTION_ID, title: "Unsorted" }];
-    }
-    return visibleSections;
-  }, [hasUnsortedTasks, sections]);
+  const buckets = useMemo(() => sections.filter((section) => !section.hidden), [sections]);
   const [internalSectionId, setInternalSectionId] = useState<string | undefined>();
   const [internalFilter, setInternalFilter] = useState<ReferenceKanbanFilter>("All");
   // Props and sections can hydrate independently. Select the first valid
@@ -98,13 +87,13 @@ export function ReferenceKanbanScreen({
 
   const counts = useMemo(() => Object.fromEntries(buckets.map((section) => [
     section.id,
-    resolved.filter(({ task }) => getDisplayedTaskSectionId(task, buckets, now) === section.id).length,
-  ])), [buckets, now, resolved]);
+    resolved.filter(({ task }) => getTaskSectionId(task, sections, now) === section.id).length,
+  ])), [buckets, now, resolved, sections]);
   const derivedOpenCount = useMemo(() => resolved.filter(({ task }) => !task.completed && !task.canceled).length, [resolved]);
   const derivedDoneCount = useMemo(() => resolved.filter(({ task }) => task.completed).length, [resolved]);
   const activeTasks = useMemo(() => {
     let list = activeSection
-      ? resolved.filter(({ task }) => getDisplayedTaskSectionId(task, buckets, now) === activeSection.id)
+      ? resolved.filter(({ task }) => getTaskSectionId(task, sections, now) === activeSection.id)
       : [];
 
     const needle = query.trim().toLowerCase();
@@ -112,7 +101,7 @@ export function ReferenceKanbanScreen({
     if (filter === "High Priority") list = list.filter(({ task }) => task.priority === "high");
     if (filter === "Due Today") list = list.filter(({ task }) => task.dueAt ? new Date(task.dueAt).toDateString() === now.toDateString() : false);
     return list;
-  }, [activeSection, buckets, filter, now, query, resolved]);
+  }, [activeSection, sections, filter, now, query, resolved]);
   const emptyMessage = buckets.length === 0
     ? "No sections available."
     : activeSection
@@ -147,7 +136,7 @@ export function ReferenceKanbanScreen({
          </ScrollView>
          <View style={styles.quickAddRow}>
            <View style={styles.quickAddCopy}><Ionicons name="add-circle-outline" size={19} color={colors.primary} /><Text style={[type.body, { color: colors.muted }]} numberOfLines={1}>Add a task to {activeSection?.title ?? "this workstream"}</Text></View>
-           <Pressable accessibilityRole="button" accessibilityLabel="Create a new task" onPress={() => onAddTask?.(activeSection?.id === UNSORTED_SECTION_ID ? undefined : activeSection?.id)} style={styles.quickAddButton}><Text style={[type.bodyStrong, { color: colors.primary }]}>New task</Text><Ionicons name="arrow-forward" size={15} color={colors.primary} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Create a new task" onPress={() => onAddTask?.(activeSection?.id)} style={styles.quickAddButton}><Text style={[type.bodyStrong, { color: colors.primary }]}>New task</Text><Ionicons name="arrow-forward" size={15} color={colors.primary} /></Pressable>
          </View>
          <View style={styles.workstreamHeader}>
           <View style={styles.heading}><View style={styles.activeDot} /><Text style={[type.title, { fontSize: 18 }]}>{activeSection?.title ?? "Workstream"}</Text><Text style={[type.body, { color: colors.muted, backgroundColor: colors.surfaceLow, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 }]}>{activeTasks.length} tasks</Text></View>
@@ -155,21 +144,13 @@ export function ReferenceKanbanScreen({
         </View>
         <View style={{ gap: referenceSpacing.sm }}>
            {activeTasks.map((item) => <KanbanCard key={item.task.id} item={item} now={now} selected={selectedTaskId === item.task.id} onPress={() => onTaskPress?.(item.task)} onMenu={onTaskMenu ? () => onTaskMenu(item.task) : undefined} onToggle={onToggleComplete ? () => onToggleComplete(item.task) : undefined} />)}
-           {activeTasks.length === 0 ? <View style={styles.emptyState}><View style={styles.emptyIcon}><Ionicons name={query ? "search-outline" : "layers-outline"} size={22} color={colors.primary} /></View><Text style={[type.section, { fontSize: 16 }]}>{query ? "No tasks match" : "No tasks in this section"}</Text><Text style={[type.body, { color: colors.muted, textAlign: "center" }]}>{query ? "Try a different search." : emptyMessage}</Text><Pressable accessibilityRole="button" accessibilityLabel="Add a task" onPress={() => onAddTask?.(activeSection?.id === UNSORTED_SECTION_ID ? undefined : activeSection?.id)} style={styles.emptyAction}><Ionicons name="add" size={17} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Add a task</Text></Pressable></View> : null}
+            {activeTasks.length === 0 ? <View style={styles.emptyState}><View style={styles.emptyIcon}><Ionicons name={query ? "search-outline" : "layers-outline"} size={22} color={colors.primary} /></View><Text style={[type.section, { fontSize: 16 }]}>{query ? "No tasks match" : "No tasks in this section"}</Text><Text style={[type.body, { color: colors.muted, textAlign: "center" }]}>{query ? "Try a different search." : emptyMessage}</Text><Pressable accessibilityRole="button" accessibilityLabel="Add a task" onPress={() => onAddTask?.(activeSection?.id)} style={styles.emptyAction}><Ionicons name="add" size={17} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Add a task</Text></Pressable></View> : null}
         </View>
       </ScrollView>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Add task to ${activeSection?.title ?? "this section"}`} onPress={() => onAddTask?.(activeSection?.id === UNSORTED_SECTION_ID ? undefined : activeSection?.id)} style={styles.fab}><Ionicons name="add" size={31} color={colors.onPrimary} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Add task to ${activeSection?.title ?? "this section"}`} onPress={() => onAddTask?.(activeSection?.id)} style={styles.fab}><Ionicons name="add" size={31} color={colors.onPrimary} /></Pressable>
       <ReferenceMobileBottomNav active={activeTab} onNavigate={onNavigate} />
     </View>
   );
-}
-
-function getDisplayedTaskSectionId(task: Task, sections: BoardSection[], now: Date): string | undefined {
-  const sectionId = getTaskSectionId(task, sections, now);
-  if (sectionId) return sectionId;
-  return !task.sectionId && sections.some((section) => section.id === UNSORTED_SECTION_ID)
-    ? UNSORTED_SECTION_ID
-    : undefined;
 }
 
 function KanbanCard({ item, now, selected, onPress, onMenu, onToggle }: { item: ReturnType<typeof resolveReferenceTask>; now: Date; selected: boolean; onPress: () => void; onMenu?: () => void; onToggle?: () => void }) {

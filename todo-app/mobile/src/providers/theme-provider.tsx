@@ -17,6 +17,7 @@ interface ThemeContextValue {
   theme: Theme;
   preference: ThemePreference;
   setPreference: (preference: ThemePreference) => void;
+  savePreference: (preference: ThemePreference) => Promise<void>;
   /** Cycles system -> light -> dark -> system. */
   toggle: () => void;
 }
@@ -37,6 +38,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           setPreferenceState(value);
         }
       })
+      .catch(() => {
+        // Storage may be unavailable; keep the system theme.
+      })
       .finally(() => {
         if (!cancelled) setHydrated(true);
       });
@@ -50,6 +54,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     void AsyncStorage.setItem(THEME_KEY, next);
   }, []);
 
+  const savePreference = useCallback(async (next: ThemePreference) => {
+    await AsyncStorage.setItem(THEME_KEY, next);
+    setPreferenceState(next);
+  }, []);
+
   const resolved = preference === "system" ? (system === "dark" ? "dark" : "light") : preference;
 
   const toggle = useCallback(() => {
@@ -57,8 +66,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [preference, setPreference]);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme: themes[resolved], preference, setPreference, toggle }),
-    [resolved, preference, setPreference, toggle],
+    () => ({ theme: themes[resolved], preference, setPreference, savePreference, toggle }),
+    [resolved, preference, setPreference, savePreference, toggle],
   );
 
   // Avoid a light flash before the saved preference loads.

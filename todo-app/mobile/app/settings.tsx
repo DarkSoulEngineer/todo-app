@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
 import { Pill, ScreenHeader, SurfaceCard } from "@/components/reference/mobile/reference-primitives";
@@ -12,7 +12,9 @@ import { useTasksContext } from "@/providers/tasks-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { exportAllBoards, exportAllBoardsCsv, pickBoardsFile } from "@/lib/data/transfer";
+import { Sheet } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import type { ThemePreference } from "@/theme/tokens";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
 
@@ -32,15 +34,24 @@ const WEEK_START_OPTIONS: { value: CalendarWeekStart; label: string }[] = [
   { value: 0, label: "Sunday" },
 ];
 
+type BackupScope = "preferences" | "boards" | "all";
+const BACKUP_OPTIONS: { value: BackupScope; label: string; description: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: "preferences", label: "Preferences", description: "Theme, calendar view and week start", icon: "options-outline" },
+  { value: "boards", label: "Boards", description: "Every board, list and task", icon: "albums-outline" },
+  { value: "all", label: "All", description: "Preferences and all boards in one JSON file", icon: "archive-outline" },
+];
+
 export default function SettingsRoute() {
   const api = useTasksContext();
-  const { preference, setPreference } = useTheme();
-  const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart } = usePreferences();
+  const { preference, setPreference, savePreference } = useTheme();
+  const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart, savePreferences } = usePreferences();
   const { colors, type } = useReferenceTheme();
   const insets = useSafeAreaInsets();
   const styles = createStyles(colors);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [scope, setScope] = useState<BackupScope>("all");
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const taskCount = api.projects.reduce((total, project) => total + (project.id === api.currentProjectId ? api.tasks.length : project.workspace.tasks.length), 0);
@@ -60,20 +71,23 @@ export default function SettingsRoute() {
       : project.workspace,
   }));
 
-  const handleExport = async (format: "json" | "csv") => {
+  const handleSave = async () => {
     setBusy(true);
     setStatus(null);
     try {
       const boards = allBoards();
-      if (!boards.length) {
-        setStatus("There are no boards to export yet.");
-        return;
+      const settings = { theme: preference, calendarDefaultView, calendarWeekStart };
+      if (scope === "preferences") await exportSettings(settings);
+      else if (scope === "all") await exportFullBackup(boards, settings);
+      else {
+        if (!boards.length) throw new Error("There are no boards to save yet.");
+        await exportAllBoards(boards);
       }
-      if (format === "json") await exportAllBoards(boards);
-      else await exportAllBoardsCsv(boards);
-      setStatus(`${format === "json" ? "Board backup" : "All-board CSV"} ready to share.`);
+      setSaveOpen(false);
+      setStatus({ message: Platform.OS === "web" ? "Backup download started." : "Backup ready to share. Choose a destination to save it.", error: false });
     } catch {
-      setStatus("Could not export your boards.");
+      setStatus({ message: scope === "boards" && !api.projects.length ? "There are no boards to save yet." : "Could not save your backup. Please try again.", error: true });
+      setSaveOpen(false);
     } finally {
       setBusy(false);
     }
@@ -83,19 +97,21 @@ export default function SettingsRoute() {
     setBusy(true);
     setStatus(null);
     try {
-      const boards = await pickBoardsFile();
-      if (!boards) {
-        setStatus("Import cancelled or that file is not a Janus backup.");
+      const backup = await pickBackupFile();
+      if (!backup) {
+        setStatus({ message: "Import cancelled. Nothing changed.", error: false });
         return;
       }
-      const importedIds = api.importProjects(boards);
-      if (!importedIds.length) {
-        setStatus("Could not import that backup.");
-        return;
+      if (backup.settings) {
+        await Promise.all([savePreferences(backup.settings), savePreference(backup.settings.theme)]);
       }
-      setStatus(`Imported ${importedIds.length} board${importedIds.length === 1 ? "" : "s"}.`);
-    } catch {
-      setStatus("Could not import that backup.");
+      const importedIds = backup.boards.length ? api.importProjects(backup.boards) : [];
+      if (backup.boards.length && !importedIds.length) throw new Error("Could not import boards.");
+      const parts = [backup.settings ? "preferences" : "", importedIds.length ? `${importedIds.length} board${importedIds.length === 1 ? "" : "s"}` : ""].filter(Boolean);
+      setStatus({ message: `Imported ${parts.join(" and ")}.`, error: false });
+    } catch (error) {
+      setStatus({ message: error instanceof Error && error.message === "Choose a valid Janus JSON backup."
+        ? error.message : "Could not import that backup. Please try again.", error: true });
     } finally {
       setBusy(false);
     }
@@ -120,6 +136,7 @@ export default function SettingsRoute() {
                   <Pressable
                     key={option.value}
                     accessibilityRole="button"
+                    disabled={busy}
                     accessibilityState={{ selected }}
                     accessibilityLabel={`Use ${option.label.toLowerCase()} theme`}
                     onPress={() => setPreference(option.value)}
@@ -142,7 +159,7 @@ export default function SettingsRoute() {
               {CALENDAR_VIEW_OPTIONS.map((option) => {
                 const selected = calendarDefaultView === option.value;
                 return (
-                  <Pressable key={option.value} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={[styles.segment, selected && styles.segmentSelected]}>
+                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={[styles.segment, selected && styles.segmentSelected]}>
                     <Ionicons name={option.icon} size={17} color={selected ? colors.primary : colors.muted} />
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
                   </Pressable>
@@ -154,7 +171,7 @@ export default function SettingsRoute() {
               {WEEK_START_OPTIONS.map((option) => {
                 const selected = calendarWeekStart === option.value;
                 return (
-                  <Pressable key={option.value} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={[styles.segment, selected && styles.segmentSelected]}>
+                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={[styles.segment, selected && styles.segmentSelected]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
                   </Pressable>
                 );
@@ -164,24 +181,19 @@ export default function SettingsRoute() {
         </View>
 
         <View style={styles.sectionBlock}>
-          <SectionHeading title="Data & backups" subtitle="Back up every board in one file, or restore boards from another device." />
+          <SectionHeading title="Data & backups" subtitle="Changes save automatically on this device. Choose what to include when saving a backup file." />
           <SurfaceCard style={styles.sectionCard}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Export all boards as JSON" disabled={busy} onPress={() => void handleExport("json")} style={({ pressed }) => [styles.actionRow, styles.firstRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
-              <View style={styles.actionIcon}><Ionicons name="code-slash-outline" size={19} color={colors.primary} /></View>
-              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Export all boards as JSON</Text><Text style={[type.caption, { color: colors.muted }]}>One backup with every board, list and task</Text></View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Save backup" disabled={busy} onPress={() => { setStatus(null); setSaveOpen(true); }} style={({ pressed }) => [styles.actionRow, styles.firstRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
+              <View style={styles.actionIcon}><Ionicons name="save-outline" size={19} color={colors.primary} /></View>
+              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Save</Text><Text style={[type.caption, { color: colors.muted }]}>Choose preferences, boards or all</Text></View>
               <Ionicons name="chevron-forward" size={17} color={colors.outline} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Export all boards as CSV" disabled={busy} onPress={() => void handleExport("csv")} style={({ pressed }) => [styles.actionRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
-              <View style={styles.actionIcon}><Ionicons name="document-text-outline" size={19} color={colors.primary} /></View>
-              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Export all boards as CSV</Text><Text style={[type.caption, { color: colors.muted }]}>Every task across all boards for spreadsheets</Text></View>
-              <Ionicons name="chevron-forward" size={17} color={colors.outline} />
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Import boards from a Janus backup" disabled={busy} onPress={() => void handleImport()} style={({ pressed }) => [styles.actionRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Import backup" disabled={busy} onPress={() => void handleImport()} style={({ pressed }) => [styles.actionRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
               <View style={styles.actionIcon}><Ionicons name="cloud-upload-outline" size={19} color={colors.secondary} /></View>
-              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Import boards</Text><Text style={[type.caption, { color: colors.muted }]}>Restore one or more boards from a Janus backup</Text></View>
+              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Import</Text><Text style={[type.caption, { color: colors.muted }]}>Restore a JSON backup; adds boards and replaces included preferences</Text></View>
               <Ionicons name="chevron-forward" size={17} color={colors.outline} />
             </Pressable>
-            {status ? <View accessibilityLiveRegion="polite" style={[styles.statusBanner, { backgroundColor: status.toLowerCase().includes("could not") ? colors.errorContainer : colors.successFixed }]}><Ionicons name={status.toLowerCase().includes("could not") ? "alert-circle-outline" : "checkmark-circle-outline"} size={17} color={status.toLowerCase().includes("could not") ? colors.error : colors.success} /><Text style={[type.caption, { flex: 1, color: status.toLowerCase().includes("could not") ? colors.error : colors.success }]}>{status}</Text></View> : null}
+            {status ? <View accessibilityLiveRegion="polite" style={[styles.statusBanner, { backgroundColor: status.error ? colors.errorContainer : colors.successFixed }]}><Ionicons name={status.error ? "alert-circle-outline" : "checkmark-circle-outline"} size={17} color={status.error ? colors.error : colors.success} /><Text style={[type.caption, { flex: 1, color: status.error ? colors.error : colors.success }]}>{status.message}</Text></View> : null}
           </SurfaceCard>
         </View>
 
@@ -204,6 +216,22 @@ export default function SettingsRoute() {
         </View>
       </ScrollView>
       <ReferenceMobileBottomNav active="settings" onNavigate={navigate} />
+      <Sheet visible={saveOpen} onClose={() => { if (!busy) setSaveOpen(false); }}>
+        <Text accessibilityRole="header" style={type.title}>Save backup</Text>
+        <Text style={[type.caption, { color: colors.muted, marginBottom: 12 }]}>What would you like to download or save?</Text>
+        <View accessibilityRole="radiogroup">
+          {BACKUP_OPTIONS.map((option, index) => (
+            <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, index === 0 && styles.firstRow, { opacity: pressed ? 0.7 : 1 }]}>
+              <View style={styles.actionIcon}><Ionicons name={option.icon} size={19} color={colors.primary} /></View>
+              <View style={styles.actionCopy}><Text style={type.bodyStrong}>{option.label}</Text><Text style={[type.caption, { color: colors.muted }]}>{option.description}</Text></View>
+              <Ionicons name={scope === option.value ? "radio-button-on" : "radio-button-off"} size={22} color={scope === option.value ? colors.primary : colors.outline} />
+            </Pressable>
+          ))}
+        </View>
+        <Text style={[type.caption, { color: colors.muted, marginVertical: 12 }]}>Saves a JSON file you can import into Janus later.</Text>
+        <Button label={busy ? "Saving…" : "Save file"} disabled={busy} onPress={() => void handleSave()} />
+        <Button label="Cancel" variant="ghost" disabled={busy} onPress={() => setSaveOpen(false)} />
+      </Sheet>
     </View>
   );
 }

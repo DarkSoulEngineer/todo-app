@@ -141,7 +141,7 @@ export function getCompletionDatesInWindow(tasks: Task[], windowStart: Date, win
 
 /** Compute insights for a specific window (used for current and previous period). */
 export interface WindowInsights {
-  points: Array<{ key: string; label: string; count: number }>;
+  points: { key: string; label: string; count: number }[];
   total: number;
   best: number;
   streak: number;
@@ -155,7 +155,7 @@ export function computeWindowInsights(
   const days = Math.max(0, differenceInCalendarDays(windowEnd, windowStart) + 1);
   const completed = getCompletionDatesInWindow(tasks, windowStart, windowEnd);
 
-  const points: Array<{ key: string; label: string; count: number }> = [];
+  const points: { key: string; label: string; count: number }[] = [];
   for (let index = days - 1; index >= 0; index -= 1) {
     const day = subDays(windowEnd, index);
     const count = completed.filter((date) => isSameDay(date, day)).length;

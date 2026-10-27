@@ -28,10 +28,9 @@ import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
 import { exportWorkspace, exportWorkspaceCsv, pickWorkspaceFile } from "@/lib/data/transfer";
 import { matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
 import { rescheduleToDay } from "@/lib/utils/datetime";
+import { getRibbonContext } from "@/lib/features/ribbon-context";
 import { mobileContentStyle } from "@/theme/layout";
 import type { BoardSection, Priority, SortKey, Task, TaskDraft, ViewMode } from "@/lib/domain/types";
-
-const UNSORTED_SECTION_ID = "__unsorted";
 
 export default function WorkspaceScreen() {
   const { theme } = useTheme();
@@ -47,7 +46,6 @@ export default function WorkspaceScreen() {
   const [query, setQuery] = useState("");
   const [compactCards, setCompactCards] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [showCheckboxes, setShowCheckboxes] = useState(true);
   const [showMoveArrows, setShowMoveArrows] = useState(false);
   const [focusedColumn, setFocusedColumn] = useState(false);
   const [sort, setSort] = useState<SortKey>("manual");
@@ -106,14 +104,12 @@ export default function WorkspaceScreen() {
     const hiddenSectionIds = new Set(sections.filter((section) => section.hidden).map((section) => section.id));
     return visibleTasks.filter((task) => {
       const sectionId = getTaskSectionId(task, sections, now);
-      // BoardView renders tasks without a resolved section in Unsorted, while
-      // tasks resolved to hidden sections have no rendered column.
-      return sectionId === undefined || !hiddenSectionIds.has(sectionId);
+      return sectionId !== undefined && !hiddenSectionIds.has(sectionId);
     });
   }, [now, sections, visibleTasks]);
   const selectedTasks = useMemo(() => renderedBoardTasks.filter((task) => selectedTaskIds.has(task.id)), [renderedBoardTasks, selectedTaskIds]);
   const allVisibleSelected = renderedBoardTasks.length > 0 && renderedBoardTasks.every((task) => selectedTaskIds.has(task.id));
-  const enterSelectionMode = () => { setMode("board"); setSelectionMode(true); setSelectedTaskIds(new Set()); };
+  const enterSelectionMode = () => { if (!getRibbonContext(mode).selection) return; setSelectionMode(true); setSelectedTaskIds(new Set()); };
   const exitSelectionMode = () => { setSelectionMode(false); setSelectedTaskIds(new Set()); };
   const toggleSelectedTask = (taskId: string) => {
     setSelectedTaskIds((current) => {
@@ -147,13 +143,10 @@ export default function WorkspaceScreen() {
   const runBulkMove = (sectionId: string | null) => {
     if (!selectedTasks.length) return;
     const target = sections.find((section) => section.id === sectionId);
-    if (sectionId !== null && !target) return;
+    if (!target) return;
     const before = api.snapshot();
-    selectedTasks.forEach((task) => {
-      if (sectionId === null) api.setTaskSectionId(task.id, null);
-      else api.assignTaskToSection(task.id, sectionId);
-    });
-    toast.success(`Moved ${selectedTasks.length} ${selectedTasks.length === 1 ? "task" : "tasks"} to ${target?.title ?? "Unsorted"}`, { action: { label: "Undo", onPress: () => api.restore(before) } });
+    selectedTasks.forEach((task) => api.assignTaskToSection(task.id, target.id));
+    toast.success(`Moved ${selectedTasks.length} ${selectedTasks.length === 1 ? "task" : "tasks"} to ${target.title}`, { action: { label: "Undo", onPress: () => api.restore(before) } });
   };
   const deleteSelected = () => {
     if (!selectedTasks.length) return;
@@ -164,10 +157,7 @@ export default function WorkspaceScreen() {
   };
   const addNewTask = (due?: string | null, sectionId?: string | null) => { setEditorTask(null); setInitialDueAt(due ?? null); setInitialSectionId(sectionId ?? null); setEditorVisible(true); };
   const saveTaskSection = (taskId: string, sectionId: string | null) => {
-    if (sectionId === null || sectionId === UNSORTED_SECTION_ID) {
-      api.setTaskSectionId(taskId, null);
-      return;
-    }
+    if (sectionId === null) return;
     const section = sections.find((item) => item.id === sectionId);
     if (!section) return;
     if (isCustomSection(section)) api.setTaskSectionId(taskId, section.id);
@@ -262,7 +252,7 @@ export default function WorkspaceScreen() {
     if (sectionId === null) api.setTaskSectionId(task.id, null);
     else if (target && isCustomSection(target)) api.setTaskSectionId(task.id, sectionId);
     else if (target) api.assignTaskToSection(task.id, sectionId);
-    toast.success(`Moved to ${target?.title ?? "Unsorted"}`, {
+    toast.success(`Moved to ${target?.title ?? "list"}`, {
       action: { label: "Undo", onPress: () => api.restore(before) },
     });
   };
@@ -320,7 +310,7 @@ export default function WorkspaceScreen() {
   const activeFilterBoard = boards.find((board) => board.id === boardFilter);
   const filterOptions = [{ label: "All boards", icon: boardFilter === "all" ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter("all"); setSelectedTaskIds(new Set()); } }, ...boards.map((board) => ({ label: board.label, icon: boardFilter === board.id ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter(board.id); setSelectedTaskIds(new Set()); } }))];
   const filtersContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
-    <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="swap-vertical-outline" label="Sort" onPress={() => setSortMenu(true)} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>SORT</Text></View>
+    {getRibbonContext(mode).sorting ? <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="swap-vertical-outline" label="Sort" onPress={() => setSortMenu(true)} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>SORT</Text></View> : null}
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionActionRow}><Pressable accessibilityRole="button" accessibilityLabel={`Filter board: ${activeFilterBoard?.label ?? "All boards"}`} accessibilityHint="Opens a dropdown of boards to filter by." onPress={() => setFilterMenu(true)} style={[styles.optionDropdown, { borderColor: theme.colors.border, backgroundColor: theme.colors.input }]}>{activeFilterBoard ? <View style={[styles.optionToolDot, { backgroundColor: boardColor(activeFilterBoard.color).dot }]} /> : <Ionicons name="grid-outline" size={15} color={theme.colors.mutedForeground} />}<Text numberOfLines={1} style={[styles.optionDropdownLabel, { color: theme.colors.foreground }]}>{activeFilterBoard?.label ?? "All boards"}</Text><Ionicons name="chevron-down" size={15} color={theme.colors.mutedForeground} /></Pressable></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>FILTER</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="pricetag-outline" label="Add filter/tag" onPress={() => setAddFilterOpen(true)} />{boards.length ? <OptionTool icon="trash-outline" label="Remove tag" tone="danger" onPress={() => setRemoveTagOpen(true)} /> : null}</View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>TAGS</Text></View>
   </ScrollView>;
@@ -328,11 +318,11 @@ export default function WorkspaceScreen() {
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <ThemeAtmosphere />
       <View style={{ flex: 1, paddingBottom: 68 + insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
-        <MobileBoardRibbon selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onSample={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showCheckboxes={showCheckboxes} onShowCheckboxes={() => setShowCheckboxes(!showCheckboxes)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
+        <MobileBoardRibbon selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
           {actionsContent}
         </MobileBoardRibbon>
         {mode === "board" ? <View style={{ flex: 1, minHeight: 0 }}>
-          {hasRefinements && visibleTasks.length === 0 ? <ScrollView contentContainerStyle={[mobileContentStyle, { paddingBottom: 76 }]}><WorkspaceEmptyState hasRefinements onCreate={() => addNewTask()} onClear={() => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); }} /></ScrollView> : <MobileTaskColumns key={id} tasks={visibleTasks} sections={sections} boards={boards} now={now} compact={compactCards} zoom={zoom} showCheckboxes={showCheckboxes} showMoveArrows={showMoveArrows} focused={focusedColumn} hiddenSections={sections.filter((section) => section.hidden)} selectionMode={selectionMode} selectedTaskIds={selectedTaskIds} onToggleSelect={toggleSelectedTask} onShowSection={toggleSectionVisibility} onTask={openEditor} onComplete={api.toggleComplete} onLongPress={setTaskAction} onMove={moveTaskToSection} onToggleSubtask={api.toggleSubtask} onAddTask={(sectionId) => addNewTask(null, sectionId)} onSectionMenu={setSectionMenu} onAddSection={() => setAddSectionOpen(true)} />}
+          {hasRefinements && visibleTasks.length === 0 ? <ScrollView contentContainerStyle={[mobileContentStyle, { paddingBottom: 76 }]}><WorkspaceEmptyState hasRefinements onCreate={() => addNewTask()} onClear={() => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); }} /></ScrollView> : <MobileTaskColumns key={id} tasks={visibleTasks} sections={sections} boards={boards} now={now} compact={compactCards} zoom={zoom} showMoveArrows={showMoveArrows} focused={focusedColumn} hiddenSections={sections.filter((section) => section.hidden)} selectionMode={selectionMode} selectedTaskIds={selectedTaskIds} onToggleSelect={toggleSelectedTask} onShowSection={toggleSectionVisibility} onTask={openEditor} onLongPress={setTaskAction} onMove={moveTaskToSection} onToggleSubtask={api.toggleSubtask} onAddTask={(sectionId) => addNewTask(null, sectionId)} onSectionMenu={setSectionMenu} onAddSection={() => setAddSectionOpen(true)} />}
         </View> : <ScrollView style={{ flex: 1 }} contentContainerStyle={[mobileContentStyle, { paddingBottom: 76 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {mode === "list" ? <ListView tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={setCalendarDay} tasks={visibleTasks} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
@@ -347,7 +337,7 @@ export default function WorkspaceScreen() {
       <TextEntrySheet visible={addFilterOpen} title="Add filter/tag" description="Create a tag to group tasks and filter this board." placeholder="Tag name" actionLabel="Add tag" onClose={() => setAddFilterOpen(false)} onSubmit={createFilterTag} />
       <OptionSheet visible={removeTagOpen} title="Remove tag" options={boards.map((board) => ({ label: board.label, icon: "trash-outline" as const, destructive: true, onPress: () => removeTag(board) }))} onClose={() => setRemoveTagOpen(false)} />
        <OptionSheet visible={sortMenu} title="Sort tasks" options={SORT_OPTIONS.map((option) => ({ label: option.label, icon: sort === option.value ? "checkmark-circle" : "radio-button-off-outline", onPress: () => setSort(option.value) }))} onClose={() => setSortMenu(false)} />
-        <OptionSheet visible={bulkSectionMenu} title="Move selected tasks" options={[{ label: "Move to Unsorted", icon: "file-tray-outline" as const, onPress: () => runBulkMove(null) }, ...sections.map((section) => ({ label: `Move to ${section.title}`, icon: "arrow-forward-outline" as const, onPress: () => runBulkMove(section.id) }))]} onClose={() => setBulkSectionMenu(false)} />
+        <OptionSheet visible={bulkSectionMenu} title="Move selected tasks" options={sections.map((section) => ({ label: `Move to ${section.title}`, icon: "arrow-forward-outline" as const, onPress: () => runBulkMove(section.id) }))} onClose={() => setBulkSectionMenu(false)} />
        <OptionSheet visible={bulkPriorityMenu} title="Set selected priority" options={PRIORITY_ORDER.map((priority) => ({ label: PRIORITY_META[priority].label, icon: "flag-outline" as const, onPress: () => runBulkPriority(priority) }))} onClose={() => setBulkPriorityMenu(false)} />
        <OptionSheet visible={sectionMenu !== null} title={sectionMenu?.title ?? "List"} options={sectionMenu ? [
          ...(isCustomSection(sectionMenu) ? [{ label: "Rename list", icon: "pencil-outline" as const, onPress: () => setRenameSectionTarget(sectionMenu) }] : []),
@@ -358,7 +348,7 @@ export default function WorkspaceScreen() {
        ] : []} onClose={() => setSectionMenu(null)} />
        <Sheet visible={deleteSectionTarget !== null} onClose={() => setDeleteSectionTarget(null)}>
          <Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>Delete list?</Text>
-         <Text style={[styles.sheetCopy, { color: theme.colors.mutedForeground }]}>“{deleteSectionTarget?.title}” will be removed. Its cards will move to Unsorted or their status list.</Text>
+          <Text style={[styles.sheetCopy, { color: theme.colors.mutedForeground }]}>“{deleteSectionTarget?.title}” will be removed. Its cards will move to the first available list. An Inbox list will be created if needed.</Text>
          <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
            <Button variant="outline" label="Keep list" onPress={() => setDeleteSectionTarget(null)} style={{ flex: 1 }} />
            <Button variant="danger" label="Delete list" onPress={deleteList} style={{ flex: 1 }} />
@@ -453,7 +443,7 @@ function TaskActions({ task, tasks, sections, now, onClose, onComplete, onCancel
   const sectionId = task ? getTaskSectionId(task, sections, now) : undefined;
   const siblings = task ? tasks.filter((item) => getTaskSectionId(item, sections, now) === sectionId) : [];
   const taskIndex = task ? siblings.findIndex((item) => item.id === task.id) : -1;
-  const moveOptions = [...sections.filter((section) => section.id !== sectionId).map((section) => ({ label: `Move to ${section.title}`, icon: "arrow-forward-outline" as const, onPress: () => onMove(section.id) })), ...(sectionId !== undefined ? [{ label: "Move to Unsorted", icon: "file-tray-outline" as const, onPress: () => onMove(null) }] : [])];
+  const moveOptions = sections.filter((section) => section.id !== sectionId).map((section) => ({ label: `Move to ${section.title}`, icon: "arrow-forward-outline" as const, onPress: () => onMove(section.id) }));
   return <OptionSheet visible={task !== null} title={task?.title ?? "Task actions"} options={[{ label: task?.completed ? "Mark incomplete" : "Complete task", icon: "checkmark-circle-outline", onPress: onComplete }, { label: task?.canceled ? "Restore task" : "Cancel task", icon: "close-circle-outline", onPress: onCancel }, ...(taskIndex > 0 ? [{ label: "Move task up", icon: "arrow-up-outline" as const, onPress: onMoveUp }] : []), ...(taskIndex >= 0 && taskIndex < siblings.length - 1 ? [{ label: "Move task down", icon: "arrow-down-outline" as const, onPress: onMoveDown }] : []), ...moveOptions, { label: "Delete task", icon: "trash-outline", destructive: true, onPress: onDelete }]} onClose={onClose} />;
 }
 

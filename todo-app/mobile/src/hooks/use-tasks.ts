@@ -17,6 +17,8 @@ import {
 import {
   CANCELED_SECTION_TITLE,
   findCanceledSection,
+  getTaskSectionId,
+  ensureDefaultTaskSection,
   isCustomSection,
   isStatusSection,
 } from "@/lib/domain/sections";
@@ -257,14 +259,16 @@ export function useTasks(): TasksApi {
   const ensureCanceledSection = useCallback((): BoardSection => {
     const existing = findCanceledSection(sectionsRef.current);
     if (existing) {
-      if (existing.hidden) {
-        setLiveSections((prev) =>
-          prev.map((section) =>
-            section.id === existing.id ? { ...section, hidden: false } : section,
-          ),
-        );
+      const isEmpty = !tasksRef.current.some(
+        (task) => getTaskSectionId(task, sectionsRef.current, new Date()) === existing.id,
+      );
+      const visible = existing.hidden ? { ...existing, hidden: false } : existing;
+      if (isEmpty) {
+        setLiveSections((prev) => [...prev.filter((section) => section.id !== existing.id), visible]);
+      } else if (existing.hidden) {
+        setLiveSections((prev) => prev.map((section) => section.id === existing.id ? visible : section));
       }
-      return existing;
+      return visible;
     }
     const section: BoardSection = {
       id: `custom-${makeId(8)}`,
@@ -363,9 +367,12 @@ export function useTasks(): TasksApi {
 
   const addTask = useCallback((draft: TaskDraft): Task => {
     const task = createTask(draft);
+    const nextSections = [...sectionsRef.current];
+    task.sectionId = ensureDefaultTaskSection(nextSections).id;
+    if (nextSections.length !== sectionsRef.current.length) setLiveSections(() => nextSections);
     setLiveTasks((prev) => [...prev, task]);
     return task;
-  }, [setLiveTasks]);
+  }, [setLiveSections, setLiveTasks]);
 
   const updateTask = useCallback(
     (id: string, draft: TaskDraft) => {
@@ -673,13 +680,15 @@ export function useTasks(): TasksApi {
   }, [setLiveSections]);
 
   const deleteSection = useCallback((id: string) => {
-    setLiveSections((prev) => {
-      const target = prev.find((section) => section.id === id);
-      if (!target || !isCustomSection(target)) return prev;
-      return prev.filter((section) => section.id !== id);
-    });
+    const target = sectionsRef.current.find((section) => section.id === id);
+    if (!target || !isCustomSection(target)) return;
+    const nextSections = sectionsRef.current.filter((section) => section.id !== id);
+    const now = new Date();
+    const affectedIds = new Set(tasksRef.current.filter((task) => getTaskSectionId(task, sectionsRef.current, now) === id).map((task) => task.id));
+    const fallbackId = affectedIds.size ? ensureDefaultTaskSection(nextSections).id : null;
+    setLiveSections(() => nextSections);
     setLiveTasks((prev) =>
-      prev.map((task) => (task.sectionId === id ? { ...task, sectionId: null } : task)),
+      prev.map((task) => (affectedIds.has(task.id) ? { ...task, sectionId: fallbackId } : task)),
     );
   }, [setLiveSections, setLiveTasks]);
 
@@ -831,18 +840,13 @@ export function useTasks(): TasksApi {
     const sampleBoards = SAMPLE_BOARDS.map((board) => ({ ...board }));
     boardsRef.current = sampleBoards;
     setBoards(sampleBoards);
-    if (sectionsRef.current.length === 0) {
-      const sampleSections = SAMPLE_SECTIONS.map((section) => ({ ...section }));
-      const sampleTasks = distributeSampleTasks(samples);
-      sectionsRef.current = sampleSections;
-      tasksRef.current = sampleTasks;
-      setSections(sampleSections);
-      setTasks(sampleTasks);
-    } else {
-      tasksRef.current = samples;
-      setTasks(samples);
-    }
-  }, []);
+    const sampleSections = sectionsRef.current.some((section) => !section.hidden && isCustomSection(section))
+      ? sectionsRef.current
+      : [...sectionsRef.current, ...SAMPLE_SECTIONS.map((section) => ({ ...section, id: `custom-${makeId(8)}` }))];
+    const sampleTasks = distributeSampleTasks(samples, sampleSections);
+    setLiveSections(() => sampleSections);
+    setLiveTasks(() => sampleTasks);
+  }, [setLiveSections, setLiveTasks]);
 
   const createVersion = useCallback(() => {
     const version: WorkspaceVersion = {

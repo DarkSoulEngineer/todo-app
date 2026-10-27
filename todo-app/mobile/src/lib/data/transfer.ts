@@ -1,10 +1,15 @@
 import { File, Paths } from "expo-file-system";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
+import { Platform } from "react-native";
+import { parseSettingsJson, serializeSettings, type AppSettings } from "@/lib/data/settings";
 import type { Workspace } from "@/lib/domain/types";
-import { buildWorkspace, parseWorkspaceJson } from "@/lib/data/workspace";
+import { parseWorkspaceJson } from "@/lib/data/workspace";
+import { parseBackupJson, parseBoardsJson, serializeFullBackup, type ImportedBackup } from "@/lib/data/backup";
 import { exportProjectsToCSV, exportTasksToCSV } from "@/lib/features/insights-filters";
 import type { ProjectImport } from "@/lib/domain/projects";
+
+export { parseBoardsJson } from "@/lib/data/backup";
 
 function safeName(value: string): string {
   return value
@@ -16,18 +21,64 @@ function safeName(value: string): string {
 
 /** Writes a file into the cache directory and opens the share sheet. */
 async function shareText(fileName: string, mimeType: string, contents: string): Promise<void> {
+  if (Platform.OS === "web") {
+    const url = URL.createObjectURL(new Blob([contents], { type: mimeType }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+  if (!(await Sharing.isAvailableAsync())) throw new Error("File sharing is unavailable on this device.");
   const file = new File(Paths.cache, fileName);
   if (file.exists) file.delete();
   file.create();
   await file.write(contents);
 
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(file.uri, {
-      mimeType,
-      dialogTitle: "Export Janus backup",
-      UTI: mimeType === "text/csv" ? "public.comma-separated-values-text" : "public.json",
-    });
+  await Sharing.shareAsync(file.uri, {
+    mimeType,
+    dialogTitle: "Export Janus backup",
+    UTI: mimeType === "text/csv" ? "public.comma-separated-values-text" : "public.json",
+  });
+}
+
+export async function exportSettings(settings: AppSettings): Promise<void> {
+  await shareText(
+    `janus-settings-${new Date().toISOString().slice(0, 10)}.json`,
+    "application/json",
+    serializeSettings(settings),
+  );
+}
+
+export async function exportFullBackup(boards: ProjectImport[], settings: AppSettings): Promise<void> {
+  await shareText(
+    `janus-backup-${new Date().toISOString().slice(0, 10)}.json`,
+    "application/json",
+    serializeFullBackup(boards, settings),
+  );
+}
+
+export async function pickBackupFile(): Promise<ImportedBackup | null> {
+  const picked = await pickJsonFile();
+  if (!picked) return null;
+  const backup = parseBackupJson(picked.raw);
+  if (!backup) throw new Error("Choose a valid Janus JSON backup.");
+  if (backup.boards.length === 1 && backup.boards[0].name === "Imported board") {
+    backup.boards[0].name = picked.name;
   }
+  return backup;
+}
+
+/** Cancellation is not an error; invalid backups are rejected before any changes. */
+export async function pickSettingsFile(): Promise<AppSettings | null> {
+  const picked = await pickJsonFile();
+  if (!picked) return null;
+  const settings = parseSettingsJson(picked.raw);
+  if (!settings) throw new Error("Could not import settings. Choose a valid Janus settings JSON backup (version 1).");
+  return settings;
 }
 
 /** Shares a board as a JSON backup that can be imported on any device. */
@@ -92,54 +143,6 @@ export interface ImportedWorkspace {
   name: string;
 }
 
-function optionalName(value: unknown): string | null {
-  if (typeof value !== "object" || value === null) return null;
-  const name = (value as Record<string, unknown>).name;
-  return typeof name === "string" && name.trim() ? name.trim() : null;
-}
-
-function optionalClosedAt(value: unknown): string | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
-  const closedAt = (value as Record<string, unknown>).closedAt;
-  if (typeof closedAt !== "string") return undefined;
-  const date = new Date(closedAt);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-}
-
-/**
- * Reads a JSON backup containing one board or a full all-board export.
- * Single-board exports and older Janus backups are returned as one entry.
- */
-export function parseBoardsJson(raw: string): ProjectImport[] | null {
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-      const projects = (parsed as Record<string, unknown>).projects;
-      if (Array.isArray(projects)) {
-        const boards: ProjectImport[] = [];
-        for (const [index, entry] of projects.entries()) {
-          if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return null;
-          const record = entry as Record<string, unknown>;
-          const workspace = buildWorkspace(record.workspace ?? record);
-          if (!workspace) return null;
-          boards.push({
-            name: optionalName(record) ?? `Imported board ${index + 1}`,
-            closedAt: optionalClosedAt(record),
-            workspace,
-          });
-        }
-        return boards.length > 0 ? boards : null;
-      }
-    }
-
-    const workspace = buildWorkspace(parsed);
-    if (!workspace) return null;
-    return [{ name: optionalName(parsed) ?? "Imported board", workspace }];
-  } catch {
-    return null;
-  }
-}
-
 async function pickJsonFile(): Promise<{ raw: string; name: string } | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: ["application/json", "text/plain", "*/*"],
@@ -149,7 +152,9 @@ async function pickJsonFile(): Promise<{ raw: string; name: string } | null> {
   if (result.canceled || result.assets.length === 0) return null;
 
   const asset = result.assets[0];
-  const raw = await new File(asset.uri).text();
+  const raw = Platform.OS === "web" && asset.file
+    ? await asset.file.text()
+    : await new File(asset.uri).text();
   const name = asset.name?.replace(/\.(json|txt)$/i, "").trim() || "Imported board";
   return { raw, name };
 }

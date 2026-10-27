@@ -9,13 +9,9 @@ import {
   type ReactNode,
 } from "react";
 
-export type CalendarWeekStart = 0 | 1;
-export type CalendarDefaultView = "month" | "week";
+import type { AppPreferences, CalendarDefaultView, CalendarWeekStart } from "@/lib/data/settings";
 
-interface AppPreferences {
-  calendarWeekStart: CalendarWeekStart;
-  calendarDefaultView: CalendarDefaultView;
-}
+export type { CalendarDefaultView, CalendarWeekStart } from "@/lib/data/settings";
 
 const PREFERENCES_KEY = "janus.preferences.v1";
 
@@ -25,6 +21,7 @@ const DEFAULTS: AppPreferences = {
 };
 
 interface PreferencesContextValue extends AppPreferences {
+  savePreferences: (value: AppPreferences) => Promise<void>;
   setCalendarWeekStart: (value: CalendarWeekStart) => void;
   setCalendarDefaultView: (value: CalendarDefaultView) => void;
 }
@@ -69,13 +66,20 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const savePreferences = useCallback(async (next: AppPreferences) => {
+    const preferences = { calendarWeekStart: next.calendarWeekStart, calendarDefaultView: next.calendarDefaultView };
+    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+    setPreferences(preferences);
+  }, []);
+
   const value = useMemo<PreferencesContextValue>(
     () => ({
       ...preferences,
+      savePreferences,
       setCalendarWeekStart: (value) => update({ calendarWeekStart: value }),
       setCalendarDefaultView: (value) => update({ calendarDefaultView: value }),
     }),
-    [preferences, update],
+    [preferences, update, savePreferences],
   );
 
   if (!hydrated) return null;

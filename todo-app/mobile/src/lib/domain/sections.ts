@@ -35,6 +35,15 @@ export function isCustomSection(section: BoardSection): boolean {
   return section.status === undefined;
 }
 
+/** Gives new or displaced cards a real list, creating one only when needed. */
+export function ensureDefaultTaskSection(sections: BoardSection[]): BoardSection {
+  const existing = sections.find((section) => !section.hidden && isCustomSection(section));
+  if (existing) return existing;
+  const section = { id: `custom-${makeId(8)}`, title: "Inbox" };
+  sections.push(section);
+  return section;
+}
+
 function asStatus(value: unknown): TaskStatus | undefined {
   return STATUS_SECTIONS.includes(value as TaskStatus) ? (value as TaskStatus) : undefined;
 }
@@ -76,6 +85,7 @@ export function normalizeSections(value: unknown): BoardSection[] {
 
 /** Drops `sectionId` references that no longer point at a custom section. */
 export function reconcileSectionIds(tasks: { sectionId: string | null }[], sections: BoardSection[]): void {
+  if (tasks.length && !sections.length) ensureDefaultTaskSection(sections);
   const customIds = new Set(sections.filter(isCustomSection).map((section) => section.id));
   for (const task of tasks) {
     if (task.sectionId && !customIds.has(task.sectionId)) task.sectionId = null;
@@ -93,7 +103,7 @@ export function getTaskSectionId(task: Task, sections: BoardSection[], now: Date
   }
   const status = deriveStatus(task, now);
   const statusSection = sections.find((s) => s.status === status);
-  return statusSection?.id;
+  return statusSection?.id ?? sections.find((section) => !section.hidden && isCustomSection(section))?.id;
 }
 
 /**

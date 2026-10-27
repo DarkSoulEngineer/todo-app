@@ -17,16 +17,15 @@ interface Props {
   zoom?: number;
   selected: boolean;
   selectionMode: boolean;
-  showCheckbox?: boolean;
   onPress: () => void;
   onMenu: () => void;
-  onComplete: () => void;
+  onSelect: () => void;
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
   onToggleSubtask: (subtaskId: string) => void;
 }
 
-export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, showCheckbox = true, onPress, onMenu, onComplete, onMoveLeft, onMoveRight, onToggleSubtask }: Props) {
+export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, onToggleSubtask }: Props) {
   const c = useMobileBoardColors();
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -38,14 +37,12 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const priorityInk = theme.scheme === "light" ? task.priority === "high" ? "#9A3412" : task.priority === "medium" ? c.warning : c.info : priorityColor;
   const tagTone = board ? boardColor(board.color) : null;
   const settled = task.completed || task.canceled;
-  const checkboxVisible = showCheckbox || selectionMode;
-  const checkboxLabel = selectionMode ? `${selected ? "Deselect" : "Select"} ${task.title}` : `${task.completed ? "Reopen" : "Complete"} ${task.title}`;
   const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: () => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={handler} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.5 : 1 }]}><Ionicons name={name} size={15} color={c.mutedForeground} /></Pressable>;
 
   return <View testID={`kanban-card-${task.id}`} style={[styles.card, { backgroundColor: c.card, borderColor: selected ? c.primary : `${accent}55`, borderLeftColor: accent }]}>
     <LinearGradient pointerEvents="none" colors={["transparent", task.priority === "high" ? "#F9731618" : task.priority === "medium" ? "#F59E0B18" : `${cardTheme?.accent ?? c.info}10`]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
     <View style={styles.topRow}>
-      {checkboxVisible ? <Pressable accessibilityRole="checkbox" accessibilityLabel={checkboxLabel} aria-checked={selectionMode ? selected : task.completed} onPress={onComplete} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selectionMode ? selected ? "checkbox" : "square-outline" : task.completed ? "checkbox" : task.canceled ? "close-circle-outline" : "square-outline"} size={20} color={selectionMode ? selected ? c.primary : c.mutedForeground : task.completed ? c.success : c.mutedForeground} /></Pressable> : null}
+      {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={onSelect} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <Pressable accessibilityRole={selectionMode ? "checkbox" : "button"} accessibilityLabel={task.title} aria-checked={selectionMode ? selected : undefined} onPress={onPress} onLongPress={onMenu} style={styles.titleArea}><Text numberOfLines={2} style={[styles.title, { fontSize: 13 * zoom, lineHeight: 18 * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{task.title}</Text></Pressable>
       <View style={styles.actions}>
         {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}

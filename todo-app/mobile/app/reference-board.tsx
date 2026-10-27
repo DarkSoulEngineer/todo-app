@@ -24,7 +24,6 @@ export default function ReferenceBoardRoute() {
   const taskOptions = taskAction ? [
     { label: taskAction.completed ? "Mark incomplete" : "Complete task", icon: "checkmark-circle-outline" as const, onPress: () => api.toggleComplete(taskAction.id) },
     { label: taskAction.canceled ? "Restore task" : "Cancel task", icon: "close-circle-outline" as const, onPress: () => api.toggleCancel(taskAction.id) },
-    ...(taskAction.sectionId ? [{ label: "Move to Unsorted", icon: "file-tray-outline" as const, onPress: () => api.setTaskSectionId(taskAction.id, null) }] : []),
     ...moveOptions,
     { label: "Delete task", icon: "trash-outline" as const, destructive: true, onPress: () => { const before = api.snapshot(); api.deleteTask(taskAction.id); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } },
   ] : [];
