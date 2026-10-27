@@ -89,8 +89,16 @@ function ManagerCard({ project, accent, metrics, pinned, editing, ready, first, 
   return <View testID={`manager-board-${project.id}`} style={[styles.board, { backgroundColor: c.card, borderColor: c.border }]}>
     {/* A sibling hit surface opens every non-control area without nesting buttons. */}
     <Pressable accessibilityRole="button" accessibilityLabel={closed ? `${project.name}, closed board` : `Open ${project.name}`} accessibilityHint={closed ? "Shows options to reopen this board" : "Opens board view"} disabled={editing} onPress={onOpen} onLongPress={onMenu} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: 20, backgroundColor: pressed ? c.primarySoft : "transparent" }]} />
-    <View pointerEvents="box-none" style={styles.cardHeader}><View pointerEvents="none" style={styles.cardTitleArea}><Text style={[styles.boardTitle, { color: c.foreground }]} numberOfLines={2}>{project.name}</Text>{closed ? <View style={[styles.closedBadge, { backgroundColor: c.secondary, borderColor: c.border }]}><Ionicons name="lock-closed" size={10} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 9, fontWeight: "700", letterSpacing: 0.5 }}>CLOSED</Text></View> : null}{isValid(date) ? <Text style={[styles.created, { color: c.mutedForeground }]}>Created {format(date, "dd MMM yyyy")}</Text> : null}</View>{closed ? null : <Pressable accessibilityRole="button" accessibilityLabel={`${pinned ? "Unpin" : "Pin"} ${project.name}`} accessibilityState={{ selected: pinned, disabled: !ready }} disabled={!ready} onPress={onPin} style={styles.pin}><Ionicons name={pinned ? "star" : "star-outline"} size={21} color={pinned ? c.primary : c.borderStrong} /></Pressable>}</View>
-    {editing ? <View pointerEvents="box-none" style={styles.reorder}><Button variant="outline" label="Move up" disabled={first} onPress={() => onMove(-1)} /><Button variant="outline" label="Move down" disabled={last} onPress={() => onMove(1)} /></View> : null}
+    <View pointerEvents="box-none" style={styles.cardHeader}>
+      <View pointerEvents="none" style={styles.cardTitleArea}><Text style={[styles.boardTitle, { color: c.foreground }]} numberOfLines={2}>{project.name}</Text>{closed ? <View style={[styles.closedBadge, { backgroundColor: c.secondary, borderColor: c.border }]}><Ionicons name="lock-closed" size={10} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 9, fontWeight: "700", letterSpacing: 0.5 }}>CLOSED</Text></View> : null}{isValid(date) ? <Text style={[styles.created, { color: c.mutedForeground }]}>Created {format(date, "dd MMM yyyy")}</Text> : null}</View>
+      {closed ? null : <View pointerEvents="box-none" style={styles.headerActions}>
+        {editing ? <>
+          <BoardMoveButton direction="up" boardName={project.name} disabled={first || !ready} onPress={() => onMove(-1)} />
+          <BoardMoveButton direction="down" boardName={project.name} disabled={last || !ready} onPress={() => onMove(1)} />
+        </> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel={`${pinned ? "Unpin" : "Pin"} ${project.name}`} accessibilityState={{ selected: pinned, disabled: !ready }} disabled={!ready} onPress={onPin} style={styles.reorderButton}><Ionicons name={pinned ? "star" : "star-outline"} size={21} color={pinned ? c.primary : c.borderStrong} /></Pressable>
+      </View>}
+    </View>
     <View pointerEvents="none" style={styles.progressArea}>
       <View style={styles.progressMeta}><View style={styles.inline}><Ionicons name="ellipse-outline" size={11} color={c.mutedForeground} /><Text style={{ color: c.secondaryForeground, fontSize: 13 }}>{metrics.open} open</Text></View><View style={styles.inline}><Ionicons name="checkmark" size={17} color={accent} /><Text style={{ color: accent, fontSize: 13 }}>{metrics.done} done</Text></View><Text style={[styles.percent, { color: c.mutedForeground }]}>{metrics.completionPercent}%</Text></View>
       <View style={[styles.track, { backgroundColor: c.secondary }]}><View style={{ height: "100%", width: `${metrics.completionPercent}%`, backgroundColor: accent, borderRadius: 5 }} /></View>
@@ -98,6 +106,21 @@ function ManagerCard({ project, accent, metrics, pinned, editing, ready, first, 
     <View pointerEvents="none" style={styles.signals}><View style={styles.inline}><Ionicons name="warning-outline" size={14} color={c.destructive} /><Text style={{ color: c.destructive, fontSize: 12 }}>{metrics.overdue} overdue</Text></View><View style={styles.inline}><Ionicons name="time-outline" size={14} color={c.info} /><Text style={{ color: c.info, fontSize: 12 }}>{metrics.dueSoon} due soon</Text></View></View>
     <View pointerEvents="box-none" style={[styles.cardFooter, { borderColor: c.border }]}>{closed ? <><CardAction icon="refresh-outline" label="Reopen" onPress={onReopen} /><View pointerEvents="none" style={{ flex: 1 }} /><CardAction label="Remove" onPress={onRemove} destructive disabled={!ready} /><IconButton icon="ellipsis-horizontal" label={`Actions for ${project.name}`} onPress={onMenu} size={44} /></> : <><CardAction icon="download-outline" label="Save" onPress={onSave} /><CardAction icon="copy-outline" label="Duplicate" onPress={onDuplicate} /><View pointerEvents="none" style={{ flex: 1 }} /><CardAction label="Remove" onPress={onRemove} destructive disabled={!ready} /><IconButton icon="ellipsis-horizontal" label={`Actions for ${project.name}`} onPress={onMenu} size={44} /></>}</View>
   </View>;
+}
+
+function BoardMoveButton({ direction, boardName, disabled, onPress }: { direction: "up" | "down"; boardName: string; disabled: boolean; onPress: () => void }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  return <Pressable
+    accessibilityRole="button"
+    accessibilityLabel={`Move ${boardName} ${direction}`}
+    accessibilityState={{ disabled }}
+    disabled={disabled}
+    onPress={onPress}
+    style={({ pressed }) => [styles.reorderButton, { opacity: disabled ? 0.3 : pressed ? 0.6 : 1 }]}
+  >
+    <Ionicons name={direction === "up" ? "arrow-up" : "arrow-down"} size={22} color={disabled ? c.mutedForeground : c.primary} />
+  </Pressable>;
 }
 
 function CardAction({ icon, label, onPress, destructive, disabled }: { icon?: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; destructive?: boolean; disabled?: boolean }) {
@@ -117,7 +140,7 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
   let offset = 0;
   return <View style={styles.overviewSection}>
     <SectionHeading title="Board stats" subtitle="Across open boards · includes canceled tasks" style={styles.overviewHeading} />
-    <View style={[styles.overview, { backgroundColor: c.card, borderColor: c.border, shadowColor: c.shadow }]}>
+    <View style={styles.overview}>
       <View style={styles.statsContent}>
       <View accessible accessibilityLabel={`${metrics.total} tasks: ${metrics.done} completed, ${metrics.overdue} overdue, ${metrics.open - metrics.overdue} open and not overdue, ${metrics.canceled} canceled`} style={styles.donut}>
         <Svg width="100%" height="100%" viewBox="0 0 120 120">
@@ -134,7 +157,7 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
         </Svg>
         <View style={styles.donutLabel}><Text style={[styles.donutValue, { color: c.foreground }]}>{metrics.total}</Text><Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 5 }}>TASKS</Text></View>
       </View>
-      <View style={[styles.statsTotal, { borderColor: c.border, backgroundColor: c.backgroundAlt }]}><View style={{ flexShrink: 1 }}><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={[styles.boardCount, { color: c.mutedForeground }]}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>
+      <View style={styles.statsTotal}><View style={{ flexShrink: 1 }}><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={[styles.boardCount, { color: c.mutedForeground }]}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>
         <View style={[styles.legend, { borderColor: c.border }]}>{slices.map((slice) => <View key={slice.label} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: slice.color }]} /><Text style={[styles.legendLabel, { color: c.secondaryForeground }]}>{slice.label}</Text><Text style={[styles.legendValue, { color: c.foreground }]}>{slice.value}</Text><Text style={[styles.legendPercent, { color: c.mutedForeground }]}>{metrics.total ? Math.round(slice.value / metrics.total * 100) : 0}%</Text></View>)}</View>
       </View>
     </View>
@@ -147,14 +170,16 @@ const styles = StyleSheet.create({
   content: mobileContentStyle,
   arrange: { paddingHorizontal: 10, borderRadius: 13 },
   sectionHeading: { marginTop: 24, marginBottom: 10 }, firstSectionHeading: { marginBottom: 10 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },
-  board: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 17, paddingTop: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }, cardHeader: { flexDirection: "row", alignItems: "flex-start" }, cardTitleArea: { flex: 1, paddingVertical: 4, minHeight: 44 }, boardTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.4 }, closedBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5, height: 20, paddingHorizontal: 6, borderWidth: 1, borderRadius: 7 }, created: { fontSize: 12, marginTop: 4 }, pin: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -10, marginTop: -5 }, reorder: { flexDirection: "row", gap: 8, marginTop: 12 },
+  board: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 17, paddingTop: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }, cardHeader: { flexDirection: "row", alignItems: "flex-start" }, cardTitleArea: { flex: 1, paddingVertical: 4, minHeight: 44 }, boardTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.4 }, closedBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5, height: 20, paddingHorizontal: 6, borderWidth: 1, borderRadius: 7 }, created: { fontSize: 12, marginTop: 4 }, pin: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -10, marginTop: -5 },
+  headerActions: { flexDirection: "row", alignItems: "center", marginTop: -5, marginRight: -10 },
+  reorderButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   progressArea: { paddingTop: 18, paddingBottom: 8 }, progressMeta: { flexDirection: "row", alignItems: "center", gap: 16 }, inline: { flexDirection: "row", alignItems: "center", gap: 5 }, percent: { marginLeft: "auto", fontSize: 12, fontWeight: "600" }, track: { height: 6, borderRadius: 5, marginTop: 8, overflow: "hidden" }, signals: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, minHeight: 47, paddingVertical: 9 },
   cardFooter: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, gap: 12, marginTop: 4, minHeight: 45 }, cardAction: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 5 },
   overviewSection: { marginTop: 34 },
   overviewHeading: { marginBottom: 12 },
-  overview: { borderRadius: 20, borderWidth: 1, padding: 16, shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  overview: { padding: 16 },
   statsContent: { paddingTop: 4 },
-  statsTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 16, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14 },
+  statsTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 16, padding: 14 },
   totalLabel: { fontSize: 11 },
   totalValue: { fontSize: 39, lineHeight: 44, marginTop: 4 },
   boardCount: { flexShrink: 1, maxWidth: "50%", textAlign: "right", fontSize: 12, lineHeight: 18, paddingBottom: 4 },

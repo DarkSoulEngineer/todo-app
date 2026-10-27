@@ -110,8 +110,9 @@ export function MobileBoardRibbon(props: Props) {
       <Pressable accessibilityRole="button" accessibilityLabel="Back to boards" onPress={props.onBoards} onLongPress={props.onSwitchBoard} style={styles.tabAction}>
         <Ionicons name="arrow-back" size={20} color={c.foreground} />
       </Pressable>
-      {TABS.filter((item) => isRibbonTabAvailable(item.value, props.mode)).map((item) => <Pressable key={item.value} accessibilityRole="tab" accessibilityLabel={item.value === "select" ? "Select tasks" : item.value === "filters" && props.filtersActive ? "Filters tools, filter active" : `${item.label} tools`} aria-selected={shownTab === item.value} onPress={() => openTab(item.value)} style={[styles.tab, { borderBottomColor: shownTab === item.value ? c.primary : "transparent" }]}><View style={styles.tabIcon}><Ionicons name={item.icon} size={15} color={shownTab === item.value ? c.foreground : c.mutedForeground} />{item.value === "filters" && props.filtersActive ? <View testID="board-filter-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.primary, borderColor: c.card }]} /> : null}</View>{tabLabels === "all" || (tabLabels === "active" && shownTab === item.value) ? <Text numberOfLines={1} style={{ color: shownTab === item.value ? c.foreground : c.mutedForeground, fontSize: 13 }}>{item.label}</Text> : null}</Pressable>)}
-      <View style={styles.spacer} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabList} contentContainerStyle={styles.tabs}>
+        {TABS.filter((item) => isRibbonTabAvailable(item.value, props.mode)).map((item) => <Pressable key={item.value} accessibilityRole="tab" accessibilityLabel={item.value === "select" ? "Select tasks" : item.value === "filters" && props.filtersActive ? "Filters tools, filter active" : `${item.label} tools`} aria-selected={shownTab === item.value} onPress={() => openTab(item.value)} style={[styles.tab, { borderBottomColor: shownTab === item.value ? c.primary : "transparent" }]}><View style={styles.tabIcon}><Ionicons name={item.icon} size={15} color={shownTab === item.value ? c.foreground : c.mutedForeground} />{item.value === "filters" && props.filtersActive ? <View testID="board-filter-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.primary, borderColor: c.card }]} /> : null}</View>{tabLabels === "all" || (tabLabels === "active" && shownTab === item.value) ? <Text numberOfLines={1} style={{ color: shownTab === item.value ? c.foreground : c.mutedForeground, fontSize: 13 }}>{item.label}</Text> : null}</Pressable>)}
+      </ScrollView>
       {context.search ? <Pressable accessibilityRole="button" accessibilityLabel="Search tasks" onPress={() => { setSearchOpen((value) => !value); resetHideTimer(); }} style={[styles.tabAction, searchVisible && { backgroundColor: c.input }]}>
         <Ionicons name="search-outline" size={18} color={searchVisible ? c.primary : c.foreground} />
       </Pressable> : null}
@@ -129,7 +130,8 @@ export function MobileBoardRibbon(props: Props) {
 }
 
 const styles = StyleSheet.create({
-  spacer: { flex: 1 },
+  tabList: { flex: 1, minWidth: 0 },
+  tabs: { flexDirection: "row", gap: 4 },
   tabIcon: { position: "relative" },
   filterDot: { position: "absolute", top: -3, right: -4, width: 8, height: 8, borderRadius: 4, borderWidth: 1 },
   icon: { width: CONTROL_SIZE, height: CONTROL_SIZE, alignItems: "center", justifyContent: "center", flexShrink: 0 },
