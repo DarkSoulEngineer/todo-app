@@ -119,7 +119,11 @@ export function withWorkspace(
   };
 }
 
-export function activeProject(state: ProjectsState): JanusProject {
+export function activeProject(state: ProjectsState): JanusProject | undefined {
+  return state.projects.find((project) => project.id === state.currentId) ?? state.projects[0];
+}
+
+/** Validates a parsed registry payload. Anything malformed falls b
   return state.projects.find((project) => project.id === state.currentId) ?? state.projects[0];
 }
 

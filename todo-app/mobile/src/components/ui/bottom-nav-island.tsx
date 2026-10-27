@@ -18,16 +18,16 @@ export function BottomNavIsland({ children, tabCount = 3, blurTarget }: { childr
     paddingLeft: Math.max(insets.left, 16),
     paddingRight: Math.max(insets.right, 16),
   }]}>
-    <View testID="navigation-content-fade" pointerEvents="none" style={[styles.contentFade, { height: 32 + bottomGap }]}>
+    <View testID="navigation-content-fade" pointerEvents="none" style={[styles.contentFade, { height: 24 + bottomGap }]}>
       <LinearGradient
-        colors={[`${c.background}00`, `${c.background}40`, `${c.background}B3`]}
-        locations={[0, 0.6, 1]}
+        colors={[`${c.background}00`, `${c.background}20`, `${c.background}90`]}
+        locations={[0, 0.5, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={styles.fadeEdge}
       />
     </View>
-    <View testID="navigation-island-surface" style={[styles.surface, { maxWidth: tabCount * 80 + 16, shadowColor: c.shadow, backgroundColor: dark ? "rgba(18, 15, 11, 0.70)" : "rgba(255, 255, 255, 0.70)", borderColor: c.border }]}>
+    <View testID="navigation-island-surface" style={[styles.surface, { maxWidth: Math.min(600, tabCount * 80 + 48), shadowColor: c.shadow, backgroundColor: dark ? "rgba(18, 15, 11, 0.70)" : "rgba(255, 255, 255, 0.70)", borderColor: c.border }]}>
       <View style={[styles.glass, {
         backgroundColor: dark ? "rgba(18, 15, 11, 0.70)" : "rgba(255, 255, 255, 0.70)",
         borderColor: c.border,

@@ -199,6 +199,17 @@ export function useTasks(): TasksApi {
       setVersions(storedVersions);
       if (registry.projects.length > 0) {
         const active = activeProject(registry);
+        if (!active) {
+          activeIdRef.current = "";
+          tasksRef.current = [];
+          sectionsRef.current = [];
+          boardsRef.current = [];
+          setTasks([]);
+          setSections([]);
+          setBoards([]);
+          setIsLoading(false);
+          return;
+        }
         activeIdRef.current = active.id;
         tasksRef.current = active.workspace.tasks;
         sectionsRef.current = active.workspace.sections;
@@ -894,6 +905,7 @@ export function useTasks(): TasksApi {
     saveQueueRef.current = saveQueueRef.current.then(() => saveProjects(next));
     if (!activate) return;
     const active = activeProject(next);
+    if (!active) return;
     activeIdRef.current = active.id;
     tasksRef.current = active.workspace.tasks;
     sectionsRef.current = active.workspace.sections;
@@ -1136,7 +1148,7 @@ export function useTasks(): TasksApi {
       deleteVersion,
       projects: projectsState?.projects ?? [],
       currentProjectId: projectsState?.currentId ?? "",
-      currentProjectName: projectsState ? activeProject(projectsState).name : "",
+      currentProjectName: projectsState ? (activeProject(projectsState)?.name ?? "") : "",
       createProject,
       importProject,
       importProjects,
