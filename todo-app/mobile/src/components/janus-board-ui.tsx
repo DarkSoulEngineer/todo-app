@@ -20,6 +20,7 @@ import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { boardColor } from "@/lib/domain/boards";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
@@ -310,7 +311,7 @@ function TaskEditorForm({
       <View style={[styles.taskEditorHandle, { backgroundColor: theme.colors.borderStrong }]} />
             <View style={styles.taskEditorHeader}>
               <View style={styles.taskEditorHeaderCopy}>
-                <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task details" : "New task"}</Text>
+                <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task details" : "Add task"}</Text>
                 <Text style={[styles.taskEditorSubtitle, { color: theme.colors.mutedForeground }]}>{task ? "Changes save automatically" : "Start with a title. Details can wait."}</Text>
               </View>
               <IconButton icon="close" label="Close task editor" onPress={closeEditor} size={40} />
@@ -338,24 +339,20 @@ function TaskEditorForm({
                 multiline
                 style={[styles.taskEditorNotes, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
               />
-              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>
-                <View style={styles.taskEditorSectionHeader}>
-                  <View style={[styles.taskEditorSectionIcon, { backgroundColor: theme.colors.primarySoft }]}><Ionicons name="options-outline" size={15} color={theme.colors.primary} /></View>
-                  <Text style={[styles.taskEditorSectionTitle, { color: theme.colors.foreground }]}>Organize</Text>
-                </View>
-                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
+              <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground, marginTop: 18 }]}>ORGANIZE</Text>
+              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border, marginTop: 6 }]}>
+                <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
                 <View style={styles.wrapRow}>{PRIORITY_ORDER.map((item) => <Chip key={item} label={PRIORITY_META[item].label} active={priority === item} color={PRIORITY_META[item].dot} onPress={() => setPriority(item)} />)}</View>
-                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
+                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; })}</ScrollView>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}><Chip label="Unsorted" active={!sectionId} onPress={() => setSectionId(null)} />{sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}</ScrollView>
               </View>
-              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>
-                <View style={styles.taskEditorSectionHeader}>
-                  <View style={[styles.taskEditorSectionIcon, { backgroundColor: theme.colors.infoSoft }]}><Ionicons name="calendar-outline" size={15} color={theme.colors.info} /></View>
-                  <Text style={[styles.taskEditorSectionTitle, { color: theme.colors.foreground }]}>Schedule</Text>
-                  <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>OPTIONAL</Text>
-                </View>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
+                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>SCHEDULE</Text>
+                <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>OPTIONAL</Text>
+              </View>
+              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border, marginTop: 6 }]}>
                 <View style={styles.taskEditorDateRow}>
                   <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due ${format(dateValue, "MMMM d, yyyy")}` : "Set due date"} onPress={() => setPicker("date")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}>
                     <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
@@ -369,13 +366,12 @@ function TaskEditorForm({
                 </View>
                 {picker ? <View style={styles.taskEditorPicker}><DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /></View> : null}
               </View>
-              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>
-                <View style={styles.taskEditorSectionHeader}>
-                  <View style={[styles.taskEditorSectionIcon, { backgroundColor: theme.colors.successSoft }]}><Ionicons name="checkbox-outline" size={15} color={theme.colors.success} /></View>
-                  <Text style={[styles.taskEditorSectionTitle, { color: theme.colors.foreground }]}>Checklist</Text>
-                  {subtasks.length ? <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>{subtasks.filter((item) => item.done).length}/{subtasks.length} DONE</Text> : null}
-                </View>
-                {subtasks.length ? <View style={[styles.taskEditorChecklist, { borderColor: theme.colors.border, backgroundColor: theme.colors.input }]}>{subtasks.map((subtask, index) => <View key={subtask.id} style={[styles.taskEditorSubtaskRow, index > 0 ? { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.taskEditorSubtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><TextInput value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} placeholderTextColor={theme.colors.mutedForeground} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.taskEditorSubtaskInput, { color: theme.colors.foreground, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} style={({ pressed }) => [styles.taskEditorSubtaskDelete, { opacity: pressed ? 0.6 : 1 }]}><Ionicons name="trash-outline" size={17} color={theme.colors.mutedForeground} /></Pressable></View>)}</View> : null}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
+                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>CHECKLIST</Text>
+                {subtasks.length ? <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>{subtasks.filter((item) => item.done).length}/{subtasks.length} DONE</Text> : null}
+              </View>
+              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border, marginTop: 6 }]}>
+                {subtasks.length ? <View style={[styles.taskEditorChecklist, { borderColor: theme.colors.border, backgroundColor: theme.colors.input, marginTop: 0 }]}>{subtasks.map((subtask, index) => <View key={subtask.id} style={[styles.taskEditorSubtaskRow, index > 0 ? { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.taskEditorSubtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><TextInput value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} placeholderTextColor={theme.colors.mutedForeground} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.taskEditorSubtaskInput, { color: theme.colors.foreground, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} style={({ pressed }) => [styles.taskEditorSubtaskDelete, { opacity: pressed ? 0.6 : 1 }]}><Ionicons name="trash-outline" size={17} color={theme.colors.mutedForeground} /></Pressable></View>)}</View> : null}
                 <View style={styles.taskEditorAddSubtask}><TextInput value={subtaskTitle} onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a step" placeholderTextColor={theme.colors.mutedForeground} returnKeyType="done" style={[styles.taskEditorAddSubtaskInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add subtask" onPress={addSubtaskLocal}><Ionicons name="add" size={19} color={theme.colors.primary} /></Button></View>
               </View>
             </ScrollView>
@@ -604,14 +600,12 @@ export function InsightsPanel({ tasks, boards, now, onReset, onExport }: Insight
 
   return (
     <View style={{ gap: 14 }}>
-      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <View>
-            <Text style={[styles.editorEyebrow, { color: theme.colors.primary }]}>INSIGHTS FILTERS</Text>
-            <Text style={[styles.insightTitle, { color: theme.colors.foreground, marginBottom: 0 }]}>Focus your period</Text>
-          </View>
+      <View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <SectionHeading title="Focus your period" subtitle="Insights filters" style={{ flex: 1 }} titleStyle={{ fontSize: 18, lineHeight: 24 }} />
           {activeFilters ? <Button variant="ghost" label="Reset" onPress={reset} accessibilityLabel="Reset insights filters" /> : null}
         </View>
+        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch} accessibilityLabel="Date range filters">
           {INSIGHTS_DATE_OPTIONS.map((option) => <Chip key={option.value} label={option.label} active={filters.dateRange === option.value} onPress={() => chooseDateRange(option.value)} />)}
         </ScrollView>
@@ -633,8 +627,9 @@ export function InsightsPanel({ tasks, boards, now, onReset, onExport }: Insight
           <Chip label="All boards" active={filters.boardId === "all"} onPress={() => updateFilters({ boardId: "all" })} />
           {boards.map((board) => <Chip key={board.id} label={board.label} color={boardColor(board.color).dot} active={filters.boardId === board.id} onPress={() => updateFilters({ boardId: board.id })} />)}
         </ScrollView>
-        {picker ? <DateTimePicker value={dateForPicker} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} maximumDate={now} onChange={(event, selected) => { if (selected) chooseCustomDate(selected); else setPicker(null); }} /> : null}
-      </Card>
+          {picker ? <DateTimePicker value={dateForPicker} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} maximumDate={now} onChange={(event, selected) => { if (selected) chooseCustomDate(selected); else setPicker(null); }} /> : null}
+        </Card>
+      </View>
 
       <View style={styles.statsGrid}>
         <Stat label="Total tasks" value={stats.total.toString()} accent={theme.colors.primary} />
@@ -647,9 +642,11 @@ export function InsightsPanel({ tasks, boards, now, onReset, onExport }: Insight
         <Stat label="Best day" value={period.best.toString()} accent={theme.colors.info} />
       </View>
 
-      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <View style={styles.overviewHeader}>
-          <View style={{ flex: 1 }}><Text style={[styles.insightTitle, { color: theme.colors.foreground, marginBottom: 2 }]}>Completion overview</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>A quick read on the work behind this period</Text></View>
+      <View>
+        <SectionHeading title="Completion overview" subtitle="A quick read on the work behind this period" style={{ marginBottom: 8 }} />
+        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <View style={styles.overviewHeader}>
+            <View style={{ flex: 1 }} />
           <View style={styles.completionRing} accessibilityLabel={`${completionPercent}% complete`}>
             <Svg width={completionRingSize} height={completionRingSize} viewBox={`0 0 ${completionRingSize} ${completionRingSize}`}>
               <Circle cx={completionRingSize / 2} cy={completionRingSize / 2} r={completionRingRadius} stroke={theme.colors.secondary} strokeWidth={completionRingStroke} fill="transparent" />
@@ -662,23 +659,28 @@ export function InsightsPanel({ tasks, boards, now, onReset, onExport }: Insight
         <View style={[styles.overviewTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.overviewFill, { width: `${completionPercent}%`, backgroundColor: theme.colors.primary }]} /></View>
         <View style={styles.overviewFooter}><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Overall progress</Text><Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: "700" }}>{completionPercent}% complete</Text></View>
       </Card>
+      </View>
 
-      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <Text style={[styles.insightTitle, { color: theme.colors.foreground }]}>Completion trend</Text>
-          <View style={styles.trendMeta}><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{periodLabel}</Text><View style={styles.legend}><View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Current period</Text><View style={[styles.legendDash, { borderTopColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Previous period</Text></View></View>
+      <View>
+        <SectionHeading title="Completion trend" subtitle={periodLabel} style={{ marginBottom: 8 }} />
+        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <View style={styles.trendMeta}><View style={styles.legend}><View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Current period</Text><View style={[styles.legendDash, { borderTopColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Previous period</Text></View></View>
           {period.windowTotal === 0 && period.previousWindowTotal === 0 ? <Text style={{ color: theme.colors.mutedForeground, textAlign: "center", paddingVertical: 28 }}>No completions in this period</Text> : <View style={styles.chart}>{trendPoints.map((point, index) => { const previous = previousTrendPoints[index]?.count ?? 0; return <View key={point.key} style={styles.chartPoint}><View style={styles.chartValuePair}><Text style={[styles.chartLabel, { color: theme.colors.primary }]}>{point.count || ""}</Text><Text style={[styles.chartLabel, { color: theme.colors.primary }]}>{previous || ""}</Text></View><View style={styles.chartBars}><Pressable accessibilityRole="button" accessibilityLabel={`${point.count} completed on ${point.label}, current period`} onPress={() => setSelectedTrendPoint({ label: point.label, count: point.count, previous, isPrevious: false })} style={[styles.chartBarButton, { height: 76 }]}><View style={[styles.chartBar, { height: Math.max(5, (point.count / maxTrend) * 76), backgroundColor: point.count ? theme.colors.primary : theme.colors.secondary }]} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`${previous} completed on ${point.label}, previous period`} onPress={() => setSelectedTrendPoint({ label: point.label, count: previous, previous, isPrevious: true })} style={[styles.chartPreviousOverlay, { height: Math.max(5, (previous / maxTrend) * 76), borderTopColor: theme.colors.primary }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{point.label}</Text></View>; })}</View>}
           {selectedTrendPoint ? <Pressable accessibilityRole="button" accessibilityLabel="Dismiss trend detail" onPress={() => setSelectedTrendPoint(null)} style={[styles.trendDetail, { backgroundColor: theme.colors.secondary }]}><View style={[styles.legendDot, { backgroundColor: selectedTrendPoint.isPrevious ? theme.colors.primary : theme.colors.primary }]} /><Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 12 }}>{selectedTrendPoint.isPrevious ? "Previous period" : "Current period"} · {selectedTrendPoint.label}</Text><Text style={{ color: theme.colors.foreground, fontSize: 12, fontWeight: "700" }}>{selectedTrendPoint.count} completed</Text><Ionicons name="close" size={15} color={theme.colors.mutedForeground} /></Pressable> : null}
          <View style={styles.comparisonCallout}><Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }}>{period.windowTotal} completed this period</Text>{period.periodChange !== null ? <View style={styles.comparisonValue}><Ionicons name="trending-up-outline" size={14} color={theme.colors.success} /><Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: "700" }}>{period.periodChange > 0 ? "+" : ""}{period.periodChange}% vs prev</Text></View> : null}</View>
-      </Card>
+        </Card>
+      </View>
 
-      <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <View style={styles.productivityHeader}><View><Text style={[styles.insightTitle, { color: theme.colors.foreground, marginBottom: 2 }]}>Productivity details</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>Find the shape of your work</Text></View><Ionicons name="analytics-outline" size={22} color={theme.colors.primary} /></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productivityTabs}>{PRODUCTIVITY_TABS.map((tab) => <Chip key={tab.value} label={tab.label} icon={tab.icon} active={productivityTab === tab.value} onPress={() => setProductivityTab(tab.value)} />)}</ScrollView>
+      <View>
+        <SectionHeading title="Productivity details" subtitle="Find the shape of your work" style={{ marginBottom: 8 }} />
+        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productivityTabs}>{PRODUCTIVITY_TABS.map((tab) => <Chip key={tab.value} label={tab.label} icon={tab.icon} active={productivityTab === tab.value} onPress={() => setProductivityTab(tab.value)} />)}</ScrollView>
         {productivityTab === "categories" ? <View style={styles.productivityBody}>{categoryCounts.length === 0 ? <Text style={[styles.emptyChartText, { color: theme.colors.mutedForeground }]}>No category data for these filters</Text> : categoryCounts.map(({ board, value }) => <View key={board.id} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.foreground }]} numberOfLines={1}>{board.label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${Math.max(8, (value / maxCategory) * 100)}%`, backgroundColor: boardColor(board.color).dot }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{value}</Text></View>)}</View> : null}
         {productivityTab === "priorities" ? <View style={styles.productivityBody}>{PRIORITY_ORDER.map((key) => <View key={key} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.foreground }]}>{PRIORITY_META[key].label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${priorityCounts[key] ? Math.max(8, (priorityCounts[key] / maxPriority) * 100) : 0}%`, backgroundColor: PRIORITY_META[key].dot }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{priorityCounts[key]}</Text></View>)}</View> : null}
         {productivityTab === "weekdays" ? <View style={styles.productivityBody}><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>Most productive rhythm across the selected period</Text><View style={styles.weekBars}>{weekday.map((value, index) => <View key={`${WEEKDAY_LABELS[index]}-${index}`} style={styles.weekBarItem}><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{value || ""}</Text><View style={[styles.weekBar, { height: Math.max(5, (value / maxWeekday) * 56), backgroundColor: value ? theme.colors.info : theme.colors.secondary }]} /><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{WEEKDAY_LABELS[index]}</Text></View>)}</View></View> : null}
         {productivityTab === "trends" ? <View style={styles.productivityBody}><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>Current and previous periods stay aligned for an at-a-glance comparison.</Text><View style={styles.miniTrend}><Text style={[styles.miniTrendValue, { color: theme.colors.foreground }]}>{period.windowTotal}</Text><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>completed in this window</Text><View style={[styles.miniTrendDivider, { backgroundColor: theme.colors.border }]} /><Text style={[styles.miniTrendValue, { color: theme.colors.foreground }]}>{period.previousWindowTotal}</Text><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>previous window</Text></View></View> : null}
-      </Card>
+        </Card>
+      </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 13 }}>{filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"} match current filters</Text>
@@ -725,16 +727,16 @@ const styles = StyleSheet.create({
   taskEditorScroll: { flexShrink: 1, minHeight: 0 },
   taskEditorContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 20 },
   taskEditorLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.2, marginTop: 16, marginBottom: 7 },
-  taskEditorTitleInput: { height: 58, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 0, fontSize: 20, lineHeight: 26, fontWeight: "700", textAlignVertical: "center" },
-  taskEditorNotes: { minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, fontSize: 14, lineHeight: 20, textAlignVertical: "top" },
-  taskEditorSection: { marginTop: 18, borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, padding: 14 },
-  taskEditorSectionHeader: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 2 },
-  taskEditorSectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  taskEditorSectionTitle: { flex: 1, fontSize: 14, fontWeight: "700" },
+  taskEditorTitleInput: { height: 56, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 0, fontSize: 19, lineHeight: 25, fontWeight: "700", textAlignVertical: "center" },
+  taskEditorNotes: { minHeight: 88, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, fontSize: 14, lineHeight: 20, textAlignVertical: "top" },
+  taskEditorSectionHeading: { marginTop: 20, marginBottom: 8 },
+  taskEditorSection: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
+  taskEditorSectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: "700", letterSpacing: -0.1 },
   taskEditorSectionMeta: { fontSize: 9, fontWeight: "800", letterSpacing: 1 },
   taskEditorInlineLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.1, marginTop: 14, marginBottom: 7 },
+  taskEditorInlineLabelFirst: { marginTop: 0 },
   taskEditorChipRow: { flexDirection: "row", gap: 8, paddingRight: 4, paddingBottom: 2 },
-  taskEditorDateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
+  taskEditorDateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   taskEditorDateField: { flex: 1, minHeight: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
   taskEditorDateText: { flex: 1, fontSize: 13, fontWeight: "600" },
   taskEditorClearDue: { width: 44, height: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, alignItems: "center", justifyContent: "center" },

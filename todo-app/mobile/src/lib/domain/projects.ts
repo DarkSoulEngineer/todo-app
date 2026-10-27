@@ -47,6 +47,13 @@ export interface ProjectsState {
   projects: JanusProject[];
 }
 
+/** A board ready to be added from a backup file. */
+export interface ProjectImport {
+  name: string;
+  workspace: Workspace;
+  closedAt?: string;
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }

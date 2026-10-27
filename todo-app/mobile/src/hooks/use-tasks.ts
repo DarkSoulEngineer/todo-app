@@ -30,6 +30,7 @@ import {
   withWorkspace,
   type ProjectsState,
   type JanusProject,
+  type ProjectImport,
 } from "@/lib/domain/projects";
 import { loadVersions, saveVersions } from "@/lib/data/versions";
 import {
@@ -139,6 +140,8 @@ export interface TasksApi {
   createProject: (name?: string) => string;
   /** Creates a board from an imported workspace and switches to it. */
   importProject: (name: string, workspace: Workspace) => string;
+  /** Adds every board in a backup at once, preserving closed state. */
+  importProjects: (entries: ProjectImport[]) => string[];
   /** Duplicates a board (tasks/sections/boards included) and switches to it. */
   duplicateProject: (id: string) => string | null;
   renameProject: (id: string, name: string) => void;
@@ -924,6 +927,28 @@ export function useTasks(): TasksApi {
     [applyRegistry, registryWithLiveWorkspace],
   );
 
+  const importProjects = useCallback(
+    (entries: ProjectImport[]) => {
+      const registry = registryWithLiveWorkspace();
+      if (!registry || entries.length === 0) return [];
+      const imported = entries.map((entry) => {
+        const project = projectFromWorkspace(entry.name, entry.workspace);
+        return entry.closedAt ? { ...project, closedAt: entry.closedAt } : project;
+      });
+      const firstOpen = imported.find((project) => !project.closedAt);
+      applyRegistry(
+        {
+          ...registry,
+          currentId: firstOpen?.id ?? registry.currentId,
+          projects: [...registry.projects, ...imported],
+        },
+        Boolean(firstOpen),
+      );
+      return imported.map((project) => project.id);
+    },
+    [applyRegistry, registryWithLiveWorkspace],
+  );
+
   const duplicateProject = useCallback(
     (id: string) => {
       const registry = registryWithLiveWorkspace();
@@ -1089,6 +1114,7 @@ export function useTasks(): TasksApi {
       currentProjectName: projectsState ? activeProject(projectsState).name : "",
       createProject,
       importProject,
+      importProjects,
       duplicateProject,
       renameProject,
       switchProject,
@@ -1147,6 +1173,7 @@ export function useTasks(): TasksApi {
       projectsState,
       createProject,
       importProject,
+      importProjects,
       duplicateProject,
       renameProject,
       switchProject,

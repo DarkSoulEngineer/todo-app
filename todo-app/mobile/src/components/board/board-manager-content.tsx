@@ -9,6 +9,7 @@ import { ScreenHeader } from "@/components/reference/mobile/reference-primitives
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MobileSearchField, MobileTopBarAction } from "@/components/ui/mobile-top-bar";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { useTheme } from "@/providers/theme-provider";
 import { getTaskMetrics, type TaskMetrics } from "@/lib/data/manager-state";
 import type { JanusProject } from "@/lib/domain/projects";
@@ -60,14 +61,19 @@ export function BoardManagerContent(props: Props) {
       search={showSearch ? <MobileSearchField value={props.query} onChangeText={props.onQuery} placeholder="Search boards" accessibilityLabel="Search boards" /> : null}
     />
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
-      <View style={[styles.sectionHeader, styles.firstSectionHeader]}><View style={styles.sectionCopy}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>YOUR BOARDS</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{props.totalBoards} active</Text></View><Button variant="outline" label={props.editing ? "Done" : "Rearrange"} onPress={() => props.onEdit(!props.editing)} disabled={!props.ready || (!props.editing && props.totalBoards < 2)} style={styles.arrange}>
-        <Ionicons name={props.editing ? "checkmark" : "reorder-three-outline"} size={18} color={c.mutedForeground} />
-        <Text style={{ color: c.secondaryForeground, fontSize: 12 }}>{props.editing ? "Done" : "Rearrange"}</Text>
-      </Button></View>
+      <SectionHeading
+        title="Your boards"
+        subtitle={`${props.totalBoards} active`}
+        style={styles.firstSectionHeading}
+        right={<Button variant="outline" label={props.editing ? "Done" : "Rearrange"} onPress={() => props.onEdit(!props.editing)} disabled={!props.ready || (!props.editing && props.totalBoards < 2)} style={styles.arrange}>
+          <Ionicons name={props.editing ? "checkmark" : "reorder-three-outline"} size={18} color={c.mutedForeground} />
+          <Text style={{ color: c.secondaryForeground, fontSize: 12 }}>{props.editing ? "Done" : "Rearrange"}</Text>
+        </Button>}
+      />
       {props.editing ? <Text style={[styles.editHint, { color: c.primary }]}>Use the arrows to arrange your boards.</Text> : null}
       {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View style={styles.boards}>{props.projects.map((project, index) => <ManagerCard key={project.id} project={project} accent={index % 2 ? "#EC4899" : c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />)}</View>}
       {props.closedProjects.length ? <>
-        <View style={styles.sectionHeader}><View style={styles.sectionCopy}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>CLOSED BOARDS</Text><Text style={{ color: c.mutedForeground, fontSize: 12 }}>{props.closedProjects.length} closed</Text></View></View>
+        <SectionHeading title="Closed boards" subtitle={`${props.closedProjects.length} closed`} style={styles.sectionHeading} />
         <Text style={[styles.editHint, { color: c.mutedForeground }]}>Closed boards stay safe with their tasks. Reopen one to keep working on it.</Text>
         <View style={styles.boards}>{props.closedProjects.map((project) => <ManagerCard key={project.id} project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />)}</View>
       </> : null}
@@ -109,26 +115,28 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
   const strokeWidth = 11;
   const segmentCount = slices.filter((slice) => slice.value > 0).length;
   let offset = 0;
-  return <View style={styles.overview}>
-    <View style={styles.overviewHeading}><View style={{ flex: 1 }}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.secondaryForeground }]}>BOARD STATS</Text><Text style={[styles.overviewHint, { color: c.mutedForeground }]}>Across open boards · includes canceled tasks</Text></View></View>
-    <View style={styles.statsContent}>
-        <View accessible accessibilityLabel={`${metrics.total} tasks: ${metrics.done} completed, ${metrics.overdue} overdue, ${metrics.open - metrics.overdue} open and not overdue, ${metrics.canceled} canceled`} style={styles.donut}>
-          <Svg width="100%" height="100%" viewBox="0 0 120 120">
-            <Circle cx={60} cy={60} r={48} fill="none" stroke={c.border} strokeWidth={strokeWidth} />
-            {slices.map((slice) => {
-              const length = metrics.total ? slice.value / metrics.total * circumference : 0;
-              const start = offset;
-              offset += length;
-              // Caps stay inside each task share; tiny shares retain their exact length.
-              const rounded = segmentCount > 1 && length > strokeWidth + 2;
-              const trim = rounded ? strokeWidth / 2 + 1 : 0;
-              return length > 0 ? <Circle key={slice.label} cx={60} cy={60} r={48} fill="none" stroke={slice.color} strokeWidth={strokeWidth} strokeDasharray={`${length - trim * 2} ${circumference}`} strokeDashoffset={-(start + trim)} strokeLinecap={rounded ? "round" : "butt"} transform="rotate(-90 60 60)" /> : null;
-            })}
-          </Svg>
-          <View style={styles.donutLabel}><Text style={[styles.donutValue, { color: c.foreground }]}>{metrics.total}</Text><Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 5 }}>TASKS</Text></View>
-        </View>
-      <View style={[styles.statsTotal, { borderColor: c.border }]}><View style={{ flexShrink: 1 }}><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={[styles.boardCount, { color: c.mutedForeground }]}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>
-      <View style={styles.legend}>{slices.map((slice) => <View key={slice.label} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: slice.color }]} /><Text style={[styles.legendLabel, { color: c.secondaryForeground }]}>{slice.label}</Text><Text style={[styles.legendValue, { color: c.foreground }]}>{slice.value}</Text><Text style={[styles.legendPercent, { color: c.mutedForeground }]}>{metrics.total ? Math.round(slice.value / metrics.total * 100) : 0}%</Text></View>)}</View>
+  return <View style={styles.overviewSection}>
+    <SectionHeading title="Board stats" subtitle="Across open boards · includes canceled tasks" style={styles.overviewHeading} />
+    <View style={[styles.overview, { backgroundColor: c.card, borderColor: c.border, shadowColor: c.shadow }]}>
+      <View style={styles.statsContent}>
+      <View accessible accessibilityLabel={`${metrics.total} tasks: ${metrics.done} completed, ${metrics.overdue} overdue, ${metrics.open - metrics.overdue} open and not overdue, ${metrics.canceled} canceled`} style={styles.donut}>
+        <Svg width="100%" height="100%" viewBox="0 0 120 120">
+          <Circle cx={60} cy={60} r={48} fill="none" stroke={c.border} strokeWidth={strokeWidth} />
+          {slices.map((slice) => {
+            const length = metrics.total ? slice.value / metrics.total * circumference : 0;
+            const start = offset;
+            offset += length;
+            // Caps stay inside each task share; tiny shares retain their exact length.
+            const rounded = segmentCount > 1 && length > strokeWidth + 2;
+            const trim = rounded ? strokeWidth / 2 + 1 : 0;
+            return length > 0 ? <Circle key={slice.label} cx={60} cy={60} r={48} fill="none" stroke={slice.color} strokeWidth={strokeWidth} strokeDasharray={`${length - trim * 2} ${circumference}`} strokeDashoffset={-(start + trim)} strokeLinecap={rounded ? "round" : "butt"} transform="rotate(-90 60 60)" /> : null;
+          })}
+        </Svg>
+        <View style={styles.donutLabel}><Text style={[styles.donutValue, { color: c.foreground }]}>{metrics.total}</Text><Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 5 }}>TASKS</Text></View>
+      </View>
+      <View style={[styles.statsTotal, { borderColor: c.border, backgroundColor: c.backgroundAlt }]}><View style={{ flexShrink: 1 }}><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={[styles.boardCount, { color: c.mutedForeground }]}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>
+        <View style={[styles.legend, { borderColor: c.border }]}>{slices.map((slice) => <View key={slice.label} style={styles.legendRow}><View style={[styles.legendDot, { backgroundColor: slice.color }]} /><Text style={[styles.legendLabel, { color: c.secondaryForeground }]}>{slice.label}</Text><Text style={[styles.legendValue, { color: c.foreground }]}>{slice.value}</Text><Text style={[styles.legendPercent, { color: c.mutedForeground }]}>{metrics.total ? Math.round(slice.value / metrics.total * 100) : 0}%</Text></View>)}</View>
+      </View>
     </View>
   </View>;
 }
@@ -138,22 +146,22 @@ const styles = StyleSheet.create({
   themeSwitch: { flexDirection: "row", borderWidth: 1, borderRadius: 10, padding: 2 }, themeButton: { width: 44, height: 44, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   content: mobileContentStyle,
   arrange: { paddingHorizontal: 10, borderRadius: 13 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 22, marginBottom: 12 }, firstSectionHeader: { marginTop: 0 }, sectionCopy: { flexDirection: "row", alignItems: "center", gap: 10 }, sectionTitle: { fontSize: 14, fontWeight: "700", letterSpacing: 0.7 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },
+  sectionHeading: { marginTop: 24, marginBottom: 10 }, firstSectionHeading: { marginBottom: 10 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },
   board: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 17, paddingTop: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }, cardHeader: { flexDirection: "row", alignItems: "flex-start" }, cardTitleArea: { flex: 1, paddingVertical: 4, minHeight: 44 }, boardTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.4 }, closedBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5, height: 20, paddingHorizontal: 6, borderWidth: 1, borderRadius: 7 }, created: { fontSize: 12, marginTop: 4 }, pin: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -10, marginTop: -5 }, reorder: { flexDirection: "row", gap: 8, marginTop: 12 },
   progressArea: { paddingTop: 18, paddingBottom: 8 }, progressMeta: { flexDirection: "row", alignItems: "center", gap: 16 }, inline: { flexDirection: "row", alignItems: "center", gap: 5 }, percent: { marginLeft: "auto", fontSize: 12, fontWeight: "600" }, track: { height: 6, borderRadius: 5, marginTop: 8, overflow: "hidden" }, signals: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, minHeight: 47, paddingVertical: 9 },
   cardFooter: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, gap: 12, marginTop: 4, minHeight: 45 }, cardAction: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 5 },
-  overview: { marginTop: 34 },
-  overviewHeading: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  overviewHint: { fontSize: 11, lineHeight: 17, marginTop: 4 },
-  statsContent: { paddingTop: 8, paddingBottom: 12 },
-  statsTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 16, paddingBottom: 22, borderBottomWidth: StyleSheet.hairlineWidth },
+  overviewSection: { marginTop: 34 },
+  overviewHeading: { marginBottom: 12 },
+  overview: { borderRadius: 20, borderWidth: 1, padding: 16, shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  statsContent: { paddingTop: 4 },
+  statsTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 16, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14 },
   totalLabel: { fontSize: 11 },
   totalValue: { fontSize: 39, lineHeight: 44, marginTop: 4 },
   boardCount: { flexShrink: 1, maxWidth: "50%", textAlign: "right", fontSize: 12, lineHeight: 18, paddingBottom: 4 },
-  donut: { width: "100%", maxWidth: 260, aspectRatio: 1, alignSelf: "center", marginBottom: 28 },
+  donut: { width: "100%", maxWidth: 260, aspectRatio: 1, alignSelf: "center", marginBottom: 24 },
   donutLabel: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" },
   donutValue: { fontSize: 38, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  legend: { gap: 20, alignSelf: "stretch", marginTop: 24 },
+  legend: { gap: 16, alignSelf: "stretch", marginTop: 20, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendLabel: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 19 },

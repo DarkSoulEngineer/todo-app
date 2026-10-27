@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, format, isSameDay, parseISO, startOfDay, subDays, isValid } from "date-fns";
-import type { Task } from "@/lib/domain/types";
+import type { Task, Workspace } from "@/lib/domain/types";
 import type { Board } from "@/lib/domain/boards";
 
 /** Date range preset options. */
@@ -237,18 +237,10 @@ export function exportTasksToCSV(tasks: Task[], boards: Board[]): string {
   const headers = ["id", "title", "status", "priority", "board", "completedAt", "createdAt"];
   const rows = tasks.map((task) => {
     const board = boards.find((b) => b.id === task.category);
-    const status = task.completed
-      ? "completed"
-      : task.canceled
-        ? "canceled"
-        : task.dueAt && Date.parse(task.dueAt) < Date.now()
-          ? "overdue"
-          : "upcoming";
-
     return [
       task.id,
       task.title,
-      status,
+      csvStatus(task),
       task.priority,
       board?.label || "",
       task.completedAt || "",
@@ -257,6 +249,38 @@ export function exportTasksToCSV(tasks: Task[], boards: Board[]): string {
   });
 
   return [headers.map(escapeCsvField).join(","), ...rows].join("\n");
+}
+
+/** Export every task across a set of boards, with the owning board as a column. */
+export function exportProjectsToCSV(projects: { name: string; workspace: Workspace }[]): string {
+  const headers = ["project", "id", "title", "status", "priority", "board", "completedAt", "createdAt"];
+  const rows = projects.flatMap((project) =>
+    project.workspace.tasks.map((task) => {
+      const board = project.workspace.boards.find((item) => item.id === task.category);
+      return [
+        project.name,
+        task.id,
+        task.title,
+        csvStatus(task),
+        task.priority,
+        board?.label || "",
+        task.completedAt || "",
+        task.createdAt,
+      ].map(escapeCsvField).join(",");
+    }),
+  );
+
+  return [headers.map(escapeCsvField).join(","), ...rows].join("\n");
+}
+
+function csvStatus(task: Task): string {
+  return task.completed
+    ? "completed"
+    : task.canceled
+      ? "canceled"
+      : task.dueAt && Date.parse(task.dueAt) < Date.now()
+        ? "overdue"
+        : "upcoming";
 }
 
 /** Check if any filter is non-default. */

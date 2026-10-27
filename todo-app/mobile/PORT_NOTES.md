@@ -28,9 +28,10 @@ These notes supersede older build briefs that describe the app as unfinished.
   My Tasks and Calendar aggregate tasks from every open board; tapping a task
   opens the board that owns it.
 - My Tasks is an overview, not a creation surface. Its filter is a single-select
-  menu with `None` as the default.
-- Settings is app-level: appearance, calendar defaults, data/backups, and About.
-  It does not show current-board data.
+  menu with `None` as the default. The overview and overdue attention controls
+  share one card, which is tinted red only when tasks are overdue.
+- Settings is app-level: appearance, calendar defaults, all-board backup/import,
+  and About. It does not show current-board data.
 - Board columns are called **lists** in the UI. The domain model keeps
   `BoardSection`/`sectionId`, so internal names stay unchanged.
 - Canceling a card creates or reuses a custom **Canceled** list, unhides it if
@@ -84,7 +85,7 @@ const {
   clearCompleted, getCompletedIds, snapshot, restore,
   versions, createVersion, restoreVersion, deleteVersion,
   loadSample,
-  createProject, importProject, duplicateProject, renameProject,
+  createProject, importProject, importProjects, duplicateProject, renameProject,
   switchProject, removeProject,
 } = useTasksContext();
 ```
@@ -92,7 +93,8 @@ const {
 - `projects: JanusProject[]` — `{ id, name, createdAt, updatedAt, workspace }`.
   Each project owns a full `workspace = { tasks, sections, boards }`.
 - `createProject(name)` / `duplicateProject(id)` / `importProject(name, workspace)`
-  switch to the new board and return its id.
+  switch to the new board and return its id. `importProjects(entries)` adds a
+  whole backup at once, preserves closed boards, and returns the new ids.
 - `removeProject` refuses to remove the last board (returns false).
 - `createVersion()` snapshots the active workspace into `versions`.
 - Mutations are synchronous state updates; persistence is automatic.
@@ -127,7 +129,7 @@ import { getTaskSectionId, isCustomSection, isStatusSection, STATUS_SECTIONS } f
 import { detectCardTheme, BOARD_WASHES, PRIORITY_WASHES } from "@/lib/features/card-themes";
 import { computeInsightsForWindow, getPreviousPeriodPoints } from "@/lib/features/insights";
 import { DEFAULT_FILTERS, computeWindowInsights, windowStartFromPreset, windowEndFromPreset, getPriorityCounts, getWeekdayCompletionCounts, computePeriodComparison, formatPeriodChange, hasActiveFilters } from "@/lib/features/insights-filters";
-import { exportWorkspace, exportWorkspaceCsv, pickWorkspaceFile } from "@/lib/data/transfer";
+import { exportAllBoards, exportAllBoardsCsv, exportWorkspace, exportWorkspaceCsv, pickBoardsFile, pickWorkspaceFile } from "@/lib/data/transfer";
 import { parseWorkspaceJson } from "@/lib/data/workspace";
 import { pluralize } from "@/lib/utils/utils";
 ```
@@ -139,7 +141,11 @@ import { pluralize } from "@/lib/utils/utils";
 - `parseQuickAdd("Buy milk tomorrow 5pm !high #work", now)` returns
   `{ title, priority, category, dueAt }`; `quickAddToDraft(parsed)` returns a `TaskDraft`.
 - `exportWorkspace(workspace, name)` and `exportWorkspaceCsv(...)` open the share sheet.
+- `exportAllBoards(boards)` writes one JSON backup for every board;
+  `exportAllBoardsCsv(boards)` writes one CSV with a `project` column.
 - `pickWorkspaceFile()` returns `{ workspace, name } | null`.
+- `pickBoardsFile()` restores one or more boards from a JSON backup, including
+  older single-board exports.
 
 ## Screen contracts
 
