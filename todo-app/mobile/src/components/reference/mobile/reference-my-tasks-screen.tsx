@@ -33,7 +33,7 @@ export interface ReferenceMyTasksScreenProps {
   userName?: string;
 }
 
-export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onTaskLongPress, embedded = false, onToggleComplete, onReviewAttention, onRescheduleAttention, onNavigate, activeTab = "calendar" }: ReferenceMyTasksScreenProps) {
+export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onTaskLongPress, embedded = false, onToggleComplete, onReviewAttention, onRescheduleAttention, onNavigate, activeTab = "top-tasks" }: ReferenceMyTasksScreenProps) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
   const insets = useSafeAreaInsets();

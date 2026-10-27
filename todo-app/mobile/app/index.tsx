@@ -157,7 +157,7 @@ export default function BoardManagerScreen() {
     if (id) { toast.success("Board duplicated"); router.push(`/board/${id}`); }
   };
   const navigate = (tab: ReferenceMobileTab) => {
-    if (tab === "calendar") router.replace("/calendar");
+    if (tab === "top-tasks") router.replace("/top-tasks");
     else if (tab === "settings") router.replace("/settings");
   };
 

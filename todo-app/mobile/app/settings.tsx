@@ -59,7 +59,7 @@ export default function SettingsRoute() {
   const navigate = (tab: ReferenceMobileTab) => {
     if (tab === "settings") return;
     if (tab === "boards") return router.replace("/");
-    if (tab === "calendar") return router.replace("/calendar");
+    if (tab === "top-tasks") return router.replace("/top-tasks");
   };
 
   const allBoards = () => api.projects.map((project) => ({
@@ -151,7 +151,7 @@ export default function SettingsRoute() {
         </View>
 
         <View style={styles.sectionBlock}>
-          <SectionHeading title="Calendar" subtitle="Choose how the Calendar tab opens and which day starts its week." />
+          <SectionHeading title="Calendar" subtitle="Choose how board calendars open and which day starts their week." />
           <SurfaceCard style={styles.sectionCard}>
             <Text style={[type.caption, styles.settingLabelFirst]}>DEFAULT VIEW</Text>
             <View style={styles.segmented}>

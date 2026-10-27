@@ -78,30 +78,18 @@ test("overview omits overdue actions when no task is overdue", () => {
   assert.equal(find(tree, "Pressable").some((button) => button.props.accessibilityLabel === "Review overdue tasks"), false);
 });
 
-test("bottom navigation now contains only Home, Calendar, and Settings", async () => {
+test("bottom navigation contains only Home, Top Tasks, and Settings", async () => {
   const { ReferenceMobileBottomNav } = await loadComponent("../src/components/reference/mobile/reference-mobile-bottom-nav.tsx");
-  const labels = find(ReferenceMobileBottomNav({ active: "calendar" }), "Pressable").map((node) => node.props.accessibilityLabel);
-  assert.deepEqual(labels, ["Home", "Calendar", "Settings"]);
+  const labels = find(ReferenceMobileBottomNav({ active: "top-tasks" }), "Pressable").map((node) => node.props.accessibilityLabel);
+  assert.deepEqual(labels, ["Home", "Top Tasks", "Settings"]);
 });
 
-test("legacy My Tasks bookmarks redirect to Calendar", async () => {
+test("legacy My Tasks bookmarks redirect to Top Tasks", async () => {
   const { default: MyTasksRoute } = await loadComponent("../app/my-tasks.tsx");
-  assert.equal(MyTasksRoute().props.href, "/calendar");
+  assert.equal(MyTasksRoute().props.href, "/top-tasks");
 });
 
-test("Calendar embeds My Tasks after its calendar inside the main scroll content", async () => {
-  const source = await readFile(new URL("../app/calendar.tsx", import.meta.url), "utf8");
-  const ast = ts.createSourceFile("calendar.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const elements = [];
-  function visit(node, inScroll = false) {
-    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(ast) === "ScrollView") inScroll = true;
-    if (ts.isJsxSelfClosingElement(node)) elements.push({ name: node.tagName.getText(ast), inScroll, node });
-    ts.forEachChild(node, (child) => visit(child, inScroll));
-  }
-  visit(ast);
-  const calendar = elements.findIndex((item) => item.name === "CalendarPanel");
-  const agenda = elements.findIndex((item) => item.name === "ReferenceMyTasksScreen");
-  assert.ok(calendar >= 0 && agenda > calendar);
-  assert.equal(elements[agenda].inScroll, true);
-  assert.ok(elements[agenda].node.attributes.properties.some((prop) => prop.name?.getText(ast) === "embedded"));
+test("the retired main Calendar route redirects to Top Tasks", async () => {
+  const { default: CalendarRoute } = await loadComponent("../app/calendar.tsx");
+  assert.equal(CalendarRoute().props.href, "/top-tasks");
 });

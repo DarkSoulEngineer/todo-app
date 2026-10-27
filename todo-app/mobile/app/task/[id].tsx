@@ -25,8 +25,7 @@ export default function TaskInspectorRoute() {
   const task = api.tasks.find((item) => item.id === id);
   const returnToOrigin = useCallback(() => {
     if (origin === "desktop" && boardId) return router.replace(`/board/${boardId}`);
-    if (origin === "my-tasks") return router.replace("/calendar");
-    if (origin === "calendar") return router.replace("/calendar");
+    if (origin === "my-tasks" || origin === "calendar") return router.replace("/top-tasks");
     return router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/");
   }, [api.currentProjectId, boardId, origin]);
 

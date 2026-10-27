@@ -48,8 +48,7 @@ export default function NewTaskRoute() {
   const section = workspaceReady ? api.sections.find((item) => item.id === sectionId) : undefined;
   const returnToOrigin = () => {
     if (origin === "desktop" && boardId) return router.replace(`/board/${boardId}`);
-    if (origin === "my-tasks") return router.replace("/calendar");
-    if (origin === "calendar") return router.replace("/calendar");
+    if (origin === "my-tasks" || origin === "calendar") return router.replace("/top-tasks");
     if (origin === "reference-board") return router.replace("/reference-board");
     return router.replace(api.currentProjectId ? `/board/${api.currentProjectId}` : "/");
   };

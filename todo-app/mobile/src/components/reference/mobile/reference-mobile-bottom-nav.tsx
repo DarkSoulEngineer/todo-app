@@ -3,11 +3,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReferenceTheme, type ReferenceColors } from "../reference-theme";
 
-export type ReferenceMobileTab = "boards" | "calendar" | "settings";
+export type ReferenceMobileTab = "boards" | "top-tasks" | "settings";
 
 const tabs: { key: ReferenceMobileTab; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "boards", label: "Home", icon: "home-outline", activeIcon: "home" },
-  { key: "calendar", label: "Calendar", icon: "calendar-outline", activeIcon: "calendar" },
+  { key: "top-tasks", label: "Top Tasks", icon: "flame-outline", activeIcon: "flame" },
   { key: "settings", label: "Settings", icon: "settings-outline", activeIcon: "settings" },
 ];
 

@@ -11,8 +11,8 @@ export interface BoardTaskEntry {
 }
 
 /**
- * Tasks from every open board, flattened for the cross-board overview screens
- * (My Tasks and Calendar). The active board's workspace is read from the live
+ * Tasks from every open board, flattened for cross-board overviews such as
+ * Top Tasks. The active board's workspace is read from the live
  * task state so edits show immediately, even before the registry catches up.
  */
 export function useAllBoardTasks(includeClosed = false) {

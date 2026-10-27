@@ -24,8 +24,9 @@ the native date picker.
 app/                     expo-router routes
   _layout.tsx            providers + headerless stack
   index.tsx              Home / board manager
-  my-tasks.tsx           legacy redirect to Calendar
-  calendar.tsx           cross-board calendar overview
+  top-tasks.tsx          prioritized cross-board Top 3 / Top 10 overview
+  my-tasks.tsx           legacy redirect to Top Tasks
+  calendar.tsx           legacy redirect to Top Tasks
   settings.tsx           app-level settings
   board/[id].tsx         board workspace: Board / List / Calendar / Insights
   task/new.tsx           task creation route
@@ -37,7 +38,7 @@ src/
     ui/                  shared top bar, sheets, inputs, atmosphere
   hooks/
     use-tasks.ts         task + project state, persistence orchestration
-    use-all-board-tasks.ts  open-board aggregation for My Tasks and Calendar
+    use-all-board-tasks.ts  live open-board aggregation for Top Tasks
   lib/
     domain/              pure task/board/list/status rules
     features/            quick-add grammar, insights, board layout, card themes
@@ -75,14 +76,19 @@ The mobile app uses a shared ribbon top bar and a three-tab bottom navigation:
 | Tab | Route | Purpose |
 |---|---|---|
 | Home | `app/index.tsx` | Board manager with open/closed boards, import, create, and rearrange. |
-| Calendar | `app/calendar.tsx` | Calendar and My Tasks across open boards, with month/week modes, search, task filters, and editing. |
+| Top Tasks | `app/top-tasks.tsx` | Top 3 or Top 10 unfinished tasks across open boards, with editing, completion, and board navigation. |
 | Settings | `app/settings.tsx` | App-level appearance, calendar defaults, data/backups, and About. |
 
 Board-specific work stays in `app/board/[id].tsx` and keeps its own
-Board / List / Calendar / Insights ribbon. My Tasks is a section below the main
-calendar, not a separate tab. The old `/my-tasks` route redirects to `/calendar`.
-Calendar includes task creation for the selected day; long press a task in
-My Tasks to reschedule it, including tasks without due dates.
+Board / List / Calendar / Insights ribbon. Calendar is available **only inside
+boards**, including its day-task sheet and task creation. Calendar defaults in
+Settings apply to these board calendars. The old `/calendar`
+and `/my-tasks` routes redirect to `/top-tasks`.
+
+Top Tasks ranks high priority before medium before low, then earlier deadlines
+(including overdue work) before undated tasks. Oldest creation date and stable
+board/task IDs break ties. Completed, canceled, and closed-board tasks are excluded.
+Completing a task automatically reveals the next ranked task.
 
 All three top-level screens share the ribbon top-bar/search styling, content
 width, page padding, and bottom-nav clearance from `src/theme/layout.ts`.

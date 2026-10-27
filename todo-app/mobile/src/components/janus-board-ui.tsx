@@ -104,7 +104,6 @@ export function TaskCard({
   boards,
   now,
   onPress,
-  onComplete,
   onLongPress,
   compact = false,
 }: {
@@ -112,7 +111,6 @@ export function TaskCard({
   boards: Board[];
   now: Date;
   onPress: () => void;
-  onComplete: () => void;
   onLongPress?: () => void;
   compact?: boolean;
 }) {
@@ -123,6 +121,7 @@ export function TaskCard({
   const cardTheme = detectCardTheme(task.title, task.description);
   const doneSubtasks = task.subtasks.filter((item) => item.done).length;
   const status = deriveStatus(task, now);
+  const overdueDuration = status === "overdue" && due ? due.label.replace(/\s+overdue$/i, "") : null;
   const statusColor = status === "completed" ? theme.colors.success : status === "canceled" ? theme.colors.mutedForeground : status === "overdue" ? theme.colors.destructive : theme.colors.primary;
   const statusBackground = status === "completed" ? theme.colors.successSoft : status === "canceled" ? theme.colors.secondary : status === "overdue" ? theme.colors.destructiveSoft : theme.colors.primarySoft;
   const taskAction = onLongPress ?? onPress;
@@ -139,25 +138,16 @@ export function TaskCard({
         />
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityLabel={`${task.completed ? "Mark incomplete" : "Complete"} ${task.title}`}
-            accessibilityState={{ checked: task.completed }}
-            onPress={(event) => { event.stopPropagation(); onComplete(); }}
-            style={[styles.check, { borderColor: task.completed ? theme.colors.success : theme.colors.borderStrong, backgroundColor: task.completed ? theme.colors.success : theme.colors.card }]}
-          >
-            {task.completed ? <Ionicons name="checkmark" size={15} color={theme.colors.successForeground} /> : null}
-          </Pressable>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
            <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} accessibilityHint="Opens task actions" onPress={(event) => { event.stopPropagation(); taskAction(); }} style={({ pressed }) => [styles.taskAction, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary, opacity: pressed ? 0.65 : 1 }]}>
              <Ionicons name="ellipsis-horizontal" size={19} color={theme.colors.mutedForeground} />
            </Pressable>
         </View>
-        {!compact && task.description ? <Text style={[styles.taskDescription, { color: theme.colors.mutedForeground }]} numberOfLines={2}>{task.description}</Text> : null}
-        <View style={styles.metaRow}>
-           <View accessible accessibilityLabel={`Status: ${STATUS_LABELS[status]}`} style={[styles.statusBadge, { backgroundColor: statusBackground }]}><Ionicons name={status === "completed" ? "checkmark-circle-outline" : status === "canceled" ? "ban-outline" : status === "overdue" ? "alert-circle-outline" : "ellipse-outline"} size={13} color={statusColor} /><Text style={{ color: statusColor, fontSize: 12, fontWeight: "700" }}>{STATUS_LABELS[status]}</Text></View>
+        {!compact && task.description ? <Text style={[styles.taskDescription, { color: theme.colors.mutedForeground, marginLeft: 0 }]} numberOfLines={2}>{task.description}</Text> : null}
+        <View style={[styles.metaRow, { marginLeft: 0 }]}>
+           <View accessible accessibilityLabel={overdueDuration ? `Overdue by ${overdueDuration}. Due ${due?.title}` : `Status: ${STATUS_LABELS[status]}`} style={[styles.statusBadge, { backgroundColor: statusBackground }]}><Ionicons name={status === "completed" ? "checkmark-circle-outline" : status === "canceled" ? "ban-outline" : status === "overdue" ? "alert-circle-outline" : "ellipse-outline"} size={13} color={statusColor} /><Text style={{ color: statusColor, fontSize: 12, fontWeight: "700" }}>{overdueDuration ?? STATUS_LABELS[status]}</Text></View>
            <View style={[styles.priorityBadge, { backgroundColor: PRIORITY_META[task.priority].tint }]}><View style={[styles.priorityDot, { backgroundColor: PRIORITY_META[task.priority].dot }]} /><Text style={{ color: PRIORITY_META[task.priority].ink, fontSize: 12, fontWeight: "700" }}>{PRIORITY_META[task.priority].label}</Text></View>
-           {due && !task.canceled ? <View accessible accessibilityLabel={`Due ${due.title}`} style={styles.metaItem}><Ionicons name="time-outline" size={14} color={due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground} /><Text style={{ color: due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{due.label}</Text></View> : null}
+           {due && !task.canceled && status !== "overdue" ? <View accessible accessibilityLabel={`Due ${due.title}`} style={styles.metaItem}><Ionicons name="time-outline" size={14} color={due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground} /><Text style={{ color: due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{due.label}</Text></View> : null}
             {board && boardTone ? <Chip label={board.label} color={boardTone.dot} /> : null}
             {(task.tags ?? []).slice(0, 2).map((tag) => <Chip key={tag} label={tag} color={theme.colors.primary} />)}
             {task.subtasks.length > 0 ? <View style={styles.metaItem}><Ionicons name="list-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{doneSubtasks}/{task.subtasks.length}</Text></View> : null}

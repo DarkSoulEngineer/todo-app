@@ -17,6 +17,7 @@ import { useNow } from "@/hooks/use-now";
 import { useTasksContext } from "@/providers/tasks-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { useToast } from "@/providers/toast-provider";
+import { usePreferences } from "@/providers/preferences-provider";
 import { BOARD_COLORS, boardColor } from "@/lib/domain/boards";
 import { BulkSelectionToolbar } from "@/components/board/bulk-selection-toolbar";
 import { MobileBoardBottomNav } from "@/components/board/mobile-board-bottom-nav";
@@ -329,7 +330,7 @@ export default function WorkspaceScreen() {
       </View>
       <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} />
        <TaskEditor visible={editorVisible} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />
-       <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
+       <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onComplete={() => { if (calendarActionTask) api.toggleComplete(calendarActionTask.id); setCalendarActionTask(null); }} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}
        <TaskActions task={taskAction} tasks={visibleTasks} sections={sections} now={now} onClose={() => setTaskAction(null)} onComplete={() => { if (taskAction) api.toggleComplete(taskAction.id); setTaskAction(null); }} onCancel={() => { if (taskAction) api.toggleCancel(taskAction.id); setTaskAction(null); }} onDelete={() => { if (taskAction) { const before = api.snapshot(); api.deleteTask(taskAction.id); setTaskAction(null); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } }} onMove={(sectionId) => { if (taskAction) moveTaskToSection(taskAction, sectionId); setTaskAction(null); }} onMoveUp={() => { if (taskAction) reorderTask(taskAction, "up"); setTaskAction(null); }} onMoveDown={() => { if (taskAction) reorderTask(taskAction, "down"); setTaskAction(null); }} />
        <OptionSheet visible={projectSwitcherOpen} title="Switch board" options={projectOptions} onClose={() => setProjectSwitcherOpen(false)} />
@@ -361,7 +362,7 @@ export default function WorkspaceScreen() {
            <>
              <Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{format(calendarDay, "EEEE, MMM d")}</Text>
              <View style={{ marginTop: 14 }}>
-                {calendarTasks.length ? calendarTasks.map((task) => <TaskCard key={task.id} task={task} boards={boards} now={now} onPress={() => openEditor(task)} onComplete={() => api.toggleComplete(task.id)} onLongPress={() => setCalendarActionTask(task)} />) : <EmptyState icon="sunny-outline" title="A clear day" message="Nothing is due here yet." />}
+                 {calendarTasks.length ? calendarTasks.map((task) => <TaskCard key={task.id} task={task} boards={boards} now={now} onPress={() => openEditor(task)} onLongPress={() => setCalendarActionTask(task)} />) : <EmptyState icon="sunny-outline" title="A clear day" message="Nothing is due here yet." />}
                 <Button variant="soft" label="Add task for this day" onPress={() => { const due = new Date(calendarDay); due.setHours(9, 0, 0, 0); setCalendarDay(null); addNewTask(due.toISOString()); }} style={{ marginTop: 6 }}><Ionicons name="add" size={18} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task for this day</Text></Button>
               </View>
            </>
@@ -405,7 +406,8 @@ function ListView({ tasks, boards, now, hasRefinements, onTask, onClear }: { tas
 }
 function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, onAddTask, onTask, onTaskAction, now }: { month: Date; setMonth: (date: Date) => void; selectedDay: Date | null; setSelectedDay: (date: Date | null) => void; tasks: Task[]; onAddTask: (due?: string | null) => void; onTask: (task: Task) => void; onTaskAction: (task: Task) => void; now: Date }) {
   const { theme } = useTheme();
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("month");
+  const { calendarDefaultView, calendarWeekStart } = usePreferences();
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>(calendarDefaultView);
   const unscheduled = tasks.filter((task) => !task.dueAt);
   const addForDay = (day: Date) => { const due = new Date(day); due.setHours(9, 0, 0, 0); onAddTask(due.toISOString()); };
   return <View>
@@ -415,13 +417,13 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, onA
       selectedDay={selectedDay}
       tasks={tasks}
       now={now}
-      weekStartsOn={1}
+      weekStartsOn={calendarWeekStart}
       onModeChange={setCalendarMode}
       onAnchorChange={setMonth}
       onSelectDay={setSelectedDay}
       onTaskPress={onTask}
       onTaskLongPress={onTaskAction}
-      onToday={() => setMonth(calendarMode === "week" ? startOfWeek(now, { weekStartsOn: 1 }) : startOfMonth(now))}
+      onToday={() => setMonth(calendarMode === "week" ? startOfWeek(now, { weekStartsOn: calendarWeekStart }) : startOfMonth(now))}
     />
     <View style={{ marginTop: 15 }}>
       <SectionHeading title="Plan a day" subtitle="Tap a date to open its task sheet, or long press a task to reschedule it." style={{ marginBottom: 8 }} />
@@ -435,8 +437,8 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, onA
     </View>
   </View>;
 }
-function CalendarTaskActions({ task, now, onClose, onChooseDate, onToday, onTomorrow, onClearDue }: { task: Task | null; now: Date; onClose: () => void; onChooseDate: () => void; onToday: () => void; onTomorrow: () => void; onClearDue: () => void }) {
-  return <OptionSheet visible={task !== null} title={task?.title ?? "Calendar task"} options={[{ label: "Choose a day", icon: "calendar-outline", onPress: onChooseDate }, { label: `Move to today · ${format(now, "MMM d")}`, icon: "today-outline", onPress: onToday }, { label: `Move to tomorrow · ${format(addDays(now, 1), "MMM d")}`, icon: "arrow-forward-circle-outline", onPress: onTomorrow }, ...(task?.dueAt ? [{ label: "Remove due date", icon: "close-circle-outline" as const, destructive: true, onPress: onClearDue }] : [])]} onClose={onClose} />;
+function CalendarTaskActions({ task, now, onClose, onComplete, onChooseDate, onToday, onTomorrow, onClearDue }: { task: Task | null; now: Date; onClose: () => void; onComplete: () => void; onChooseDate: () => void; onToday: () => void; onTomorrow: () => void; onClearDue: () => void }) {
+  return <OptionSheet visible={task !== null} title={task?.title ?? "Calendar task"} options={[{ label: task?.completed ? "Mark incomplete" : "Complete task", icon: "checkmark-circle-outline", onPress: onComplete }, { label: "Choose a day", icon: "calendar-outline", onPress: onChooseDate }, { label: `Move to today · ${format(now, "MMM d")}`, icon: "today-outline", onPress: onToday }, { label: `Move to tomorrow · ${format(addDays(now, 1), "MMM d")}`, icon: "arrow-forward-circle-outline", onPress: onTomorrow }, ...(task?.dueAt ? [{ label: "Remove due date", icon: "close-circle-outline" as const, destructive: true, onPress: onClearDue }] : [])]} onClose={onClose} />;
 }
 
 function TaskActions({ task, tasks, sections, now, onClose, onComplete, onCancel, onDelete, onMove, onMoveUp, onMoveDown }: { task: Task | null; tasks: Task[]; sections: BoardSection[]; now: Date; onClose: () => void; onComplete: () => void; onCancel: () => void; onDelete: () => void; onMove: (sectionId: string | null) => void; onMoveUp: () => void; onMoveDown: () => void }) {
