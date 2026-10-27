@@ -23,6 +23,8 @@ export interface ReferenceMyTasksScreenProps {
   tasks: ReferenceTaskInput[];
   boardName?: string;
   onTaskPress?: (task: Task, projectId?: string) => void;
+  onTaskLongPress?: (task: Task) => void;
+  embedded?: boolean;
   onToggleComplete?: (task: Task) => void;
   onReviewAttention?: () => void;
   onRescheduleAttention?: () => void;
@@ -31,7 +33,7 @@ export interface ReferenceMyTasksScreenProps {
   userName?: string;
 }
 
-export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggleComplete, onReviewAttention, onRescheduleAttention, onNavigate, activeTab = "my-tasks" }: ReferenceMyTasksScreenProps) {
+export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onTaskLongPress, embedded = false, onToggleComplete, onReviewAttention, onRescheduleAttention, onNavigate, activeTab = "calendar" }: ReferenceMyTasksScreenProps) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
   const insets = useSafeAreaInsets();
@@ -41,6 +43,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
   const [showSearch, setShowSearch] = useState(false);
   const [filterMenu, setFilterMenu] = useState(false);
   const now = useNow();
+  const Content = embedded ? View : ScrollView;
   const resolved = useMemo(() => tasks.map((task, index) => resolveReferenceTask(task, index)), [tasks]);
   const matching = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -77,9 +80,9 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
   }, [filter, matching, now, sortDirection]);
 
   return (
-    <View style={styles.root}>
-      <ThemeAtmosphere />
-      <ScreenHeader
+    <View style={embedded ? styles.embeddedRoot : styles.root}>
+      {embedded ? null : <ThemeAtmosphere />}
+      {embedded ? null : <ScreenHeader
         title="My tasks"
         onSearch={() => setShowSearch(prev => !prev)}
         searchActive={showSearch}
@@ -88,7 +91,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
         moreLabel="Filter tasks"
         showThemeToggle={false}
         search={showSearch ? <MobileSearchField value={query} onChangeText={setQuery} placeholder="Search tasks or tags" accessibilityLabel="Search my tasks" /> : null}
-      />
+      />}
       <OptionSheet
         visible={filterMenu}
         title="Filter tasks"
@@ -99,29 +102,34 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
         }))}
         onClose={() => setFilterMenu(false)}
       />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
+      <Content {...(embedded ? {} : { showsVerticalScrollIndicator: false, contentContainerStyle: [styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }] })}>
 
-        <SectionHeading title="Task overview" style={styles.overviewHeading} />
-        <SurfaceCard style={[styles.summaryCard, summary.overdue > 0 && styles.summaryCardOverdue]}>
+        <SectionHeading title={embedded ? "My tasks" : "Task overview"} subtitle={embedded ? "Across all open boards · long press a task to reschedule" : undefined} style={styles.overviewHeading} right={embedded ? <Pressable accessibilityRole="button" accessibilityLabel="Filter my tasks" onPress={() => setFilterMenu(true)} style={styles.sortButton}><Ionicons name="funnel-outline" size={17} color={colors.primary} /><Text style={[type.caption, { color: colors.primary }]}>{filter === "None" ? "Filter" : filter}</Text></Pressable> : undefined} />
+        {embedded ? <View style={styles.embeddedSearch}><MobileSearchField value={query} onChangeText={setQuery} placeholder="Search tasks or boards" accessibilityLabel="Search my tasks" /></View> : null}
+        <SurfaceCard style={styles.summaryCard}>
           <View style={styles.summaryTop}>
             <View style={styles.summaryCopy}>
-              <Text style={[type.body, { color: colors.muted }]}><Text style={type.bodyStrong}>{summary.completed} of {summary.total}</Text> completed · {summary.remaining} open{summary.canceled ? ` · ${summary.canceled}\u00a0canceled` : ""}</Text>
-              <View style={styles.summaryPills}><Pill label={`${summary.remaining} open`} tone="primary" icon="time-outline" />{summary.overdue > 0 ? <Pill label={`${summary.overdue} overdue`} tone="error" icon="alert-circle-outline" /> : null}</View>
+              <Text style={[type.caption, styles.summaryEyebrow, { color: colors.muted }]}>COMPLETED</Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>{summary.completed}<Text style={[styles.summaryTotal, { color: colors.muted }]}> / {summary.total}</Text></Text>
+              <View style={styles.summaryMeta}>
+                <View style={styles.summaryMetaItem}><Ionicons name="ellipse-outline" size={13} color={colors.primary} /><Text style={[type.caption, { color: colors.muted }]}>{summary.remaining} open</Text></View>
+                {summary.canceled ? <View style={styles.summaryMetaItem}><Ionicons name="close-circle-outline" size={14} color={colors.muted} /><Text style={[type.caption, { color: colors.muted }]}>{summary.canceled} canceled</Text></View> : null}
+              </View>
             </View>
             <ProgressRing value={summary.progress} />
           </View>
           {summary.overdue > 0 ? (
             <View style={styles.summaryAttention}>
               <View style={styles.attentionContent}>
-                <View style={styles.warningIcon}><Ionicons name="warning-outline" size={21} color={colors.error} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[type.section, { color: colors.error }]}>Reschedule overdue tasks</Text>
-                  <Text style={[type.body, { color: colors.error, marginTop: 3 }]}>{summary.overdue} task{summary.overdue === 1 ? " is" : "s are"} overdue. Reschedule {summary.overdue === 1 ? "it" : "them"} to keep this board current.</Text>
+                <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
+                <View style={styles.attentionCopy}>
+                  <Text style={[type.bodyStrong, { color: colors.text }]}>{summary.overdue} overdue task{summary.overdue === 1 ? "" : "s"}</Text>
+                  <Text style={[type.caption, { color: colors.muted, marginTop: 4 }]}>Choose a new date or review the details.</Text>
                 </View>
               </View>
               <View style={styles.attentionActions}>
-                <Pressable accessibilityRole="button" onPress={onRescheduleAttention} style={styles.lightAction}><Ionicons name="calendar-outline" size={16} color={colors.error} /><Text style={[type.bodyStrong, { color: colors.error }]}>Reschedule</Text></Pressable>
-                <Pressable accessibilityRole="button" onPress={onReviewAttention} style={styles.dangerAction}><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Review</Text></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Reschedule overdue tasks" onPress={onRescheduleAttention} style={({ pressed }) => [styles.attentionAction, { opacity: pressed ? 0.6 : 1 }]}><Ionicons name="calendar-outline" size={17} color={colors.primary} /><Text style={[type.bodyStrong, { color: colors.primary }]}>Reschedule</Text></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Review overdue tasks" onPress={onReviewAttention} style={({ pressed }) => [styles.attentionAction, { opacity: pressed ? 0.6 : 1 }]}><Text style={[type.bodyStrong, { color: colors.muted }]}>Review</Text><Ionicons name="arrow-forward" size={16} color={colors.muted} /></Pressable>
               </View>
             </View>
           ) : null}
@@ -132,14 +140,14 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onToggle
           style={styles.scheduleHeading}
           right={<Pressable accessibilityRole="button" accessibilityLabel={sortDirection === "asc" ? "Sort by due time, earliest first" : "Sort by due time, latest first"} onPress={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")} style={styles.sortButton}><Text style={[type.body, { color: colors.muted }]}>{sortDirection === "asc" ? "Earliest first" : "Latest first"}</Text><Ionicons name={sortDirection === "asc" ? "arrow-up-outline" : "arrow-down-outline"} size={15} color={colors.muted} /></Pressable>}
         />
-        <View style={{ gap: referenceSpacing.sm }}>{visible.length ? visible.map((item, index) => <ScheduleCard key={item.task.id} item={item} index={index} now={now} onPress={() => onTaskPress?.(item.task, item.projectId)} onComplete={() => onToggleComplete?.(item.task)} />) : <EmptyAgendaState filtered={Boolean(query)} />}</View>
-      </ScrollView>
-      <ReferenceMobileBottomNav active={activeTab} onNavigate={onNavigate} />
+        <View style={{ gap: referenceSpacing.sm }}>{visible.length ? visible.map((item, index) => <ScheduleCard key={`${item.projectId ?? ""}:${item.task.id}`} item={item} index={index} now={now} onPress={() => onTaskPress?.(item.task, item.projectId)} onLongPress={() => onTaskLongPress?.(item.task)} onComplete={() => onToggleComplete?.(item.task)} />) : <EmptyAgendaState filtered={Boolean(query) || filter !== "None"} />}</View>
+      </Content>
+      {embedded ? null : <ReferenceMobileBottomNav active={activeTab} onNavigate={onNavigate} />}
     </View>
   );
 }
 
-function ScheduleCard({ item, index, now, onPress, onComplete }: { item: ReturnType<typeof resolveReferenceTask>; index: number; now: Date; onPress: () => void; onComplete: () => void }) {
+function ScheduleCard({ item, index, now, onPress, onLongPress, onComplete }: { item: ReturnType<typeof resolveReferenceTask>; index: number; now: Date; onPress: () => void; onLongPress: () => void; onComplete: () => void }) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
   const { task } = item;
@@ -155,7 +163,7 @@ function ScheduleCard({ item, index, now, onPress, onComplete }: { item: ReturnT
   const overdueDaysOnly = overdueLabel ? overdueLabel.match(/(\d+[hdwmy]?|\d+)\s*overdue/i)?.[1] ?? null : null;
   const topLine = dueTime && overdue && overdueDaysOnly ? `${dueTime} • ${overdueDaysOnly}` : dueTime && overdue ? `${dueTime} • Overdue` : dueTime ? dueTime : (dueInfo?.label ?? "No due time");
   return <View style={styles.taskCard}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onPress} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: referenceRadii.md, backgroundColor: pressed ? colors.primaryFixed : "transparent" }]} />
+    <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: referenceRadii.md, backgroundColor: pressed ? colors.primaryFixed : "transparent" }]} />
     <View pointerEvents="none" style={[styles.taskRail, { backgroundColor: rail }]} />
     <View pointerEvents="none" style={styles.taskTop}>
       <Text style={[type.bodyStrong, { color: overdue ? colors.error : completed ? colors.muted : colors.primary }]} numberOfLines={1}>
@@ -192,19 +200,23 @@ function EmptyAgendaState({ filtered }: { filtered: boolean }) {
 function createStyles(colors: ReferenceColors, type: ReferenceType) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
+    embeddedRoot: { marginTop: 24 },
+    embeddedSearch: { marginBottom: referenceSpacing.md },
     content: mobileContentStyle,
-    summaryCard: { padding: referenceSpacing.md, overflow: "hidden" },
-    summaryCardOverdue: { backgroundColor: colors.errorContainer, borderColor: colors.error, borderLeftWidth: 7 },
+    summaryCard: { padding: referenceSpacing.lg, overflow: "hidden" },
     summaryTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: referenceSpacing.sm },
     summaryCopy: { flex: 1, minWidth: 0 },
     overviewHeading: { marginBottom: 10 },
-    summaryPills: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 14 },
-    summaryAttention: { marginTop: referenceSpacing.md, paddingTop: referenceSpacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.error },
+    summaryEyebrow: { letterSpacing: 1.1, fontSize: 10 },
+    summaryValue: { fontSize: 34, lineHeight: 44, fontWeight: "700", fontVariant: ["tabular-nums"], marginTop: 3 },
+    summaryTotal: { fontSize: 19, fontWeight: "400" },
+    summaryMeta: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 7 },
+    summaryMetaItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+    summaryAttention: { marginTop: referenceSpacing.lg, paddingTop: referenceSpacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
     attentionContent: { flexDirection: "row", alignItems: "flex-start", gap: referenceSpacing.sm },
-    warningIcon: { width: 38, height: 38, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.card },
-    attentionActions: { flexDirection: "row", justifyContent: "flex-end", gap: referenceSpacing.sm, marginTop: 12 },
-    lightAction: { minHeight: 44, paddingHorizontal: 14, borderRadius: referenceRadii.lg, backgroundColor: colors.card, flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center" },
-    dangerAction: { minHeight: 44, paddingHorizontal: 17, borderRadius: referenceRadii.lg, backgroundColor: colors.error, alignItems: "center", justifyContent: "center" },
+    attentionCopy: { flex: 1, minWidth: 0 },
+    attentionActions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: referenceSpacing.sm, marginTop: 6 },
+    attentionAction: { minHeight: 44, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", gap: 7, justifyContent: "center" },
     scheduleHeading: { marginTop: 23, marginBottom: 10 },
     sortButton: { minHeight: 44, paddingLeft: 8, flexDirection: "row", alignItems: "center", gap: 2 },
     taskCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.outlineVariant, borderRadius: referenceRadii.md, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1, minHeight: 110, padding: referenceSpacing.md, paddingLeft: 18, overflow: "hidden" },

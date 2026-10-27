@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CalendarPanel, type CalendarMode } from "@/components/calendar/calendar-panel";
 import { OptionSheet, TaskEditor } from "@/components/janus-board-ui";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
+import { ReferenceMyTasksScreen } from "@/components/reference/mobile/reference-my-tasks-screen";
 import { Pill, ScreenHeader, SurfaceCard } from "@/components/reference/mobile/reference-primitives";
 import { useReferenceTheme, type ReferenceColors, referenceSpacing } from "@/components/reference/reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
@@ -39,6 +40,10 @@ export default function CalendarRoute() {
   const [editorProjectId, setEditorProjectId] = useState<string | null>(null);
   const [addDueAt, setAddDueAt] = useState<string | null>(null);
   const tasks = useMemo(() => entries.map((entry) => entry.task), [entries]);
+  const agendaTasks = useMemo(() => entries.map(({ task, projectId, projectName, boards }) => ({
+    task, projectId, projectLabel: projectName,
+    boardLabel: boards.find((board) => board.id === task.category)?.label,
+  })), [entries]);
   const projectIdByTaskId = useMemo(() => new Map(entries.map((entry) => [entry.task.id, entry.projectId])), [entries]);
 
   const openTask = (task: Task) => {
@@ -50,7 +55,6 @@ export default function CalendarRoute() {
   };
 
   const selectedTasks = useMemo(() => tasksForDay(tasks, selectedDay), [tasks, selectedDay]);
-  const unscheduledTasks = useMemo(() => tasks.filter((task) => !task.dueAt), [tasks]);
 
   const selectDay = (day: Date) => {
     setSelectedDay(day);
@@ -68,7 +72,6 @@ export default function CalendarRoute() {
   const navigate = (tab: ReferenceMobileTab) => {
     if (tab === "calendar") return;
     if (tab === "boards") return router.replace("/");
-    if (tab === "my-tasks") return router.replace("/my-tasks");
     if (tab === "settings") return router.replace("/settings");
   };
 
@@ -168,15 +171,21 @@ export default function CalendarRoute() {
             <Pressable accessibilityRole="button" accessibilityLabel={`Add task for ${format(selectedDay, "MMMM d")}`} onPress={addTaskForSelectedDay} style={styles.addDayButton}><Ionicons name="add" size={18} color={colors.primary} /><Text style={[type.bodyStrong, { color: colors.primary }]}>Add task for this day</Text></Pressable>
           </SurfaceCard>
 
-          <SectionHeading
-            title="Unscheduled"
-            subtitle={unscheduledTasks.length ? "Long press a task to choose a day." : "Every task has a due date."}
-            right={<Pill label={`${unscheduledTasks.length}`} />}
-            style={styles.unscheduledHeading}
+          <ReferenceMyTasksScreen
+            embedded
+            tasks={agendaTasks}
+            onTaskPress={openTask}
+            onTaskLongPress={setCalendarActionTask}
+            onToggleComplete={(task) => api.toggleComplete(task.id)}
+            onReviewAttention={() => {
+              const task = tasks.find((task) => deriveStatus(task, today) === "overdue");
+              if (task) openTask(task);
+            }}
+            onRescheduleAttention={() => {
+              const task = tasks.find((task) => deriveStatus(task, today) === "overdue");
+              if (task) setCalendarActionTask(task);
+            }}
           />
-          {unscheduledTasks.length ? <SurfaceCard style={styles.unscheduledCard}>
-            {unscheduledTasks.slice(0, 8).map((task) => <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} onPress={() => openTask(task)} onLongPress={() => setCalendarActionTask(task)} style={styles.unscheduledTask}><View style={[styles.taskDot, { backgroundColor: taskColor(task, colors, today) }]} /><Text style={[type.body, { flex: 1, color: colors.text }]} numberOfLines={1}>{task.title || "Untitled task"}</Text><Ionicons name="ellipsis-horizontal" size={16} color={colors.muted} /></Pressable>)}
-          </SurfaceCard> : null}
         </ScrollView>
         <ReferenceMobileBottomNav active="calendar" onNavigate={navigate} />
         <CalendarTaskActions task={calendarActionTask} now={today} onClose={() => setCalendarActionTask(null)} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, today); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(today, 1)); }} onClearDue={() => { if (calendarActionTask) api.setTaskDueAt(calendarActionTask.id, null); }} />
@@ -229,15 +238,6 @@ function tasksForDay(tasks: Task[], day: Date): Task[] {
   return tasks.filter((task) => task.dueAt && isValid(parseISO(task.dueAt)) && isSameDay(parseISO(task.dueAt), day)).sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? ""));
 }
 
-function taskColor(task: Task, colors: ReferenceColors, now: Date): string {
-  const status = deriveStatus(task, now);
-  if (status === "canceled") return colors.muted;
-  if (status === "completed") return colors.success;
-  if (status === "overdue") return colors.error;
-  if (task.priority === "high") return colors.warning;
-  return colors.primary;
-}
-
 function CalendarTaskActions({ task, now, onClose, onChooseDate, onToday, onTomorrow, onClearDue }: { task: Task | null; now: Date; onClose: () => void; onChooseDate: () => void; onToday: () => void; onTomorrow: () => void; onClearDue: () => void }) {
   return <OptionSheet visible={task !== null} title={task?.title ?? "Calendar task"} options={[{ label: "Choose a day", icon: "calendar-outline", onPress: onChooseDate }, { label: `Move to today · ${format(now, "MMM d")}`, icon: "today-outline", onPress: onToday }, { label: `Move to tomorrow · ${format(addDays(now, 1), "MMM d")}`, icon: "arrow-forward-circle-outline", onPress: onTomorrow }, ...(task?.dueAt ? [{ label: "Remove due date", icon: "close-circle-outline" as const, destructive: true, onPress: onClearDue }] : [])]} onClose={onClose} />;
 }
@@ -260,7 +260,6 @@ function CalendarTask({ task, onPress, onToggle, onMenu }: { task: Task; onPress
 function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: mobileContentStyle,
-  taskDot: { width: 6, height: 6, borderRadius: 3 },
   sectionHeading: { marginTop: 16, marginBottom: 9 },
   taskCard: { padding: referenceSpacing.sm },
   taskRow: { minHeight: 62, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant },
@@ -270,7 +269,4 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   checkmark: { color: colors.onPrimary, fontWeight: "800" },
   taskAction: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   addDayButton: { minHeight: 44, marginTop: 8, borderRadius: 10, backgroundColor: colors.surfaceLow, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
-  unscheduledHeading: { marginTop: 20, marginBottom: 8 },
-  unscheduledCard: { paddingHorizontal: referenceSpacing.sm, borderStyle: "dashed" },
-  unscheduledTask: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant },
 }); }

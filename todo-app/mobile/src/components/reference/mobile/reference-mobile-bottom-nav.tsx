@@ -3,16 +3,15 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReferenceTheme, type ReferenceColors } from "../reference-theme";
 
-export type ReferenceMobileTab = "boards" | "my-tasks" | "calendar" | "settings";
+export type ReferenceMobileTab = "boards" | "calendar" | "settings";
 
 const tabs: { key: ReferenceMobileTab; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "boards", label: "Home", icon: "home-outline", activeIcon: "home" },
-  { key: "my-tasks", label: "My Tasks", icon: "checkmark-circle-outline", activeIcon: "checkmark-circle" },
   { key: "calendar", label: "Calendar", icon: "calendar-outline", activeIcon: "calendar" },
   { key: "settings", label: "Settings", icon: "settings-outline", activeIcon: "settings" },
 ];
 
-export function ReferenceMobileBottomNav({ active = "my-tasks", onNavigate }: { active?: ReferenceMobileTab; onNavigate?: (tab: ReferenceMobileTab) => void }) {
+export function ReferenceMobileBottomNav({ active = "boards", onNavigate }: { active?: ReferenceMobileTab; onNavigate?: (tab: ReferenceMobileTab) => void }) {
   const insets = useSafeAreaInsets();
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors);

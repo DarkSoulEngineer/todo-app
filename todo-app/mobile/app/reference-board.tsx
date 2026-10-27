@@ -41,7 +41,6 @@ export default function ReferenceBoardRoute() {
 
   const navigate = (tab: ReferenceMobileTab) => {
     if (tab === "boards") return router.replace("/");
-    if (tab === "my-tasks") return router.replace("/my-tasks");
     if (tab === "calendar") return router.replace("/calendar");
     if (tab === "settings") return router.replace("/settings");
   };

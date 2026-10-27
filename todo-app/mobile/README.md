@@ -24,7 +24,7 @@ the native date picker.
 app/                     expo-router routes
   _layout.tsx            providers + headerless stack
   index.tsx              Home / board manager
-  my-tasks.tsx           cross-board task overview
+  my-tasks.tsx           legacy redirect to Calendar
   calendar.tsx           cross-board calendar overview
   settings.tsx           app-level settings
   board/[id].tsx         board workspace: Board / List / Calendar / Insights
@@ -70,20 +70,21 @@ On web, export starts a download. Run the backup codec checks with Node 24:
 
 ## Navigation
 
-The mobile app uses a shared ribbon top bar and a four-tab bottom navigation:
+The mobile app uses a shared ribbon top bar and a three-tab bottom navigation:
 
 | Tab | Route | Purpose |
 |---|---|---|
 | Home | `app/index.tsx` | Board manager with open/closed boards, import, create, and rearrange. |
-| My Tasks | `app/my-tasks.tsx` | Tasks from every open board; tapping a task opens its owning board. |
-| Calendar | `app/calendar.tsx` | Calendar across every open board, with month/week modes and Today. |
+| Calendar | `app/calendar.tsx` | Calendar and My Tasks across open boards, with month/week modes, search, task filters, and editing. |
 | Settings | `app/settings.tsx` | App-level appearance, calendar defaults, data/backups, and About. |
 
 Board-specific work stays in `app/board/[id].tsx` and keeps its own
-Board / List / Calendar / Insights ribbon. My Tasks and Calendar are overviews
-only; task creation stays in Home and board views.
+Board / List / Calendar / Insights ribbon. My Tasks is a section below the main
+calendar, not a separate tab. The old `/my-tasks` route redirects to `/calendar`.
+Calendar includes task creation for the selected day; long press a task in
+My Tasks to reschedule it, including tasks without due dates.
 
-All four top-level screens share the ribbon top-bar/search styling, content
+All three top-level screens share the ribbon top-bar/search styling, content
 width, page padding, and bottom-nav clearance from `src/theme/layout.ts`.
 Interacting with a ribbon control resets its auto-hide timer.
 
