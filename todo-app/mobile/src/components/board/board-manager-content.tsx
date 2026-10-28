@@ -163,7 +163,7 @@ function WorkspaceOverview({ metrics, boards, wide = false, sidebar = false, cha
   const { theme } = useTheme();
   const c = theme.colors;
   // Overdue is a subset of open tasks: do not count it twice in the donut.
-  const slices = [{ label: "Completed", value: metrics.done, color: c.success }, { label: "Overdue", value: metrics.overdue, color: c.destructive }, { label: "Open (not overdue)", value: metrics.open - metrics.overdue, color: c.info }, { label: "Canceled", value: metrics.canceled, color: c.primary }];
+  const slices = [{ label: "Completed", value: metrics.done, color: c.success }, { label: "Overdue", value: metrics.overdue, color: c.destructive }, { label: "Open (not overdue)", value: metrics.open - metrics.overdue, color: c.info }, { label: "Canceled", value: metrics.canceled, color: theme.scheme === "dark" ? "#9CA3AF" : "#6B7280" }];
   const circumference = 2 * Math.PI * 48;
   const strokeWidth = 11;
   const segmentCount = slices.filter((slice) => slice.value > 0).length;
