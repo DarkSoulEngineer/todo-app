@@ -4,6 +4,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
+import { JanusLogo } from "@/components/ui/janus-logo";
 import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
@@ -48,8 +49,8 @@ export function WelcomeScreen() {
       <ThemeAtmosphere />
       <View style={[styles.content, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
         <View style={styles.header}>
-          <View style={[styles.logoWrap, { backgroundColor: c.primarySoft }]}>
-            <Ionicons name="layers-outline" size={32} color={c.primary} />
+          <View style={[styles.logoWrap, { backgroundColor: "transparent" }]}>
+            <JanusLogo size={72} />
           </View>
           <Text style={[styles.title, { color: c.foreground }]}>Welcome</Text>
           <Text style={[styles.subtitle, { color: c.mutedForeground }]}>

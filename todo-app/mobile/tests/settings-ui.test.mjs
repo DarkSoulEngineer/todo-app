@@ -63,9 +63,10 @@ test("theme picker shows a sun/moon switch and only the palettes for that mode",
     "@/theme/palettes": { themes: entries }, "@/theme/tokens": { getThemeById: (id) => entries.find((entry) => entry.id === id)?.scheme === "light" ? lightTheme : darkTheme },
   });
   let tree = state.render(ThemePicker, {});
-  // Dark is the active mode, so the switch offers light and the trigger reports a dark palette.
-  assert.equal(byLabel(tree, "Use light appearance").props.accessibilityLabel, "Use light appearance");
-  assert.equal(nodes(tree).filter((node) => node.type === "Ionicons").length, 1, "a single sun/moon icon represents the switch");
+  // Dark is the active mode, so its palettes are shown and light-only ones are hidden.
+  assert.equal(byLabel(tree, "Use dark appearance").props.accessibilityState.checked, true);
+  assert.equal(byLabel(tree, "Use light appearance").props.accessibilityState.checked, false);
+  assert.equal(nodes(tree).filter((node) => node.type === "Ionicons").length, 2, "the switch shows sun and moon icons");
   assert.equal(byLabel(tree, "Choose interface theme").props.accessibilityState.expanded, false);
   byLabel(tree, "Choose interface theme").props.onPress();
   tree = state.render(ThemePicker, {});
@@ -83,7 +84,7 @@ test("theme picker shows a sun/moon switch and only the palettes for that mode",
   byLabel(tree, "Use light appearance").props.onPress();
   assert.equal(choices.at(-1), "light");
   tree = state.render(ThemePicker, {});
-  assert.equal(byLabel(tree, "Use dark appearance").props.accessibilityLabel, "Use dark appearance");
+  assert.equal(byLabel(tree, "Use light appearance").props.accessibilityState.checked, true);
   byLabel(tree, "Choose interface theme").props.onPress();
   tree = state.render(ThemePicker, {});
   assert.ok(byLabel(tree, "Solarized Light"));
@@ -128,7 +129,7 @@ test("System remains available in either mode and follows the device appearance"
     "@/theme/palettes": { themes: entries }, "@/theme/tokens": { getThemeById: () => lightTheme },
   });
   let tree = state.render(ThemePicker, {});
-  assert.equal(byLabel(tree, "Use dark appearance").props.accessibilityLabel, "Use dark appearance", "System resolves to the device scheme");
+  assert.equal(byLabel(tree, "Use light appearance").props.accessibilityState.checked, true, "System resolves to the device scheme");
   byLabel(tree, "Choose interface theme").props.onPress();
   tree = state.render(ThemePicker, {});
   assert.ok(byLabel(tree, "System"), "System is offered while following the device");
@@ -153,7 +154,7 @@ test("settings sections keep calendar, export and import actions functional", as
     "@/providers/preferences-provider": { usePreferences: () => ({ ...settings, setCalendarDefaultView: (value) => calls.push(["view", value]), setCalendarWeekStart: (value) => calls.push(["week", value]), savePreferences: async () => calls.push(["preferences"]) }) },
     "@/providers/tasks-provider": { useTasksContext: () => ({ projects: [], tasks: [] }) },
     "@/providers/theme-provider": { useTheme: () => ({ preference: "matrix", savePreference: async (value) => calls.push(["theme", value]) }) },
-    "@/components/ui/section-heading": { SectionHeading: "Heading" }, "@/components/ui/sheet": { Sheet: "Sheet" }, "@/components/ui/button": { Button: "Button" },
+    "@/components/ui/section-heading": { SectionHeading: "Heading" }, "@/components/ui/sheet": { Sheet: "Sheet" }, "@/components/ui/button": { Button: "Button" }, "@/components/ui/janus-logo": { JanusLogo: "JanusLogo" },
     "@/lib/data/transfer": { exportFullBackup: async (_, value) => calls.push(["export", value.theme]), pickBackupFile: async () => ({ settings, boards: [] }) },
     "@/theme/layout": { mobileContentStyle: {}, mobileBottomNavClearance: 112 },
   });

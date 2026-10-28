@@ -14,6 +14,7 @@ import { useTheme } from "@/providers/theme-provider";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { JanusLogo } from "@/components/ui/janus-logo";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
 
@@ -187,6 +188,13 @@ export default function SettingsRoute() {
             <View style={[styles.infoRow, { borderTopColor: colors.outlineVariant }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>No account required</Text><Text style={[type.caption, { color: colors.muted }]}>Back up anytime from Data &amp; backups.</Text></View>
             </View>
+          </View>
+          <View style={[styles.sectionCard, { gap: 10 }]}>
+            <View style={{ alignItems: "center" }}><JanusLogo size={56} /></View>
+            <Text style={[type.bodyStrong, { color: colors.text }]}>The story of Janus</Text>
+            <Text style={[type.caption, { color: colors.muted, lineHeight: 20 }]}>
+              Janus is the two faced keeper of doorways. One face looks back at what is finished, the other looks ahead at what remains. In this board the good face marks tasks you have completed and done. The bad face marks what is still unfinished and overdue. The logo carries both faces in a single mark, so progress and neglect stay visible at a glance.
+            </Text>
           </View>
         </View> : null}
       </ScrollView>

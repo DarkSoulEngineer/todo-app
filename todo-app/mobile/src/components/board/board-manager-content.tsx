@@ -7,6 +7,7 @@ import Svg, { Circle } from "react-native-svg";
 import { IconButton } from "@/components/janus-board-ui";
 import { ScreenHeader } from "@/components/reference/mobile/reference-primitives";
 import { Button } from "@/components/ui/button";
+import { JanusLogo } from "@/components/ui/janus-logo";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MobileSearchField, MobileTopBarAction } from "@/components/ui/mobile-top-bar";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -71,6 +72,7 @@ export function BoardManagerContent(props: Props) {
     <ScreenHeader
       title="Janus"
       subtitle="Focused task manager"
+      leading={<JanusLogo size={28} />}
       onSearch={() => setShowSearch(prev => !prev)}
       searchActive={showSearch}
       showThemeToggle={false}
