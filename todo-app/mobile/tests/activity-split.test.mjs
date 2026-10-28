@@ -54,18 +54,24 @@ test("Activity switches at the existing 900px desktop breakpoint only", () => {
     }
   }
 });
-test("empty desktop board shows the full create editor, never a mini placeholder", () => {
-  const tree = render(1000, "list", null, false, []);
-  assert.equal(editor(tree).props.visible, true);
-  assert.equal(editor(tree).props.task, null);
-  assert.equal(find(tree, (node) => node.type === "EmptyState" && node.props.title === "Task details").length, 0);
-  assert.equal(find(tree, (node) => node.type === "ScrollView" && node.props.style?.minWidth === 0).length, 1);
+test("empty boards fall back to Board without an automatic Activity create editor", () => {
+  for (const width of [390, 1200]) {
+    const updates = [];
+    const tree = render(width, "list", null, true, [], updates);
+    const nav = find(tree, (node) => node.type === "MobileBoardBottomNav")[0];
+    assert.equal(nav.props.mode, "board");
+    assert.equal(nav.props.hasTasks, false);
+    assert.equal(editor(tree).props.visible, false);
+    assert.equal(editor(tree).props.presentation, "sheet");
+    assert.equal(find(tree, (node) => node.type === "MobileTaskColumns").length, 1);
+    assert.ok(updates.some(([index, value]) => index === 0 && value === "board"));
+    assert.ok(updates.some(([index, value]) => index === 12 && value === false));
+  }
 });
-test("deleted selections fall back to top priority, or the create editor when the last task is removed", () => {
+test("deleted selections fall back to top priority, or leave Activity when the last task is removed", () => {
   const remaining = { ...task, id: "remaining", priority: "high" };
   assert.equal(editor(render(1000, "list", task, true, [remaining])).props.task.id, "remaining");
-  assert.equal(editor(render(1000, "list", task, true, [])).props.task, null);
-  assert.equal(editor(render(1000, "list", task, true, [])).props.visible, true);
+  assert.equal(editor(render(1000, "list", task, true, [])).props.visible, false);
 });
 test("desktop defaults to canonical top priority, not latest update; active tasks win", () => {
   const recent = { ...task, id: "recent", priority: "low", updatedAt: "2026-10-29T10:00:00Z" };
@@ -107,9 +113,12 @@ test("filters do not replace an existing selection or change the board-wide defa
   assert.equal(editor(render(1200, "list", task, true, [high, task], [], options)).props.task.id, "a");
   assert.equal(editor(render(1200, "list", null, false, [high, task], [], options)).props.task.id, "high");
   assert.equal(source.includes('title="Task details"'), false);
+  const nav = find(render(1200, "list", task, true, [high, task], [], options), (node) => node.type === "MobileBoardBottomNav")[0];
+  assert.equal(nav.props.hasTasks, true);
+  assert.equal(nav.props.mode, "list");
 });
-test("pane widths stay identical for closed, deleted and empty selections", () => {
-  for (const [selected, visible, tasks] of [[task, true, [task]], [task, false, [task]], [task, true, []], [null, false, []]]) {
+test("pane widths stay identical for closed and deleted selections while cards remain", () => {
+  for (const [selected, visible, tasks] of [[task, true, [task]], [task, false, [task]], [{ ...task, id: "deleted" }, true, [task]], [null, false, [task]]]) {
     const panel = find(render(1200, "list", selected, visible, tasks), (node) => node.props?.style?.flex === 6)[0];
     assert.equal(panel.props.style.minWidth, 440);
     assert.equal(panel.props.style.width, undefined);

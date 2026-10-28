@@ -47,7 +47,10 @@ export default function WorkspaceScreen() {
   const api = useTasksContext();
   const { tasks, sections, boards, projects, isLoading, currentProjectId, switchProject: switchProjectApi } = api;
   const requestedProjectId = useRef<string | null>(null);
-  const [mode, setMode] = useState<ViewMode>("board");
+  const [requestedMode, setMode] = useState<ViewMode>("board");
+  const hasTasks = tasks.length > 0;
+  const activityUnavailable = requestedMode === "list" && !hasTasks;
+  const mode = activityUnavailable ? "board" : requestedMode;
   // Match the existing desktop workspace breakpoint; keep other tabs unchanged.
   const activitySplit = mode === "list" && width >= 900;
   const [query, setQuery] = useState("");
@@ -81,6 +84,16 @@ export default function WorkspaceScreen() {
   const [bulkSectionMenu, setBulkSectionMenu] = useState(false);
   const [bulkPriorityMenu, setBulkPriorityMenu] = useState(false);
   const [editorProjectId, setEditorProjectId] = useState(currentProjectId);
+  useEffect(() => {
+    if (!activityUnavailable || isLoading) return;
+    // Clear Activity's editor when the last card is removed or an empty board opens.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMode("board");
+    setEditorVisible(false);
+    setEditorTask(null);
+    setInitialDueAt(null);
+    setInitialSectionId(null);
+  }, [activityUnavailable, isLoading]);
   const defaultActivityTask = useMemo(() => {
     const entries = tasks.map((task) => ({ task, projectId: currentProjectId, projectName: "", boards }));
     // Match Top Tasks' priority/deadline ordering. Finished-only boards still
@@ -339,7 +352,7 @@ export default function WorkspaceScreen() {
     <View style={styles.optionToolGroup}><View style={styles.optionToolButtons}><OptionTool icon="swap-horizontal-outline" label="Switch board" onPress={() => setProjectSwitcherOpen(true)} /><OptionTool icon="archive-outline" label="Close board" onPress={closeBoard} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>BOARD</Text></View>
   </ScrollView>;
   const activeFilterBoard = boards.find((board) => board.id === boardFilter);
-  const showEditor = activitySplit || (editorVisible && (!editorTask || tasks.some((task) => task.id === editorTask.id)));
+  const showEditor = !activityUnavailable && (activitySplit || (editorVisible && (!editorTask || tasks.some((task) => task.id === editorTask.id))));
   const taskEditor = <TaskEditor presentation={activitySplit ? "panel" : "sheet"} visible={showEditor} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />;
   const filterOptions = [{ label: "All boards", icon: boardFilter === "all" ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter("all"); setSelectedTaskIds(new Set()); } }, ...boards.map((board) => ({ label: board.label, icon: boardFilter === board.id ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter(board.id); setSelectedTaskIds(new Set()); } }))];
   const filtersContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
@@ -367,7 +380,7 @@ export default function WorkspaceScreen() {
         </View>
       </View>
       </BlurTargetView>
-      <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); if (value !== mode) { setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null); } setMode(value); }} blurTarget={blurTarget} />
+      <MobileBoardBottomNav mode={mode} hasTasks={hasTasks} onMode={(value) => { if (value === "list" && !hasTasks) return; if (value !== "board" && selectionMode) exitSelectionMode(); if (value !== mode) { setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null); } setMode(value); }} blurTarget={blurTarget} />
        <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onComplete={() => { if (calendarActionTask) api.toggleComplete(calendarActionTask.id); setCalendarActionTask(null); }} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}
        <TaskActions task={taskAction} tasks={visibleTasks} sections={sections} now={now} onClose={() => setTaskAction(null)} onComplete={() => { if (taskAction) api.toggleComplete(taskAction.id); setTaskAction(null); }} onCancel={() => { if (taskAction) api.toggleCancel(taskAction.id); setTaskAction(null); }} onDelete={() => { if (taskAction) { const before = api.snapshot(); api.deleteTask(taskAction.id); setTaskAction(null); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } }} onMove={(sectionId) => { if (taskAction) moveTaskToSection(taskAction, sectionId); setTaskAction(null); }} onMoveUp={() => { if (taskAction) reorderTask(taskAction, "up"); setTaskAction(null); }} onMoveDown={() => { if (taskAction) reorderTask(taskAction, "down"); setTaskAction(null); }} />

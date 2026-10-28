@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { BlurTargetView } from "expo-blur";
 import { router } from "expo-router";
@@ -6,28 +5,21 @@ import { useRef, useState, type ComponentRef } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
-import { Pill, ScreenHeader, SurfaceCard } from "@/components/reference/mobile/reference-primitives";
+import { ScreenHeader } from "@/components/reference/mobile/reference-primitives";
+import { ThemePicker } from "@/components/settings/theme-picker";
 import { useReferenceTheme, type ReferenceColors, referenceRadii, referenceSpacing } from "@/components/reference/reference-theme";
 import { usePreferences, type CalendarDefaultView, type CalendarWeekStart } from "@/providers/preferences-provider";
 import { useTasksContext } from "@/providers/tasks-provider";
 import { useTheme } from "@/providers/theme-provider";
-import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
-import type { ThemePreference } from "@/theme/tokens";
-import { themes } from "@/theme/palettes";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
 
-const THEME_OPTIONS: { value: ThemePreference; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: "system", label: "System", icon: "phone-portrait-outline" },
-  ...themes.filter((t) => t.id !== "system").map((t) => ({ value: t.id, label: t.name, icon: t.scheme === "dark" ? "moon-outline" as const : "sunny-outline" as const })),
-];
-
-const CALENDAR_VIEW_OPTIONS: { value: CalendarDefaultView; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: "month", label: "Month", icon: "calendar-outline" },
-  { value: "week", label: "Week", icon: "today-outline" },
+const CALENDAR_VIEW_OPTIONS: { value: CalendarDefaultView; label: string }[] = [
+  { value: "month", label: "Month" },
+  { value: "week", label: "Week" },
 ];
 
 const WEEK_START_OPTIONS: { value: CalendarWeekStart; label: string }[] = [
@@ -36,16 +28,18 @@ const WEEK_START_OPTIONS: { value: CalendarWeekStart; label: string }[] = [
 ];
 
 type BackupScope = "preferences" | "boards" | "all";
-const BACKUP_OPTIONS: { value: BackupScope; label: string; description: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: "preferences", label: "Preferences", description: "Theme, calendar view and week start", icon: "options-outline" },
-  { value: "boards", label: "Boards", description: "Every board, list and task", icon: "albums-outline" },
-  { value: "all", label: "All", description: "Preferences and all boards in one JSON file", icon: "archive-outline" },
+const BACKUP_OPTIONS: { value: BackupScope; label: string; description: string }[] = [
+  { value: "preferences", label: "Preferences", description: "Theme, calendar view and week start" },
+  { value: "boards", label: "Boards", description: "Every board, list and task" },
+  { value: "all", label: "Everything", description: "Preferences and all boards in one JSON file" },
 ];
+
+const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Data & backups", "About"] as const;
 
 export default function SettingsRoute() {
   const api = useTasksContext();
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
-  const { preference, setPreference, savePreference } = useTheme();
+  const { preference, savePreference } = useTheme();
   const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart, savePreferences } = usePreferences();
   const { colors, type } = useReferenceTheme();
   const insets = useSafeAreaInsets();
@@ -54,6 +48,7 @@ export default function SettingsRoute() {
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [scope, setScope] = useState<BackupScope>("all");
+  const [section, setSection] = useState<typeof SETTINGS_SECTIONS[number]>("Appearance");
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const taskCount = api.projects.reduce((total, project) => total + (project.id === api.currentProjectId ? api.tasks.length : project.workspace.tasks.length), 0);
@@ -121,54 +116,38 @@ export default function SettingsRoute() {
   return (
     <View style={styles.root}>
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
-      <ThemeAtmosphere />
       <ScreenHeader title="Settings" showThemeToggle={false} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
-        <View style={styles.sectionBlock}>
-          <SectionHeading
-            title="Appearance"
-            subtitle="Choose how Janus looks on this device. Your choice is saved automatically."
-            right={<Pill label={preference === "system" ? "Auto" : themes.find((theme) => theme.id === preference)?.name ?? "Theme"} tone="primary" />}
-          />
-          <SurfaceCard style={styles.sectionCard}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeScroll}>
-              {THEME_OPTIONS.map((option) => {
-                const selected = preference === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="button"
-                    disabled={busy}
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`Use ${option.label} theme`}
-                    onPress={() => setPreference(option.value)}
-                    style={[styles.themeChip, selected && styles.themeChipSelected, { borderColor: selected ? colors.primary : colors.outlineVariant }]}
-                  >
-                    <Ionicons name={option.icon} size={16} color={selected ? colors.primary : colors.muted} />
-                    <Text style={[type.caption, { color: selected ? colors.primary : colors.muted }]} numberOfLines={1}>{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </SurfaceCard>
-        </View>
+        <ScrollView horizontal accessibilityRole="tablist" accessibilityLabel="Settings sections" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionTabs}>
+          {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
+            style={[styles.sectionTab, { borderBottomColor: section === label ? colors.primary : "transparent" }]}>
+            <Text style={[type.bodyStrong, { color: section === label ? colors.text : colors.muted }]}>{label}</Text>
+          </Pressable>)}
+        </ScrollView>
+        {section === "Appearance" ? <View style={styles.sectionBlock}>
+          <SectionHeading title="Theme & appearance" subtitle="Choose a palette. Changes save automatically on this device." />
+          <View style={styles.sectionCard}>
+            <Text style={[type.caption, styles.settingLabelFirst]}>Interface theme</Text>
+            <ThemePicker disabled={busy} />
+          </View>
+          <Text style={[type.caption, { color: colors.muted }]}>Your theme applies to every board and view. Choose System to follow your device’s light or dark appearance.</Text>
+        </View> : null}
 
-        <View style={styles.sectionBlock}>
+        {section === "Calendar" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Calendar" subtitle="Choose how board calendars open and which day starts their week." />
-          <SurfaceCard style={styles.sectionCard}>
-            <Text style={[type.caption, styles.settingLabelFirst]}>DEFAULT VIEW</Text>
+          <View style={styles.sectionCard}>
+            <Text style={[type.bodyStrong, styles.settingLabelFirst]}>Default view</Text>
             <View style={styles.segmented}>
               {CALENDAR_VIEW_OPTIONS.map((option) => {
                 const selected = calendarDefaultView === option.value;
                 return (
                   <Pressable key={option.value} disabled={busy} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={[styles.segment, selected && styles.segmentSelected]}>
-                    <Ionicons name={option.icon} size={17} color={selected ? colors.primary : colors.muted} />
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
                   </Pressable>
                 );
               })}
             </View>
-            <Text style={[type.caption, styles.settingLabel]}>WEEK STARTS ON</Text>
+            <Text style={[type.bodyStrong, styles.settingLabel]}>Week starts on</Text>
             <View style={styles.segmented}>
               {WEEK_START_OPTIONS.map((option) => {
                 const selected = calendarWeekStart === option.value;
@@ -179,43 +158,39 @@ export default function SettingsRoute() {
                 );
               })}
             </View>
-          </SurfaceCard>
-        </View>
+          </View>
+        </View> : null}
 
-        <View style={styles.sectionBlock}>
+        {section === "Data & backups" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Data & backups" subtitle="Changes save automatically on this device. Choose what to include when saving a backup file." />
-          <SurfaceCard style={styles.sectionCard}>
+          <View style={styles.sectionCard}>
             <Pressable accessibilityRole="button" accessibilityLabel="Save backup" disabled={busy} onPress={() => { setStatus(null); setSaveOpen(true); }} style={({ pressed }) => [styles.actionRow, styles.firstRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
-              <View style={styles.actionIcon}><Ionicons name="save-outline" size={19} color={colors.primary} /></View>
-              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Save</Text><Text style={[type.caption, { color: colors.muted }]}>Choose preferences, boards or all</Text></View>
-              <Ionicons name="chevron-forward" size={17} color={colors.outline} />
+              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Export backup</Text><Text style={[type.caption, { color: colors.muted }]}>Choose preferences, boards or everything</Text></View>
+              <Text style={[type.caption, { color: colors.primary }]}>Export</Text>
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Import backup" disabled={busy} onPress={() => void handleImport()} style={({ pressed }) => [styles.actionRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
-              <View style={styles.actionIcon}><Ionicons name="cloud-upload-outline" size={19} color={colors.secondary} /></View>
-              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Import</Text><Text style={[type.caption, { color: colors.muted }]}>Restore a JSON backup; adds boards and replaces included preferences</Text></View>
-              <Ionicons name="chevron-forward" size={17} color={colors.outline} />
+              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Import backup</Text><Text style={[type.caption, { color: colors.muted }]}>Adds boards and replaces included preferences</Text></View>
+              <Text style={[type.caption, { color: colors.primary }]}>Import</Text>
             </Pressable>
-            {status ? <View accessibilityLiveRegion="polite" style={[styles.statusBanner, { backgroundColor: status.error ? colors.errorContainer : colors.successFixed }]}><Ionicons name={status.error ? "alert-circle-outline" : "checkmark-circle-outline"} size={17} color={status.error ? colors.error : colors.success} /><Text style={[type.caption, { flex: 1, color: status.error ? colors.error : colors.success }]}>{status.message}</Text></View> : null}
-          </SurfaceCard>
-        </View>
+            <Text style={[type.caption, styles.storageNote, { color: colors.muted }]}>{api.projects.length} board{api.projects.length === 1 ? "" : "s"} · {taskCount} task{taskCount === 1 ? "" : "s"} stored locally</Text>
+            {status ? <View accessibilityLiveRegion="polite" style={[styles.statusBanner, { backgroundColor: status.error ? colors.errorContainer : colors.successFixed }]}><Text style={[type.caption, { flex: 1, color: status.error ? colors.error : colors.success }]}>{status.message}</Text></View> : null}
+          </View>
+        </View> : null}
 
-        <View style={styles.sectionBlock}>
+        {section === "About" ? <View style={styles.sectionBlock}>
           <SectionHeading
-            title="About"
-            subtitle="Janus is a local-first task manager. Your boards and tasks stay on this device unless you export them."
-            right={<Pill label={`v${appVersion}`} />}
+            title="Janus"
+            subtitle={`Version ${appVersion}`}
           />
-          <SurfaceCard style={styles.sectionCard}>
+          <View style={styles.sectionCard}>
             <View style={[styles.infoRow, styles.firstRow, { borderTopColor: colors.outlineVariant }]}>
-              <View style={styles.actionIcon}><Ionicons name="folder-open-outline" size={19} color={colors.primary} /></View>
-              <View style={styles.actionCopy}><Text style={type.bodyStrong}>{api.projects.length} board{api.projects.length === 1 ? "" : "s"} · {taskCount} task{taskCount === 1 ? "" : "s"}</Text><Text style={[type.caption, { color: colors.muted }]}>Stored locally on this device</Text></View>
+              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Local-first</Text><Text style={[type.caption, { color: colors.muted }]}>Your boards and tasks stay on this device unless you export them.</Text></View>
             </View>
             <View style={[styles.infoRow, { borderTopColor: colors.outlineVariant }]}>
-              <View style={styles.actionIcon}><Ionicons name="shield-checkmark-outline" size={19} color={colors.success} /></View>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>No account required</Text><Text style={[type.caption, { color: colors.muted }]}>Back up anytime from Data &amp; backups.</Text></View>
             </View>
-          </SurfaceCard>
-        </View>
+          </View>
+        </View> : null}
       </ScrollView>
       </BlurTargetView>
       <ReferenceMobileBottomNav active="settings" onNavigate={navigate} blurTarget={blurTarget} />
@@ -225,9 +200,8 @@ export default function SettingsRoute() {
         <View accessibilityRole="radiogroup">
           {BACKUP_OPTIONS.map((option, index) => (
             <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, index === 0 && styles.firstRow, { opacity: pressed ? 0.7 : 1 }]}>
-              <View style={styles.actionIcon}><Ionicons name={option.icon} size={19} color={colors.primary} /></View>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>{option.label}</Text><Text style={[type.caption, { color: colors.muted }]}>{option.description}</Text></View>
-              <Ionicons name={scope === option.value ? "radio-button-on" : "radio-button-off"} size={22} color={scope === option.value ? colors.primary : colors.outline} />
+              <Text style={[type.caption, { color: colors.primary }]}>{scope === option.value ? "Selected" : ""}</Text>
             </Pressable>
           ))}
         </View>
@@ -242,20 +216,19 @@ export default function SettingsRoute() {
 function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { ...mobileContentStyle, gap: referenceSpacing.lg },
-  sectionBlock: { gap: 8 },
-  sectionCard: { padding: referenceSpacing.md },
+  sectionBlock: { gap: 12 },
+  sectionCard: { padding: referenceSpacing.md, borderRadius: referenceRadii.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.outlineVariant, backgroundColor: colors.card },
+  sectionTabs: { flexDirection: "row", gap: 18, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant },
+  sectionTab: { minHeight: 44, justifyContent: "center", borderBottomWidth: 2, paddingHorizontal: 2 },
   firstRow: { borderTopWidth: 0 },
   settingLabel: { marginTop: referenceSpacing.md, marginBottom: 6, color: colors.muted },
-  settingLabelFirst: { marginBottom: 6, color: colors.muted },
+  settingLabelFirst: { marginBottom: 10, color: colors.muted },
   segmented: { padding: 4, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 3 },
   segment: { flex: 1, minHeight: 44, paddingHorizontal: 6, borderRadius: referenceRadii.md, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
-  segmentSelected: { backgroundColor: colors.card, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 5, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  themeScroll: { flexDirection: "row", gap: 8 },
-  themeChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, minHeight: 38, borderRadius: referenceRadii.pill, borderWidth: 1, backgroundColor: colors.surfaceLow },
-  themeChipSelected: { backgroundColor: colors.card },
-  actionRow: { minHeight: 58, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
-  infoRow: { minHeight: 58, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  actionIcon: { width: 38, height: 38, borderRadius: referenceRadii.md, backgroundColor: colors.surfaceLow, alignItems: "center", justifyContent: "center" },
-  actionCopy: { flex: 1, minWidth: 0, gap: 2 },
-  statusBanner: { minHeight: 42, marginTop: 8, paddingHorizontal: 10, borderRadius: referenceRadii.md, flexDirection: "row", alignItems: "center", gap: 7 },
+  segmentSelected: { backgroundColor: colors.card },
+  actionRow: { minHeight: 60, paddingHorizontal: 4, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
+  infoRow: { minHeight: 60, paddingHorizontal: 4, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  actionCopy: { flex: 1, minWidth: 0, gap: 5 },
+  storageNote: { marginTop: 8, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
+  statusBanner: { minHeight: 42, marginTop: 12, padding: 10, borderRadius: referenceRadii.md, flexDirection: "row", alignItems: "center" },
  }); }

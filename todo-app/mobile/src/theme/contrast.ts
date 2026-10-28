@@ -20,7 +20,11 @@ export function contrastRatio(ink: string, surface: string): number {
 
 /** Keep the original hue where possible; move only as far as readability needs. */
 export function readableInk(ink: string, surfaces: string[], minimum = 4.5): string {
-  const score = (color: string) => Math.min(...surfaces.map((surface) => contrastRatio(color, surface)));
+  const backgrounds = surfaces.map(luminance);
+  const score = (color: string) => {
+    const value = luminance(color);
+    return Math.min(...backgrounds.map((background) => (Math.max(value, background) + 0.05) / (Math.min(value, background) + 0.05)));
+  };
   if (score(ink) >= minimum) return ink;
   const target = score("#FFFFFF") >= score("#000000") ? 255 : 0;
   const original = channels(ink);
@@ -42,6 +46,12 @@ export function withReadableText(colors: ThemeColors): ThemeColors {
   c.foreground = readableInk(c.foreground, surfaces);
   c.mutedForeground = readableInk(c.mutedForeground, surfaces);
   c.secondaryForeground = readableInk(c.secondaryForeground, [c.secondary]);
+  // These colors are also used as small status/selected labels, not only fills.
+  c.primary = readableInk(c.primary, [...surfaces, c.primarySoft]);
+  c.destructive = readableInk(c.destructive, [...surfaces, c.destructiveSoft]);
+  c.success = readableInk(c.success, [...surfaces, c.successSoft]);
+  c.warning = readableInk(c.warning, [...surfaces, c.warningSoft]);
+  c.info = readableInk(c.info, [...surfaces, c.infoSoft]);
   // Soft buttons and selected chips use primarySoft, not the solid accent.
   c.accentForeground = readableInk(c.accentForeground, [c.primarySoft]);
   c.primaryForeground = readableInk(c.primaryForeground, [c.primary]);

@@ -40,7 +40,7 @@ export interface ThemeDefinition {
 
 const light: ThemeColors = {
   background: "#F1EEE9",
-  backgroundAlt: "#F1EEE9",
+  backgroundAlt: "#EAE6E0",
   card: "#FFFFFF",
   cardElevated: "#FFFFFF",
   foreground: "#211C17",
@@ -176,7 +176,7 @@ const gruvboxDark: ThemeColors = {
   border: "#3C3836",
   borderStrong: "#504945",
   input: "#282828",
-  primary: "#D3869B",
+  primary: "#FABD2F",
   primaryForeground: "#282828",
   primarySoft: "#3C3836",
   secondary: "#3C3836",
@@ -208,7 +208,7 @@ const gruvboxLight: ThemeColors = {
   border: "#D5C4A1",
   borderStrong: "#BDAE93",
   input: "#FBF1C7",
-  primary: "#B16286",
+  primary: "#B57614",
   primaryForeground: "#FBF1C7",
   primarySoft: "#D5C4A1",
   secondary: "#EBDBB2",
@@ -583,14 +583,14 @@ const githubLight: ThemeColors = {
 };
 
 const microsoftLight: ThemeColors = {
-  background: "#FAF9F8",
-  backgroundAlt: "#F3F2F1",
+  background: "#F5F7FA",
+  backgroundAlt: "#EDF1F5",
   card: "#FFFFFF",
   cardElevated: "#FFFFFF",
   foreground: "#323130",
   mutedForeground: "#605E5C",
-  border: "#EDEBE9",
-  borderStrong: "#C8C6C4",
+  border: "#DCE2EA",
+  borderStrong: "#B6C1CF",
   input: "#FFFFFF",
   primary: "#0078D4",
   primaryForeground: "#FFFFFF",
@@ -615,19 +615,19 @@ const microsoftLight: ThemeColors = {
 };
 
 const microsoftDark: ThemeColors = {
-  background: "#1F1F1F",
-  backgroundAlt: "#252423",
-  card: "#2D2C2C",
-  cardElevated: "#323130",
+  background: "#17191C",
+  backgroundAlt: "#1C1F24",
+  card: "#22262B",
+  cardElevated: "#2B3036",
   foreground: "#FAF9F8",
   mutedForeground: "#C8C6C4",
-  border: "#323130",
-  borderStrong: "#484644",
-  input: "#1F1F1F",
+  border: "#363C45",
+  borderStrong: "#505A66",
+  input: "#1C1F24",
   primary: "#4CC2FF",
   primaryForeground: "#000000",
   primarySoft: "#323130",
-  secondary: "#2D2C2C",
+  secondary: "#2B3036",
   secondaryForeground: "#FAF9F8",
   accent: "#A5A4F7",
   accentForeground: "#000000",
@@ -715,21 +715,21 @@ const cyberpunk: ThemeColors = {
   backgroundAlt: "#0A0A0A",
   card: "#111111",
   cardElevated: "#1A1A1A",
-  foreground: "#00FFFF",
-  mutedForeground: "#FF00FF",
-  border: "#FF00FF",
-  borderStrong: "#00FFFF",
+  foreground: "#E6F7FA",
+  mutedForeground: "#9DAEBB",
+  border: "#283445",
+  borderStrong: "#51647D",
   input: "#000000",
   primary: "#FF00FF",
   primaryForeground: "#000000",
   primarySoft: "#1A1A1A",
   secondary: "#111111",
-  secondaryForeground: "#00FFFF",
+  secondaryForeground: "#E6F7FA",
   accent: "#FFFF00",
   accentForeground: "#000000",
   destructive: "#FF0055",
   destructiveSoft: "#4C0011",
-  destructiveForeground: "#00FFFF",
+  destructiveForeground: "#FFFFFF",
   success: "#00FF88",
   successSoft: "#001F11",
   successForeground: "#000000",
@@ -738,7 +738,7 @@ const cyberpunk: ThemeColors = {
   info: "#00FFFF",
   infoSoft: "#001F1F",
   overlay: "rgba(0,0,0,0.8)",
-  shadow: "rgba(255,0,255,0.5)",
+  shadow: "rgba(0,0,0,0.5)",
   skeleton: "#1A1A1A",
 };
 
@@ -774,6 +774,70 @@ const materialOcean: ThemeColors = {
   skeleton: "#252630",
 };
 
+const matrix: ThemeColors = {
+  ...dark,
+  background: "#030A05", backgroundAlt: "#07160B",
+  card: "#0A1D10", cardElevated: "#102B18", input: "#051108",
+  foreground: "#C2FFD0", mutedForeground: "#78D994",
+  border: "#165C2D", borderStrong: "#258C45",
+  primary: "#00FF41", primaryForeground: "#031007", primarySoft: "#073E16",
+  secondary: "#102B18", secondaryForeground: "#A3F7B8",
+  accent: "#B6FF00", accentForeground: "#00FF41",
+  destructive: "#FF5678", destructiveSoft: "#352027", destructiveForeground: "#1E090D",
+  success: "#39FF88", successSoft: "#183225", successForeground: "#08170E",
+  warning: "#FFE600", warningSoft: "#332E1B",
+  info: "#00FFD0", infoSoft: "#18332D",
+  overlay: "rgba(2,8,4,0.72)", shadow: "rgba(0,0,0,0.5)", skeleton: "#1C3023",
+};
+
+/** An original neon palette: electric accents, calm ink and midnight surfaces. */
+const neonCircuit: ThemeColors = {
+  ...dark,
+  background: "#05071A", backgroundAlt: "#0A1030",
+  card: "#101735", cardElevated: "#18234A", input: "#080E26",
+  foreground: "#EBFAFF", mutedForeground: "#A6BAF0",
+  border: "#254A80", borderStrong: "#447BD0",
+  primary: "#00F5FF", primaryForeground: "#02151C", primarySoft: "#063A46",
+  secondary: "#18234A", secondaryForeground: "#D3E2FF",
+  accent: "#FF2BEB", accentForeground: "#00F5FF",
+  destructive: "#FF528A", destructiveSoft: "#3C2339", destructiveForeground: "#230D17",
+  success: "#3DFF9B", successSoft: "#18372E", successForeground: "#091C12",
+  warning: "#FFE600", warningSoft: "#383122",
+  info: "#AF8AFF", infoSoft: "#252D4D",
+  overlay: "rgba(4,7,18,0.72)", shadow: "rgba(0,0,0,0.5)", skeleton: "#23304E",
+};
+
+function blend(base: string, accent: string, amount: number): string {
+  return `#${[1, 3, 5].map((offset) => {
+    const a = parseInt(base.slice(offset, offset + 2), 16);
+    const b = parseInt(accent.slice(offset, offset + 2), 16);
+    return Math.round(a + (b - a) * amount).toString(16).padStart(2, "0");
+  }).join("")}`;
+}
+
+/** Adapt editor palettes to app surfaces without changing their signature hues. */
+function refinePalette(definition: ThemeDefinition): ThemeDefinition {
+  const c = { ...definition.colors };
+  const isLight = definition.scheme === "light";
+  // Status containers used to share unrelated brown/blue fills across palettes.
+  // Derive each from its own canvas and semantic hue instead.
+  const vivid = definition.id === "matrix" || definition.id === "neon-circuit";
+  const softAmount = isLight ? 0.10 : vivid ? 0.18 : 0.12;
+  c.primarySoft = blend(c.background, c.primary, softAmount);
+  c.accentForeground = c.primary;
+  c.destructiveSoft = blend(c.background, c.destructive, softAmount);
+  c.successSoft = blend(c.background, c.success, softAmount);
+  c.warningSoft = blend(c.background, c.warning, softAmount);
+  c.infoSoft = blend(c.background, c.info, softAmount);
+  if (isLight) {
+    // Paper-like cards above a gently tinted canvas; never gray-on-gray blocks.
+    c.card = blend(c.card, "#FFFFFF", 0.32);
+    c.cardElevated = c.card;
+    c.input = c.card;
+  }
+  return { ...definition, colors: c };
+}
+
 export const themes: ThemeDefinition[] = [
   { id: "system", name: "System", category: "system", scheme: "light", colors: light },
   { id: "light", name: "Light", category: "light", scheme: "light", colors: light },
@@ -799,7 +863,9 @@ export const themes: ThemeDefinition[] = [
   { id: "everforest-dark", name: "Everforest Dark", category: "dark", scheme: "dark", colors: everforestDark },
   { id: "cyberpunk", name: "Cyberpunk 2077", category: "colorful", scheme: "dark", colors: cyberpunk },
   { id: "material-ocean", name: "Material Ocean", category: "dark", scheme: "dark", colors: materialOcean },
-];
+  { id: "matrix", name: "Matrix", category: "colorful", scheme: "dark", colors: matrix },
+  { id: "neon-circuit", name: "Neon Circuit", category: "colorful", scheme: "dark", colors: neonCircuit },
+].map((definition) => refinePalette(definition as ThemeDefinition));
 
 export const themesById = Object.fromEntries(themes.map((t) => [t.id, t]));
 

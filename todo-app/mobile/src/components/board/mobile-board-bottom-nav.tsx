@@ -25,16 +25,18 @@ interface MobileBoardBottomNavProps {
   mode: ViewMode;
   onMode: (mode: ViewMode) => void;
   blurTarget?: NavigationBlurTarget;
+  hasTasks?: boolean;
 }
 
-export function MobileBoardBottomNav({ mode, onMode, blurTarget }: MobileBoardBottomNavProps) {
+export function MobileBoardBottomNav({ mode, onMode, blurTarget, hasTasks = true }: MobileBoardBottomNavProps) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors);
+  const tabs = VIEW_TABS.filter((tab) => hasTasks || tab.key !== "list");
 
   return (
-    <BottomNavIsland tabCount={4} blurTarget={blurTarget}>
+    <BottomNavIsland tabCount={hasTasks ? 4 : 3} blurTarget={blurTarget}>
       <View style={styles.row}>
-        {VIEW_TABS.map((tab) => {
+        {tabs.map((tab) => {
           const selected = tab.key === mode;
           return (
             <Pressable

@@ -31,6 +31,18 @@ const adapter = await load("../src/components/reference/reference-theme.ts", {
 });
 function toggle() {}
 
+test("Matrix and Neon Circuit retain intense green and cyan accents after contrast correction", () => {
+  assert.equal(tokens.themes.matrix.colors.primary, "#00FF41");
+  assert.equal(tokens.themes["neon-circuit"].colors.primary, "#00F5FF");
+  assert.equal(tokens.themes["neon-circuit"].colors.accent, "#FF2BEB");
+  assert.equal(tokens.themes.matrix.colors.accent, "#B6FF00");
+});
+
+test("Gruvbox uses its warm golden accent instead of pink", () => {
+  assert.equal(palettes.themesById["gruvbox-dark"].colors.primary, "#FABD2F");
+  assert.equal(palettes.themesById["gruvbox-light"].colors.primary, "#B57614");
+});
+
 test("all themes have readable body, muted, selected-chip and button text", () => {
   for (const [id, { colors: c }] of Object.entries(tokens.themes)) {
     const pairs = [
@@ -39,12 +51,15 @@ test("all themes have readable body, muted, selected-chip and button text", () =
       [c.accentForeground, c.primarySoft], [c.secondaryForeground, c.secondary],
       [c.primaryForeground, c.primary], [c.destructiveForeground, c.destructive],
       [c.successForeground, c.success],
+      ...[[c.primary, c.primarySoft], [c.destructive, c.destructiveSoft],
+        [c.success, c.successSoft], [c.warning, c.warningSoft], [c.info, c.infoSoft]]
+        .flatMap(([ink, soft]) => [c.background, c.backgroundAlt, c.card, c.cardElevated, c.secondary, soft].map((surface) => [ink, surface])),
     ];
     for (const [ink, surface] of pairs) {
       assert.ok(contrast.contrastRatio(ink, surface) >= 4.5, `${id}: ${ink} on ${surface} must meet 4.5:1`);
     }
     assert.equal(c.background, palettes.themesById[id].colors.background);
-    assert.equal(c.primary, palettes.themesById[id].colors.primary);
+    assert.equal(c.accent, palettes.themesById[id].colors.accent);
   }
 });
 
@@ -52,9 +67,33 @@ test("contrast correction leaves readable colors and source palettes unchanged",
   assert.equal(contrast.readableInk("#FFFFFF", ["#000000"]), "#FFFFFF");
   assert.equal(contrast.readableInk("#000000", ["#FFFFFF"]), "#000000");
   const original = JSON.stringify(palettes.themesById["tokyo-night"].colors);
-  const corrected = contrast.withReadableText(palettes.themesById["tokyo-night"].colors);
-  assert.notEqual(corrected.accentForeground, palettes.themesById["tokyo-night"].colors.accentForeground);
+  const lowContrast = { ...palettes.themesById["tokyo-night"].colors, accentForeground: "#000000" };
+  const corrected = contrast.withReadableText(lowContrast);
+  assert.notEqual(corrected.accentForeground, lowContrast.accentForeground);
   assert.equal(JSON.stringify(palettes.themesById["tokyo-night"].colors), original);
+});
+
+test("theme catalog has unique ids, names and visual palettes; System is a mode, not another palette", () => {
+  assert.equal(new Set(palettes.themes.map((theme) => theme.id)).size, palettes.themes.length);
+  assert.equal(new Set(palettes.themes.map((theme) => theme.name.toLowerCase())).size, palettes.themes.length);
+  const signatures = Object.values(tokens.themes).map(({ colors: c }) => JSON.stringify([c.background, c.card, c.primary, c.accent]));
+  assert.equal(new Set(signatures).size, signatures.length);
+  assert.equal(tokens.themes.system, undefined);
+  for (const id of ["matrix", "neon-circuit"]) {
+    assert.equal(tokens.themes[id].scheme, "dark");
+    assert.equal(palettes.themesById[id].category, "colorful");
+  }
+});
+
+test("all catalog colors are valid and containers are distinct from their base", () => {
+  for (const [id, { colors: c }] of Object.entries(tokens.themes)) {
+    for (const [key, value] of Object.entries(c)) {
+      assert.match(value, /^(#[0-9a-f]{6}|rgba\([\d.,\s]+\))$/i, `${id}.${key}`);
+    }
+    for (const key of ["primarySoft", "destructiveSoft", "successSoft", "warningSoft", "infoSoft"]) {
+      assert.notEqual(c[key], c.background, `${id}.${key} must not disappear into the canvas`);
+    }
+  }
 });
 
 test("every palette reaches shared view surfaces, text, controls and cards", () => {
