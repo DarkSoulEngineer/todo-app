@@ -53,6 +53,7 @@ export default function SettingsRoute() {
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const taskCount = api.projects.reduce((total, project) => total + (project.id === api.currentProjectId ? api.tasks.length : project.workspace.tasks.length), 0);
+  const hasProjects = api.projects.length > 0;
 
   const navigate = (tab: ReferenceMobileTab) => {
     if (tab === "settings") return;
@@ -117,7 +118,7 @@ export default function SettingsRoute() {
   return (
     <View style={styles.root}>
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
-      <ScreenHeader title="Settings" showThemeToggle={false} />
+      <ScreenHeader title="Settings" showThemeToggle={false} onBack={!hasProjects ? () => router.back() : undefined} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
         <ScrollView horizontal accessibilityRole="tablist" accessibilityLabel="Settings sections" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionTabs}>
           {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
@@ -199,7 +200,7 @@ export default function SettingsRoute() {
         </View> : null}
       </ScrollView>
       </BlurTargetView>
-      <ReferenceMobileBottomNav active="settings" onNavigate={navigate} blurTarget={blurTarget} />
+      {hasProjects ? <ReferenceMobileBottomNav active="settings" onNavigate={navigate} blurTarget={blurTarget} /> : null}
       <Sheet visible={saveOpen} onClose={() => { if (!busy) setSaveOpen(false); }}>
         <Text accessibilityRole="header" style={type.title}>Save backup</Text>
         <Text style={[type.caption, { color: colors.muted, marginBottom: 12 }]}>What would you like to download or save?</Text>
