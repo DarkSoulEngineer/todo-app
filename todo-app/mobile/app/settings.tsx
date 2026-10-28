@@ -130,7 +130,7 @@ export default function SettingsRoute() {
             <Text style={[type.caption, styles.settingLabelFirst]}>Interface theme</Text>
             <ThemePicker disabled={busy} />
           </View>
-          <Text style={[type.caption, { color: colors.muted }]}>The sun and moon buttons switch your appearance; the selector then lists only palettes that match it. System follows your device’s light or dark appearance.</Text>
+          <Text style={[type.caption, { color: colors.muted }]}>The switch toggles between Light and Dark; the selector then lists only palettes that match it. System follows your device’s light or dark appearance.</Text>
         </View> : null}
 
         {section === "Calendar" ? <View style={styles.sectionBlock}>
