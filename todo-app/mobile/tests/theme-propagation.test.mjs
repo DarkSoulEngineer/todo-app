@@ -31,6 +31,11 @@ const adapter = await load("../src/components/reference/reference-theme.ts", {
 });
 function toggle() {}
 
+test("Monokai uses orange as primary and green as its secondary accent", () => {
+  assert.equal(palettes.themesById.monokai.colors.primary, "#FD971F");
+  assert.equal(palettes.themesById.monokai.colors.accent, "#A6E22E");
+});
+
 test("Matrix and Neon Circuit retain intense green and cyan accents after contrast correction", () => {
   assert.equal(tokens.themes.matrix.colors.primary, "#00FF41");
   assert.equal(tokens.themes["neon-circuit"].colors.primary, "#00F5FF");
@@ -38,9 +43,9 @@ test("Matrix and Neon Circuit retain intense green and cyan accents after contra
   assert.equal(tokens.themes.matrix.colors.accent, "#B6FF00");
 });
 
-test("Gruvbox uses its warm golden accent instead of pink", () => {
-  assert.equal(palettes.themesById["gruvbox-dark"].colors.primary, "#FABD2F");
-  assert.equal(palettes.themesById["gruvbox-light"].colors.primary, "#B57614");
+test("Gruvbox uses its green primary accent in both variants", () => {
+  assert.equal(palettes.themesById["gruvbox-dark"].colors.primary, "#B8BB26");
+  assert.equal(palettes.themesById["gruvbox-light"].colors.primary, "#79740E");
 });
 
 test("all themes have readable body, muted, selected-chip and button text", () => {

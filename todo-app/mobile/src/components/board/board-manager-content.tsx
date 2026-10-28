@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format, isValid, parseISO } from "date-fns";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
@@ -14,6 +14,7 @@ import { useTheme } from "@/providers/theme-provider";
 import { getTaskMetrics, type TaskMetrics } from "@/lib/data/manager-state";
 import type { JanusProject } from "@/lib/domain/projects";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
+import { getHomeLayout } from "@/lib/features/home-layout";
 
 interface Props {
   projects: JanusProject[];
@@ -46,6 +47,8 @@ export function BoardManagerContent(props: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const layout = getHomeLayout(width, insets.left, insets.right);
   const [showSearch, setShowSearch] = useState(false);
   return <>
     <ScreenHeader
@@ -60,7 +63,9 @@ export function BoardManagerContent(props: Props) {
       </>}
       search={showSearch ? <MobileSearchField value={props.query} onChangeText={props.onQuery} placeholder="Search boards" accessibilityLabel="Search boards" /> : null}
     />
-    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
+    <ScrollView testID="home-content" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, layout.wide && styles.contentWide, { paddingLeft: layout.padding + insets.left, paddingRight: layout.padding + insets.right, paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
+      <View testID="home-dashboard" style={layout.sidebar ? styles.dashboardWide : undefined}>
+      <View style={layout.sidebar ? styles.boardsPane : undefined}>
       <SectionHeading
         title="Your boards"
         subtitle={`${props.totalBoards} active`}
@@ -71,13 +76,17 @@ export function BoardManagerContent(props: Props) {
         </Button>}
       />
       {props.editing ? <Text style={[styles.editHint, { color: c.primary }]}>Use the arrows to arrange your boards.</Text> : null}
-      {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View style={styles.boards}>{props.projects.map((project, index) => <ManagerCard key={project.id} project={project} accent={index % 2 ? "#EC4899" : c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />)}</View>}
+      {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View testID="home-board-grid" style={[styles.boards, layout.wide && styles.boardGrid]}>{props.projects.map((project, index) => <View key={project.id} style={layout.wide ? { width: layout.cardWidth } : undefined}><ManagerCard project={project} accent={c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>}
       {props.closedProjects.length ? <>
         <SectionHeading title="Closed boards" subtitle={`${props.closedProjects.length} closed`} style={styles.sectionHeading} />
         <Text style={[styles.editHint, { color: c.mutedForeground }]}>Closed boards stay safe with their tasks. Reopen one to keep working on it.</Text>
-        <View style={styles.boards}>{props.closedProjects.map((project) => <ManagerCard key={project.id} project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />)}</View>
+        <View testID="home-closed-board-grid" style={[styles.boards, layout.wide && styles.boardGrid]}>{props.closedProjects.map((project) => <View key={project.id} style={layout.wide ? { width: layout.cardWidth } : undefined}><ManagerCard project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>
       </> : null}
-      <WorkspaceOverview metrics={props.metrics} boards={props.totalBoards} />
+      </View>
+      <View testID="home-stats-panel" style={layout.sidebar ? { width: layout.statsWidth } : undefined}>
+        <WorkspaceOverview metrics={props.metrics} boards={props.totalBoards} wide={layout.wide} sidebar={layout.sidebar} />
+      </View>
+      </View>
     </ScrollView>
   </>;
 }
@@ -86,7 +95,7 @@ function ManagerCard({ project, accent, metrics, pinned, editing, ready, first, 
   const { theme } = useTheme();
   const c = theme.colors;
   const date = parseISO(project.createdAt);
-  return <View testID={`manager-board-${project.id}`} style={[styles.board, { backgroundColor: c.card, borderColor: c.border }]}>
+  return <View testID={`manager-board-${project.id}`} style={[styles.board, { flexGrow: 1, backgroundColor: c.card, borderColor: c.border }]}>
     {/* A sibling hit surface opens every non-control area without nesting buttons. */}
     <Pressable accessibilityRole="button" accessibilityLabel={closed ? `${project.name}, closed board` : `Open ${project.name}`} accessibilityHint={closed ? "Shows options to reopen this board" : "Opens board view"} disabled={editing} onPress={onOpen} onLongPress={onMenu} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: 20, backgroundColor: pressed ? c.primarySoft : "transparent" }]} />
     <View pointerEvents="box-none" style={styles.cardHeader}>
@@ -129,7 +138,7 @@ function CardAction({ icon, label, onPress, destructive, disabled }: { icon?: ke
   return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.cardAction, { opacity: disabled ? 0.4 : pressed ? 0.6 : 1 }]}>{icon ? <Ionicons name={icon} size={15} color={color} /> : null}<Text style={{ color, fontSize: 12, fontWeight: "500" }}>{label}</Text></Pressable>;
 }
 
-function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: number }) {
+function WorkspaceOverview({ metrics, boards, wide = false, sidebar = false }: { metrics: TaskMetrics; boards: number; wide?: boolean; sidebar?: boolean }) {
   const { theme } = useTheme();
   const c = theme.colors;
   // Overdue is a subset of open tasks: do not count it twice in the donut.
@@ -138,11 +147,11 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
   const strokeWidth = 11;
   const segmentCount = slices.filter((slice) => slice.value > 0).length;
   let offset = 0;
-  return <View style={styles.overviewSection}>
+  return <View style={[styles.overviewSection, sidebar && styles.overviewSidebar]}>
     <SectionHeading title="Board stats" subtitle="Across open boards · includes canceled tasks" style={styles.overviewHeading} />
-    <View style={styles.overview}>
-      <View style={styles.statsContent}>
-      <View accessible accessibilityLabel={`${metrics.total} tasks: ${metrics.done} completed, ${metrics.overdue} overdue, ${metrics.open - metrics.overdue} open and not overdue, ${metrics.canceled} canceled`} style={styles.donut}>
+    <View style={[styles.overview, wide && { backgroundColor: c.card, borderColor: c.border, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16 }]}>
+      <View testID="home-stats-layout" style={[styles.statsContent, wide && !sidebar && styles.statsContentWide]}>
+      <View accessible accessibilityLabel={`${metrics.total} tasks: ${metrics.done} completed, ${metrics.overdue} overdue, ${metrics.open - metrics.overdue} open and not overdue, ${metrics.canceled} canceled`} style={[styles.donut, wide && styles.donutWide, sidebar && styles.donutSidebar]}>
         <Svg width="100%" height="100%" viewBox="0 0 120 120">
           <Circle cx={60} cy={60} r={48} fill="none" stroke={c.border} strokeWidth={strokeWidth} />
           {slices.map((slice) => {
@@ -157,8 +166,8 @@ function WorkspaceOverview({ metrics, boards }: { metrics: TaskMetrics; boards: 
         </Svg>
         <View style={styles.donutLabel}><Text style={[styles.donutValue, { color: c.foreground }]}>{metrics.total}</Text><Text style={{ color: c.mutedForeground, fontSize: 11, marginTop: 5 }}>TASKS</Text></View>
       </View>
-      <View style={styles.statsTotal}><View style={{ flexShrink: 1 }}><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={[styles.boardCount, { color: c.mutedForeground }]}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>
-        <View style={[styles.legend, { borderColor: c.border }]}>{slices.map((slice) => {
+      {sidebar ? <Text style={[styles.statsBoardCount, { color: c.mutedForeground }]}>Across {boards} {boards === 1 ? "board" : "boards"}</Text> : <View style={[styles.statsTotal, wide && styles.statsTotalWide]}><View style={{ flexShrink: 1 }}><Text style={[styles.totalLabel, { color: c.mutedForeground }]}>TOTAL TASKS</Text><Text style={[styles.totalValue, { color: c.foreground, fontFamily: serif }]}>{metrics.total}</Text></View><Text style={[styles.boardCount, wide && styles.boardCountWide, { color: c.mutedForeground }]}>across {boards} {boards === 1 ? "board" : "boards"}</Text></View>}
+        <View style={[styles.legend, { borderColor: c.border }, wide && !sidebar && styles.legendWide]}>{slices.map((slice) => {
           const share = metrics.total ? Math.max(0, Math.min(1, slice.value / metrics.total)) : 0;
           const percent = Math.round(share * 100);
           return <View key={slice.label} accessible accessibilityRole="progressbar" accessibilityLabel={slice.label} accessibilityValue={{ min: 0, max: 100, now: percent, text: `${slice.value} tasks, ${percent}%` }} style={styles.legendRow}>
@@ -182,17 +191,29 @@ const styles = StyleSheet.create({
   newBoardButton: { width: 44, height: 44, borderRadius: 7, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   themeSwitch: { flexDirection: "row", borderWidth: 1, borderRadius: 10, padding: 2 }, themeButton: { width: 44, height: 44, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   content: mobileContentStyle,
+  contentWide: { maxWidth: "100%", paddingTop: 24 },
+  boardGrid: { flexDirection: "row", flexWrap: "wrap", alignItems: "stretch" },
+  dashboardWide: { flexDirection: "row", alignItems: "flex-start", gap: 24 },
+  boardsPane: { flex: 1, minWidth: 0 },
+  overviewSidebar: { marginTop: 0 },
+  donutSidebar: { width: 240, maxWidth: 240, marginTop: 8, marginBottom: 16 },
+  statsBoardCount: { fontSize: 13, textAlign: "center", marginBottom: 8 },
   arrange: { paddingHorizontal: 10, borderRadius: 13 },
   sectionHeading: { marginTop: 24, marginBottom: 10 }, firstSectionHeading: { marginBottom: 10 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },
   board: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 17, paddingTop: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }, cardHeader: { flexDirection: "row", alignItems: "flex-start" }, cardTitleArea: { flex: 1, paddingVertical: 4, minHeight: 44 }, boardTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.4 }, closedBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5, height: 20, paddingHorizontal: 6, borderWidth: 1, borderRadius: 7 }, created: { fontSize: 12, marginTop: 4 }, pin: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -10, marginTop: -5 },
   headerActions: { flexDirection: "row", alignItems: "center", marginTop: -5, marginRight: -10 },
   reorderButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   progressArea: { paddingTop: 18, paddingBottom: 8 }, progressMeta: { flexDirection: "row", alignItems: "center", gap: 16 }, inline: { flexDirection: "row", alignItems: "center", gap: 5 }, percent: { marginLeft: "auto", fontSize: 12, fontWeight: "600" }, track: { height: 6, borderRadius: 5, marginTop: 8, overflow: "hidden" }, signals: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, minHeight: 47, paddingVertical: 9 },
-  cardFooter: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, gap: 12, marginTop: 4, minHeight: 45 }, cardAction: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 5 },
+  cardFooter: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, gap: 12, marginTop: "auto", paddingTop: 4, minHeight: 45 }, cardAction: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 5 },
   overviewSection: { marginTop: 34 },
   overviewHeading: { marginBottom: 12 },
   overview: { padding: 16 },
   statsContent: { paddingTop: 4 },
+  statsContentWide: { flexDirection: "row", alignItems: "center", gap: 24 },
+  donutWide: { width: 200, maxWidth: 200, marginBottom: 0 },
+  statsTotalWide: { width: 100, padding: 0, flexDirection: "column", alignItems: "flex-start", gap: 8 },
+  boardCountWide: { maxWidth: "100%", textAlign: "left", paddingBottom: 0 },
+  legendWide: { flex: 1, minWidth: 0, marginTop: 0, paddingTop: 0, borderTopWidth: 0, borderLeftWidth: StyleSheet.hairlineWidth, paddingLeft: 24 },
   statsTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 16, padding: 14 },
   totalLabel: { fontSize: 11 },
   totalValue: { fontSize: 39, lineHeight: 44, marginTop: 4 },
