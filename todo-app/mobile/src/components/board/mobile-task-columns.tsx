@@ -44,7 +44,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const c = useMobileBoardColors();
   const { width, height } = useWindowDimensions();
   const focused = props.focused;
-  const enabled = (props.dragEnabled ?? true) && !props.selectionMode && !focused;
+  const enabled = width >= 768 && (props.dragEnabled ?? true) && !props.selectionMode && !focused;
   const { host: previewHost, layer: previewLayer, overlay: previewOverlay } = useNativeDragPreview();
   const zoom = props.zoom;
   const boardsById = useMemo(() => new Map(props.boards.map((board) => [board.id, board])), [props.boards]);

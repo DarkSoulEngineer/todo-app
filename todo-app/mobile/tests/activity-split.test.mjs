@@ -83,6 +83,22 @@ test("desktop Calendar keeps day details inline while mobile keeps the day sheet
   assert.equal(editor(splitTree).props.presentation, "panel");
   assert.equal(editor(splitTree).props.visible, true);
 });
+
+test("mobile day list includes every matching task and opens the editor only from a full task row", () => {
+  const day = new Date(2026, 9, 28);
+  const dueTasks = Array.from({ length: 4 }, (_, index) => ({ ...task, id: `day-${index}`, dueAt: new Date(2026, 9, 28, 9 + index).toISOString() }));
+  const otherTask = { ...task, id: "other", dueAt: new Date(2026, 9, 29, 9).toISOString() };
+  const updates = [];
+  const tree = render(390, "calendar", null, false, [...dueTasks, otherTask, { ...task, id: "undated", dueAt: null }], updates, { calendarDay: day });
+  const sheet = find(tree, (node) => node.type === "Sheet" && node.props.visible === true)[0];
+  const rows = find(sheet, (node) => node.type === "TaskCard");
+  assert.deepEqual(rows.map((row) => row.props.task.id), dueTasks.map((task) => task.id));
+  assert.equal(editor(tree).props.visible, false);
+  rows[1].props.onPress();
+  assert.ok(updates.some(([slot, value]) => slot === 24 && value === null), "dismiss the day list before opening the editor");
+  assert.ok(updates.some(([slot, value]) => slot === 11 && value.id === "day-1"));
+  assert.ok(updates.some(([slot, value]) => slot === 12 && value === true));
+});
 test("empty boards fall back to Board without an automatic Activity create editor", () => {
   for (const width of [390, 1200]) {
     const updates = [];

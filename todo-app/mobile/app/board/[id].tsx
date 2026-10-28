@@ -380,7 +380,7 @@ export default function WorkspaceScreen() {
   };
   const calendarTasks = calendarDay ? visibleTasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), calendarDay)) : [];
   const actionsContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
-    {mode === "board" ? <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="reorder-three-outline" label={dragEnabled ? "Disable dragging" : "Enable dragging"} selected={dragEnabled} onPress={() => { setDragEnabled((enabled) => !enabled); if (!dragEnabled) setFocusedColumn(false); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DRAG & DROP</Text></View> : null}
+    {mode === "board" && width >= 768 ? <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="reorder-three-outline" label={dragEnabled ? "Disable dragging" : "Enable dragging"} selected={dragEnabled} onPress={() => { setDragEnabled((enabled) => !enabled); if (!dragEnabled) setFocusedColumn(false); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DRAG & DROP</Text></View> : null}
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="sparkles-outline" label="Load sample" onPress={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>CREATE</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="share-outline" label="Export JSON" onPress={() => { if (activeProject) void exportWorkspace(liveWorkspace, activeProject.name); }} /><OptionTool icon="document-text-outline" label="Export CSV" onPress={() => { if (activeProject) void exportWorkspaceCsv(liveWorkspace, activeProject.name); }} /><OptionTool icon="cloud-upload-outline" label="Import board" onPress={importBoard} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DATA</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="bookmark-outline" label="Save version" onPress={() => { api.createVersion(); toast.success("Version saved"); }} />{api.versions.length ? <OptionTool icon="return-down-back-outline" label={`Restore ${api.versions[0].label}`} onPress={() => { api.restoreVersion(api.versions[0].id); toast.success("Version restored"); }} /> : null}{api.versions.length ? <OptionTool icon="trash-outline" label={`Delete ${api.versions[0].label}`} tone="danger" onPress={() => { api.deleteVersion(api.versions[0].id); toast.success("Version deleted"); }} /> : null}</View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>VERSIONS</Text></View>
@@ -447,9 +447,10 @@ export default function WorkspaceScreen() {
        {splitView ? null : <Sheet visible={calendarDay !== null} onClose={() => setCalendarDay(null)}>
          {calendarDay ? (
            <>
-             <Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{format(calendarDay, "EEEE, MMM d")}</Text>
+              <Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{format(calendarDay, "EEEE, MMM d")}</Text>
+              <Text style={{ color: theme.colors.mutedForeground, fontSize: 13, marginTop: 4 }}>{calendarTasks.length} {calendarTasks.length === 1 ? "task" : "tasks"} · Select a task to edit it</Text>
              <View style={{ marginTop: 14 }}>
-                 {calendarTasks.length ? calendarTasks.map((task) => <TaskCard key={task.id} task={task} boards={boards} now={now} onPress={() => openEditor(task)} onLongPress={() => setCalendarActionTask(task)} />) : <EmptyState icon="sunny-outline" title="A clear day" message="Nothing is due here yet." />}
+                  {calendarTasks.length ? calendarTasks.map((task) => <TaskCard key={task.id} task={task} boards={boards} now={now} onPress={() => { setCalendarDay(null); openEditor(task); }} onLongPress={() => { setCalendarDay(null); setCalendarActionTask(task); }} />) : <EmptyState icon="sunny-outline" title="A clear day" message="Nothing is due here yet." />}
                 <Button variant="soft" label="Add task for this day" onPress={() => { const due = new Date(calendarDay); due.setHours(9, 0, 0, 0); setCalendarDay(null); addNewTask(due.toISOString()); }} style={{ marginTop: 6 }}><Ionicons name="add" size={18} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task for this day</Text></Button>
               </View>
            </>
@@ -509,6 +510,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boa
       tasks={tasks}
       now={now}
       weekStartsOn={calendarWeekStart}
+      daySelectionOnly={!split}
       onModeChange={setCalendarMode}
       onAnchorChange={setMonth}
       onSelectDay={setSelectedDay}
@@ -521,7 +523,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boa
       {dayTasks.map((task) => <TaskCard key={task.id} compact task={task} boards={boards} now={now} onPress={() => onTask(task)} onLongPress={() => onTaskAction(task)} />)}
       <Button variant="soft" label={`Add for ${format(selectedDay, "MMM d")}`} onPress={() => addForDay(selectedDay)} style={{ marginTop: 4 }}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>
     </View> : <View style={{ marginTop: 15 }}>
-      <SectionHeading title="Plan a day" subtitle={split ? "Tap a date to see its tasks here, or long press a task to reschedule it." : "Tap a date to open its task sheet, or long press a task to reschedule it."} style={{ marginBottom: 8 }} />
+      <SectionHeading title="Plan a day" subtitle={split ? "Tap a date to see its tasks here, or long press a task to reschedule it." : "Tap anywhere on a date to see all its tasks. Select a task from the list to edit it."} style={{ marginBottom: 8 }} />
       <View style={{ borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, backgroundColor: theme.colors.card, padding: 13 }}>
         <Button variant="soft" label={`Add for ${selectedDay ? format(selectedDay, "MMM d") : "today"}`} onPress={() => addForDay(selectedDay ?? now)}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>
       </View>

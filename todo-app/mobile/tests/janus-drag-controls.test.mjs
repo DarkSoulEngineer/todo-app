@@ -19,7 +19,8 @@ function nodes(node) {
   return [node, ...nodes(node.props?.children)];
 }
 const react = { useMemo: (fn) => fn(), useRef: (current) => ({ current }), useState: (initial) => [initial, () => {}], useEffect() {} };
-const native = { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", useWindowDimensions: () => ({ width: 1440, height: 1000 }), StyleSheet: { create: (value) => value } };
+let width = 1440;
+const native = { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", useWindowDimensions: () => ({ width, height: 1000 }), StyleSheet: { create: (value) => value } };
 const { MobileTaskColumns } = await load("../src/components/board/mobile-task-columns.tsx", {
   react, "react-native": native, "@expo/vector-icons": { Ionicons: "Icon" },
   "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId },
@@ -57,6 +58,16 @@ test("Actions can disable dragging; selection and focus keep their normal intera
   assert.ok(nodes(renderColumns({ dragEnabled: true })).filter((node) => node.type === "DragCell").every((node) => node.props.enabled));
 });
 
+test("phone resolutions disable both card and list dragging; tablets and desktop retain it", () => {
+  try {
+    for (width of [320, 390, 600, 767, 768, 1024, 1440]) {
+      const cells = nodes(renderColumns({ dragEnabled: true })).filter((node) => node.type === "DragCell");
+      assert.equal(cells.length, 2);
+      assert.ok(cells.every((node) => node.props.enabled === (width >= 768)), `drag availability at ${width}px`);
+    }
+  } finally { width = 1440; }
+});
+
 test("Board Actions toggle dragging on and off, with no toggle on other views", async () => {
   const slots = [];
   let cursor = 0;
@@ -90,6 +101,11 @@ test("Board Actions toggle dragging on and off, with no toggle on other views", 
   toggle(tree).props.onPress();
   tree = render();
   assert.equal(columns(tree).props.dragEnabled, true);
+  try {
+    for (width of [390, 600, 767, 768, 1024, 1440]) {
+      assert.equal(Boolean(toggle(render())), width >= 768, `drag action visibility at ${width}px`);
+    }
+  } finally { width = 1440; }
   slots[0] = "calendar";
   assert.equal(toggle(render()), undefined);
 });

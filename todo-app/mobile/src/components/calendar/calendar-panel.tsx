@@ -16,6 +16,8 @@ interface CalendarPanelProps {
   tasks: Task[];
   now: Date;
   weekStartsOn?: 0 | 1;
+  /** Small calendar chips select the whole day instead of opening an editor. */
+  daySelectionOnly?: boolean;
   onModeChange: (mode: CalendarMode) => void;
   onAnchorChange: (date: Date) => void;
   onSelectDay: (day: Date) => void;
@@ -31,7 +33,7 @@ const LEGEND = [
   { label: "Canceled", token: "mutedForeground" as const },
 ];
 
-export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStartsOn = 1, onModeChange, onAnchorChange, onSelectDay, onTaskPress, onTaskLongPress, onToday }: CalendarPanelProps) {
+export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStartsOn = 1, daySelectionOnly = false, onModeChange, onAnchorChange, onSelectDay, onTaskPress, onTaskLongPress, onToday }: CalendarPanelProps) {
   const { theme } = useTheme();
   const colors = theme.colors;
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -101,7 +103,7 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
               </View>
               {dayTasks.slice(0, mode === "week" ? 5 : 2).map((task) => {
                 const color = taskColor(task, colors, now);
-                return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} onPress={(event) => { event.stopPropagation(); onTaskPress(task); }} onLongPress={onTaskLongPress ? (event) => { event.stopPropagation(); onTaskLongPress(task); } : undefined} style={({ pressed }) => [styles.taskChip, { backgroundColor: `${color}1A`, opacity: pressed ? 0.6 : 1 }]}>
+                return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={daySelectionOnly ? `View tasks for ${format(day, "EEEE, MMMM d")}` : `Open ${task.title}`} onPress={(event) => { event.stopPropagation(); if (daySelectionOnly) onSelectDay(day); else onTaskPress(task); }} onLongPress={!daySelectionOnly && onTaskLongPress ? (event) => { event.stopPropagation(); onTaskLongPress(task); } : undefined} style={({ pressed }) => [styles.taskChip, { backgroundColor: `${color}1A`, opacity: pressed ? 0.6 : 1 }]}>
                   <View style={[styles.taskDot, { backgroundColor: color }]} />
                   <Text style={[styles.taskText, task.completed && styles.taskTextDone]} numberOfLines={1}>{task.title || "Untitled task"}</Text>
                 </Pressable>;
