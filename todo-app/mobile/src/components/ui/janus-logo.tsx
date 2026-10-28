@@ -11,8 +11,8 @@ export function JanusLogo({ size = 48 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 64 64" accessibilityLabel="Janus logo">
       <Rect x={6} y={14} width={24} height={36} rx={6} fill={good} />
       <Rect x={34} y={14} width={24} height={36} rx={6} fill={bad} />
-      <Circle cx={18} cy={24} r={6} fill={surface} />
-      <Circle cx={46} cy={40} r={6} fill={surface} />
+      <Circle cx={14} cy={22} r={4} fill={surface} />
+      <Circle cx={50} cy={42} r={4} fill={surface} />
     </Svg>
   );
 }
