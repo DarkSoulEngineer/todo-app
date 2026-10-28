@@ -1,6 +1,6 @@
 import type { ViewMode } from "@/lib/domain/types";
 
-export type RibbonTab = "home" | "actions" | "filters" | "select";
+export type RibbonTab = "home" | "actions" | "filters" | "hidden" | "select";
 
 export function getRibbonContext(mode: ViewMode) {
   return {
@@ -17,6 +17,7 @@ export function isRibbonTabAvailable(tab: RibbonTab, mode: ViewMode): boolean {
   const context = getRibbonContext(mode);
   if (tab === "select") return context.selection;
   if (tab === "filters") return context.filters;
+  if (tab === "hidden") return context.boardDisplay;
   return true;
 }
 

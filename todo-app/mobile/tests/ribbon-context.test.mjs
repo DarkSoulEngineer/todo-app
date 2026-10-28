@@ -9,7 +9,7 @@ const { outputText } = ts.transpileModule(source, {
 });
 const { getRibbonContext, isRibbonTabAvailable, resolveRibbonTab } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 const modes = ["board", "list", "calendar", "insights"];
-const tabs = ["home", "actions", "filters", "select"];
+const tabs = ["home", "actions", "filters", "hidden", "select"];
 
 test("Board retains every ribbon tab and board tool group", () => {
   for (const tab of tabs) assert.equal(isRibbonTabAvailable(tab, "board"), true);
@@ -19,6 +19,7 @@ test("Board retains every ribbon tab and board tool group", () => {
 test("Activity and Calendar hide selection, sorting, display and zoom tools", () => {
   for (const mode of ["list", "calendar"]) {
     assert.equal(isRibbonTabAvailable("select", mode), false);
+    assert.equal(isRibbonTabAvailable("hidden", mode), false);
     assert.deepEqual(getRibbonContext(mode), {
       selection: false, boardDisplay: false, sorting: false, filters: true, search: true,
     });
@@ -29,6 +30,7 @@ test("Activity and Calendar hide selection, sorting, display and zoom tools", ()
 test("Insights hides filters and search that do not affect its data", () => {
   assert.equal(isRibbonTabAvailable("filters", "insights"), false);
   assert.equal(isRibbonTabAvailable("select", "insights"), false);
+  assert.equal(isRibbonTabAvailable("hidden", "insights"), false);
   assert.equal(getRibbonContext("insights").search, false);
   assert.equal(getRibbonContext("insights").boardDisplay, false);
   assert.equal(isRibbonTabAvailable("home", "insights"), true);
@@ -41,6 +43,8 @@ test("leaving selection falls back safely instead of showing hidden tools", () =
   assert.equal(resolveRibbonTab("list", "select", "actions", false), "actions");
   assert.equal(resolveRibbonTab("insights", "select", "filters", false), "home");
   assert.equal(resolveRibbonTab("insights", "filters", "home", false), "home");
+  assert.equal(resolveRibbonTab("calendar", "hidden", "home", false), "home");
+  assert.equal(resolveRibbonTab("board", "select", "hidden", false), "hidden");
 });
 
 test("every mode transition resolves to a visible tab, even with stale selection", () => {

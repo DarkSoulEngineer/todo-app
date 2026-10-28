@@ -123,3 +123,73 @@ test("manual pinning still keeps the ribbon open after selection ends", () => {
   app.elapse();
   assert.equal(JSON.stringify(app.render()).includes("Action tools"), true);
 });
+
+test("Hidden tab keeps its dot while collapsed and restores lists from the ribbon", () => {
+  const app = setup();
+  app.props.hiddenSections = [{ id: "a", title: "Backlog", hidden: true }, { id: "b", title: "Planning", hidden: true }];
+  const restored = [];
+  app.props.onShowSection = (section) => {
+    restored.push(section.id);
+    app.props.hiddenSections = app.props.hiddenSections.filter((item) => item.id !== section.id);
+  };
+  const dot = (tree) => nodes(tree).find((node) => node.props?.testID === "board-hidden-indicator");
+  let tree = app.render();
+  assert.ok(dot(tree));
+  assert.equal(button(tree, "Show Backlog"), undefined, "restore controls belong only to the Hidden tab");
+  app.elapse();
+  tree = app.render();
+  assert.ok(dot(tree), "collapsed ribbons must still advertise hidden lists");
+  button(tree, "Hidden tools, 2 hidden lists").props.onPress();
+  tree = app.render();
+  assert.equal(button(tree, "Hidden tools, 2 hidden lists").props["aria-selected"], true);
+  button(tree, "Show Backlog").props.onPress();
+  tree = app.render();
+  assert.deepEqual(restored, ["a"]);
+  assert.ok(dot(tree));
+  assert.ok(button(tree, "Hidden tools, 1 hidden list"));
+  assert.equal(button(tree, "Show Backlog"), undefined);
+  button(tree, "Show Planning").props.onPress();
+  tree = app.render();
+  assert.deepEqual(restored, ["a", "b"]);
+  assert.equal(dot(tree), undefined);
+  assert.equal(button(tree, "Hidden tools"), undefined);
+  assert.equal(button(tree, "Home tools").props["aria-selected"], true);
+  assert.ok(!JSON.stringify(tree).includes("HIDDEN LISTS"));
+});
+
+test("Hidden tab exists only for hidden lists and sits after Select", () => {
+  const app = setup();
+  const tabs = (tree) => nodes(tree).filter((node) => node.props?.accessibilityRole === "tab").map((node) => node.props.accessibilityLabel);
+  assert.deepEqual(tabs(app.render()), ["Home tools", "Actions tools", "Filters tools", "Select tasks"]);
+  app.props.hiddenSections = [{ id: "a", title: "Backlog", hidden: true }];
+  let tree = app.render();
+  assert.deepEqual(tabs(tree), ["Home tools", "Actions tools", "Filters tools", "Select tasks", "Hidden tools, 1 hidden list"]);
+  button(tree, "Hidden tools, 1 hidden list").props.onPress();
+  tree = app.render();
+  app.props.hiddenSections = [];
+  tree = app.render();
+  assert.equal(button(tree, "Hidden tools"), undefined);
+  assert.equal(button(tree, "Home tools").props["aria-selected"], true);
+  assert.equal(button(tree, "Show Backlog"), undefined);
+});
+
+test("Hidden indication is independent of Filters and disappears outside Board view", () => {
+  const app = setup();
+  app.props.filtersActive = true;
+  app.props.hiddenSections = [{ id: "a", title: "Backlog", hidden: true }];
+  let tree = app.render();
+  assert.ok(nodes(tree).some((node) => node.props?.testID === "board-filter-indicator"));
+  assert.ok(nodes(tree).some((node) => node.props?.testID === "board-hidden-indicator"));
+  button(tree, "Hidden tools, 1 hidden list").props.onPress();
+  tree = app.render();
+  app.props.mode = "calendar";
+  tree = app.render();
+  assert.equal(button(tree, "Hidden tools, 1 hidden list"), undefined);
+  assert.equal(button(tree, "Show Backlog"), undefined);
+  assert.ok(nodes(tree).some((node) => node.props?.testID === "board-filter-indicator"));
+  app.props.mode = "board";
+  app.props.hiddenSections = [];
+  tree = app.render();
+  assert.ok(nodes(tree).some((node) => node.props?.testID === "board-filter-indicator"));
+  assert.ok(!nodes(tree).some((node) => node.props?.testID === "board-hidden-indicator"));
+});

@@ -35,7 +35,7 @@ const { MobileTaskColumns } = await load("../src/components/board/mobile-task-co
   "@/lib/features/janus-drag": { sectionDragId: (id) => `section:${id}`, taskDragId: (id) => `task:${id}` },
 });
 function renderColumns(overrides = {}) {
-  return MobileTaskColumns({ tasks: [{ id: "one", title: "One", sectionId: "a" }], sections: [{ id: "a", title: "First" }], boards: [], now: new Date(), hiddenSections: [], selectionMode: false, selectedTaskIds: new Set(), focused: false, compact: false, zoom: 1, showMoveArrows: false, ...overrides });
+  return MobileTaskColumns({ tasks: [{ id: "one", title: "One", sectionId: "a" }], sections: [{ id: "a", title: "First" }], boards: [], now: new Date(), selectionMode: false, selectedTaskIds: new Set(), focused: false, compact: false, zoom: 1, showMoveArrows: false, ...overrides });
 }
 
 test("cards and lists are draggable immediately without an extra arrange row", () => {
@@ -45,6 +45,26 @@ test("cards and lists are draggable immediately without an extra arrange row", (
   assert.ok(cells.every((node) => node.props.enabled));
   assert.ok(!nodes(tree).some((node) => /arrange|rearranging/i.test(node.props?.accessibilityLabel ?? "")));
   assert.ok(!JSON.stringify(tree).includes("Arrange cards and lists"));
+});
+
+test("list backgrounds wrap their cards with one dot-row of extra padding and a scrolling height cap", () => {
+  const tree = renderColumns({ sections: [{ id: "a", title: "First" }, { id: "empty", title: "Empty" }] });
+  for (const id of ["a", "empty"]) {
+    const cell = nodes(tree).find((node) => node.type === "DragCell" && node.props.id === `section:${id}`);
+    assert.equal(cell.props.constrainHeight, true);
+    const column = nodes(cell).find((node) => node.props?.testID === `janus-column-${id}`);
+    const style = Object.assign({}, ...column.props.style);
+    assert.equal(style.height, undefined, "short lists must not stretch to viewport height");
+    assert.equal(style.paddingBottom, 20, "the background dot grid repeats every 20 points");
+    assert.equal(style.maxHeight, "100%");
+    assert.equal(style.flexShrink, 1);
+  }
+});
+
+test("hidden lists no longer add a restore row above the board canvas", () => {
+  const tree = renderColumns({ sections: [{ id: "a", title: "First" }, { id: "secret", title: "Secret", hidden: true }] });
+  assert.ok(!nodes(tree).some((node) => node.props?.testID === "janus-column-secret"));
+  assert.ok(!nodes(tree).some((node) => node.props?.accessibilityLabel === "Show Secret"));
 });
 
 test("Actions can disable dragging; selection and focus keep their normal interactions", () => {

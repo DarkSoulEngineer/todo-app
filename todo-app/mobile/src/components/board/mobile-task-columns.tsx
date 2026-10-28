@@ -19,7 +19,6 @@ export interface MobileTaskColumnsProps {
   sections: BoardSection[];
   boards: Board[];
   now: Date;
-  hiddenSections: BoardSection[];
   selectionMode: boolean;
   selectedTaskIds: Set<string>;
   focused: boolean;
@@ -28,7 +27,6 @@ export interface MobileTaskColumnsProps {
   dragEnabled?: boolean;
   zoom: number;
   onToggleSelect: (id: string) => void;
-  onShowSection: (section: BoardSection) => void;
   onTask: (task: Task) => void;
   onLongPress: (task: Task) => void;
   onMove: (task: Task, sectionId: string | null) => void;
@@ -140,7 +138,6 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   </View>;
 
   return <View ref={previewHost} collapsable={false} style={styles.root}>
-    {props.hiddenSections.length ? <ScrollView horizontal style={styles.hiddenRail} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hiddenContent}>{props.hiddenSections.map((section) => <Pressable key={section.id} accessibilityRole="button" accessibilityLabel={`Show ${section.title}`} onPress={() => props.onShowSection(section)} style={[styles.hiddenChip, { borderColor: c.border, backgroundColor: c.card }]}><Ionicons name="eye-outline" size={13} color={c.primary} /><Text style={{ color: c.mutedForeground, fontSize: 11 }}>{section.title}</Text></Pressable>)}</ScrollView> : null}
     {focused && active ? <>
       <ScrollView ref={tabs} horizontal onContentSizeChange={scrollToNewColumn} showsHorizontalScrollIndicator={false} style={styles.tabsRail} contentContainerStyle={styles.tabs}>{columns.map((section, index) => <Pressable key={section.id} accessibilityRole="tab" accessibilityLabel={`${section.title}, ${grouped.get(section.id)?.length ?? 0} cards`} aria-selected={index === activeIndex} onPress={() => selectColumn(index)} style={[styles.tab, { backgroundColor: c.backgroundAlt, borderColor: index === activeIndex ? c.primary : c.border }]}><Text style={{ color: index === activeIndex ? c.primary : c.mutedForeground, fontSize: 12, fontWeight: index === activeIndex ? "600" : "400" }}>{section.title}</Text></Pressable>)}</ScrollView>
       <View style={[styles.focusColumn, { backgroundColor: c.backgroundAlt, borderColor: c.border }]}>{heading(active)}<ScrollView testID="janus-focused-scroll" style={styles.cardScroll} contentContainerStyle={styles.cards} keyboardShouldPersistTaps="handled">{cards(active, activeIndex)}</ScrollView>{addCard(active)}</View>
@@ -150,7 +147,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
       const index = Math.min(columns.length - 1, Math.max(0, Math.round(event.nativeEvent.contentOffset.x / interval)));
       if (columns[index]) setSelectedId(columns[index].id);
     }} style={styles.carousel} contentContainerStyle={styles.columns}>
-      {columns.map((section, index) => <JanusDragCell key={section.id} id={sectionDragId(section.id)} name={section.title} width={columnWidth} enabled={enabled} active={drag.drag?.id === sectionDragId(section.id)} target={drag.drag?.target?.kind === "section" && drag.drag.target.sectionId === section.id} floating fillHeight handleHeight={60} renderPreview={() => sectionPreview(section, index)} previewLayer={previewLayer} onRegister={drag.register} onStart={dragStart} onMove={dragMove} onDrop={drag.drop} onCancel={drag.cancel}>
+      {columns.map((section, index) => <JanusDragCell key={section.id} id={sectionDragId(section.id)} name={section.title} width={columnWidth} enabled={enabled} active={drag.drag?.id === sectionDragId(section.id)} target={drag.drag?.target?.kind === "section" && drag.drag.target.sectionId === section.id} floating constrainHeight handleHeight={60} renderPreview={() => sectionPreview(section, index)} previewLayer={previewLayer} onRegister={drag.register} onStart={dragStart} onMove={dragMove} onDrop={drag.drop} onCancel={drag.cancel}>
         <View testID={`janus-column-${section.id}`} style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: drag.drag?.target?.kind === "task" && drag.drag.target.sectionId === section.id ? c.primary : c.border }]}>{heading(section)}<ScrollView ref={(node) => autoScroll.registerList(section.id, node)} testID={`janus-column-scroll-${section.id}`} onScroll={(event) => autoScroll.trackList(section.id, event.nativeEvent.contentOffset.y)} scrollEventThrottle={16} scrollEnabled={!drag.drag} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.cardScroll} contentContainerStyle={styles.cards}>{cards(section, index)}</ScrollView>{addCard(section)}</View>
       </JanusDragCell>)}
       <Pressable accessibilityRole="button" accessibilityLabel="Add list" onPress={props.onAddSection} style={[styles.addSection, { width: columnWidth, borderColor: c.border }]}><Ionicons name="add" size={20} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground }}>Add list</Text></Pressable>
@@ -161,9 +158,9 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0 }, carousel: { flex: 1, minHeight: 0 }, columns: { padding: 10, gap: 10, alignItems: "flex-start" },
-  column: { height: "100%", maxHeight: "100%", minHeight: 220, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingTop: 5 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
+  column: { maxHeight: "100%", minHeight: 220, flexShrink: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingTop: 5, paddingBottom: 20 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
   insertLine: { position: "absolute", top: -5, left: 0, right: 0, height: 3, borderRadius: 2, zIndex: 20 },
   cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 7 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },
   addSection: { borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
-  hiddenRail: { flexGrow: 0, maxHeight: 44 }, hiddenContent: { paddingHorizontal: 12, paddingVertical: 5, gap: 7 }, hiddenChip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderRadius: 8 }, tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { flex: 1, minHeight: 0, margin: 10, paddingHorizontal: 8, borderWidth: 1, borderRadius: 12 },
+  tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { flex: 1, minHeight: 0, margin: 10, paddingHorizontal: 8, borderWidth: 1, borderRadius: 12 },
 });

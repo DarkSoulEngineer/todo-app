@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { ViewMode } from "@/lib/domain/types";
+import type { BoardSection, ViewMode } from "@/lib/domain/types";
 import { getRibbonContext, isRibbonTabAvailable, resolveRibbonTab, type RibbonTab } from "@/lib/features/ribbon-context";
 import { useMobileBoardColors } from "./mobile-board-colors";
 
@@ -15,6 +15,7 @@ const TABS: { value: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[
   { value: "actions", label: "Actions", icon: "options-outline" },
   { value: "filters", label: "Filters", icon: "funnel-outline" },
   { value: "select", label: "Select", icon: "checkbox-outline" },
+  { value: "hidden", label: "Hidden", icon: "eye-off-outline" },
 ];
 
 interface Props {
@@ -37,6 +38,8 @@ interface Props {
   children: ReactNode;
   filters: ReactNode;
   filtersActive: boolean;
+  hiddenSections?: BoardSection[];
+  onShowSection?: (section: BoardSection) => void;
   /** True while tasks are being selected on the board. */
   selecting: boolean;
   /** Called when the Select tab is opened. */
@@ -58,11 +61,14 @@ export function MobileBoardRibbon(props: Props) {
   const [previousTab, setPreviousTab] = useState<Tab>("home");
   const tabLabels: "all" | "active" | "none" = fontScale > 1.2 ? "none" : width >= 480 ? "all" : width >= 360 ? "active" : "none";
   const context = getRibbonContext(props.mode);
+  const hiddenSections = props.hiddenSections ?? [];
   const searchVisible = context.search && (searchOpen || props.query.length > 0);
 
   // Selection mode owns the Select tab. When it ends, fall back to the tab the
   // user was on before opening it without needing to sync state in an effect.
-  const shownTab = resolveRibbonTab(props.mode, tab, previousTab, props.selecting);
+  const resolvedTab = resolveRibbonTab(props.mode, tab, previousTab, props.selecting);
+  const shownTab = resolvedTab === "hidden" && hiddenSections.length === 0 ? "home" : resolvedTab;
+  const visibleTabs = TABS.filter((item) => isRibbonTabAvailable(item.value, props.mode) && (item.value !== "hidden" || hiddenSections.length > 0));
   const selectionActive = shownTab === "select";
   const ribbonExpanded = expanded || selectionActive;
 
@@ -91,7 +97,7 @@ export function MobileBoardRibbon(props: Props) {
   }, [resetHideTimer]);
 
   const openTab = (next: Tab) => {
-    if (!isRibbonTabAvailable(next, props.mode)) return;
+    if (!isRibbonTabAvailable(next, props.mode) || (next === "hidden" && hiddenSections.length === 0)) return;
     if (next === "select") {
       if (shownTab !== "select") {
         setPreviousTab(shownTab);
@@ -113,7 +119,7 @@ export function MobileBoardRibbon(props: Props) {
         <Ionicons name="arrow-back" size={20} color={c.foreground} />
       </Pressable>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabList} contentContainerStyle={styles.tabs}>
-        {TABS.filter((item) => isRibbonTabAvailable(item.value, props.mode)).map((item) => <Pressable key={item.value} accessibilityRole="tab" accessibilityLabel={item.value === "select" ? "Select tasks" : item.value === "filters" && props.filtersActive ? "Filters tools, filter active" : `${item.label} tools`} aria-selected={shownTab === item.value} onPress={() => openTab(item.value)} style={[styles.tab, { borderBottomColor: shownTab === item.value ? c.primary : "transparent" }]}><View style={styles.tabIcon}><Ionicons name={item.icon} size={15} color={shownTab === item.value ? c.foreground : c.mutedForeground} />{item.value === "filters" && props.filtersActive ? <View testID="board-filter-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.primary, borderColor: c.card }]} /> : null}</View>{tabLabels === "all" || (tabLabels === "active" && shownTab === item.value) ? <Text numberOfLines={1} style={{ color: shownTab === item.value ? c.foreground : c.mutedForeground, fontSize: 13 }}>{item.label}</Text> : null}</Pressable>)}
+        {visibleTabs.map((item) => <Pressable key={item.value} accessibilityRole="tab" accessibilityLabel={item.value === "select" ? "Select tasks" : item.value === "filters" && props.filtersActive ? "Filters tools, filter active" : item.value === "hidden" && hiddenSections.length ? `Hidden tools, ${hiddenSections.length} hidden ${hiddenSections.length === 1 ? "list" : "lists"}` : `${item.label} tools`} aria-selected={shownTab === item.value} onPress={() => openTab(item.value)} style={[styles.tab, { borderBottomColor: shownTab === item.value ? c.primary : "transparent" }]}><View style={styles.tabIcon}><Ionicons name={item.icon} size={15} color={shownTab === item.value ? c.foreground : c.mutedForeground} />{item.value === "filters" && props.filtersActive ? <View testID="board-filter-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.primary, borderColor: c.card }]} /> : item.value === "hidden" && hiddenSections.length ? <View testID="board-hidden-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.primary, borderColor: c.card }]} /> : null}</View>{tabLabels === "all" || (tabLabels === "active" && shownTab === item.value) ? <Text numberOfLines={1} style={{ color: shownTab === item.value ? c.foreground : c.mutedForeground, fontSize: 13 }}>{item.label}</Text> : null}</Pressable>)}
       </ScrollView>
       {context.search ? <Pressable accessibilityRole="button" accessibilityLabel="Search tasks" onPress={() => { setSearchOpen((value) => !value); resetHideTimer(); }} style={[styles.tabAction, searchVisible && { backgroundColor: c.input }]}>
         <Ionicons name="search-outline" size={18} color={searchVisible ? c.primary : c.foreground} />
@@ -127,6 +133,10 @@ export function MobileBoardRibbon(props: Props) {
         <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("contract-outline", "Compact cards", props.onCompact, props.compact)}{tool("reader-outline", "Focus column", props.onFocused, props.focused)}{tool("swap-horizontal-outline", "Move arrows", props.onShowMoveArrows, props.showMoveArrows)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DISPLAY</Text></View>
         <View style={styles.toolGroup}><View style={styles.toolButtons}>{tool("remove", "Zoom out", () => props.onZoom(props.zoom - 0.1), false, props.zoom <= 0.7)}{tool("refresh-outline", `${Math.round(props.zoom * 100)}%`, () => props.onZoom(1), false, false, `Reset zoom to 100% (currently ${Math.round(props.zoom * 100)}%)`)}{tool("add", "Zoom in", () => props.onZoom(props.zoom + 0.1), false, props.zoom >= 1.3)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>ZOOM</Text></View>
       </> : null}
+    </ScrollView> : shownTab === "hidden" ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
+      <View style={styles.toolGroup}><View style={styles.toolButtons}>
+        {hiddenSections.map((section) => <View key={section.id} style={{ maxWidth: 180 }}>{tool("eye-outline", section.title, () => { if (hiddenSections.length === 1) setTab("home"); props.onShowSection?.(section); }, false, false, `Show ${section.title}`)}</View>)}
+      </View><Text style={[styles.caption, { color: c.mutedForeground }]}>HIDDEN LISTS · {hiddenSections.length}</Text></View>
     </ScrollView> : shownTab === "filters" ? props.filters : shownTab === "select" ? (props.selection ?? props.children) : props.children) : null}
   </View>;
 }
