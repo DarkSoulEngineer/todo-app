@@ -14,7 +14,7 @@ vm.runInNewContext(await compile("../src/lib/features/ribbon-context.ts"), { exp
 const source = await compile("../src/components/board/mobile-board-ribbon.tsx");
 const sameDeps = (a, b) => a && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
 
-function setup() {
+function setup({ width = 400, fontScale = 1 } = {}) {
   const slots = [];
   const timers = new Map();
   let cursor = 0;
@@ -46,9 +46,11 @@ function setup() {
   const colors = new Proxy({}, { get: () => "#888888" });
   const mocks = {
     react, "@expo/vector-icons": { Ionicons: "Icon", MaterialCommunityIcons: "Icon" },
-    "react-native": { Pressable: "Pressable", ScrollView: "ScrollView", View: "View", Text: "Text", TextInput: "TextInput", StyleSheet: { create: (styles) => styles }, useWindowDimensions: () => ({ width: 400, fontScale: 1 }) },
+    "react-native": { Pressable: "Pressable", ScrollView: "ScrollView", View: "View", Text: "Text", TextInput: "TextInput", StyleSheet: { create: (styles) => styles }, useWindowDimensions: () => ({ width, fontScale }) },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0 }) },
     "./mobile-board-colors": { useMobileBoardColors: () => colors }, "@/lib/features/ribbon-context": context,
+    "@/components/ui/sheet": { Sheet: "Sheet" },
+    "@/components/ui/ribbon-scroll-view": { RibbonScrollView: "RibbonScrollView" },
   };
   const exports = {};
   vm.runInNewContext(source, {
@@ -69,6 +71,46 @@ function nodes(node) {
 }
 const button = (tree, label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
 const hasSelection = (tree) => JSON.stringify(tree).includes("Selection tools");
+
+test("mobile overflow menu names every available tab even with icon-only labels", () => {
+  for (const width of [320, 390, 600]) for (const fontScale of [1, 1.5]) {
+    const app = setup({ width, fontScale });
+    app.props.hiddenSections = [{ id: "hidden", title: "Backlog", hidden: true }];
+    let tree = app.render();
+    button(tree, "More ribbon tabs").props.onPress();
+    tree = app.render();
+    assert.equal(nodes(tree).find((node) => node.type === "Sheet").props.visible, true);
+    assert.equal(app.timers.size, 0, "reading the menu pauses ribbon auto-hide");
+    const options = nodes(tree).filter((node) => node.props?.accessibilityLabel?.endsWith("ribbon tab"));
+    assert.deepEqual(options.map((node) => node.props.accessibilityLabel), ["Show Home ribbon tab", "Show Actions ribbon tab", "Show Filters ribbon tab", "Show Select ribbon tab", "Show Hidden ribbon tab"]);
+    button(tree, "Show Hidden ribbon tab").props.onPress();
+    tree = app.render();
+    assert.equal(nodes(tree).find((node) => node.type === "Sheet").props.visible, false);
+    assert.ok(button(tree, "Show Backlog"));
+    assert.equal(app.timers.size, 1);
+    button(tree, "More ribbon tabs").props.onPress();
+    tree = app.render();
+    button(tree, "Show Select ribbon tab").props.onPress();
+    tree = app.render();
+    assert.equal(app.props.selecting, true);
+    assert.equal(hasSelection(tree), true);
+  }
+});
+
+test("overflow menu respects the current view and desktop keeps its full ribbon", () => {
+  const desktop = setup({ width: 1024 });
+  assert.equal(button(desktop.render(), "More ribbon tabs"), undefined);
+  const app = setup();
+  app.props.mode = "insights";
+  let tree = app.render();
+  button(tree, "More ribbon tabs").props.onPress();
+  tree = app.render();
+  assert.ok(button(tree, "Show Home ribbon tab"));
+  assert.ok(button(tree, "Show Actions ribbon tab"));
+  assert.equal(button(tree, "Show Filters ribbon tab"), undefined);
+  assert.equal(button(tree, "Show Select ribbon tab"), undefined);
+  assert.equal(button(tree, "Show Hidden ribbon tab"), undefined);
+});
 
 test("Select cancels pending auto-hide and stays open during inactivity and interaction", () => {
   const app = setup();

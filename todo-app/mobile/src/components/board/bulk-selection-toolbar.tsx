@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { useTheme } from "@/providers/theme-provider";
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
 
 export interface BulkSelectionToolbarProps {
   /** Keeps the toolbar out of the tree when the board is not selecting tasks. */
@@ -69,11 +70,8 @@ export function BulkSelectionToolbar({
   );
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
+    <RibbonScrollView
       contentContainerStyle={styles.tools}
-      keyboardShouldPersistTaps="handled"
       accessibilityRole="toolbar"
       accessibilityLabel="Bulk task actions"
       style={style}
@@ -93,7 +91,7 @@ export function BulkSelectionToolbar({
         {onPriority ? <ToolButton icon="flag-outline" label="Priority" accessibilityLabel="Set priority for selected tasks" onPress={onPriority} disabled={actionDisabled} /> : null}
         {onDelete ? <ToolButton icon="trash-outline" label="Delete" accessibilityLabel={`Delete ${count} selected ${taskWord}`} onPress={onDelete} tone="danger" disabled={actionDisabled} /> : null}
       </>) : null}
-    </ScrollView>
+    </RibbonScrollView>
   );
 }
 

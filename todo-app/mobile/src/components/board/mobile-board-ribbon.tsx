@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BoardSection, ViewMode } from "@/lib/domain/types";
 import { getRibbonContext, isRibbonTabAvailable, resolveRibbonTab, type RibbonTab } from "@/lib/features/ribbon-context";
 import { useMobileBoardColors } from "./mobile-board-colors";
+import { Sheet } from "@/components/ui/sheet";
+import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
 
 const CONTROL_SIZE = 44;
 
@@ -59,6 +61,7 @@ export function MobileBoardRibbon(props: Props) {
   const [pinned, setPinned] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [previousTab, setPreviousTab] = useState<Tab>("home");
+  const [moreOpen, setMoreOpen] = useState(false);
   const tabLabels: "all" | "active" | "none" = fontScale > 1.2 ? "none" : width >= 480 ? "all" : width >= 360 ? "active" : "none";
   const context = getRibbonContext(props.mode);
   const hiddenSections = props.hiddenSections ?? [];
@@ -80,12 +83,12 @@ export function MobileBoardRibbon(props: Props) {
       clearTimeout(hideTimerRef.current);
       hideTimerRef.current = null;
     }
-    if (!pinned && expanded && !selectionActive) {
+    if (!pinned && expanded && !selectionActive && !moreOpen) {
       hideTimerRef.current = setTimeout(() => {
         setExpanded(false);
       }, AUTO_HIDE_DELAY_MS);
     }
-  }, [expanded, pinned, selectionActive]);
+  }, [expanded, moreOpen, pinned, selectionActive]);
 
   useEffect(() => {
     resetHideTimer();
@@ -121,27 +124,40 @@ export function MobileBoardRibbon(props: Props) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabList} contentContainerStyle={styles.tabs}>
         {visibleTabs.map((item) => <Pressable key={item.value} accessibilityRole="tab" accessibilityLabel={item.value === "select" ? "Select tasks" : item.value === "filters" && props.filtersActive ? "Filters tools, filter active" : item.value === "hidden" && hiddenSections.length ? `Hidden tools, ${hiddenSections.length} hidden ${hiddenSections.length === 1 ? "list" : "lists"}` : `${item.label} tools`} aria-selected={shownTab === item.value} onPress={() => openTab(item.value)} style={[styles.tab, { borderBottomColor: shownTab === item.value ? c.primary : "transparent" }]}><View style={styles.tabIcon}><Ionicons name={item.icon} size={15} color={shownTab === item.value ? c.foreground : c.mutedForeground} />{item.value === "filters" && props.filtersActive ? <View testID="board-filter-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.primary, borderColor: c.card }]} /> : item.value === "hidden" && hiddenSections.length ? <View testID="board-hidden-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.primary, borderColor: c.card }]} /> : null}</View>{tabLabels === "all" || (tabLabels === "active" && shownTab === item.value) ? <Text numberOfLines={1} style={{ color: shownTab === item.value ? c.foreground : c.mutedForeground, fontSize: 13 }}>{item.label}</Text> : null}</Pressable>)}
       </ScrollView>
+      {width < 768 ? <Pressable accessibilityRole="button" accessibilityLabel="More ribbon tabs" accessibilityHint="Shows every available ribbon tab with its name" accessibilityState={{ expanded: moreOpen }} onPress={() => setMoreOpen(true)} style={styles.tabAction}><Ionicons name="ellipsis-horizontal" size={20} color={c.foreground} /></Pressable> : null}
       {context.search ? <Pressable accessibilityRole="button" accessibilityLabel="Search tasks" onPress={() => { setSearchOpen((value) => !value); resetHideTimer(); }} style={[styles.tabAction, searchVisible && { backgroundColor: c.input }]}>
         <Ionicons name="search-outline" size={18} color={searchVisible ? c.primary : c.foreground} />
       </Pressable> : null}
       <Pressable accessibilityRole="switch" accessibilityLabel={pinned ? "Unpin ribbon" : "Pin ribbon open"} accessibilityHint={pinned ? "The ribbon will auto-hide after some seconds of inactivity." : "The ribbon will stay open continuously."} accessibilityState={{ checked: pinned }} onPress={() => { if (pinned) { setPinned(false); resetHideTimer(); } else { setPinned(true); setExpanded(true); if (hideTimerRef.current) clearTimeout(hideTimerRef.current); } }} style={styles.tabAction}>{pinned ? <MaterialCommunityIcons name="pin" size={18} color={c.primary} /> : <MaterialCommunityIcons name="pin-off-outline" size={18} color={c.mutedForeground} />}</Pressable>
     </View>
     {searchVisible ? <View style={styles.searchRow}><View style={[styles.search, { borderColor: c.borderStrong, backgroundColor: c.input }]}><Ionicons name="search-outline" size={16} color={c.mutedForeground} /><TextInput accessibilityLabel="Filter tasks and labels" value={props.query} onChangeText={props.onQuery} placeholder="Search tasks…" placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }]} />{props.query ? icon("close", "Clear search", () => props.onQuery("")) : null}</View></View> : null}
-    {ribbonExpanded ? (shownTab === "home" ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
+    {ribbonExpanded ? (shownTab === "home" ? <RibbonScrollView accessibilityLabel="Home ribbon tools" onInteraction={resetHideTimer} contentContainerStyle={styles.tools}>
       <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("add", "New card", props.onNewTask)}{props.mode === "board" ? tool("add-circle-outline", "List", props.onAddSection) : null}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>CREATE</Text></View>
       {context.boardDisplay ? <>
         <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("contract-outline", "Compact cards", props.onCompact, props.compact)}{tool("reader-outline", "Focus column", props.onFocused, props.focused)}{tool("swap-horizontal-outline", "Move arrows", props.onShowMoveArrows, props.showMoveArrows)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DISPLAY</Text></View>
         <View style={styles.toolGroup}><View style={styles.toolButtons}>{tool("remove", "Zoom out", () => props.onZoom(props.zoom - 0.1), false, props.zoom <= 0.7)}{tool("refresh-outline", `${Math.round(props.zoom * 100)}%`, () => props.onZoom(1), false, false, `Reset zoom to 100% (currently ${Math.round(props.zoom * 100)}%)`)}{tool("add", "Zoom in", () => props.onZoom(props.zoom + 0.1), false, props.zoom >= 1.3)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>ZOOM</Text></View>
       </> : null}
-    </ScrollView> : shownTab === "hidden" ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
+    </RibbonScrollView> : shownTab === "hidden" ? <RibbonScrollView accessibilityLabel="Hidden list tools" onInteraction={resetHideTimer} contentContainerStyle={styles.tools}>
       <View style={styles.toolGroup}><View style={styles.toolButtons}>
         {hiddenSections.map((section) => <View key={section.id} style={{ maxWidth: 180 }}>{tool("eye-outline", section.title, () => { if (hiddenSections.length === 1) setTab("home"); props.onShowSection?.(section); }, false, false, `Show ${section.title}`)}</View>)}
       </View><Text style={[styles.caption, { color: c.mutedForeground }]}>HIDDEN LISTS · {hiddenSections.length}</Text></View>
-    </ScrollView> : shownTab === "filters" ? props.filters : shownTab === "select" ? (props.selection ?? props.children) : props.children) : null}
+    </RibbonScrollView> : shownTab === "filters" ? props.filters : shownTab === "select" ? (props.selection ?? props.children) : props.children) : null}
+    <Sheet visible={moreOpen && width < 768} onClose={() => setMoreOpen(false)}>
+      <Text accessibilityRole="header" style={[styles.moreTitle, { color: c.foreground }]}>Ribbon tabs</Text>
+      <Text style={[styles.moreHint, { color: c.mutedForeground }]}>Choose a tab. Swipe tool rows or use their arrows for more options.</Text>
+      {visibleTabs.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Show ${item.label} ribbon tab`} accessibilityState={{ selected: shownTab === item.value }} onPress={() => { openTab(item.value); setMoreOpen(false); }} style={[styles.moreOption, { backgroundColor: shownTab === item.value ? c.primarySoft : "transparent" }]}>
+        <Ionicons name={item.icon} size={20} color={c.foreground} />
+        <Text style={{ flex: 1, color: c.foreground, fontSize: 15 }}>{item.label}{item.value === "hidden" ? ` (${hiddenSections.length})` : item.value === "filters" && props.filtersActive ? " · Active" : ""}</Text>
+        {shownTab === item.value ? <Ionicons name="checkmark" size={20} color={c.primary} /> : null}
+      </Pressable>)}
+    </Sheet>
   </View>;
 }
 
 const styles = StyleSheet.create({
+  moreTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  moreHint: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
+  moreOption: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, borderRadius: 10 },
   tabList: { flex: 1, minWidth: 0 },
   tabs: { flexDirection: "row", gap: 4 },
   tabIcon: { position: "relative" },
