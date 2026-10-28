@@ -21,6 +21,7 @@ const layoutModule = await load("../src/lib/features/home-layout.ts");
 const { getHomeLayout } = layoutModule;
 const metrics = { total: 26, open: 13, done: 7, overdue: 7, canceled: 6, dueSoon: 5, completionPercent: 27 };
 let width = 390;
+let activeDrag = null;
 const colors = new Proxy({}, { get: () => "#888888" });
 const { BoardManagerContent } = await load("../src/components/board/board-manager-content.tsx", {
   react: { useState: (value) => [value, () => {}] },
@@ -37,6 +38,8 @@ const { BoardManagerContent } = await load("../src/components/board/board-manage
   "@/lib/data/manager-state": { getTaskMetrics: () => metrics },
   "@/theme/layout": { mobileContentStyle: { maxWidth: 600, width: "100%" }, mobileBottomNavClearance: 112 },
   "@/lib/features/home-layout": layoutModule,
+  "./board-drag-cell": { BoardDragCell: "BoardDragCell" },
+  "@/hooks/use-board-grid-drag": { useBoardGridDrag: () => ({ drag: activeDrag, register() {}, start() {}, move() {}, drop() {}, cancel() {} }) },
 });
 function nodes(node) {
   if (!node || typeof node !== "object") return [];
@@ -58,11 +61,22 @@ test("responsive grid fills available width without overflowing cards or safe ar
       assert.ok(layout.cardWidth > 0);
       const occupied = layout.columns * layout.cardWidth + (layout.columns - 1) * 16 + layout.padding * 2 + inset * 2 + (layout.sidebar ? layout.statsWidth + 24 : 0);
       assert.ok(Math.abs(occupied - viewport) < 0.01);
-      if (layout.wide) assert.ok(layout.cardWidth >= 340);
+      if (layout.wide) assert.ok(layout.cardWidth >= 300);
       else assert.equal(layout.columns, 1);
-      assert.ok(layout.columns <= 3, "large screens must wrap boards rather than becoming one long row");
-      assert.equal(layout.sidebar, viewport - inset * 2 >= 1200);
+      assert.ok(layout.columns <= 2, "wide layouts keep two columns of boards");
+      assert.equal(layout.sidebar, viewport - inset * 2 >= 1320);
     }
+  }
+});
+
+test("desktop divides the page evenly between two board columns and Stats", () => {
+  for (const viewport of [1320, 1366, 1440, 1536, 1920, 2560]) {
+    const layout = getHomeLayout(viewport);
+    assert.equal(layout.columns, 2);
+    assert.ok(layout.cardWidth >= 300);
+    assert.equal(layout.statsWidth, (viewport - layout.padding * 2 - 24) / 2);
+    assert.equal(layout.cardWidth * 2 + 16, layout.statsWidth);
+    assert.ok(layout.statsChartSize >= 240 && layout.statsChartSize <= 360);
   }
 });
 
@@ -76,7 +90,10 @@ test("Home retains phone sizing and uses full-width grids for active and closed 
     for (const id of ["home-board-grid", "home-closed-board-grid"]) {
       const grid = find(tree, id);
       assert.equal(flatten(grid.props.style).flexWrap, layout.wide ? "wrap" : undefined);
-      for (const cell of grid.props.children) assert.equal(cell.props.style?.width, layout.wide ? layout.cardWidth : undefined);
+      for (const cell of grid.props.children) {
+        if (!cell || cell.props.testID === "home-add-board-card") continue;
+        assert.equal(cell.props.width ?? cell.props.style?.width, layout.wide ? layout.cardWidth : undefined);
+      }
     }
     const overview = nodes(tree).find((node) => node.type?.name === "WorkspaceOverview");
     const stats = overview.type(overview.props);
@@ -84,7 +101,7 @@ test("Home retains phone sizing and uses full-width grids for active and closed 
     assert.equal(flatten(find(tree, "home-dashboard").props.style).flexDirection, layout.sidebar ? "row" : undefined);
     assert.equal(find(tree, "home-stats-panel").props.style?.width, layout.sidebar ? layout.statsWidth : undefined);
     const donut = nodes(stats).find((node) => node.props?.accessible && node.props.accessibilityLabel?.includes("26 tasks"));
-    if (layout.wide) assert.equal(flatten(donut.props.style).width, layout.sidebar ? 240 : 200);
+    if (layout.wide) assert.equal(flatten(donut.props.style).width, layout.sidebar ? layout.statsChartSize : 200);
     const shares = nodes(stats).filter((node) => node.props?.accessibilityRole === "progressbar");
     assert.equal(shares.length, 4);
     assert.equal(shares[2].props.accessibilityValue.text, "6 tasks, 23%");
@@ -95,11 +112,48 @@ test("grid keeps ordering and board actions intact", () => {
   width = 1440;
   const calls = [];
   const tree = render({ onOpen: (id) => calls.push(["open", id]), onMove: (id, direction) => calls.push(["move", id, direction]) });
-  const cards = find(tree, "home-board-grid").props.children.map((cell) => cell.props.children);
+  const cards = find(tree, "home-board-grid").props.children.filter((cell) => cell && cell.props.testID !== "home-add-board-card").map((cell) => cell.props.children);
   assert.deepEqual(Array.from(cards, (card) => card.props.project.id), projects.map((project) => project.id));
   cards[0].props.onOpen();
   cards[1].props.onMove(-1);
   assert.deepEqual(calls, [["open", "0"], ["move", "1", -1]]);
   assert.equal(cards[0].props.first, true);
   assert.equal(cards.at(-1).props.last, true);
+});
+
+test("outline create card fills a grid slot and opens the existing create action", () => {
+  for (width of [390, 768, 1440]) {
+    let created = 0;
+    const tree = render({ onCreate: () => created++ });
+    const add = find(tree, "home-add-board-card");
+    assert.ok(add);
+    assert.equal(add.props.accessibilityLabel, "Add new board");
+    const style = flatten(add.props.style({ pressed: false }));
+    assert.equal(style.borderStyle, "dashed");
+    assert.equal(style.backgroundColor, "transparent");
+    assert.equal(style.width, getHomeLayout(width).wide ? getHomeLayout(width).cardWidth : undefined);
+    add.props.onPress();
+    assert.equal(created, 1);
+    assert.equal(find(render({ editing: true }), "home-add-board-card"), undefined);
+    assert.equal(find(render({ ready: false }), "home-add-board-card").props.disabled, true);
+  }
+});
+
+test("move arrows vanish on every card while dragging and return without layout changes", () => {
+  width = 1440;
+  for (const dragging of [false, true, false]) {
+    activeDrag = dragging ? { id: "0", target: "1" } : null;
+    const tree = render({ editing: true });
+    const cells = find(tree, "home-board-grid").props.children.filter(Boolean);
+    for (const cell of cells) {
+      const card = cell.props.children;
+      const rendered = card.type(card.props);
+      const arrows = find(rendered, `board-move-arrows-${card.props.project.id}`);
+      assert.ok(arrows, "keep arrow space reserved to preserve drag measurements");
+      assert.equal(flatten(arrows.props.style).opacity, dragging ? 0 : 1);
+      assert.equal(arrows.props.pointerEvents, dragging ? "none" : "box-none");
+      assert.equal(arrows.props.accessibilityElementsHidden, dragging);
+    }
+  }
+  activeDrag = null;
 });

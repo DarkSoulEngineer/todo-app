@@ -152,6 +152,15 @@ export function moveBoardInLayout(layout: BoardLayout, fromIndex: number, toInde
   return { cols: layout.cols, order };
 }
 
+/** Stable ids keep drag/drop correct across grid rows and hidden closed boards. */
+export function dropBoardInLayout(layout: BoardLayout, sourceId: string, targetId: string, openIds: readonly string[]): BoardLayout {
+  if (!openIds.includes(sourceId) || !openIds.includes(targetId)) return layout;
+  const from = layout.order.indexOf(sourceId);
+  const to = layout.order.indexOf(targetId);
+  if (from < 0 || to < 0) return layout;
+  return moveBoardInLayout(layout, from, to);
+}
+
 /** Drops a removed board and closes the gap behind it. */
 export function removeBoardFromLayout(layout: BoardLayout, boardId: string): BoardLayout {
   const index = layout.order.indexOf(boardId);

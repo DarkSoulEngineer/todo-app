@@ -4,9 +4,11 @@ export function getHomeLayout(width: number, leftInset = 0, rightInset = 0) {
   const wide = available >= 768;
   const padding = wide ? 24 : 12;
   const contentWidth = Math.max(0, available - padding * 2);
-  const sidebar = available >= 1200;
-  const statsWidth = sidebar ? Math.min(440, Math.max(360, Math.round(contentWidth * 0.28))) : 0;
+  // An equal split needs room for two usable cards in the left half.
+  const sidebar = available >= 1320;
+  const statsWidth = sidebar ? (contentWidth - 24) / 2 : 0;
   const boardWidth = contentWidth - (sidebar ? statsWidth + 24 : 0);
-  const columns = wide ? Math.min(3, Math.max(2, Math.floor((boardWidth + 16) / (340 + 16)))) : 1;
-  return { wide, sidebar, statsWidth, padding, columns, cardWidth: Math.max(0, (boardWidth - (columns - 1) * 16) / columns) };
+  const columns = wide ? 2 : 1;
+  const statsChartSize = sidebar ? Math.min(360, Math.max(240, Math.round(statsWidth * 0.48))) : 200;
+  return { wide, sidebar, statsWidth, statsChartSize, padding, columns, cardWidth: Math.max(0, (boardWidth - (columns - 1) * 16) / columns) };
 }

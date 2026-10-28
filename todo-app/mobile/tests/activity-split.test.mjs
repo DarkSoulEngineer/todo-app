@@ -17,12 +17,12 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
   const effects = [];
   const boardId = options.boardId ?? "board";
   const states = { 0: mode, 11: selected, 12: visible, 31: options.owner ?? boardId };
-  const api = { tasks, sections: [], boards: [], versions: [], projects: [{ id: boardId, name: "Board" }], currentProjectId: boardId };
+  const api = { tasks, sections: [], boards: [], versions: [], projects: options.projects ?? [{ id: boardId, name: "Board" }], currentProjectId: boardId };
   const fallback = new Proxy({}, { get: (_, key) => key });
   const mocks = {
     react: { useState: (initial) => { const index = state++; return [index in states ? states[index] : typeof initial === "function" ? initial() : initial, (value) => updates.push([index, value])]; }, useRef: (current) => ({ current }), useEffect: (effect) => effects.push(effect), useMemo: (fn) => fn() },
     "react-native": { View: "View", Text: "Text", ScrollView: "ScrollView", Pressable: "Pressable", StyleSheet: { create: (v) => v, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width }) },
-    "expo-router": { useLocalSearchParams: () => ({ id: boardId }) },
+    "expo-router": { useLocalSearchParams: () => ({ id: boardId }), router: { replace: (destination) => options.onNavigate?.(destination) } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
     "@/providers/tasks-provider": { useTasksContext: () => api },
@@ -47,6 +47,20 @@ function find(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...find(node.props?.children, predicate)];
 }
 const editor = (tree) => find(tree, (node) => node.type === "TaskEditor")[0];
+test("board switch indicators exclude closed boards and close the editor before navigating", () => {
+  const updates = [];
+  const destinations = [];
+  const tree = render(1200, "board", task, true, [task], updates, {
+    projects: [{ id: "board", name: "Current" }, { id: "other", name: "Other" }, { id: "closed", name: "Closed", closedAt: "2026-10-28" }],
+    onNavigate: (destination) => destinations.push(destination),
+  });
+  const indicator = find(tree, (node) => node.type === "BoardSwitchIndicator")[0];
+  assert.deepEqual(Array.from(indicator.props.boards, (board) => board.id), ["board", "other"]);
+  indicator.props.onSwitch("other");
+  assert.deepEqual(destinations, ["/board/other"]);
+  assert.ok(updates.some(([slot, value]) => slot === 12 && value === false));
+  assert.ok(updates.some(([slot, value]) => slot === 11 && value === null));
+});
 test("Activity switches at the existing 900px desktop breakpoint only", () => {
   for (const width of [390, 768, 899, 900, 1200]) {
     for (const mode of ["list", "board", "calendar", "insights"]) {

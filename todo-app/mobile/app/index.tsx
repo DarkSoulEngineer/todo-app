@@ -15,7 +15,7 @@ import { useTheme } from "@/providers/theme-provider";
 import { useToast } from "@/providers/toast-provider";
 import { exportWorkspace, pickWorkspaceFile } from "@/lib/data/transfer";
 import { getWorkspaceMetrics, loadManagerState, saveManagerLayout, saveManagerPins } from "@/lib/data/manager-state";
-import { EMPTY_BOARD_LAYOUT, boardLayoutOrder, moveBoardInLayout, reconcileBoardLayout, removeBoardFromLayout, type BoardLayout } from "@/lib/features/board-layout";
+import { EMPTY_BOARD_LAYOUT, boardLayoutOrder, dropBoardInLayout, moveBoardInLayout, reconcileBoardLayout, removeBoardFromLayout, type BoardLayout } from "@/lib/features/board-layout";
 import type { JanusProject } from "@/lib/domain/projects";
 
 export default function BoardManagerScreen() {
@@ -111,6 +111,13 @@ export default function BoardManagerScreen() {
     if (!reopenProject(project.id)) return;
     router.push(`/board/${project.id}`);
   };
+  const reorderBoard = (sourceId: string, targetId: string) => {
+    if (!managerReady || !editMode) return;
+    const next = dropBoardInLayout(resolvedLayout, sourceId, targetId, openProjects.map((project) => project.id));
+    if (next === resolvedLayout) return;
+    setLayout(next);
+    void saveManagerLayout(next);
+  };
   const promptClosed = (project: JanusProject) => {
     setClosedPromptProject(project);
   };
@@ -171,7 +178,7 @@ export default function BoardManagerScreen() {
   return <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
     <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
-    <BoardManagerContent projects={displayProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
+    <BoardManagerContent projects={displayProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onReorder={reorderBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
     </BlurTargetView>
     <ReferenceMobileBottomNav active="boards" onNavigate={navigate} blurTarget={blurTarget} />
     <Sheet visible={showCreate} onClose={() => setShowCreate(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>New board</Text><Text style={{ color: theme.colors.mutedForeground, marginTop: 6 }}>Add lists and categories after creating the board.</Text><Input autoFocus value={newName} onChangeText={setNewName} placeholder="Board name" onSubmitEditing={create} style={{ marginTop: 12 }} /><Button variant="outline" label="Create board" onPress={create} disabled={!newName.trim()} style={{ marginTop: 14 }} /></Sheet>
