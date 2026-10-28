@@ -1,20 +1,21 @@
 import { useTheme } from "@/providers/theme-provider";
-import Svg, { Rect, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 export function JanusLogo({ size = 48 }: { size?: number }) {
   const { theme } = useTheme();
   const c = theme.colors;
-  const width = size;
-  const height = Math.round(size * 0.62);
   const good = c.success;
   const bad = c.destructive;
-  const stroke = c.background;
+  const surface = c.background;
   return (
-    <Svg width={width} height={height} viewBox="0 0 64 40" accessibilityLabel="Janus logo">
-      <Rect x={4} y={6} width={30} height={28} rx={13} fill={good} stroke={stroke} strokeWidth={2} />
-      <Rect x={30} y={6} width={30} height={28} rx={13} fill={bad} stroke={stroke} strokeWidth={2} />
-      <SvgText x={19} y={25} fontSize={11} fontWeight="700" fill={c.successForeground ?? "#FFFFFF"} textAnchor="middle">.*</SvgText>
-      <SvgText x={45} y={25} fontSize={13} fontWeight="700" fill="#FFFFFF" textAnchor="middle">*</SvgText>
+    <Svg width={size} height={size} viewBox="0 0 64 64" accessibilityLabel="Janus logo">
+      <Rect x={6} y={14} width={26} height={36} rx={10} fill={good} />
+      <Rect x={32} y={14} width={26} height={36} rx={10} fill={bad} />
+      <Circle cx={32} cy={32} r={11} fill={surface} stroke={c.borderStrong} strokeWidth={1.5} />
+      <Path d="M32,21 A11,11 0 0,0 32,43 Z" fill={good} />
+      <Path d="M32,21 A11,11 0 0,1 32,43 Z" fill={bad} />
+      <Circle cx={32} cy={26} r={2.5} fill={bad} />
+      <Circle cx={32} cy={38} r={2.5} fill={good} />
     </Svg>
   );
 }
