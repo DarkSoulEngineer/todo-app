@@ -46,7 +46,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const insets = useSafeAreaInsets();
   const cardContentStyle = styles.cards;
   const columnContentStyle = [styles.columns, { paddingBottom: 12 + insets.bottom }];
-  const holderContentStyle = [styles.columnContent, { paddingBottom: mobileBottomNavClearance + insets.bottom }];
+  const holderContentStyle = [styles.columnContent, { paddingBottom: Math.max(0, mobileBottomNavClearance - 40) + insets.bottom }];
   const focused = props.focused;
   const enabled = width >= 768 && (props.dragEnabled ?? true) && !props.selectionMode && !focused;
   const { host: previewHost, layer: previewLayer, overlay: previewOverlay } = useNativeDragPreview();

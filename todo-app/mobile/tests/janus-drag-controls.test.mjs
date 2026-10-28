@@ -64,7 +64,7 @@ test("list backgrounds wrap their content with navigation clearance outside the 
     const scroll = nodes(holder).find((node) => node.type === "ScrollView");
     assert.equal(scroll.props.style.flexGrow, 0);
     assert.equal(scroll.props.style.flexShrink, 1);
-    assert.equal(Object.assign({}, ...scroll.props.contentContainerStyle).paddingBottom, 132, "navigation clearance stays inside the scroller");
+    assert.equal(Object.assign({}, ...scroll.props.contentContainerStyle).paddingBottom, 92, "two 20-point dot rows are removed from the navigation clearance");
     assert.ok(!nodes(column).some((node) => node.props?.testID === `janus-add-card-footer-${id}`), "creation tile must be outside the column background");
     assert.ok(nodes(cell).some((node) => node.props?.testID === `janus-add-card-footer-${id}`));
   }
