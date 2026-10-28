@@ -22,9 +22,10 @@ const { getHomeLayout } = layoutModule;
 const metrics = { total: 26, open: 13, done: 7, overdue: 7, canceled: 6, dueSoon: 5, completionPercent: 27 };
 let width = 390;
 let activeDrag = null;
+let boardPaneMeasurement = null;
 const colors = new Proxy({}, { get: () => "#888888" });
 const { BoardManagerContent } = await load("../src/components/board/board-manager-content.tsx", {
-  react: { useState: (value) => [value, () => {}] },
+  react: { useState: (value) => value === null ? [boardPaneMeasurement, (next) => { boardPaneMeasurement = next; }] : [value, () => {}] },
   "react-native": { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", Platform: { select: (values) => values.default }, useWindowDimensions: () => ({ width }), StyleSheet: { create: (value) => value, hairlineWidth: 0.5 } },
   "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 20, left: 0, right: 0 }) },
   "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle" },
@@ -78,6 +79,29 @@ test("desktop divides the page evenly between two board columns and Stats", () =
     assert.equal(layout.cardWidth * 2 + 16, layout.statsWidth);
     assert.ok(layout.statsChartSize >= 240 && layout.statsChartSize <= 360);
   }
+});
+
+test("two card columns fit the measured panel despite scrollbars and fractional pixels", () => {
+  try {
+    for (width of [768, 1320, 1440, 1920]) {
+      const layout = getHomeLayout(width);
+      const expectedPanel = layout.sidebar ? layout.statsWidth : width - layout.padding * 2;
+      for (const lostSpace of [0, 0.5, 17.25]) {
+        const measured = expectedPanel - lostSpace;
+        const initial = render();
+        find(initial, "home-boards-pane").props.onLayout({ nativeEvent: { layout: { width: measured } } });
+        const tree = render();
+        const grid = find(tree, "home-board-grid");
+        const cards = grid.props.children.filter((cell) => cell && cell.props.testID !== "home-add-board-card");
+        const cellWidth = cards[0].props.width;
+        assert.equal(cellWidth, Math.floor((measured - 16) / 2));
+        assert.ok(cellWidth * 2 + 16 <= measured, "second column must not wrap");
+        assert.ok(measured - (cellWidth * 2 + 16) < 2, "both columns should fill the panel");
+        assert.equal(flatten(find(tree, "home-add-board-card").props.style({ pressed: false })).width, cellWidth);
+        for (const cell of find(tree, "home-closed-board-grid").props.children) assert.equal(cell.props.style.width, cellWidth);
+      }
+    }
+  } finally { boardPaneMeasurement = null; }
 });
 
 test("Home retains phone sizing and uses full-width grids for active and closed boards", () => {

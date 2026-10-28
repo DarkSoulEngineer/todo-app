@@ -53,8 +53,12 @@ export function BoardManagerContent(props: Props) {
   const { width } = useWindowDimensions();
   const layout = getHomeLayout(width, insets.left, insets.right);
   const [showSearch, setShowSearch] = useState(false);
+  const [boardPaneWidth, setBoardPaneWidth] = useState<number | null>(null);
+  // The viewport includes space a scrollbar can take from the actual panel.
+  // Round down so fractional CSS pixels cannot push the second card to a new row.
+  const cardWidth = boardPaneWidth !== null ? Math.max(0, Math.floor((boardPaneWidth - (layout.columns - 1) * 16) / layout.columns)) : layout.cardWidth;
   const canDrag = layout.wide && props.editing && props.ready && Boolean(props.onReorder);
-  const gridDrag = useBoardGridDrag(canDrag, props.projects.map((project) => project.id), layout.cardWidth, props.onReorder);
+  const gridDrag = useBoardGridDrag(canDrag, props.projects.map((project) => project.id), cardWidth, props.onReorder);
   return <>
     <ScreenHeader
       title="Janus"
@@ -70,7 +74,10 @@ export function BoardManagerContent(props: Props) {
     />
     <ScrollView testID="home-content" scrollEnabled={!gridDrag.drag} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, layout.wide && styles.contentWide, { paddingLeft: layout.padding + insets.left, paddingRight: layout.padding + insets.right, paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
       <View testID="home-dashboard" style={layout.sidebar ? styles.dashboardWide : undefined}>
-      <View style={layout.sidebar ? styles.boardsPane : undefined}>
+      <View testID="home-boards-pane" onLayout={(event) => {
+        const measured = event.nativeEvent.layout.width;
+        if (Number.isFinite(measured) && measured > 0) setBoardPaneWidth(measured);
+      }} style={layout.sidebar ? styles.boardsPane : undefined}>
       <SectionHeading
         title="Your boards"
         subtitle={`${props.totalBoards} active`}
@@ -83,18 +90,18 @@ export function BoardManagerContent(props: Props) {
       {props.editing ? <Text style={[styles.editHint, { color: c.primary }]}>{canDrag ? "Drag from anywhere on a card to another grid position, or use the arrows. Pinned boards stay first outside Rearrange." : "Use the arrows to arrange your boards."}</Text> : null}
       {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View testID="home-board-grid" style={[styles.boards, layout.wide && styles.boardGrid]}>{[...props.projects.map((project, index) => {
         const card = <ManagerCard project={project} accent={c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} hideMoveArrows={Boolean(gridDrag.drag)} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />;
-        return layout.wide ? <BoardDragCell key={project.id} id={project.id} name={project.name} width={layout.cardWidth} enabled={canDrag}
+        return layout.wide ? <BoardDragCell key={project.id} id={project.id} name={project.name} width={cardWidth} enabled={canDrag}
           active={gridDrag.drag?.id === project.id} target={gridDrag.drag?.target === project.id}
           onRegister={gridDrag.register} onStart={gridDrag.start} onMove={gridDrag.move} onDrop={gridDrag.drop} onCancel={gridDrag.cancel}>{card}</BoardDragCell>
           : <View key={project.id}>{card}</View>;
       }), !props.editing ? <Pressable key="create-board-placeholder" testID="home-add-board-card" accessibilityRole="button" accessibilityLabel="Add new board" accessibilityState={{ disabled: !props.ready }} disabled={!props.ready} onPress={props.onCreate}
-        style={({ pressed }) => [styles.addBoardCard, layout.wide && { width: layout.cardWidth }, { borderColor: c.borderStrong, backgroundColor: pressed ? c.primarySoft : "transparent", opacity: props.ready ? 1 : 0.5 }]}>
+        style={({ pressed }) => [styles.addBoardCard, layout.wide && { width: cardWidth }, { borderColor: c.borderStrong, backgroundColor: pressed ? c.primarySoft : "transparent", opacity: props.ready ? 1 : 0.5 }]}>
         <Text style={{ color: c.mutedForeground, fontSize: 15, fontWeight: "500" }}>Add new board</Text>
       </Pressable> : null]}</View>}
       {props.closedProjects.length ? <>
         <SectionHeading title="Closed boards" subtitle={`${props.closedProjects.length} closed`} style={styles.sectionHeading} />
         <Text style={[styles.editHint, { color: c.mutedForeground }]}>Closed boards stay safe with their tasks. Reopen one to keep working on it.</Text>
-        <View testID="home-closed-board-grid" style={[styles.boards, layout.wide && styles.boardGrid]}>{props.closedProjects.map((project) => <View key={project.id} style={layout.wide ? { width: layout.cardWidth } : undefined}><ManagerCard project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>
+        <View testID="home-closed-board-grid" style={[styles.boards, layout.wide && styles.boardGrid]}>{props.closedProjects.map((project) => <View key={project.id} style={layout.wide ? { width: cardWidth } : undefined}><ManagerCard project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>
       </> : null}
       </View>
       <View testID="home-stats-panel" style={layout.sidebar ? { width: layout.statsWidth } : undefined}>
