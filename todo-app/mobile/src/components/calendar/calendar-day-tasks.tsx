@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { Button } from "@/components/ui/button";
 import { boardColor, type Board } from "@/lib/domain/boards";
 import { PRIORITY_META } from "@/lib/domain/constants";
@@ -16,7 +16,7 @@ export interface CalendarDayTasksProps {
   boards: Board[];
   now: Date;
   onTask: (task: Task) => void;
-  onTaskAction: (task: Task) => void;
+  onTaskAction: (task: Task, event?: GestureResponderEvent) => void;
   onAddTask: () => void;
 }
 
@@ -70,7 +70,7 @@ export function CalendarDayTasks({ day, tasks, boards, now, onTask, onTaskAction
                 boards={boards}
                 now={now}
                 onPress={() => onTask(task)}
-                onLongPress={() => onTaskAction(task)}
+                onLongPress={(event) => onTaskAction(task, event)}
               />
             </View>
           ))}
@@ -97,13 +97,15 @@ function CalendarDayTaskTile({
   now,
   onPress,
   onLongPress,
+  onActionPress,
 }: {
   task: Task;
   day: Date;
   boards: Board[];
   now: Date;
   onPress: () => void;
-  onLongPress: () => void;
+  onLongPress: (event: GestureResponderEvent) => void;
+  onActionPress?: (event: GestureResponderEvent) => void;
 }) {
   const { theme } = useTheme();
   const styles = createStyles(theme.colors);
@@ -129,7 +131,8 @@ function CalendarDayTaskTile({
       accessibilityLabel={`${status === "completed" ? "Completed task" : "Edit task"} ${task.title || "Untitled task"}`}
       accessibilityHint="Opens the task editor. Long press for task actions."
       onPress={onPress}
-      onLongPress={onLongPress}
+      onLongPress={(event) => { onLongPress(event); }}
+      onContextMenu={(event) => { event.preventDefault?.(); onLongPress(event.nativeEvent as unknown as GestureResponderEvent); }}
       delayLongPress={360}
       style={({ pressed }) => [
         styles.tile,
@@ -148,7 +151,9 @@ function CalendarDayTaskTile({
             {task.dueAt && sameDay ? format(parseISO(task.dueAt), "h:mm a") : "Any time"}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={14} color={theme.colors.mutedForeground} />
+        <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onActionPress?.(event) ?? onLongPress(event); }} style={({ pressed }) => [styles.actionPill, { opacity: pressed ? 0.7 : 1 }]}>
+          <Ionicons name="ellipsis-horizontal" size={14} color={theme.colors.mutedForeground} />
+        </Pressable>
       </View>
 
       <Text

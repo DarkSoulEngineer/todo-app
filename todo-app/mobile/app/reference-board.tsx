@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Alert } from "react-native";
 import { OptionSheet, TextEntrySheet } from "@/components/janus-board-ui";
+import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
 import { ReferenceJanusScreen, type ReferenceMobileTab } from "@/components/reference/mobile";
 import { useTasksContext } from "@/providers/tasks-provider";
 import { useToast } from "@/providers/toast-provider";
@@ -13,6 +14,7 @@ export default function ReferenceBoardRoute() {
   const toast = useToast();
   const [projectSwitcherOpen, setProjectSwitcherOpen] = useState(false);
   const [boardActionsOpen, setBoardActionsOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const [renameBoardOpen, setRenameBoardOpen] = useState(false);
   const [taskAction, setTaskAction] = useState<Task | null>(null);
 
@@ -59,7 +61,7 @@ export default function ReferenceBoardRoute() {
           if (sectionId) router.push({ pathname: "/task/new", params: { sectionId, origin: "reference-board" } });
           else router.push({ pathname: "/task/new", params: { origin: "reference-board" } });
         }}
-        onMenu={() => setBoardActionsOpen(true)}
+        onMenu={(event) => { if (event) setMenuAnchor(anchorFromEvent(event)); setBoardActionsOpen(true); }}
         onNavigate={navigate}
         activeTab="boards"
       />
@@ -72,6 +74,7 @@ export default function ReferenceBoardRoute() {
           onPress: () => api.switchProject(project.id),
         }))}
         onClose={() => setProjectSwitcherOpen(false)}
+        anchor={menuAnchor}
       />
       <OptionSheet
         visible={boardActionsOpen}
@@ -84,6 +87,7 @@ export default function ReferenceBoardRoute() {
           { label: "Delete board", icon: "trash-outline", destructive: true, onPress: deleteBoard },
         ]}
         onClose={() => setBoardActionsOpen(false)}
+        anchor={menuAnchor}
       />
       <OptionSheet visible={taskAction !== null} title={taskAction?.title ?? "Task actions"} options={taskOptions} onClose={() => setTaskAction(null)} />
       <TextEntrySheet visible={renameBoardOpen} title="Rename board" initialValue={api.currentProjectName} placeholder="Board name" onClose={() => setRenameBoardOpen(false)} onSubmit={(name) => { api.renameProject(api.currentProjectId, name); setRenameBoardOpen(false); }} />

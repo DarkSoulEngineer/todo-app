@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format, isValid, parseISO } from "date-fns";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ViewStyle } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type GestureResponderEvent, type ViewStyle } from "react-native";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
@@ -40,7 +40,7 @@ interface Props {
   onPin: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
   onReorder?: (id: string, targetId: string) => void;
-  onMenu: (project: JanusProject) => void;
+  onMenu: (project: JanusProject, event?: GestureResponderEvent) => void;
   onSave: (project: JanusProject) => void;
   onDuplicate: (project: JanusProject) => void;
   onRemove: (project: JanusProject) => void;
@@ -99,7 +99,7 @@ export function BoardManagerContent(props: Props) {
       />
       {props.editing ? <Text style={[styles.editHint, { color: c.primary }]}>{canDrag ? "Drag from anywhere on a card to another grid position, or use the arrows. Pinned boards stay first outside Rearrange." : "Use the arrows to arrange your boards."}</Text> : null}
       {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View testID="home-board-grid" style={[styles.boards, layout.wide && styles.boardGrid, layout.wide && Platform.OS === "web" && webBoardGrid]}>{[...props.projects.map((project, index) => {
-        const card = <ManagerCard project={project} accent={c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} hideMoveArrows={Boolean(gridDrag.drag)} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />;
+        const card = <ManagerCard project={project} accent={c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} hideMoveArrows={Boolean(gridDrag.drag)} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={(event) => props.onMenu(project, event)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />;
         return layout.wide ? <BoardDragCell key={project.id} id={project.id} name={project.name} width={cardWidth} enabled={canDrag}
           active={gridDrag.drag?.id === project.id} target={gridDrag.drag?.target === project.id}
           onRegister={gridDrag.register} onStart={gridDrag.start} onMove={gridDrag.move} onDrop={gridDrag.drop} onCancel={gridDrag.cancel}>{card}</BoardDragCell>
@@ -111,7 +111,7 @@ export function BoardManagerContent(props: Props) {
       {props.closedProjects.length ? <>
         <SectionHeading title="Closed boards" subtitle={`${props.closedProjects.length} closed`} style={styles.sectionHeading} />
         <Text style={[styles.editHint, { color: c.mutedForeground }]}>Closed boards stay safe with their tasks. Reopen one to keep working on it.</Text>
-        <View testID="home-closed-board-grid" style={[styles.boards, layout.wide && styles.boardGrid, layout.wide && Platform.OS === "web" && webBoardGrid]}>{props.closedProjects.map((project) => <View key={project.id} style={layout.wide ? { width: cardWidth, maxWidth: "100%" } : undefined}><ManagerCard project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={() => props.onMenu(project)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>
+        <View testID="home-closed-board-grid" style={[styles.boards, layout.wide && styles.boardGrid, layout.wide && Platform.OS === "web" && webBoardGrid]}>{props.closedProjects.map((project) => <View key={project.id} style={layout.wide ? { width: cardWidth, maxWidth: "100%" } : undefined}><ManagerCard project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={(event) => props.onMenu(project, event)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>
       </> : null}
       </View>
       <View testID="home-stats-panel" style={layout.sidebar ? { width: layout.statsWidth } : undefined}>
@@ -122,7 +122,7 @@ export function BoardManagerContent(props: Props) {
   </>;
 }
 
-function ManagerCard({ project, accent, metrics, pinned, editing, hideMoveArrows = false, ready, first, last, closed = false, onOpen, onReopen, onPin, onMove, onMenu, onSave, onDuplicate, onRemove }: { project: JanusProject; accent: string; metrics: TaskMetrics; pinned: boolean; editing: boolean; hideMoveArrows?: boolean; ready: boolean; first: boolean; last: boolean; closed?: boolean; onOpen: () => void; onReopen: () => void; onPin: () => void; onMove: (direction: -1 | 1) => void; onMenu: () => void; onSave: () => void; onDuplicate: () => void; onRemove: () => void }) {
+function ManagerCard({ project, accent, metrics, pinned, editing, hideMoveArrows = false, ready, first, last, closed = false, onOpen, onReopen, onPin, onMove, onMenu, onSave, onDuplicate, onRemove }: { project: JanusProject; accent: string; metrics: TaskMetrics; pinned: boolean; editing: boolean; hideMoveArrows?: boolean; ready: boolean; first: boolean; last: boolean; closed?: boolean; onOpen: () => void; onReopen: () => void; onPin: () => void; onMove: (direction: -1 | 1) => void; onMenu: (event?: GestureResponderEvent) => void; onSave: () => void; onDuplicate: () => void; onRemove: () => void }) {
   const { theme } = useTheme();
   const c = theme.colors;
   const date = parseISO(project.createdAt);

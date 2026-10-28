@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BoardSection, ViewMode } from "@/lib/domain/types";
 import { getRibbonContext, isRibbonTabAvailable, resolveRibbonTab, type RibbonTab } from "@/lib/features/ribbon-context";
@@ -26,7 +26,7 @@ interface Props {
   query: string;
   onQuery: (query: string) => void;
   onBoards: () => void;
-  onSwitchBoard: () => void;
+  onSwitchBoard: (event?: GestureResponderEvent) => void;
   onNewTask: () => void;
   onAddSection: () => void;
   zoom: number;

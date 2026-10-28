@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { mobileBottomNavClearance } from "@/theme/layout";
+import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
 import { getTaskSectionId } from "@/lib/domain/sections";
 import type { Board } from "@/lib/domain/boards";
 import type { BoardSection, Task } from "@/lib/domain/types";
@@ -30,10 +31,10 @@ export interface MobileTaskColumnsProps {
   zoom: number;
   onToggleSelect: (id: string) => void;
   onTask: (task: Task) => void;
-  onLongPress: (task: Task) => void;
+  onLongPress: (task: Task, event?: GestureResponderEvent) => void;
   onMove: (task: Task, sectionId: string | null) => void;
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
-  onSectionMenu: (section: BoardSection) => void;
+  onSectionMenu: (section: BoardSection, anchor?: MenuAnchor) => void;
   onAddSection: () => void;
   onAddTask: (sectionId?: string | null) => void;
   onTaskDrop: (taskId: string, sectionId: string, beforeTaskId: string | null) => void;
@@ -116,7 +117,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const cards = (section: { id: string; title: string }, index: number) => <>
     {(grouped.get(section.id) ?? []).map((task) => <JanusDragCell key={task.id} id={taskDragId(task.id)} name={task.title} width="100%" enabled={enabled} active={drag.drag?.id === taskDragId(task.id)} target={false} floating previewLayer={previewLayer} onRegister={drag.register} onStart={dragStart} onMove={dragMove} onDrop={drag.drop} onCancel={drag.cancel}>
       {drag.drag?.target?.kind === "task" && drag.drag.target.beforeTaskId === task.id ? <View testID={`janus-insert-before-${task.id}`} pointerEvents="none" style={[styles.insertLine, { backgroundColor: c.primary }]} /> : null}
-      <MobileColumnTaskCard task={task} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} hideMoveArrows={Boolean(drag.drag)} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onLongPress(task)} onSelect={() => props.onToggleSelect(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />
+      <MobileColumnTaskCard task={task} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} hideMoveArrows={Boolean(drag.drag)} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={(event)=>props.selectionMode?props.onToggleSelect(task.id):props.onLongPress(task,event)} onSelect={() => props.onToggleSelect(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />
     </JanusDragCell>)}
     {!(grouped.get(section.id)?.length) ? <Text style={[styles.empty, { color: c.mutedForeground, borderColor: c.border }]}>No cards here yet</Text> : null}
   </>;
@@ -129,7 +130,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
       {enabled ? <Ionicons name="reorder-three-outline" size={18} color={c.mutedForeground} style={{ marginRight: 5 }} /> : null}
       <Text numberOfLines={1} style={[styles.columnTitle, { color: c.foreground, fontSize: 14 * zoom }]}>{section.title}</Text>
       <Pressable testID={`janus-add-card-header-${section.id}`} accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id)} style={styles.addTop}><Ionicons name="add" size={16} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 12 }}>Add card</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${section.title}`} onPress={() => props.onSectionMenu(section as BoardSection)} style={styles.icon}><Ionicons name="ellipsis-horizontal" size={16} color={c.mutedForeground} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${section.title}`} onPress={(event) => props.onSectionMenu(section as BoardSection, anchorFromEvent(event))} style={styles.icon}><Ionicons name="ellipsis-horizontal" size={16} color={c.mutedForeground} /></Pressable>
     </View>
     <View style={{ height: 2, backgroundColor: c.borderStrong, borderRadius: 1 }} />
   </View></View>;
@@ -178,3 +179,5 @@ const styles = StyleSheet.create({
   addSection: { alignSelf: "flex-start", borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { margin: 10 },
 });
+
+

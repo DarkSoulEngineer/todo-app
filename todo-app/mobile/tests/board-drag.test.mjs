@@ -238,6 +238,7 @@ test("Home saves a successful drop through the existing persisted manager layout
     "expo-router": {}, "expo-blur": dummy,
     "@/components/board/board-manager-content": { BoardManagerContent: "BoardManagerContent" },
     "@/components/janus-board-ui": dummy,
+    "@/components/ui/anchored-menu": { anchorFromEvent: (event) => ({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) },
     "@/components/ui/button": dummy, "@/components/ui/input": dummy, "@/components/ui/sheet": dummy, "@/components/ui/atmosphere": dummy,
     "@/components/reference/mobile/reference-mobile-bottom-nav": dummy, "@/components/setup/welcome-screen": dummy,
     "@/providers/tasks-provider": { useTasksContext: () => ({ projects, tasks: [], sections: [], boards: [], isLoading: false, currentProjectId: "a" }) },

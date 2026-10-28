@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useRef, useState, type ComponentRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BoardSection, Task } from "@/lib/domain/types";
 import { describeDue, deriveStatus } from "@/lib/domain/status";
@@ -27,7 +27,7 @@ export interface ReferenceJanusScreenProps {
   onFilterChange?: (filter: ReferenceJanusFilter) => void;
   onSearch?: () => void;
   onSort?: () => void;
-  onMenu?: () => void;
+  onMenu?: (event?: GestureResponderEvent) => void;
   onTaskMenu?: (task: Task) => void;
   selectedTaskId?: string;
   onTaskPress?: (task: Task) => void;

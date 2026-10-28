@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
 import { useTheme } from "@/providers/theme-provider";
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from "react-native";
 import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
 
 export interface BulkSelectionToolbarProps {
@@ -19,8 +19,8 @@ export interface BulkSelectionToolbarProps {
   onRestore?: () => void;
   onMore?: () => void;
   onDelete?: () => void;
-  onMove?: () => void;
-  onPriority?: () => void;
+  onMove?: (event: GestureResponderEvent) => void;
+  onPriority?: (event: GestureResponderEvent) => void;
   onClose?: () => void;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -117,7 +117,7 @@ function ToolButton({
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   accessibilityLabel: string;
-  onPress: () => void;
+  onPress: (event: GestureResponderEvent) => void;
   tone?: ActionTone;
   disabled?: boolean;
   selected?: boolean;

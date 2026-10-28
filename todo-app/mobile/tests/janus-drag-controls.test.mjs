@@ -25,6 +25,7 @@ const { MobileTaskColumns } = await load("../src/components/board/mobile-task-co
   react, "react-native": native, "@expo/vector-icons": { Ionicons: "Icon" },
   "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 20 }) },
   "@/theme/layout": { mobileBottomNavClearance: 112 },
+  "@/components/ui/anchored-menu": { anchorFromEvent: (event) => ({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) },
   "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId },
   "./mobile-board-colors": { useMobileBoardColors: () => ({}) },
   "./mobile-column-task-card": { MobileColumnTaskCard: "Card" },

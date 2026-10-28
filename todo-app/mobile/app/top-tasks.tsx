@@ -11,6 +11,7 @@ import { useReferenceTheme } from "@/components/reference/reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
 import { useAllBoardTasks, type BoardTaskEntry } from "@/hooks/use-all-board-tasks";
 import { useNow } from "@/hooks/use-now";
 import { getTaskSectionId } from "@/lib/domain/sections";
@@ -31,6 +32,7 @@ export default function TopTasksRoute() {
   const [limit, setLimit] = useState<TopTasksLimit>(3);
   const [editing, setEditing] = useState<TaskTarget | null>(null);
   const [menu, setMenu] = useState<TaskTarget | null>(null);
+  const [smallMenuAnchor, setSmallMenuAnchor] = useState<MenuAnchor | null>(null);
   const ranked = useMemo(() => rankTopTasks(entries), [entries]);
   const visible = ranked.slice(0, limit);
   const editorEntry = editing ? entries.find((entry) => entry.projectId === editing.projectId && entry.task.id === editing.taskId) : undefined;
@@ -78,17 +80,17 @@ export default function TopTasksRoute() {
       <SectionHeading title="What to focus on" subtitle="High priority first, then earliest deadlines. Completed and canceled tasks stay out of this list." right={<Pill label={`${visible.length} of ${ranked.length}`} tone="primary" />} />
       {api.isLoading ? <ActivityIndicator accessibilityLabel="Loading top tasks" color={colors.primary} /> : visible.length ? visible.map((entry, index) => <View key={`${entry.projectId}:${entry.task.id}`}>
         <View style={styles.taskHeading}><Text style={[styles.rank, { color: colors.primary }]}>#{index + 1}</Text><Text numberOfLines={1} style={[type.caption, { flex: 1, color: colors.muted }]}>{entry.projectName}</Text></View>
-        <TaskCard task={entry.task} boards={entry.boards} now={now} onPress={() => openTask(entry)} onLongPress={() => setMenu({ projectId: entry.projectId, taskId: entry.task.id })} />
+        <TaskCard task={entry.task} boards={entry.boards} now={now} onPress={() => openTask(entry)} onLongPress={(event) => { if (event) setSmallMenuAnchor(anchorFromEvent(event)); setMenu({ projectId: entry.projectId, taskId: entry.task.id }); }} onActionPress={(event) => { setSmallMenuAnchor(anchorFromEvent(event)); setMenu({ projectId: entry.projectId, taskId: entry.task.id }); }} />
       </View>) : <EmptyState icon="checkmark-done-outline" title="Nothing needs your attention" message="There are no unfinished tasks across your open boards. Add a task from Home to get started." actionLabel="Go to Home" onAction={() => router.replace("/")} />}
     </ScrollView>
     </BlurTargetView>
     <ReferenceMobileBottomNav active="top-tasks" onNavigate={navigate} blurTarget={blurTarget} />
-    <OptionSheet visible={Boolean(menuEntry)} title={menuEntry?.task.title ?? "Task actions"} onClose={() => setMenu(null)} options={menuEntry ? [
+    <OptionSheet visible={Boolean(menuEntry)} title={menuEntry?.task.title ?? "Task actions"} onClose={() => { setMenu(null); setSmallMenuAnchor(null); }} options={menuEntry ? [
       { label: "Edit task", icon: "create-outline", onPress: () => openTask(menuEntry) },
       { label: "Complete task", icon: "checkmark-circle-outline", onPress: () => completeTask(menuEntry) },
       { label: "Open board", icon: "albums-outline", onPress: () => { activateOwner(menuEntry); router.push(`/board/${menuEntry.projectId}`); } },
       { label: "Cancel task", icon: "close-circle-outline", onPress: () => { activateOwner(menuEntry); api.toggleCancel(menuEntry.task.id); } },
-    ] : []} />
+    ] : []} anchor={smallMenuAnchor} />
     <TaskEditor visible={Boolean(editorEntry)} task={editorEntry?.task ?? null} boards={editorEntry?.boards ?? []} sections={editorSections} onClose={() => setEditing(null)} onSave={(draft, sectionId) => { updateTask(draft, sectionId); setEditing(null); toast.success("Task updated"); }} onAutoSave={editorEntry ? updateTask : undefined}
       onDelete={editorEntry ? () => { activateOwner(editorEntry); api.deleteTask(editorEntry.task.id); setEditing(null); toast.success("Task deleted"); } : undefined}
       onCancelTask={editorEntry ? () => { activateOwner(editorEntry); api.toggleCancel(editorEntry.task.id); setEditing(null); } : undefined}

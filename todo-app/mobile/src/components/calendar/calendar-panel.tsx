@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { addDays, addMonths, addWeeks, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns";
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
 import { deriveStatus } from "@/lib/domain/status";
 import type { Task } from "@/lib/domain/types";
@@ -22,7 +22,7 @@ interface CalendarPanelProps {
   onAnchorChange: (date: Date) => void;
   onSelectDay: (day: Date) => void;
   onTaskPress: (task: Task) => void;
-  onTaskLongPress?: (task: Task) => void;
+  onTaskLongPress?: (task: Task, event?: GestureResponderEvent) => void;
   onToday: () => void;
 }
 
@@ -103,7 +103,7 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
               </View>
               {dayTasks.slice(0, mode === "week" ? 5 : 2).map((task) => {
                 const color = taskColor(task, colors, now);
-                return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={daySelectionOnly ? `View tasks for ${format(day, "EEEE, MMMM d")}` : `Open ${task.title}`} onPress={(event) => { event.stopPropagation(); if (daySelectionOnly) onSelectDay(day); else onTaskPress(task); }} onLongPress={!daySelectionOnly && onTaskLongPress ? (event) => { event.stopPropagation(); onTaskLongPress(task); } : undefined} style={({ pressed }) => [styles.taskChip, { backgroundColor: `${color}1A`, opacity: pressed ? 0.6 : 1 }]}>
+                return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={daySelectionOnly ? `View tasks for ${format(day, "EEEE, MMMM d")}` : `Open ${task.title}`} onPress={(event) => { event.stopPropagation(); if (daySelectionOnly) onSelectDay(day); else onTaskPress(task); }} onLongPress={!daySelectionOnly && onTaskLongPress ? (event) => { event.stopPropagation(); onTaskLongPress(task, event); } : undefined} onContextMenu={!daySelectionOnly && onTaskLongPress ? (event) => { event.preventDefault?.(); event.stopPropagation(); onTaskLongPress(task, event.nativeEvent as unknown as GestureResponderEvent); } : undefined} style={({ pressed }) => [styles.taskChip, { backgroundColor: `${color}1A`, opacity: pressed ? 0.6 : 1 }]}>
                   <View style={[styles.taskDot, { backgroundColor: color }]} />
                   <Text style={[styles.taskText, task.completed && styles.taskTextDone]} numberOfLines={1}>{task.title || "Untitled task"}</Text>
                 </Pressable>;

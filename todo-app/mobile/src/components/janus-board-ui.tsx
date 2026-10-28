@@ -12,11 +12,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type GestureResponderEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
 import { mobileBottomNavClearance } from "@/theme/layout";
 import { useOpenSession } from "@/hooks/use-open-session";
+import { AnchoredMenu, useAnchoredMenus, type MenuAnchor, type MenuOption } from "@/components/ui/anchored-menu";
 import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -57,7 +59,7 @@ export function IconButton({
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  onPress: () => void;
+  onPress: (event: GestureResponderEvent) => void;
   tone?: "default" | "primary" | "danger";
   size?: number;
 }) {
@@ -67,7 +69,7 @@ export function IconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={(event) => { event.stopPropagation(); onPress(); }}
+      onPress={(event) => { event.stopPropagation(); onPress(event); }}
       style={({ pressed }) => [styles.iconButton, { width: size, height: size, opacity: pressed ? 0.65 : 1 }]}
     >
       <Ionicons name={icon} size={20} color={color} />
@@ -107,13 +109,15 @@ export function TaskCard({
   onPress,
   onLongPress,
   compact = false,
+  onActionPress,
 }: {
   task: Task;
   boards: Board[];
   now: Date;
   onPress: () => void;
-  onLongPress?: () => void;
+  onLongPress?: (event?: GestureResponderEvent) => void;
   compact?: boolean;
+  onActionPress?: (event: GestureResponderEvent) => void;
 }) {
   const { theme } = useTheme();
   const due = describeDue(task.dueAt, now);
@@ -127,12 +131,12 @@ export function TaskCard({
   const statusBackground = status === "completed" ? theme.colors.successSoft : status === "canceled" ? theme.colors.secondary : status === "overdue" ? theme.colors.destructiveSoft : theme.colors.primarySoft;
   const taskAction = onLongPress ?? onPress;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} delayLongPress={360} style={styles.taskPressable}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} onContextMenu={(event) => { event.preventDefault?.(); onLongPress?.(event.nativeEvent); }} delayLongPress={360} style={styles.taskPressable}>
       <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
-           <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} accessibilityHint="Opens task actions" onPress={(event) => { event.stopPropagation(); taskAction(); }} style={({ pressed }) => [styles.taskAction, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary, opacity: pressed ? 0.65 : 1 }]}>
+           <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} accessibilityHint="Opens task actions" onPress={(event) => { event.stopPropagation(); (onActionPress ?? taskAction)(event); }} style={({ pressed }) => [styles.taskAction, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary, opacity: pressed ? 0.65 : 1 }]}>
              <Ionicons name="ellipsis-horizontal" size={19} color={theme.colors.mutedForeground} />
            </Pressable>
         </View>
@@ -414,9 +418,11 @@ function TaskEditorForm({
   return <BottomSheetModal visible={visible} onClose={closeEditor} style={styles.taskEditorSheet}>{content}</BottomSheetModal>;
 }
 
-export function OptionSheet({ visible, title, options, onClose }: { visible: boolean; title: string; options: { label: string; icon?: keyof typeof Ionicons.glyphMap; destructive?: boolean; onPress: () => void }[]; onClose: () => void }) {
+export function OptionSheet({ visible, title, options, onClose, anchor }: { visible: boolean; title: string; options: MenuOption[]; onClose: () => void; anchor?: MenuAnchor | null }) {
   const { theme } = useTheme();
-  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{options.map((option) => <Pressable key={option.label} accessibilityRole="button" onPress={() => { option.onPress(); onClose(); }} style={({ pressed }) => [styles.option, { borderBottomColor: theme.colors.border, opacity: pressed ? 0.65 : 1 }]}><Ionicons name={option.icon ?? "chevron-forward-outline"} size={20} color={option.destructive ? theme.colors.destructive : theme.colors.primary} /><Text style={{ color: option.destructive ? theme.colors.destructive : theme.colors.foreground, fontSize: 15, fontWeight: "600" }}>{option.label}</Text></Pressable>)}</Sheet>;
+  const anchoredMenus = useAnchoredMenus();
+  if (anchoredMenus && anchor) return <AnchoredMenu visible={visible} title={title} options={options} onClose={onClose} anchor={anchor} />;
+  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{options.map((option) => <Pressable key={option.label} accessibilityRole="button" onPress={() => { option.onPress(); onClose(); }} style={({ pressed, hovered }) => [styles.option, { borderBottomColor: theme.colors.border, backgroundColor: (pressed || hovered) ? theme.colors.secondary : "transparent", opacity: pressed ? 0.85 : 1 }]}><Ionicons name={option.icon ?? "chevron-forward-outline"} size={20} color={option.destructive ? theme.colors.destructive : theme.colors.primary} /><Text style={{ color: option.destructive ? theme.colors.destructive : theme.colors.foreground, fontSize: 15, fontWeight: "600" }}>{option.label}</Text></Pressable>)}</Sheet>;
 }
 
 export function TextEntrySheet({ visible, title, description, placeholder, initialValue = "", actionLabel = "Save", onClose, onSubmit }: { visible: boolean; title: string; description?: string; placeholder?: string; initialValue?: string; actionLabel?: string; onClose: () => void; onSubmit: (value: string) => void }) {

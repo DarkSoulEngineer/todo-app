@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { BoardManagerContent } from "@/components/board/board-manager-content";
 import { OptionSheet, TextEntrySheet } from "@/components/janus-board-ui";
+import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
@@ -36,6 +37,7 @@ export default function BoardManagerScreen() {
   const [layout, setLayout] = useState<BoardLayout>(EMPTY_BOARD_LAYOUT);
   const [managerStateLoaded, setManagerStateLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const managerReady = !isLoading && managerStateLoaded;
 
   useEffect(() => {
@@ -178,7 +180,7 @@ export default function BoardManagerScreen() {
   return <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
     <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
-    <BoardManagerContent projects={displayProjects} statsProjects={openProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onReorder={reorderBoard} onMenu={setMenuProject} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
+    <BoardManagerContent projects={displayProjects} statsProjects={openProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onReorder={reorderBoard} onMenu={(project, event) => { if (event) setMenuAnchor(anchorFromEvent(event)); setMenuProject(project); }} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
     </BlurTargetView>
     <ReferenceMobileBottomNav active="boards" onNavigate={navigate} blurTarget={blurTarget} />
     <Sheet visible={showCreate} onClose={() => setShowCreate(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>New board</Text><Text style={{ color: theme.colors.mutedForeground, marginTop: 6 }}>Add lists and categories after creating the board.</Text><Input autoFocus value={newName} onChangeText={setNewName} placeholder="Board name" onSubmitEditing={create} style={{ marginTop: 12 }} /><Button variant="outline" label="Create board" onPress={create} disabled={!newName.trim()} style={{ marginTop: 14 }} /></Sheet>
@@ -193,7 +195,7 @@ export default function BoardManagerScreen() {
       ...(menuProject.closedAt ? [] : [{ label: "Duplicate", icon: "copy-outline" as const, onPress: () => duplicate(menuProject) }]),
       { label: "Export JSON", icon: "share-outline", onPress: () => saveProject(menuProject) },
       { label: "Delete board", icon: "trash-outline", destructive: true, onPress: () => askDelete(menuProject) },
-    ] : []} onClose={() => setMenuProject(null)} />
+    ] : []} onClose={() => setMenuProject(null)} anchor={menuAnchor} />
     <OptionSheet visible={closedPromptProject !== null} title={closedPromptProject ? `“${closedPromptProject.name}” is closed` : "Board closed"} options={closedPromptProject ? [
       { label: "Reopen board", icon: "refresh-outline" as const, onPress: () => reopenBoard(closedPromptProject) },
       { label: "Keep it closed", icon: "close-outline" as const, onPress: () => undefined },
