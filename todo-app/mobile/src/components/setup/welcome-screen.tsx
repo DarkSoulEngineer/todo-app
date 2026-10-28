@@ -50,7 +50,7 @@ export function WelcomeScreen() {
       <View style={[styles.content, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
         <View style={styles.header}>
           <View style={[styles.logoWrap, { backgroundColor: "transparent" }]}>
-            <JanusLogo size={72} />
+            <JanusLogo size={120} />
           </View>
           <Text style={[styles.title, { color: c.foreground }]}>Welcome</Text>
           <Text style={[styles.subtitle, { color: c.mutedForeground }]}>
