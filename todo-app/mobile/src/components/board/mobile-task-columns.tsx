@@ -6,6 +6,7 @@ import type { Board } from "@/lib/domain/boards";
 import type { BoardSection, Task } from "@/lib/domain/types";
 import { useMobileBoardColors } from "./mobile-board-colors";
 import { MobileColumnTaskCard } from "./mobile-column-task-card";
+import { BoardColumnCarousel } from "./board-column-carousel";
 
 export interface MobileTaskColumnsProps {
   tasks: Task[];
@@ -105,14 +106,14 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
     {props.focused && active ? <>
       <ScrollView ref={tabs} horizontal onContentSizeChange={scrollToNewColumn} showsHorizontalScrollIndicator={false} style={styles.tabsRail} contentContainerStyle={styles.tabs}>{columns.map((section, index) => <Pressable key={section.id} accessibilityRole="tab" accessibilityLabel={`${section.title}, ${grouped.get(section.id)?.length ?? 0} cards`} aria-selected={index === activeIndex} onPress={() => selectColumn(index)} style={[styles.tab, { backgroundColor: c.backgroundAlt, borderColor: index === activeIndex ? c.primary : c.border }]}><Text style={{ color: index === activeIndex ? c.primary : c.mutedForeground, fontSize: 12, fontWeight: index === activeIndex ? "600" : "400" }}>{section.title}</Text></Pressable>)}</ScrollView>
       <View style={[styles.focusColumn, { backgroundColor: c.backgroundAlt, borderColor: c.border }]}>{heading(active)}<ScrollView testID="kanban-focused-scroll" style={styles.cardScroll} contentContainerStyle={styles.cards} keyboardShouldPersistTaps="handled">{cards(active, activeIndex)}</ScrollView>{addCard(active)}</View>
-    </> : <ScrollView ref={carousel} testID="kanban-carousel" horizontal onContentSizeChange={scrollToNewColumn} nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={32} onScroll={(event) => {
+    </> : <BoardColumnCarousel carouselRef={carousel} columns={columns} interval={interval} onContentSizeChange={scrollToNewColumn} onScroll={(event) => {
       if (focusRef.current) return;
       const index = Math.min(columns.length - 1, Math.max(0, Math.round(event.nativeEvent.contentOffset.x / interval)));
       if (columns[index]) setSelectedId(columns[index].id);
     }} style={styles.carousel} contentContainerStyle={styles.columns}>
       {columns.map((section, index) => <View key={section.id} testID={`kanban-column-${section.id}`} style={[styles.column, { width: columnWidth, backgroundColor: c.backgroundAlt, borderColor: c.border }]}>{heading(section)}<ScrollView testID={`kanban-column-scroll-${section.id}`} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.cardScroll} contentContainerStyle={styles.cards}>{cards(section, index)}</ScrollView>{addCard(section)}</View>)}
       <Pressable accessibilityRole="button" accessibilityLabel="Add list" onPress={props.onAddSection} style={[styles.addSection, { width: columnWidth, borderColor: c.border }]}><Ionicons name="add" size={20} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground }}>Add list</Text></Pressable>
-    </ScrollView>}
+    </BoardColumnCarousel>}
   </View>;
 }
 

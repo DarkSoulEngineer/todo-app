@@ -47,16 +47,16 @@ function find(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...find(node.props?.children, predicate)];
 }
 const editor = (tree) => find(tree, (node) => node.type === "TaskEditor")[0];
-test("board switch indicators exclude closed boards and close the editor before navigating", () => {
+test("board switch menu excludes closed boards and closes the editor before navigating", () => {
   const updates = [];
   const destinations = [];
   const tree = render(1200, "board", task, true, [task], updates, {
     projects: [{ id: "board", name: "Current" }, { id: "other", name: "Other" }, { id: "closed", name: "Closed", closedAt: "2026-10-28" }],
     onNavigate: (destination) => destinations.push(destination),
   });
-  const indicator = find(tree, (node) => node.type === "BoardSwitchIndicator")[0];
-  assert.deepEqual(Array.from(indicator.props.boards, (board) => board.id), ["board", "other"]);
-  indicator.props.onSwitch("other");
+  const menu = find(tree, (node) => node.type === "OptionSheet" && node.props.title === "Switch board")[0];
+  assert.deepEqual(Array.from(menu.props.options, (option) => option.label), ["Current", "Other"]);
+  menu.props.options[1].onPress();
   assert.deepEqual(destinations, ["/board/other"]);
   assert.ok(updates.some(([slot, value]) => slot === 12 && value === false));
   assert.ok(updates.some(([slot, value]) => slot === 11 && value === null));
