@@ -132,7 +132,8 @@ export function TaskCard({
   const statusBackground = status === "completed" ? theme.colors.successSoft : status === "canceled" ? theme.colors.secondary : status === "overdue" ? theme.colors.destructiveSoft : theme.colors.primarySoft;
   const taskAction = onLongPress ?? onPress;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} onContextMenu={(event) => { event.preventDefault?.(); onLongPress?.(event.nativeEvent); }} delayLongPress={360} style={styles.taskPressable}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} // @ts-ignore
+    onContextMenu={(event) => { event.preventDefault?.(); onLongPress?.(event.nativeEvent); }} delayLongPress={360} style={styles.taskPressable}>
       <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
