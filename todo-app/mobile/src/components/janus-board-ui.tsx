@@ -404,7 +404,7 @@ function TaskEditorForm({
             </ScrollView>
             {presentation === "sheet" ? footer : null}
     </>;
-  if (presentation === "panel") return visible ? <View style={{ flex: 1, minHeight: 0, paddingTop: 12, backgroundColor: theme.colors.card }}>{content}</View> : null;
+  if (presentation === "panel") return visible ? <View style={{ flex: 1, minHeight: 0, paddingTop: 12, backgroundColor: "transparent" }}>{content}</View> : null;
   return <BottomSheetModal visible={visible} onClose={closeEditor} style={styles.taskEditorSheet}>{content}</BottomSheetModal>;
 }
 

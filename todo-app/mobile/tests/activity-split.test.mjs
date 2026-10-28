@@ -24,7 +24,7 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
     "react-native": { View: "View", Text: "Text", ScrollView: "ScrollView", Pressable: "Pressable", StyleSheet: { create: (v) => v, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width }) },
     "expo-router": { useLocalSearchParams: () => ({ id: boardId }), router: { replace: (destination) => options.onNavigate?.(destination) } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
-    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: options.colors ?? colors } }) },
     "@/providers/tasks-provider": { useTasksContext: () => api },
     "@/providers/toast-provider": { useToast: () => ({}) },
     "@/hooks/use-now": { useNow: () => new Date("2026-10-28") },
@@ -216,6 +216,24 @@ test("Activity and Calendar allocate equal space to the feed and editor througho
   assert.equal(editor(mobile).props.presentation, "sheet");
 });
 
+test("split editors use an 85% opaque alternate surface without fading controls or recoloring mobile sheets", () => {
+  const palettes = [
+    { card: "#211C17", backgroundAlt: "#191510", cardElevated: "#29231D" },
+    { card: "#FFFFFF", backgroundAlt: "#EAE6E0", cardElevated: "#FFFFFF" },
+    { card: "#161B22", backgroundAlt: "#161B22", cardElevated: "#21262D" },
+  ];
+  for (const colors of palettes) for (const mode of ["list", "calendar"]) {
+    const tree = render(1200, mode, task, true, [task], [], { colors });
+    const pane = find(tree, (node) => node.props?.testID === "workspace-editor-pane")[0];
+    const surface = colors.backgroundAlt === colors.card ? colors.cardElevated : colors.backgroundAlt;
+    assert.equal(pane.props.style.backgroundColor, `${surface}D9`);
+    assert.notEqual(surface, colors.card);
+    assert.equal(pane.props.style.opacity, undefined, "only the background is translucent");
+    const mobile = render(390, mode, task, true, [task], [], { colors });
+    assert.equal(find(mobile, (node) => node.props?.testID === "workspace-editor-pane")[0].props.style, undefined);
+  }
+});
+
 test("switching cards flushes a debounced draft to the previous task, not the next task", async () => {
   const editorSource = await readFile(new URL("../src/components/janus-board-ui.tsx", import.meta.url), "utf8");
   const compiled = ts.transpileModule(editorSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -228,11 +246,12 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
     useCallback: (fn) => fn,
     useEffect(fn, deps) { const index = cursor++; const previous = slots[index]; if (!previous || deps.some((dep, i) => dep !== previous.deps[i])) effects.push(() => { previous?.cleanup?.(); slots[index] = { deps, cleanup: fn() }; }); },
   };
+  const editorColors = new Proxy({ card: "#211C17", backgroundAlt: "#191510", cardElevated: "#29231D" }, { get: (target, key) => target[key] ?? "#888888" });
   const mocks = {
     react,
     "react-native": { View: "View", Text: "Text", TextInput: "TextInput", ScrollView: "ScrollView", Pressable: "Pressable", StyleSheet: { create: (v) => v } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
-    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: editorColors } }) },
     "@/hooks/use-open-session": { useOpenSession: () => 0 },
     "@/theme/layout": { mobileBottomNavClearance: 112 },
     "@/lib/domain/sections": { getTaskSectionId: () => undefined },
@@ -251,6 +270,7 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
     return tree;
   }
   let tree = renderForm(props);
+  assert.equal(tree.props.style.backgroundColor, "transparent");
   assert.equal(find(tree, (node) => node.props?.label === "Close task editor").length, 0);
   const panelScroll = find(tree, (node) => node.type === "ScrollView" && node.props.contentContainerStyle?.[1]?.paddingBottom === 112)[0];
   assert.ok(panelScroll, "panel keeps navigation clearance inside its own scrolling area, not a wasted outer margin");
@@ -259,6 +279,7 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
   tree = renderForm(props);
   // A layout resize preserves the form hooks and doesn't save prematurely.
   tree = renderForm({ ...props, presentation: "sheet" });
+  assert.equal(tree.props.style.backgroundColor, undefined, "mobile sheet keeps its own original surface");
   assert.equal(find(tree, (node) => node.props?.label === "Close task editor").length, 1);
   assert.equal(saves.length, 0);
   assert.equal(find(tree, (node) => node.props?.accessibilityLabel === "Task title")[0].props.value, "Edited just before switching");
