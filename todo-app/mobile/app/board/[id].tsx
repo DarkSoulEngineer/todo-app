@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CalendarPanel, type CalendarMode } from "@/components/calendar/calendar-panel";
+import { CalendarDayTasks } from "@/components/calendar/calendar-day-tasks";
 import { InsightsPanel, OptionSheet, TaskCard, TaskEditor, TextEntrySheet } from "@/components/janus-board-ui";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -554,11 +555,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boa
       onTaskLongPress={onTaskAction}
       onToday={() => setMonth(calendarMode === "week" ? startOfWeek(now, { weekStartsOn: calendarWeekStart }) : startOfMonth(now))}
     />
-    {split && selectedDay ? <View style={{ marginTop: 15 }}>
-      <SectionHeading title={format(selectedDay, "EEEE, MMM d")} subtitle={dayTasks.length ? `${dayTasks.length} ${dayTasks.length === 1 ? "task" : "tasks"} due. Select one to edit it in the panel.` : "Nothing is due this day yet."} style={{ marginBottom: 8 }} />
-      {dayTasks.map((task) => <TaskCard key={task.id} compact task={task} boards={boards} now={now} onPress={() => onTask(task)} onLongPress={() => onTaskAction(task)} />)}
-      <Button variant="soft" label={`Add for ${format(selectedDay, "MMM d")}`} onPress={() => addForDay(selectedDay)} style={{ marginTop: 4 }}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>
-    </View> : <View style={{ marginTop: 15 }}>
+    {split && selectedDay ? <CalendarDayTasks day={selectedDay} tasks={dayTasks} boards={boards} now={now} onTask={onTask} onTaskAction={onTaskAction} onAddTask={() => addForDay(selectedDay)} /> : <View style={{ marginTop: 15 }}>
       <SectionHeading title="Plan a day" subtitle={split ? "Tap anywhere on a date to see its tasks and edit the first active task." : "Tap anywhere on a date to see all its tasks. Select a task from the list to edit it."} style={{ marginBottom: 8 }} />
       <View style={{ borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, backgroundColor: theme.colors.card, padding: 13 }}>
         <Button variant="soft" label={`Add for ${selectedDay ? format(selectedDay, "MMM d") : "today"}`} onPress={() => addForDay(selectedDay ?? now)}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>

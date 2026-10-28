@@ -39,7 +39,7 @@ function render(mode, split, selectedDay = null, entries = tasks) {
     exports, require, ...dates, useTheme: () => ({ theme: { colors } }),
     usePreferences: () => ({ calendarDefaultView: mode, calendarWeekStart: 1 }),
     useMemo: react.useMemo, useState: (initial) => [initial, () => {}],
-    View: "View", Text: "Text", Button: "Button", SectionHeading: "Heading", Ionicons: "Icon", CalendarPanel: "CalendarPanel", TaskCard: "TaskCard", StyleSheet: {},
+    View: "View", Text: "Text", Button: "Button", SectionHeading: "Heading", Ionicons: "Icon", CalendarPanel: "CalendarPanel", CalendarDayTasks: "CalendarDayTasks", TaskCard: "TaskCard", StyleSheet: {},
   });
   const tree = exports.CalendarView({ month: day, selectedDay, tasks: entries, boards: [], now: day, split, setSelectedDay: (day) => selected.push(day), onTask: (task) => edited.push(task), onTaskAction: (task) => actions.push(task) });
   const props = nodes(tree).find((node) => node.type === "CalendarPanel").props;
@@ -75,10 +75,12 @@ test("web and tablet chips select the day; full day rows retain editing and long
     chip.props.onPress({ stopPropagation() {} });
     assert.equal(selected.length, 1);
     assert.equal(edited.length, 0);
-    const rows = nodes(view).filter((node) => node.type === "TaskCard");
-    assert.deepEqual(rows.map((node) => node.props.task.id), tasks.map((task) => task.id));
-    rows[2].props.onPress();
-    rows[2].props.onLongPress();
+    const rows = nodes(view).filter((node) => node.type === "CalendarDayTasks");
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].props.day, day);
+    assert.deepEqual(rows[0].props.tasks.map((task) => task.id), tasks.map((task) => task.id));
+    rows[0].props.onTask(tasks[2]);
+    rows[0].props.onTaskAction(tasks[2]);
     assert.deepEqual(edited, [tasks[2]]);
     assert.deepEqual(actions, [tasks[2]]);
   }

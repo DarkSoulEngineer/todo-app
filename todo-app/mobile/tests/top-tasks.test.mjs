@@ -169,7 +169,7 @@ test("board calendars remain available and honor saved view and week-start prefe
     vm.runInNewContext(outputText, {
       exports, require, ...require("date-fns"),
       useTheme: () => ({ theme: { colors } }), usePreferences: () => ({ calendarDefaultView, calendarWeekStart }),
-      useState: (initial) => [initial, () => {}], useMemo: (fn) => fn(), View: "View", Text: "Text", Button: "Button", SectionHeading: "SectionHeading", Ionicons: "Ionicons", CalendarPanel: "CalendarPanel", TaskCard: "TaskCard", StyleSheet: {},
+      useState: (initial) => [initial, () => {}], useMemo: (fn) => fn(), View: "View", Text: "Text", Button: "Button", SectionHeading: "SectionHeading", Ionicons: "Ionicons", CalendarPanel: "CalendarPanel", CalendarDayTasks: "CalendarDayTasks", TaskCard: "TaskCard", StyleSheet: {},
     });
     const now = new Date(2026, 9, 27);
     let anchor;
