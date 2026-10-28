@@ -22,10 +22,11 @@ interface Props {
   onSelect: () => void;
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
+  hideMoveArrows?: boolean;
   onToggleSubtask: (subtaskId: string) => void;
 }
 
-export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, onToggleSubtask }: Props) {
+export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, hideMoveArrows, onToggleSubtask }: Props) {
   const c = useMobileBoardColors();
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -39,14 +40,16 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const settled = task.completed || task.canceled;
   const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: () => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={handler} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.5 : 1 }]}><Ionicons name={name} size={15} color={c.mutedForeground} /></Pressable>;
 
-  return <View testID={`kanban-card-${task.id}`} style={[styles.card, { backgroundColor: c.card, borderColor: selected ? c.primary : `${accent}55`, borderLeftColor: accent }]}>
+  return <View testID={`janus-card-${task.id}`} style={[styles.card, { backgroundColor: c.card, borderColor: selected ? c.primary : `${accent}55`, borderLeftColor: accent }]}>
     <LinearGradient pointerEvents="none" colors={["transparent", task.priority === "high" ? "#F9731618" : task.priority === "medium" ? "#F59E0B18" : `${cardTheme?.accent ?? c.info}10`]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
     <View style={styles.topRow}>
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={onSelect} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <Pressable accessibilityRole={selectionMode ? "checkbox" : "button"} accessibilityLabel={task.title} aria-checked={selectionMode ? selected : undefined} onPress={onPress} onLongPress={onMenu} style={styles.titleArea}><Text numberOfLines={2} style={[styles.title, { fontSize: 13 * zoom, lineHeight: 18 * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{task.title}</Text></Pressable>
       <View style={styles.actions}>
-        {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}
-        {onMoveRight ? action("arrow-forward", `Move ${task.title} to next column`, onMoveRight) : null}
+        {onMoveLeft || onMoveRight ? <View pointerEvents={hideMoveArrows ? "none" : "auto"} accessibilityElementsHidden={hideMoveArrows} importantForAccessibility={hideMoveArrows ? "no-hide-descendants" : "auto"} style={{ flexDirection: "row", opacity: hideMoveArrows ? 0 : 1 }}>
+          {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}
+          {onMoveRight ? action("arrow-forward", `Move ${task.title} to next column`, onMoveRight) : null}
+        </View> : null}
         {action("ellipsis-horizontal", `Actions for ${task.title}`, onMenu)}
       </View>
     </View>

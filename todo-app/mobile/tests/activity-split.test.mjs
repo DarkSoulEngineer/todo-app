@@ -16,7 +16,7 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
   let state = 0;
   const effects = [];
   const boardId = options.boardId ?? "board";
-  const states = { 0: mode, 11: selected, 12: visible, 31: options.owner ?? boardId };
+  const states = { 0: mode, 11: selected, 12: visible, 24: options.calendarDay ?? null, 31: options.owner ?? boardId };
   const api = { tasks, sections: [], boards: [], versions: [], projects: options.projects ?? [{ id: boardId, name: "Board" }], currentProjectId: boardId };
   const fallback = new Proxy({}, { get: (_, key) => key });
   const mocks = {
@@ -61,12 +61,27 @@ test("board switch menu excludes closed boards and closes the editor before navi
   assert.ok(updates.some(([slot, value]) => slot === 12 && value === false));
   assert.ok(updates.some(([slot, value]) => slot === 11 && value === null));
 });
-test("Activity switches at the existing 900px desktop breakpoint only", () => {
+test("Activity and Calendar share the existing 900px desktop split breakpoint", () => {
   for (const width of [390, 768, 899, 900, 1200]) {
     for (const mode of ["list", "board", "calendar", "insights"]) {
-      assert.equal(editor(render(width, mode)).props.presentation, mode === "list" && width >= 900 ? "panel" : "sheet");
+      const split = (mode === "list" || mode === "calendar") && width >= 900;
+      assert.equal(editor(render(width, mode)).props.presentation, split ? "panel" : "sheet");
     }
   }
+});
+test("desktop Calendar keeps day details inline while mobile keeps the day sheet", () => {
+  const day = new Date("2026-10-28T00:00:00");
+  const splitTree = render(1200, "calendar", null, false, [task], [], { calendarDay: day });
+  const mobileTree = render(390, "calendar", null, false, [task], [], { calendarDay: day });
+  const isCalendarView = (node) => typeof node.type === "function" && node.type.name === "CalendarView";
+  const splitCalendar = find(splitTree, isCalendarView)[0];
+  const mobileCalendar = find(mobileTree, isCalendarView)[0];
+  assert.equal(splitCalendar.props.split, true);
+  assert.equal(mobileCalendar.props.split, false);
+  assert.equal(find(splitTree, (node) => node.type === "Sheet" && node.props.visible === true).length, 0);
+  assert.ok(find(mobileTree, (node) => node.type === "Sheet" && node.props.visible === true).length > 0);
+  assert.equal(editor(splitTree).props.presentation, "panel");
+  assert.equal(editor(splitTree).props.visible, true);
 });
 test("empty boards fall back to Board without an automatic Activity create editor", () => {
   for (const width of [390, 1200]) {

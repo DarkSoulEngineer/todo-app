@@ -128,7 +128,7 @@ export function BoardDragCell(props: BoardDragCellProps) {
 }
 
 const styles: Record<string, CSSProperties> = {
-  cell: { position: "relative", display: "flex", flexDirection: "column", flexShrink: 0, minWidth: 0, boxSizing: "border-box" },
+  cell: { position: "relative", display: "flex", flexDirection: "column", flexShrink: 0, minWidth: 0, maxWidth: "100%", boxSizing: "border-box" },
   content: { display: "flex", flexDirection: "column", flexGrow: 1 },
   outline: { position: "absolute", inset: 0, borderRadius: 20, boxSizing: "border-box", pointerEvents: "none" },
 };

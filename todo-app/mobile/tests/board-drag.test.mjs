@@ -205,7 +205,7 @@ test("whole-card dragging waits for movement so clicks still reach card controls
   events.onPanResponderMove(null, { dx: 356, dy: 286 });
   const moving = state.render(() => BoardDragCell({ ...props, active: true }));
   assert.equal(moving.props.children[0].props.testID, "board-drag-placeholder-a");
-  const transform = moving.props.children[1].props.style[1].transform;
+  const transform = Object.assign({}, ...moving.props.children[1].props.style.filter(Boolean)).transform;
   assert.equal(10 + 10 + transform[0].translateX, 376, "original grab point must follow cursor X");
   assert.equal(20 + 10 + transform[1].translateY, 316, "original grab point must follow cursor Y");
   events.onPanResponderTerminate();
@@ -214,8 +214,9 @@ test("whole-card dragging waits for movement so clicks still reach card controls
   events.onPanResponderGrant(null, { x0: 106, y0: 206 });
   events.onPanResponderMove(null, { dx: 50, dy: 40, moveX: 156, moveY: 246 });
   const repeated = state.render(() => BoardDragCell({ ...props, active: true }));
-  assert.equal(repeated.props.children[1].props.style[1].transform[0].translateX, 56);
-  assert.equal(repeated.props.children[1].props.style[1].transform[1].translateY, 46);
+  const repeatedTransform = Object.assign({}, ...repeated.props.children[1].props.style.filter(Boolean)).transform;
+  assert.equal(repeatedTransform[0].translateX, 56);
+  assert.equal(repeatedTransform[1].translateY, 46);
 });
 
 test("Home saves a successful drop through the existing persisted manager layout", async () => {
@@ -259,4 +260,35 @@ test("Home saves a successful drop through the existing persisted manager layout
   editing = false; content().props.onReorder("a", "c");
   editing = true; ready = false; content().props.onReorder("a", "c");
   assert.equal(saved.length, 1, "invalid, non-arrange and unhydrated drops must not write storage");
+});
+
+test("native section drags use a visual-only overlay and never claim card-body gestures", async () => {
+  const state = hooks();
+  let events;
+  const previews = [];
+  let hidden = 0;
+  const { JanusDragCell: BoardDragCell } = await load("../src/components/board/janus-drag-cell.tsx", {
+    react: state.react,
+    "react-native": { View: "View", Animated: { View: "AnimatedView", ValueXY: class {
+      setValue() {} getTranslateTransform() { return []; }
+    } }, StyleSheet: { create: (value) => value, absoluteFill: {} }, PanResponder: { create: (value) => { events = value; return { panHandlers: {} }; } } },
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
+  });
+  const props = { id: "section:a", name: "A", width: 288, enabled: true, handleHeight: 60, previewLayer: { show: (...args) => previews.push(args), hide: () => hidden++ }, renderPreview: () => "Visual-only section", children: "Live registered children", onRegister: () => () => {}, onStart() {}, onMove() {}, onDrop() {}, onCancel() {} };
+  let tree = state.render(() => BoardDragCell(props));
+  tree.props.ref.current = { measureInWindow: (receive) => receive(10, 100, 288, 600) };
+  events.onStartShouldSetPanResponderCapture({ nativeEvent: { pageX: 30, pageY: 220 } });
+  assert.equal(events.onMoveShouldSetPanResponderCapture(null, { dx: 10, dy: 0 }), false);
+  events.onStartShouldSetPanResponderCapture({ nativeEvent: { pageX: 30, pageY: 120 } });
+  assert.equal(events.onMoveShouldSetPanResponderCapture(null, { dx: 10, dy: 0 }), true);
+  events.onPanResponderGrant(null, { x0: 30, y0: 120 });
+  tree = state.render(() => BoardDragCell({ ...props, active: true }));
+  assert.equal(previews.length, 1);
+  assert.equal(previews[0][0], "Visual-only section");
+  assert.equal(previews[0][1].width, 288);
+  const style = Object.assign({}, ...tree.props.children[1].props.style.filter(Boolean));
+  assert.equal(style.transform, undefined, "only the overlay moves, so native scroll views cannot clip it");
+  assert.equal(style.opacity, 0.2);
+  events.onPanResponderTerminate();
+  assert.ok(hidden > 0);
 });

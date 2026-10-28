@@ -21,12 +21,13 @@ const layoutModule = await load("../src/lib/features/home-layout.ts");
 const { getHomeLayout } = layoutModule;
 const metrics = { total: 26, open: 13, done: 7, overdue: 7, canceled: 6, dueSoon: 5, completionPercent: 27 };
 let width = 390;
+let platform = "web";
 let activeDrag = null;
 let boardPaneMeasurement = null;
 const colors = new Proxy({}, { get: () => "#888888" });
 const { BoardManagerContent } = await load("../src/components/board/board-manager-content.tsx", {
   react: { useState: (value) => value === null ? [boardPaneMeasurement, (next) => { boardPaneMeasurement = next; }] : [value, () => {}] },
-  "react-native": { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", Platform: { select: (values) => values.default }, useWindowDimensions: () => ({ width }), StyleSheet: { create: (value) => value, hairlineWidth: 0.5 } },
+  "react-native": { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", Platform: { get OS() { return platform; }, select: (values) => values.default }, useWindowDimensions: () => ({ width }), StyleSheet: { create: (value) => value, hairlineWidth: 0.5 } },
   "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 20, left: 0, right: 0 }) },
   "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle" },
   "@expo/vector-icons": { Ionicons: "Icon" },
@@ -130,6 +131,24 @@ test("Home retains phone sizing and uses full-width grids for active and closed 
     assert.equal(shares.length, 4);
     assert.equal(shares[2].props.accessibilityValue.text, "6 tasks, 23%");
   }
+});
+
+test("web reserves exactly two tracks in normal and rearrange modes without changing native or phone layouts", () => {
+  try {
+    for (platform of ["web", "ios", "android"]) {
+      for (width of [390, 768, 1320, 2000]) {
+        for (const editing of [false, true]) {
+          const tree = render({ editing });
+          for (const id of ["home-board-grid", "home-closed-board-grid"]) {
+            const style = flatten(find(tree, id).props.style);
+            const webGrid = platform === "web" && width >= 768;
+            assert.equal(style.display, webGrid ? "grid" : undefined);
+            assert.equal(style.gridTemplateColumns, webGrid ? "repeat(2, minmax(0, 1fr))" : undefined);
+          }
+        }
+      }
+    }
+  } finally { platform = "web"; }
 });
 
 test("grid keeps ordering and board actions intact", () => {

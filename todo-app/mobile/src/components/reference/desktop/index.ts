@@ -4,7 +4,7 @@ export {
   ReferenceRibbon,
   ReferenceStatusbar,
   ReferenceTitlebar,
-  KanbanColumn,
+  JanusColumn,
 } from "./reference-desktop-workspace";
 export type {
   ReferenceDesktopWorkspaceProps,

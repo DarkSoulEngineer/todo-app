@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Alert } from "react-native";
 import { OptionSheet, TextEntrySheet } from "@/components/janus-board-ui";
-import { ReferenceKanbanScreen, type ReferenceMobileTab } from "@/components/reference/mobile";
+import { ReferenceJanusScreen, type ReferenceMobileTab } from "@/components/reference/mobile";
 import { useTasksContext } from "@/providers/tasks-provider";
 import { useToast } from "@/providers/toast-provider";
 import { getTaskSectionId } from "@/lib/domain/sections";
@@ -47,7 +47,7 @@ export default function ReferenceBoardRoute() {
 
   return (
     <>
-      <ReferenceKanbanScreen
+      <ReferenceJanusScreen
         tasks={api.tasks}
         sections={api.sections}
         title="Board"

@@ -11,9 +11,9 @@ import { Pill, ReferenceTaskInput, resolveReferenceTask, ScreenHeader } from "./
 import { useReferenceTheme, type ReferenceColors, type ReferenceType, referenceRadii, referenceSpacing } from "../reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 
-export type ReferenceKanbanFilter = "All" | "High Priority" | "Due Today";
+export type ReferenceJanusFilter = "All" | "High Priority" | "Due Today";
 
-export interface ReferenceKanbanScreenProps {
+export interface ReferenceJanusScreenProps {
   tasks: ReferenceTaskInput[];
   sections?: BoardSection[];
   title?: string;
@@ -23,8 +23,8 @@ export interface ReferenceKanbanScreenProps {
   doneCount?: number;
   activeSectionId?: string;
   onSectionChange?: (sectionId: string) => void;
-  activeFilter?: ReferenceKanbanFilter;
-  onFilterChange?: (filter: ReferenceKanbanFilter) => void;
+  activeFilter?: ReferenceJanusFilter;
+  onFilterChange?: (filter: ReferenceJanusFilter) => void;
   onSearch?: () => void;
   onSort?: () => void;
   onMenu?: () => void;
@@ -37,7 +37,7 @@ export interface ReferenceKanbanScreenProps {
   activeTab?: ReferenceMobileTab;
 }
 
-export function ReferenceKanbanScreen({
+export function ReferenceJanusScreen({
   tasks,
   sections = [],
   title = "Board",
@@ -59,7 +59,7 @@ export function ReferenceKanbanScreen({
   onAddTask,
   onNavigate,
   activeTab = "boards",
-}: ReferenceKanbanScreenProps) {
+}: ReferenceJanusScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
@@ -69,7 +69,7 @@ export function ReferenceKanbanScreen({
   const resolved = useMemo(() => tasks.map((task) => resolveReferenceTask(task)), [tasks]);
   const buckets = useMemo(() => sections.filter((section) => !section.hidden), [sections]);
   const [internalSectionId, setInternalSectionId] = useState<string | undefined>();
-  const [internalFilter, setInternalFilter] = useState<ReferenceKanbanFilter>("All");
+  const [internalFilter, setInternalFilter] = useState<ReferenceJanusFilter>("All");
   // Props and sections can hydrate independently. Select the first valid
   // preference without overwriting a still-valid user selection.
   const selectedSectionId = [activeSectionId, internalSectionId].find((sectionId) => sectionId && buckets.some((section) => section.id === sectionId)) ?? buckets[0]?.id;
@@ -80,7 +80,7 @@ export function ReferenceKanbanScreen({
     if (activeSectionId === undefined) setInternalSectionId(sectionId);
     onSectionChange?.(sectionId);
   };
-  const setFilter = (nextFilter: ReferenceKanbanFilter) => {
+  const setFilter = (nextFilter: ReferenceJanusFilter) => {
     if (activeFilter === undefined) setInternalFilter(nextFilter);
     onFilterChange?.(nextFilter);
   };
@@ -132,7 +132,7 @@ export function ReferenceKanbanScreen({
         </ScrollView>
         <View style={styles.swipeCue}><View style={styles.cueLong} /><View style={styles.cueShort} /><View style={styles.cueShort} /></View>
          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRail}>
-            {(["All", "High Priority", "Due Today"] as ReferenceKanbanFilter[]).map((item) => <Pressable key={item} accessibilityRole="button" aria-pressed={filter === item} accessibilityState={{ selected: filter === item }} onPress={() => setFilter(item)} style={[styles.filterButton, filter === item && styles.filterButtonActive]}>{item !== "All" ? <Ionicons name={item === "High Priority" ? "flag" : "calendar-outline"} size={15} color={item === "High Priority" ? colors.error : colors.muted} /> : null}<Text style={[type.body, { color: filter === item ? colors.text : colors.muted, fontWeight: filter === item ? "700" : "400" }]}>{item}</Text></Pressable>)}
+             {(["All", "High Priority", "Due Today"] as ReferenceJanusFilter[]).map((item) => <Pressable key={item} accessibilityRole="button" aria-pressed={filter === item} accessibilityState={{ selected: filter === item }} onPress={() => setFilter(item)} style={[styles.filterButton, filter === item && styles.filterButtonActive]}>{item !== "All" ? <Ionicons name={item === "High Priority" ? "flag" : "calendar-outline"} size={15} color={item === "High Priority" ? colors.error : colors.muted} /> : null}<Text style={[type.body, { color: filter === item ? colors.text : colors.muted, fontWeight: filter === item ? "700" : "400" }]}>{item}</Text></Pressable>)}
          </ScrollView>
          <View style={styles.quickAddRow}>
            <View style={styles.quickAddCopy}><Ionicons name="add-circle-outline" size={19} color={colors.primary} /><Text style={[type.body, { color: colors.muted }]} numberOfLines={1}>Add a task to {activeSection?.title ?? "this workstream"}</Text></View>
@@ -143,7 +143,7 @@ export function ReferenceKanbanScreen({
           {onSort || onMenu ? <View style={styles.headerActions}>{onSort ? <Pressable accessibilityRole="button" accessibilityLabel="Sort tasks" onPress={onSort} style={styles.smallIcon}><Ionicons name="swap-vertical-outline" size={19} color={colors.muted} /></Pressable> : null}{onMenu ? <Pressable accessibilityRole="button" accessibilityLabel="Section actions" onPress={onMenu} style={styles.smallIcon}><Ionicons name="ellipsis-horizontal" size={19} color={colors.muted} /></Pressable> : null}</View> : null}
         </View>
         <View style={{ gap: referenceSpacing.sm }}>
-           {activeTasks.map((item) => <KanbanCard key={item.task.id} item={item} now={now} selected={selectedTaskId === item.task.id} onPress={() => onTaskPress?.(item.task)} onMenu={onTaskMenu ? () => onTaskMenu(item.task) : undefined} onToggle={onToggleComplete ? () => onToggleComplete(item.task) : undefined} />)}
+            {activeTasks.map((item) => <JanusCard key={item.task.id} item={item} now={now} selected={selectedTaskId === item.task.id} onPress={() => onTaskPress?.(item.task)} onMenu={onTaskMenu ? () => onTaskMenu(item.task) : undefined} onToggle={onToggleComplete ? () => onToggleComplete(item.task) : undefined} />)}
             {activeTasks.length === 0 ? <View style={styles.emptyState}><View style={styles.emptyIcon}><Ionicons name={query ? "search-outline" : "layers-outline"} size={22} color={colors.primary} /></View><Text style={[type.section, { fontSize: 16 }]}>{query ? "No tasks match" : "No tasks in this section"}</Text><Text style={[type.body, { color: colors.muted, textAlign: "center" }]}>{query ? "Try a different search." : emptyMessage}</Text><Pressable accessibilityRole="button" accessibilityLabel="Add a task" onPress={() => onAddTask?.(activeSection?.id)} style={styles.emptyAction}><Ionicons name="add" size={17} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Add a task</Text></Pressable></View> : null}
         </View>
       </ScrollView>
@@ -153,7 +153,7 @@ export function ReferenceKanbanScreen({
   );
 }
 
-function KanbanCard({ item, now, selected, onPress, onMenu, onToggle }: { item: ReturnType<typeof resolveReferenceTask>; now: Date; selected: boolean; onPress: () => void; onMenu?: () => void; onToggle?: () => void }) {
+function JanusCard({ item, now, selected, onPress, onMenu, onToggle }: { item: ReturnType<typeof resolveReferenceTask>; now: Date; selected: boolean; onPress: () => void; onMenu?: () => void; onToggle?: () => void }) {
   const { colors, type } = useReferenceTheme();
   const styles = createStyles(colors, type);
   const { task } = item;
@@ -168,7 +168,7 @@ function KanbanCard({ item, now, selected, onPress, onMenu, onToggle }: { item: 
    if (blocked) return <View style={styles.blockedCard}>{openSurface}<View pointerEvents="box-none" style={styles.blockedTop}><View pointerEvents="none">{label ? <Pill label={label} /> : null}</View>{onMenu ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onMenu(); }} style={styles.menu}><Ionicons name="ellipsis-vertical" size={18} color={colors.muted} /></Pressable> : <Ionicons name="lock-closed-outline" size={16} color={colors.muted} />}</View><Text pointerEvents="none" style={[type.title, { fontSize: 16, color: colors.muted }]} numberOfLines={2}>{task.title}</Text><View pointerEvents="none" style={styles.blockedFooter}><Text style={[type.caption, { color: colors.muted }]}>{task.canceled ? "Canceled" : "Blocked"}</Text></View></View>;
 
   const done = task.subtasks.filter((subtask) => subtask.done).length;
-    return <View style={[styles.kanbanCard, selected && styles.selectedCard]}>{openSurface}
+    return <View style={[styles.janusCard, selected && styles.selectedCard]}>{openSurface}
     <View pointerEvents="none" style={[styles.cardRail, { backgroundColor: rail }]} />
     <View pointerEvents="box-none" style={styles.cardContent}><View pointerEvents="box-none" style={styles.cardTop}><View pointerEvents="none" style={styles.tagRow}>{label ? <Pill label={label} tone={overdue ? "error" : "neutral"} /> : null}<Pill label={overdue ? "Overdue" : task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Low"} tone={overdue ? "error" : task.priority === "high" ? "warning" : "neutral"} icon={task.priority === "high" ? "flag" : undefined} /></View>{onMenu ? <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onMenu(); }} style={styles.menu}><Ionicons name="ellipsis-vertical" size={18} color={colors.muted} /></Pressable> : null}</View><Text pointerEvents="none" style={[type.title, { fontSize: 17, lineHeight: 22 }]} numberOfLines={2}>{task.title}</Text>{task.subtasks.length > 0 ? <View pointerEvents="none" style={styles.progressBlock}><View style={styles.progressLabels}><Text style={[type.body, { color: colors.muted }]}><Ionicons name="checkmark-done-outline" size={14} color={colors.primary} /> Checklist Items</Text><Text style={type.bodyStrong}>{done}/{task.subtasks.length} ({Math.round((done / task.subtasks.length) * 100)}%)</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.round((done / task.subtasks.length) * 100)}%` }]} /></View></View> : null}<View pointerEvents="box-none" style={styles.cardFooter}><View pointerEvents="none" style={styles.duePill}><Ionicons name={due?.overdue ? "calendar-outline" : "time-outline"} size={14} color={due?.overdue ? colors.error : colors.primary} /><Text style={[type.caption, { color: due?.overdue ? colors.error : colors.primary }]}>{due?.label ?? "No due date"}</Text></View><View pointerEvents="box-none" style={styles.cardActions}><Pressable accessibilityRole="checkbox" aria-checked={task.completed} accessibilityState={{ checked: task.completed }} accessibilityLabel={`${task.completed ? "Mark incomplete" : "Complete"} ${task.title}`} onPress={(event) => { event.stopPropagation(); onToggle?.(); }} style={styles.cardCheck}>{task.completed ? <Ionicons name="checkmark" size={17} color={colors.primary} /> : null}</Pressable></View></View></View>
   </View>;
@@ -201,7 +201,7 @@ function createStyles(colors: ReferenceColors, type: ReferenceType) { return Sty
   activeDot: { width: 15, height: 15, borderRadius: 8, backgroundColor: colors.primaryContainer },
   headerActions: { flexDirection: "row", alignItems: "center" },
   smallIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  kanbanCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.outlineVariant, borderRadius: referenceRadii.md, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1, minHeight: 145, padding: referenceSpacing.md, paddingLeft: 19, overflow: "hidden" },
+  janusCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.outlineVariant, borderRadius: referenceRadii.md, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1, minHeight: 145, padding: referenceSpacing.md, paddingLeft: 19, overflow: "hidden" },
   selectedCard: { borderWidth: 2, borderColor: colors.primary, paddingLeft: 18 },
   cardRail: { position: "absolute", top: 0, bottom: 0, left: 0, width: 5 },
   cardContent: { gap: 8 },

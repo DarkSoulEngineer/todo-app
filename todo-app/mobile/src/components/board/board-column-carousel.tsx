@@ -7,6 +7,7 @@ interface Props {
   carouselRef: RefObject<ComponentRef<typeof ScrollView> | null>;
   columns: { id: string; title: string }[];
   interval: number;
+  scrollEnabled?: boolean;
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
   onContentSizeChange: () => void;
@@ -15,12 +16,12 @@ interface Props {
 }
 
 /** Scroll updates stay here, so tracking the indicator doesn't rerender cards. */
-export function BoardColumnCarousel({ carouselRef, columns, interval, style, contentContainerStyle, onContentSizeChange, onScroll, children }: Props) {
+export function BoardColumnCarousel({ carouselRef, columns, interval, scrollEnabled = true, style, contentContainerStyle, onContentSizeChange, onScroll, children }: Props) {
   const [metrics, setMetrics] = useState({ viewport: 0, content: 0, offset: 0 });
   const position = getBoardScrollPosition(columns, interval, metrics.viewport, metrics.content, metrics.offset);
   return <>
     <BoardPositionIndicator {...position} onPosition={(offset) => carouselRef.current?.scrollTo({ x: offset, animated: true })} />
-    <ScrollView ref={carouselRef} testID="kanban-carousel" horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={32}
+    <ScrollView ref={carouselRef} testID="janus-carousel" scrollEnabled={scrollEnabled} horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={32}
       onLayout={(event) => { const viewport = event.nativeEvent.layout.width; setMetrics((previous) => previous.viewport === viewport ? previous : { ...previous, viewport }); }}
       onContentSizeChange={(content) => { setMetrics((previous) => previous.content === content ? previous : { ...previous, content }); onContentSizeChange(); }}
       onScroll={(event) => {
