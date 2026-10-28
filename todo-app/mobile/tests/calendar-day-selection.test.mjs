@@ -30,7 +30,7 @@ function nodes(node) {
   if (Array.isArray(node)) return node.flatMap(nodes);
   return [node, ...nodes(node.props?.children)];
 }
-function render(mode, split) {
+function render(mode, split, selectedDay = null, entries = tasks) {
   const selected = [];
   const edited = [];
   const actions = [];
@@ -41,9 +41,9 @@ function render(mode, split) {
     useMemo: react.useMemo, useState: (initial) => [initial, () => {}],
     View: "View", Text: "Text", Button: "Button", SectionHeading: "Heading", Ionicons: "Icon", CalendarPanel: "CalendarPanel", TaskCard: "TaskCard", StyleSheet: {},
   });
-  const tree = exports.CalendarView({ month: day, selectedDay: null, tasks, boards: [], now: day, split, setSelectedDay: (day) => selected.push(day), onTask: (task) => edited.push(task), onTaskAction: (task) => actions.push(task) });
+  const tree = exports.CalendarView({ month: day, selectedDay, tasks: entries, boards: [], now: day, split, setSelectedDay: (day) => selected.push(day), onTask: (task) => edited.push(task), onTaskAction: (task) => actions.push(task) });
   const props = nodes(tree).find((node) => node.type === "CalendarPanel").props;
-  return { tree: panelExports.CalendarPanel(props), selected, edited, actions, props };
+  return { tree: panelExports.CalendarPanel(props), view: tree, selected, edited, actions, props };
 }
 
 test("mobile month and week task chips select the day instead of opening tiny task targets", () => {
@@ -67,15 +67,21 @@ test("mobile month and week task chips select the day instead of opening tiny ta
   }
 });
 
-test("desktop retains direct task editing and long-press actions", () => {
-  const { tree, selected, edited, actions, props } = render("month", true);
-  assert.equal(props.daySelectionOnly, false);
-  const chip = nodes(tree).find((node) => node.props?.accessibilityLabel === "Open Task 0");
-  chip.props.onPress({ stopPropagation() {} });
-  chip.props.onLongPress({ stopPropagation() {} });
-  assert.deepEqual(edited, [tasks[0]]);
-  assert.deepEqual(actions, [tasks[0]]);
-  assert.equal(selected.length, 0);
+test("web and tablet chips select the day; full day rows retain editing and long-press actions", () => {
+  for (const mode of ["month", "week"]) {
+    const { tree, selected, edited, actions, props, view } = render(mode, true, day, [...tasks, { ...tasks[0], id: "other", dueAt: dates.addDays(day, 1).toISOString() }]);
+    assert.equal(props.daySelectionOnly, true);
+    const chip = nodes(tree).find((node) => node.props?.accessibilityLabel === `View tasks for ${dates.format(day, "EEEE, MMMM d")}`);
+    chip.props.onPress({ stopPropagation() {} });
+    assert.equal(selected.length, 1);
+    assert.equal(edited.length, 0);
+    const rows = nodes(view).filter((node) => node.type === "TaskCard");
+    assert.deepEqual(rows.map((node) => node.props.task.id), tasks.map((task) => task.id));
+    rows[2].props.onPress();
+    rows[2].props.onLongPress();
+    assert.deepEqual(edited, [tasks[2]]);
+    assert.deepEqual(actions, [tasks[2]]);
+  }
 });
 
 test("empty mobile dates still open day selection without opening an editor", () => {

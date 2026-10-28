@@ -49,13 +49,27 @@ test("overdue metadata is one alert badge with duration, not duplicated text or 
 test("cards have no completion checkbox and keep their edit and actions controls", () => {
   const calls = [];
   const tree = render(null, {}, { onPress: () => calls.push("edit"), onLongPress: () => calls.push("actions") });
+  assert.equal(tree.type, "Pressable", "the full card is the edit target, not an overlay behind its content");
+  assert.equal(typeof tree.props.onLongPress, "function");
   assert.equal(find(tree, (node) => node.props?.accessibilityRole === "checkbox").length, 0);
   const buttons = find(tree, (node) => node.type === "Pressable");
   buttons.find((button) => button.props.accessibilityLabel === "Edit task Test card").props.onPress();
-  buttons.find((button) => button.props.accessibilityLabel === "Actions for Test card").props.onPress({ stopPropagation() {} });
+  let stopped = false;
+  buttons.find((button) => button.props.accessibilityLabel === "Actions for Test card").props.onPress({ stopPropagation() { stopped = true; } });
+  assert.equal(stopped, true, "actions must not also open the editor");
   assert.deepEqual(calls, ["edit", "actions"]);
   assert.ok(text(tree).includes("CHECKLIST"));
   assert.ok(text(tree).includes("Checklist item"));
+});
+
+test("passive tags and metadata do not intercept the shared card press", () => {
+  for (const compact of [false, true]) {
+    const tree = render(null, { tags: ["Example"] }, { compact, onPress() {} });
+    const metadata = find(tree, (node) => node.props?.pointerEvents === "none");
+    assert.equal(metadata.length, 1);
+    assert.equal(find(metadata[0], (node) => node.type === "Chip").length, 1);
+    assert.equal(find(tree, (node) => node.type === "Pressable").length, 2, "one full-card target plus its actions button");
+  }
 });
 
 test("upcoming deadlines and completed/canceled status labels are preserved", () => {

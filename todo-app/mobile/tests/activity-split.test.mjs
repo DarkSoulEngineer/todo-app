@@ -16,12 +16,12 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
   let state = 0;
   const effects = [];
   const boardId = options.boardId ?? "board";
-  const states = { 0: mode, 11: selected, 12: visible, 24: options.calendarDay ?? null, 31: options.owner ?? boardId };
+  const states = { 0: mode, 11: selected, 12: visible, 24: options.calendarDay ?? null, 31: options.owner ?? boardId, ...options.states };
   const api = { tasks, sections: [], boards: [], versions: [], projects: options.projects ?? [{ id: boardId, name: "Board" }], currentProjectId: boardId };
   const fallback = new Proxy({}, { get: (_, key) => key });
   const mocks = {
     react: { useState: (initial) => { const index = state++; return [index in states ? states[index] : typeof initial === "function" ? initial() : initial, (value) => updates.push([index, value])]; }, useRef: (current) => ({ current }), useEffect: (effect) => effects.push(effect), useMemo: (fn) => fn() },
-    "react-native": { View: "View", Text: "Text", ScrollView: "ScrollView", Pressable: "Pressable", StyleSheet: { create: (v) => v, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width }) },
+    "react-native": { View: "View", Text: "Text", ScrollView: "ScrollView", Pressable: "Pressable", Platform: { OS: "web" }, StyleSheet: { create: (v) => v, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width }) },
     "expo-router": { useLocalSearchParams: () => ({ id: boardId }), router: { replace: (destination) => options.onNavigate?.(destination) } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: options.colors ?? colors } }) },
@@ -47,6 +47,53 @@ function find(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...find(node.props?.children, predicate)];
 }
 const editor = (tree) => find(tree, (node) => node.type === "TaskEditor")[0];
+test("Calendar navigation clears editors and day/action sheets before changing tabs", () => {
+  const day = new Date(2026, 9, 28);
+  const scheduled = { ...task, dueAt: new Date(2026, 9, 28, 9).toISOString() };
+  for (const width of [390, 768, 1200]) for (const target of ["board", "list", "insights"]) for (const control of ["MobileBoardRibbon", "MobileBoardBottomNav"]) {
+    const updates = [];
+    const tree = render(width, "calendar", scheduled, true, [scheduled], updates, { calendarDay: day, states: { 25: scheduled, 26: scheduled, 14: scheduled } });
+    updates.length = 0;
+    find(tree, (node) => node.type === control)[0].props.onMode(target);
+    const modeIndex = updates.findIndex(([slot]) => slot === 0);
+    assert.ok(modeIndex > 0);
+    for (const [slot, value] of [[11, null], [12, false], [13, null], [22, null], [24, null], [25, null], [26, null], [14, null]]) {
+      assert.ok(updates.some(([index, next], order) => index === slot && next === value && order < modeIndex), `${control}: state ${slot} closes before ${target}`);
+    }
+    const states = Object.fromEntries(updates);
+    const next = render(width, target, null, false, [scheduled], [], { states });
+    assert.equal(editor(next).props.presentation, width >= 900 && target === "list" ? "panel" : "sheet");
+    assert.equal(editor(next).props.visible, width >= 900 && target === "list", "only the destination's desktop Activity panel may open");
+    assert.equal(find(next, (node) => node.type === "Sheet" && node.props.visible === true).length, 0);
+    const calendarAgain = render(width, "calendar", null, false, [scheduled], [], { states: { ...states, 0: "calendar" } });
+    assert.equal(find(calendarAgain, (node) => node.type === "Sheet" && node.props.visible === true).length, 0, "returning to Calendar must not reopen the old day sheet");
+  }
+});
+
+test("leaving the workspace clears task overlays before routing Home", () => {
+  const updates = [];
+  let navigated = false;
+  const tree = render(1200, "calendar", task, true, [task], updates, {
+    calendarDay: new Date(2026, 9, 28),
+    onNavigate(destination) {
+      assert.equal(destination, "/");
+      assert.ok(updates.some(([slot, value]) => slot === 12 && value === false));
+      assert.ok(updates.some(([slot, value]) => slot === 24 && value === null));
+      navigated = true;
+    },
+  });
+  updates.length = 0;
+  find(tree, (node) => node.type === "MobileBoardRibbon")[0].props.onBoards();
+  assert.equal(navigated, true);
+});
+
+test("a retained Calendar date cannot mount a day sheet on another screen", () => {
+  for (const mode of ["board", "list", "insights"]) {
+    const tree = render(390, mode, null, false, [task], [], { calendarDay: new Date(2026, 9, 28) });
+    assert.equal(find(tree, (node) => node.type === "Sheet" && node.props.visible === true).length, 0);
+  }
+});
+
 test("board switch menu excludes closed boards and closes the editor before navigating", () => {
   const updates = [];
   const destinations = [];
@@ -80,8 +127,37 @@ test("desktop Calendar keeps day details inline while mobile keeps the day sheet
   assert.equal(mobileCalendar.props.split, false);
   assert.equal(find(splitTree, (node) => node.type === "Sheet" && node.props.visible === true).length, 0);
   assert.ok(find(mobileTree, (node) => node.type === "Sheet" && node.props.visible === true).length > 0);
-  assert.equal(editor(splitTree).props.presentation, "panel");
-  assert.equal(editor(splitTree).props.visible, true);
+  assert.equal(editor(splitTree), undefined, "an empty date must not show an unrelated board task");
+  assert.equal(find(splitTree, (node) => node.type === "EmptyState" && node.props.title === "A clear day").length, 1);
+});
+
+test("web and tablet date selection opens the first active task only from that day", () => {
+  const day = new Date(2026, 9, 28);
+  const dueAt = new Date(2026, 9, 28, 9).toISOString();
+  const dayTasks = [
+    { ...task, id: "done", dueAt, completed: true },
+    { ...task, id: "canceled", dueAt, canceled: true },
+    { ...task, id: "active", dueAt },
+    { ...task, id: "next", dueAt },
+  ];
+  const unrelated = { ...task, id: "other-day", priority: "urgent", dueAt: new Date(2026, 9, 29, 9).toISOString() };
+  for (const width of [900, 1024, 1440]) {
+    const updates = [];
+    const tree = render(width, "calendar", unrelated, true, [unrelated, ...dayTasks], updates);
+    find(tree, (node) => typeof node.type === "function" && node.type.name === "CalendarView")[0].props.setSelectedDay(day);
+    assert.ok(updates.some(([slot, value]) => slot === 24 && value === day));
+    assert.ok(updates.some(([slot, value]) => slot === 11 && value?.id === "active"));
+    const selectedTree = render(width, "calendar", unrelated, false, [unrelated, ...dayTasks], [], { calendarDay: day });
+    assert.equal(editor(selectedTree).props.task.id, "active", "fallback stays in the selected date");
+    const manualTree = render(width, "calendar", dayTasks[3], true, [unrelated, ...dayTasks], [], { calendarDay: day });
+    assert.equal(editor(manualTree).props.task.id, "next", "manual selection within the day is retained");
+    const filteredTree = render(width, "calendar", unrelated, false, [unrelated, ...dayTasks], [], { calendarDay: day, hiddenIds: ["active"] });
+    assert.equal(editor(filteredTree).props.task.id, "next", "date selection respects filters");
+    const emptyTree = render(width, "calendar", unrelated, false, [unrelated], [], { calendarDay: day });
+    assert.equal(editor(emptyTree), undefined);
+    const finishedTree = render(width, "calendar", unrelated, false, [unrelated, ...dayTasks.slice(0, 2)], [], { calendarDay: day });
+    assert.equal(editor(finishedTree).props.task.id, "done", "finished-only dates stay editable without unrelated tasks");
+  }
 });
 
 test("mobile day list includes every matching task and opens the editor only from a full task row", () => {
@@ -249,18 +325,18 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
   const editorColors = new Proxy({ card: "#211C17", backgroundAlt: "#191510", cardElevated: "#29231D" }, { get: (target, key) => target[key] ?? "#888888" });
   const mocks = {
     react,
-    "react-native": { View: "View", Text: "Text", TextInput: "TextInput", ScrollView: "ScrollView", Pressable: "Pressable", StyleSheet: { create: (v) => v } },
+    "react-native": { View: "View", Text: "Text", TextInput: "TextInput", ScrollView: "ScrollView", Pressable: "Pressable", Platform: { OS: "web" }, StyleSheet: { create: (v) => v } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: editorColors } }) },
     "@/hooks/use-open-session": { useOpenSession: () => 0 },
     "@/theme/layout": { mobileBottomNavClearance: 112 },
     "@/lib/domain/sections": { getTaskSectionId: () => undefined },
-    "@/lib/domain/constants": { PRIORITY_ORDER: [] },
+    "@/lib/domain/constants": { PRIORITY_ORDER: ["medium", "high"], PRIORITY_META: { medium: { label: "Medium", dot: "#888888" }, high: { label: "High", dot: "#FF0000" } } },
   };
   const exports = {};
   vm.runInNewContext(compiled, { exports, setTimeout: () => 1, clearTimeout() {}, require: (id) => mocks[id] ?? (id === "react/jsx-runtime" || id === "date-fns" ? require(id) : new Proxy({}, { get: (_, key) => key })) });
   const saves = [];
-  const props = { visible: true, task: { ...task, description: "", category: null, dueAt: null }, boards: [], sections: [], presentation: "panel", onAutoSave: (draft) => saves.push(["a", draft.title]) };
+  const props = { visible: true, task: { ...task, description: "", category: null, dueAt: null, subtasks: [{ id: "step", title: "First step", done: false }] }, boards: [], sections: [{ id: "first", title: "First list" }, { id: "second", title: "Second list" }], presentation: "panel", onAutoSave: (draft) => saves.push(["a", draft.title]) };
   const form = exports.TaskEditor(props).type;
   function renderForm(nextProps) {
     cursor = 0;
@@ -275,12 +351,35 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
   const panelScroll = find(tree, (node) => node.type === "ScrollView" && node.props.contentContainerStyle?.[1]?.paddingBottom === 112)[0];
   assert.ok(panelScroll, "panel keeps navigation clearance inside its own scrolling area, not a wasted outer margin");
   assert.equal(find(panelScroll, (node) => node.props?.accessibilityLabel === "Delete task").length, 1);
+  const field = (id) => find(tree, (node) => node.props?.testID === id)[0];
+  assert.equal(field("task-editor-title-field").props.style, undefined, "title spans the full editor width");
+  assert.equal(field("task-editor-notes-field").props.style, undefined, "notes span the full editor width");
+  const pairedRow = field("task-editor-priority-schedule-row");
+  assert.equal(pairedRow.props.style.flexWrap, "wrap", "paired controls stack when the panel is narrow");
+  assert.equal(pairedRow.props.children[0].props.testID, "task-editor-priority-field");
+  assert.equal(pairedRow.props.children[1].props.testID, "task-editor-schedule-field");
+  assert.equal(field("task-editor-tags-list-row").props.style.flexWrap, "wrap");
+  assert.equal(field("task-editor-tags-wrap").props.style.flexWrap, "wrap");
+  assert.equal(field("task-editor-lists-wrap").props.style.flexWrap, "wrap");
+  find(tree, (node) => node.props?.label === "High")[0].props.onPress();
+  find(tree, (node) => node.props?.label === "Second list")[0].props.onPress();
+  find(tree, (node) => node.props?.accessibilityRole === "checkbox")[0].props.onPress();
+  find(tree, (node) => node.props?.accessibilityLabel === "Set due date")[0].props.onPress();
+  tree = renderForm(props);
+  assert.equal(find(tree, (node) => node.props?.mode === "date").length, 1, "schedule picker still opens");
+  assert.equal(find(tree, (node) => node.props?.label === "High")[0].props.active, true);
+  assert.equal(find(tree, (node) => node.props?.label === "Second list")[0].props.active, true);
+  assert.equal(find(tree, (node) => node.props?.accessibilityRole === "checkbox")[0].props.accessibilityState.checked, true);
   find(tree, (node) => node.props?.accessibilityLabel === "Task title")[0].props.onChangeText("Edited just before switching");
   tree = renderForm(props);
   // A layout resize preserves the form hooks and doesn't save prematurely.
   tree = renderForm({ ...props, presentation: "sheet" });
   assert.equal(tree.props.style.backgroundColor, undefined, "mobile sheet keeps its own original surface");
   assert.equal(find(tree, (node) => node.props?.label === "Close task editor").length, 1);
+  assert.equal(find(tree, (node) => node.props?.testID === "task-editor-tags-list-row").length, 0);
+  assert.equal(find(tree, (node) => node.type === "ScrollView" && node.props.horizontal).length, 2, "mobile keeps its horizontal tag and list rails");
+  assert.equal(find(tree, (node) => node.props?.label === "High")[0].props.active, true);
+  assert.equal(find(tree, (node) => node.props?.label === "Second list")[0].props.active, true);
   assert.equal(saves.length, 0);
   assert.equal(find(tree, (node) => node.props?.accessibilityLabel === "Task title")[0].props.value, "Edited just before switching");
   slots.forEach((slot) => slot?.cleanup?.());

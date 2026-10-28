@@ -96,14 +96,21 @@ export default function WorkspaceScreen() {
     setInitialDueAt(null);
     setInitialSectionId(null);
   }, [activityUnavailable, isLoading]);
+  const visibleTasks = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return sortTasks(tasks.filter((task) => (boardFilter === "all" || task.category === boardFilter) && matchesQuery(task, needle)), sort);
+  }, [boardFilter, query, sort, tasks]);
+  const calendarTasks = useMemo(() => calendarDay ? visibleTasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), calendarDay)) : [], [calendarDay, visibleTasks]);
+  const calendarDaySelected = mode === "calendar" && calendarDay !== null;
   const defaultEditorTask = useMemo(() => {
+    if (calendarDaySelected) return calendarTasks.find((task) => !task.completed && !task.canceled) ?? calendarTasks[0] ?? null;
     const entries = tasks.map((task) => ({ task, projectId: currentProjectId, projectName: "", boards }));
     // Match Top Tasks' priority/deadline ordering. Finished-only boards still
     // keep a real task editable, using persisted board order as fallback.
     return rankTopTasks(entries)[0]?.task ?? tasks[0] ?? null;
-  }, [boards, currentProjectId, tasks]);
+  }, [boards, calendarDaySelected, calendarTasks, currentProjectId, tasks]);
   const selectionBelongsToBoard = editorProjectId === currentProjectId;
-  const validEditorSelection = selectionBelongsToBoard && selectedEditorTask ? tasks.find((task) => task.id === selectedEditorTask.id) : undefined;
+  const validEditorSelection = selectionBelongsToBoard && selectedEditorTask ? (calendarDaySelected ? calendarTasks : tasks).find((task) => task.id === selectedEditorTask.id) : undefined;
   const creatingEditorTask = selectionBelongsToBoard && editorVisible && !selectedEditorTask;
   const editorTask = splitView
     ? validEditorSelection ?? (creatingEditorTask ? null : defaultEditorTask)
@@ -131,10 +138,6 @@ export default function WorkspaceScreen() {
     switchProjectApi(id);
   }, [currentProjectId, id, isLoading, projectIds, projects, switchProjectApi]);
 
-  const visibleTasks = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return sortTasks(tasks.filter((task) => (boardFilter === "all" || task.category === boardFilter) && matchesQuery(task, needle)), sort);
-  }, [boardFilter, query, sort, tasks]);
   useEffect(() => {
     // Remember the default once; ranking, autosaves and filters must not steal
     // selection. Only deletion or a board switch chooses another default.
@@ -143,8 +146,9 @@ export default function WorkspaceScreen() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditorTask(editorTask);
       setEditorProjectId(currentProjectId);
+      if (!editorTask) setEditorVisible(false);
     }
-    if (!editorVisible) setEditorVisible(true);
+    if (!editorVisible && editorTask) setEditorVisible(true);
   }, [creatingEditorTask, currentProjectId, editorTask, editorVisible, isLoading, splitView, validEditorSelection]);
   const renderedBoardTasks = useMemo(() => {
     const hiddenSectionIds = new Set(sections.filter((section) => section.hidden).map((section) => section.id));
@@ -157,6 +161,27 @@ export default function WorkspaceScreen() {
   const allVisibleSelected = renderedBoardTasks.length > 0 && renderedBoardTasks.every((task) => selectedTaskIds.has(task.id));
   const enterSelectionMode = () => { if (!getRibbonContext(mode).selection) return; setSelectionMode(true); setSelectedTaskIds(new Set()); };
   const exitSelectionMode = () => { setSelectionMode(false); setSelectedTaskIds(new Set()); };
+  const closeTaskOverlays = () => {
+    setEditorVisible(false);
+    setEditorTask(null);
+    setInitialDueAt(null);
+    setInitialSectionId(null);
+    setCalendarDay(null);
+    setCalendarActionTask(null);
+    setCalendarPickerTask(null);
+    setTaskAction(null);
+  };
+  const changeMode = (value: ViewMode) => {
+    if (value === "list" && !hasTasks) return;
+    if (value === mode) return;
+    closeTaskOverlays();
+    if (value !== "board" && selectionMode) exitSelectionMode();
+    setMode(value);
+  };
+  const leaveWorkspace = () => {
+    closeTaskOverlays();
+    router.replace("/");
+  };
   const toggleSelectedTask = (taskId: string) => {
     setSelectedTaskIds((current) => {
       const next = new Set(current);
@@ -244,6 +269,17 @@ export default function WorkspaceScreen() {
     });
   };
   const openEditor = (task: Task) => { setEditorProjectId(currentProjectId); setEditorTask(task); setInitialDueAt(null); setEditorVisible(true); };
+  const selectCalendarDay = (day: Date | null) => {
+    setCalendarDay(day);
+    if (!splitView || !day) return;
+    const dayTasks = visibleTasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), day));
+    const firstTask = dayTasks.find((task) => !task.completed && !task.canceled) ?? dayTasks[0];
+    setEditorProjectId(currentProjectId);
+    setEditorTask(firstTask ?? null);
+    setEditorVisible(!!firstTask);
+    setInitialDueAt(null);
+    setInitialSectionId(null);
+  };
   const rescheduleTask = (task: Task, day: Date) => { api.setTaskDueAt(task.id, rescheduleToDay(day, task.dueAt)); toast.success("Rescheduled", { description: format(day, "EEE, MMM d") }); };
   const clearTaskDueDate = (task: Task) => { api.setTaskDueAt(task.id, null); toast.success("Due date removed", { description: task.title }); };
   const clearCompleted = () => {
@@ -261,7 +297,7 @@ export default function WorkspaceScreen() {
   const switchProject = (projectId: string) => {
     setProjectSwitcherOpen(false);
     if (projectId === id) return;
-    setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null);
+    closeTaskOverlays();
     exitSelectionMode();
     router.replace(`/board/${projectId}`);
   };
@@ -378,7 +414,6 @@ export default function WorkspaceScreen() {
     });
     router.replace("/");
   };
-  const calendarTasks = calendarDay ? visibleTasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), calendarDay)) : [];
   const actionsContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
     {mode === "board" && width >= 768 ? <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="reorder-three-outline" label={dragEnabled ? "Disable dragging" : "Enable dragging"} selected={dragEnabled} onPress={() => { setDragEnabled((enabled) => !enabled); if (!dragEnabled) setFocusedColumn(false); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DRAG & DROP</Text></View> : null}
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="sparkles-outline" label="Load sample" onPress={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>CREATE</Text></View>
@@ -401,22 +436,22 @@ export default function WorkspaceScreen() {
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
       <ThemeAtmosphere />
       <View style={{ flex: 1, paddingBottom: mode === "board" ? mobileBottomNavClearance + insets.bottom : 0, paddingLeft: insets.left, paddingRight: insets.right }}>
-        <MobileBoardRibbon hiddenSections={sections.filter((section) => section.hidden)} onShowSection={toggleSectionVisibility} selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); if (value !== mode) { setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null); } setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
+        <MobileBoardRibbon hiddenSections={sections.filter((section) => section.hidden)} onShowSection={toggleSectionVisibility} selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={changeMode} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={leaveWorkspace} onSwitchBoard={() => { closeTaskOverlays(); setProjectSwitcherOpen(true); }} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
           {actionsContent}
         </MobileBoardRibbon>
         <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
         {mode === "board" ? <View style={{ flex: 1, minHeight: 0 }}>
           {hasRefinements && visibleTasks.length === 0 ? <ScrollView contentContainerStyle={[mobileContentStyle, { paddingBottom: mobileBottomNavClearance + insets.bottom }]}><WorkspaceEmptyState hasRefinements onCreate={() => addNewTask()} onClear={() => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); }} /></ScrollView> : <MobileTaskColumns key={id} tasks={visibleTasks} sections={sections} boards={boards} now={now} compact={compactCards} zoom={zoom} showMoveArrows={showMoveArrows} dragEnabled={dragEnabled} focused={focusedColumn} selectionMode={selectionMode} selectedTaskIds={selectedTaskIds} onToggleSelect={toggleSelectedTask} onTask={openEditor} onLongPress={setTaskAction} onMove={moveTaskToSection} onTaskDrop={dropTask} onSectionDrop={dropSection} onToggleSubtask={api.toggleSubtask} onAddTask={(sectionId) => addNewTask(null, sectionId)} onSectionMenu={setSectionMenu} onAddSection={() => setAddSectionOpen(true)} />}
         </View> : <ScrollView testID="workspace-feed-pane" style={{ flex: 1, minWidth: 0 }} contentContainerStyle={splitView ? { padding: 12, paddingBottom: mobileBottomNavClearance + insets.bottom } : [mobileContentStyle, { paddingBottom: mobileBottomNavClearance + insets.bottom }]} showsVerticalScrollIndicator={splitView} keyboardShouldPersistTaps="handled">
-          {mode === "list" ? <ListView compact={splitView} tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} selectedTaskId={splitView && showEditor ? editorTask?.id : undefined} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={setCalendarDay} tasks={visibleTasks} boards={boards} split={splitView} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
+           {mode === "list" ? <ListView compact={splitView} tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} selectedTaskId={splitView && showEditor ? editorTask?.id : undefined} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={selectCalendarDay} tasks={visibleTasks} boards={boards} split={splitView} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
         <View key={currentProjectId} testID="workspace-editor-pane" style={splitView ? { flex: 1, minWidth: 0, minHeight: 0, marginTop: 12, marginRight: 12, marginBottom: 12 + insets.bottom, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, borderRadius: 14, overflow: "hidden", backgroundColor: `${theme.colors.backgroundAlt === theme.colors.card ? theme.colors.cardElevated : theme.colors.backgroundAlt}D9` } : undefined}>
-          {taskEditor}
+          {splitView && calendarDaySelected && !editorTask && !creatingEditorTask ? <EmptyState icon="sunny-outline" title="A clear day" message="Select another day or add a task for this day." /> : taskEditor}
         </View>
         </View>
       </View>
       </BlurTargetView>
-      <MobileBoardBottomNav mode={mode} hasTasks={hasTasks} onMode={(value) => { if (value === "list" && !hasTasks) return; if (value !== "board" && selectionMode) exitSelectionMode(); if (value !== mode) { setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null); } setMode(value); }} blurTarget={blurTarget} />
+       <MobileBoardBottomNav mode={mode} hasTasks={hasTasks} onMode={changeMode} blurTarget={blurTarget} />
        <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onComplete={() => { if (calendarActionTask) api.toggleComplete(calendarActionTask.id); setCalendarActionTask(null); }} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}
        <TaskActions task={taskAction} tasks={visibleTasks} sections={sections} now={now} onClose={() => setTaskAction(null)} onComplete={() => { if (taskAction) api.toggleComplete(taskAction.id); setTaskAction(null); }} onCancel={() => { if (taskAction) api.toggleCancel(taskAction.id); setTaskAction(null); }} onDelete={() => { if (taskAction) { const before = api.snapshot(); api.deleteTask(taskAction.id); setTaskAction(null); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } }} onMove={(sectionId) => { if (taskAction) moveTaskToSection(taskAction, sectionId); setTaskAction(null); }} onMoveUp={() => { if (taskAction) reorderTask(taskAction, "up"); setTaskAction(null); }} onMoveDown={() => { if (taskAction) reorderTask(taskAction, "down"); setTaskAction(null); }} />
@@ -444,7 +479,7 @@ export default function WorkspaceScreen() {
        </Sheet>
        <TextEntrySheet visible={renameSectionTarget !== null} title="Rename list" initialValue={renameSectionTarget?.title ?? ""} placeholder="List name" onClose={() => setRenameSectionTarget(null)} onSubmit={(value) => { if (renameSectionTarget) api.renameSection(renameSectionTarget.id, value); setRenameSectionTarget(null); }} />
       <Sheet visible={addSectionOpen} onClose={() => setAddSectionOpen(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>Add a list</Text><Text style={[styles.sheetCopy, { color: theme.colors.mutedForeground }]}>Use lists to shape this board around your flow.</Text><Input autoFocus value={sectionTitle} onChangeText={setSectionTitle} placeholder="e.g. In progress" onSubmitEditing={() => { if (sectionTitle.trim()) { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); } }} style={{ marginTop: 12 }} /><Button label="Add list" disabled={!sectionTitle.trim()} onPress={() => { api.addSection(sectionTitle); setSectionTitle(""); setAddSectionOpen(false); }} style={{ marginTop: 14 }} /></Sheet>
-       {splitView ? null : <Sheet visible={calendarDay !== null} onClose={() => setCalendarDay(null)}>
+        {splitView || mode !== "calendar" ? null : <Sheet visible={calendarDay !== null} onClose={() => setCalendarDay(null)}>
          {calendarDay ? (
            <>
               <Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{format(calendarDay, "EEEE, MMM d")}</Text>
@@ -510,7 +545,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boa
       tasks={tasks}
       now={now}
       weekStartsOn={calendarWeekStart}
-      daySelectionOnly={!split}
+      daySelectionOnly
       onModeChange={setCalendarMode}
       onAnchorChange={setMonth}
       onSelectDay={setSelectedDay}
@@ -523,7 +558,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boa
       {dayTasks.map((task) => <TaskCard key={task.id} compact task={task} boards={boards} now={now} onPress={() => onTask(task)} onLongPress={() => onTaskAction(task)} />)}
       <Button variant="soft" label={`Add for ${format(selectedDay, "MMM d")}`} onPress={() => addForDay(selectedDay)} style={{ marginTop: 4 }}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>
     </View> : <View style={{ marginTop: 15 }}>
-      <SectionHeading title="Plan a day" subtitle={split ? "Tap a date to see its tasks here, or long press a task to reschedule it." : "Tap anywhere on a date to see all its tasks. Select a task from the list to edit it."} style={{ marginBottom: 8 }} />
+      <SectionHeading title="Plan a day" subtitle={split ? "Tap anywhere on a date to see its tasks and edit the first active task." : "Tap anywhere on a date to see all its tasks. Select a task from the list to edit it."} style={{ marginBottom: 8 }} />
       <View style={{ borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, backgroundColor: theme.colors.card, padding: 13 }}>
         <Button variant="soft" label={`Add for ${selectedDay ? format(selectedDay, "MMM d") : "today"}`} onPress={() => addForDay(selectedDay ?? now)}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>
       </View>
