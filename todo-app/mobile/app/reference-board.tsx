@@ -50,7 +50,7 @@ export default function ReferenceBoardRoute() {
       <ReferenceKanbanScreen
         tasks={api.tasks}
         sections={api.sections}
-        title={api.currentProjectName || "Board"}
+        title="Board"
         subtitle="Workspace"
         onTaskPress={(task) => router.push({ pathname: "/task/[id]", params: { id: task.id, origin: "reference-board" } })}
         onToggleComplete={(task) => api.toggleComplete(task.id)}

@@ -120,10 +120,7 @@ export function withWorkspace(
 }
 
 export function activeProject(state: ProjectsState): JanusProject | undefined {
-  return state.projects.find((project) => project.id === state.currentId) ?? state.projects[0];
-}
-
-/** Validates a parsed registry payload. Anything malformed falls b
+  if (state.projects.length === 0) return undefined;
   return state.projects.find((project) => project.id === state.currentId) ?? state.projects[0];
 }
 
@@ -132,6 +129,7 @@ function sanitizeRegistry(raw: unknown): ProjectsState | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Partial<ProjectsState>;
   if (!Array.isArray(value.projects)) return null;
+  if (value.projects.length === 0) return null;
   const projects: JanusProject[] = [];
   const seenIds = new Set<string>();
   for (const entry of value.projects) {

@@ -51,7 +51,7 @@ export function WelcomeScreen() {
           <View style={[styles.logoWrap, { backgroundColor: c.primarySoft }]}>
             <Ionicons name="layers-outline" size={32} color={c.primary} />
           </View>
-          <Text style={[styles.title, { color: c.foreground }]}>Welcome to Janus</Text>
+          <Text style={[styles.title, { color: c.foreground }]}>Welcome</Text>
           <Text style={[styles.subtitle, { color: c.mutedForeground }]}>
             Get started by creating your first board to organize your tasks.
           </Text>

@@ -83,7 +83,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onTaskLo
     <View style={embedded ? styles.embeddedRoot : styles.root}>
       {embedded ? null : <ThemeAtmosphere />}
       {embedded ? null : <ScreenHeader
-        title="My tasks"
+        title="Tasks"
         onSearch={() => setShowSearch(prev => !prev)}
         searchActive={showSearch}
         onMore={() => setFilterMenu(true)}

@@ -4,7 +4,7 @@ import { addDays, format, isSameDay, parseISO, startOfDay, startOfMonth, startOf
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CalendarPanel, type CalendarMode } from "@/components/calendar/calendar-panel";
 import { InsightsPanel, OptionSheet, TaskCard, TaskEditor, TextEntrySheet } from "@/components/janus-board-ui";
@@ -31,11 +31,13 @@ import { exportWorkspace, exportWorkspaceCsv, pickWorkspaceFile } from "@/lib/da
 import { matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
 import { rescheduleToDay } from "@/lib/utils/datetime";
 import { getRibbonContext } from "@/lib/features/ribbon-context";
+import { rankTopTasks } from "@/lib/features/top-tasks";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
 import type { BoardSection, Priority, SortKey, Task, TaskDraft, ViewMode } from "@/lib/domain/types";
 
 export default function WorkspaceScreen() {
   const { theme } = useTheme();
+  const { width } = useWindowDimensions();
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const insets = useSafeAreaInsets();
   const now = useNow();
@@ -46,6 +48,8 @@ export default function WorkspaceScreen() {
   const { tasks, sections, boards, projects, isLoading, currentProjectId, switchProject: switchProjectApi } = api;
   const requestedProjectId = useRef<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("board");
+  // Match the existing desktop workspace breakpoint; keep other tabs unchanged.
+  const activitySplit = mode === "list" && width >= 900;
   const [query, setQuery] = useState("");
   const [compactCards, setCompactCards] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -56,7 +60,7 @@ export default function WorkspaceScreen() {
   const [filterMenu, setFilterMenu] = useState(false);
   const [addFilterOpen, setAddFilterOpen] = useState(false);
   const [removeTagOpen, setRemoveTagOpen] = useState(false);
-  const [editorTask, setEditorTask] = useState<Task | null>(null);
+  const [selectedEditorTask, setEditorTask] = useState<Task | null>(null);
   const [editorVisible, setEditorVisible] = useState(false);
   const [initialDueAt, setInitialDueAt] = useState<string | null>(null);
   const [taskAction, setTaskAction] = useState<Task | null>(null);
@@ -76,6 +80,19 @@ export default function WorkspaceScreen() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
   const [bulkSectionMenu, setBulkSectionMenu] = useState(false);
   const [bulkPriorityMenu, setBulkPriorityMenu] = useState(false);
+  const [editorProjectId, setEditorProjectId] = useState(currentProjectId);
+  const defaultActivityTask = useMemo(() => {
+    const entries = tasks.map((task) => ({ task, projectId: currentProjectId, projectName: "", boards }));
+    // Match Top Tasks' priority/deadline ordering. Finished-only boards still
+    // keep a real task editable, using persisted board order as fallback.
+    return rankTopTasks(entries)[0]?.task ?? tasks[0] ?? null;
+  }, [boards, currentProjectId, tasks]);
+  const selectionBelongsToBoard = editorProjectId === currentProjectId;
+  const validEditorSelection = selectionBelongsToBoard && selectedEditorTask ? tasks.find((task) => task.id === selectedEditorTask.id) : undefined;
+  const creatingActivityTask = selectionBelongsToBoard && editorVisible && !selectedEditorTask;
+  const editorTask = activitySplit
+    ? validEditorSelection ?? (creatingActivityTask ? null : defaultActivityTask)
+    : selectedEditorTask;
 
   const projectIds = useMemo(() => projects.map((project) => project.id).join("\0"), [projects]);
 
@@ -103,6 +120,17 @@ export default function WorkspaceScreen() {
     const needle = query.trim().toLowerCase();
     return sortTasks(tasks.filter((task) => (boardFilter === "all" || task.category === boardFilter) && matchesQuery(task, needle)), sort);
   }, [boardFilter, query, sort, tasks]);
+  useEffect(() => {
+    // Remember the default once; ranking, autosaves and filters must not steal
+    // selection. Only deletion or a board switch chooses another default.
+    if (!activitySplit || isLoading) return;
+    if (!validEditorSelection && !creatingActivityTask) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEditorTask(editorTask);
+      setEditorProjectId(currentProjectId);
+    }
+    if (!editorVisible) setEditorVisible(true);
+  }, [activitySplit, creatingActivityTask, currentProjectId, editorTask, editorVisible, isLoading, validEditorSelection]);
   const renderedBoardTasks = useMemo(() => {
     const hiddenSectionIds = new Set(sections.filter((section) => section.hidden).map((section) => section.id));
     return visibleTasks.filter((task) => {
@@ -158,7 +186,7 @@ export default function WorkspaceScreen() {
     exitSelectionMode();
     toast.success(`${selectedTasks.length} ${selectedTasks.length === 1 ? "task" : "tasks"} deleted`, { action: { label: "Undo", onPress: () => api.restore(before) } });
   };
-  const addNewTask = (due?: string | null, sectionId?: string | null) => { setEditorTask(null); setInitialDueAt(due ?? null); setInitialSectionId(sectionId ?? null); setEditorVisible(true); };
+  const addNewTask = (due?: string | null, sectionId?: string | null) => { setEditorProjectId(currentProjectId); setEditorTask(null); setInitialDueAt(due ?? null); setInitialSectionId(sectionId ?? null); setEditorVisible(true); };
   const saveTaskSection = (taskId: string, sectionId: string | null) => {
     if (sectionId === null) return;
     const section = sections.find((item) => item.id === sectionId);
@@ -200,7 +228,7 @@ export default function WorkspaceScreen() {
       action: { label: "Undo", onPress: () => api.restore(before) },
     });
   };
-  const openEditor = (task: Task) => { setEditorTask(task); setInitialDueAt(null); setEditorVisible(true); };
+  const openEditor = (task: Task) => { setEditorProjectId(currentProjectId); setEditorTask(task); setInitialDueAt(null); setEditorVisible(true); };
   const rescheduleTask = (task: Task, day: Date) => { api.setTaskDueAt(task.id, rescheduleToDay(day, task.dueAt)); toast.success("Rescheduled", { description: format(day, "EEE, MMM d") }); };
   const clearTaskDueDate = (task: Task) => { api.setTaskDueAt(task.id, null); toast.success("Due date removed", { description: task.title }); };
   const clearCompleted = () => {
@@ -311,6 +339,8 @@ export default function WorkspaceScreen() {
     <View style={styles.optionToolGroup}><View style={styles.optionToolButtons}><OptionTool icon="swap-horizontal-outline" label="Switch board" onPress={() => setProjectSwitcherOpen(true)} /><OptionTool icon="archive-outline" label="Close board" onPress={closeBoard} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>BOARD</Text></View>
   </ScrollView>;
   const activeFilterBoard = boards.find((board) => board.id === boardFilter);
+  const showEditor = activitySplit || (editorVisible && (!editorTask || tasks.some((task) => task.id === editorTask.id)));
+  const taskEditor = <TaskEditor presentation={activitySplit ? "panel" : "sheet"} visible={showEditor} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />;
   const filterOptions = [{ label: "All boards", icon: boardFilter === "all" ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter("all"); setSelectedTaskIds(new Set()); } }, ...boards.map((board) => ({ label: board.label, icon: boardFilter === board.id ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter(board.id); setSelectedTaskIds(new Set()); } }))];
   const filtersContent = <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.optionTools}>
     {getRibbonContext(mode).sorting ? <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="swap-vertical-outline" label="Sort" onPress={() => setSortMenu(true)} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>SORT</Text></View> : null}
@@ -322,18 +352,22 @@ export default function WorkspaceScreen() {
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
       <ThemeAtmosphere />
       <View style={{ flex: 1, paddingBottom: mode === "board" ? mobileBottomNavClearance + insets.bottom : 0, paddingLeft: insets.left, paddingRight: insets.right }}>
-        <MobileBoardRibbon selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
+        <MobileBoardRibbon selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); if (value !== mode) { setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null); } setMode(value); }} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={() => router.replace("/")} onSwitchBoard={() => setProjectSwitcherOpen(true)} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
           {actionsContent}
         </MobileBoardRibbon>
+        <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
         {mode === "board" ? <View style={{ flex: 1, minHeight: 0 }}>
           {hasRefinements && visibleTasks.length === 0 ? <ScrollView contentContainerStyle={[mobileContentStyle, { paddingBottom: mobileBottomNavClearance + insets.bottom }]}><WorkspaceEmptyState hasRefinements onCreate={() => addNewTask()} onClear={() => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); }} /></ScrollView> : <MobileTaskColumns key={id} tasks={visibleTasks} sections={sections} boards={boards} now={now} compact={compactCards} zoom={zoom} showMoveArrows={showMoveArrows} focused={focusedColumn} hiddenSections={sections.filter((section) => section.hidden)} selectionMode={selectionMode} selectedTaskIds={selectedTaskIds} onToggleSelect={toggleSelectedTask} onShowSection={toggleSectionVisibility} onTask={openEditor} onLongPress={setTaskAction} onMove={moveTaskToSection} onToggleSubtask={api.toggleSubtask} onAddTask={(sectionId) => addNewTask(null, sectionId)} onSectionMenu={setSectionMenu} onAddSection={() => setAddSectionOpen(true)} />}
-        </View> : <ScrollView style={{ flex: 1 }} contentContainerStyle={[mobileContentStyle, { paddingBottom: mobileBottomNavClearance + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {mode === "list" ? <ListView tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={setCalendarDay} tasks={visibleTasks} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
+        </View> : <ScrollView style={{ flex: activitySplit ? 4 : 1, minWidth: 0 }} contentContainerStyle={activitySplit ? { padding: 12, paddingBottom: mobileBottomNavClearance + insets.bottom } : [mobileContentStyle, { paddingBottom: mobileBottomNavClearance + insets.bottom }]} showsVerticalScrollIndicator={activitySplit} keyboardShouldPersistTaps="handled">
+          {mode === "list" ? <ListView compact={activitySplit} tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} selectedTaskId={activitySplit && showEditor ? editorTask?.id : undefined} onTask={openEditor} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={setCalendarDay} tasks={visibleTasks} onAddTask={addNewTask} onTask={openEditor} onTaskAction={setCalendarActionTask} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
+        <View key={currentProjectId} style={activitySplit ? { flex: 6, minWidth: 440, minHeight: 0, marginTop: 12, marginRight: 12, marginBottom: 12 + insets.bottom, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, borderRadius: 14, overflow: "hidden", backgroundColor: theme.colors.card } : undefined}>
+          {taskEditor}
+        </View>
+        </View>
       </View>
       </BlurTargetView>
-      <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); setMode(value); }} blurTarget={blurTarget} />
-       <TaskEditor visible={editorVisible} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />
+      <MobileBoardBottomNav mode={mode} onMode={(value) => { if (value !== "board" && selectionMode) exitSelectionMode(); if (value !== mode) { setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null); } setMode(value); }} blurTarget={blurTarget} />
        <CalendarTaskActions task={calendarActionTask} now={now} onClose={() => setCalendarActionTask(null)} onComplete={() => { if (calendarActionTask) api.toggleComplete(calendarActionTask.id); setCalendarActionTask(null); }} onChooseDate={() => { if (calendarActionTask) setCalendarPickerTask(calendarActionTask); setCalendarActionTask(null); }} onToday={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, startOfDay(now)); setCalendarActionTask(null); }} onTomorrow={() => { if (calendarActionTask) rescheduleTask(calendarActionTask, addDays(startOfDay(now), 1)); setCalendarActionTask(null); }} onClearDue={() => { if (calendarActionTask) clearTaskDueDate(calendarActionTask); setCalendarActionTask(null); }} />
        {calendarPickerTask ? <DateTimePicker value={calendarPickerTask.dueAt ? parseISO(calendarPickerTask.dueAt) : now} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setCalendarPickerTask(null); if (selected) rescheduleTask(calendarPickerTask, selected); }} /> : null}
        <TaskActions task={taskAction} tasks={visibleTasks} sections={sections} now={now} onClose={() => setTaskAction(null)} onComplete={() => { if (taskAction) api.toggleComplete(taskAction.id); setTaskAction(null); }} onCancel={() => { if (taskAction) api.toggleCancel(taskAction.id); setTaskAction(null); }} onDelete={() => { if (taskAction) { const before = api.snapshot(); api.deleteTask(taskAction.id); setTaskAction(null); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } }} onMove={(sectionId) => { if (taskAction) moveTaskToSection(taskAction, sectionId); setTaskAction(null); }} onMoveUp={() => { if (taskAction) reorderTask(taskAction, "up"); setTaskAction(null); }} onMoveDown={() => { if (taskAction) reorderTask(taskAction, "down"); setTaskAction(null); }} />
@@ -381,7 +415,7 @@ function OptionTool({ icon, dot, label, onPress, selected = false, tone = "defau
 
 function WorkspaceEmptyState({ hasRefinements, onCreate, onClear }: { hasRefinements: boolean; onCreate: () => void; onClear: () => void }) { return hasRefinements ? <EmptyState icon="search-outline" title="No matching tasks" message="Try a different search or clear the current board filter." actionLabel="Clear search and filters" onAction={onClear} /> : <EmptyState icon="checkmark-done-outline" title="Your board is ready" message="Add a task to give this workspace its first next step." actionLabel="Create a task" onAction={onCreate} />; }
 
-function ListView({ tasks, boards, now, hasRefinements, onTask, onClear }: { tasks: Task[]; boards: import("@/lib/domain/boards").Board[]; now: Date; hasRefinements: boolean; onTask: (task: Task) => void; onClear: () => void }) {
+function ListView({ tasks, boards, now, hasRefinements, selectedTaskId, compact = false, onTask, onClear }: { tasks: Task[]; boards: import("@/lib/domain/boards").Board[]; now: Date; hasRefinements: boolean; selectedTaskId?: string; compact?: boolean; onTask: (task: Task) => void; onClear: () => void }) {
   const { theme } = useTheme();
   const groupedByDay = useMemo(() => {
     const entries = [...tasks].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
@@ -401,7 +435,11 @@ function ListView({ tasks, boards, now, hasRefinements, onTask, onClear }: { tas
        const statusColor = status === "completed" ? theme.colors.success : status === "canceled" ? theme.colors.mutedForeground : status === "overdue" ? theme.colors.destructive : theme.colors.primary;
       const board = boards.find((item) => item.id === task.category);
       const priority = PRIORITY_META[task.priority];
-      return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} onPress={() => onTask(task)} style={({ pressed }) => [{ borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, backgroundColor: theme.colors.card, borderRadius: 17, padding: 13, marginBottom: 8, opacity: pressed ? 0.8 : 1 }]}>
+      if (compact) return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} accessibilityState={{ selected: selectedTaskId === task.id }} onPress={() => onTask(task)} style={({ pressed }) => ({ minHeight: 68, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 6, borderRadius: 10, borderWidth: 1, borderColor: selectedTaskId === task.id ? theme.colors.primary : theme.colors.border, backgroundColor: selectedTaskId === task.id ? theme.colors.primarySoft : theme.colors.card, opacity: pressed ? 0.8 : 1 })}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Ionicons name={task.completed ? "checkmark-circle-outline" : task.canceled ? "ban-outline" : "create-outline"} size={17} color={statusColor} /><Text numberOfLines={1} style={{ flex: 1, color: theme.colors.foreground, fontSize: 14, fontWeight: "700" }}>{task.title}</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>{format(parseISO(stamp), "p")}</Text></View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, marginLeft: 25 }}><Text style={{ color: statusColor, fontSize: 11, fontWeight: "600" }}>{eventType}</Text><Text style={{ color: priority.dot, fontSize: 11, fontWeight: "600" }}>{priority.label}</Text>{task.dueAt ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Due {format(parseISO(task.dueAt), "MMM d")}</Text> : null}{board ? <Text numberOfLines={1} style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>{board.label}</Text> : null}</View>
+      </Pressable>;
+      return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} accessibilityState={{ selected: selectedTaskId === task.id }} onPress={() => onTask(task)} style={({ pressed }) => [{ borderWidth: selectedTaskId === task.id ? 1 : StyleSheet.hairlineWidth, borderColor: selectedTaskId === task.id ? theme.colors.primary : theme.colors.border, backgroundColor: selectedTaskId === task.id ? theme.colors.primarySoft : theme.colors.card, borderRadius: 17, padding: 13, marginBottom: 8, opacity: pressed ? 0.8 : 1 }]}>
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}><View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: `${statusColor}18`, alignItems: "center", justifyContent: "center" }}><Ionicons name={status === "completed" ? "checkmark-circle-outline" : status === "canceled" ? "ban-outline" : status === "overdue" ? "alert-circle-outline" : "create-outline"} size={17} color={statusColor} /></View><View style={{ flex: 1, minWidth: 0 }}><Text style={{ color: theme.colors.foreground, fontSize: 15, lineHeight: 20, fontWeight: "700", textDecorationLine: task.completed ? "line-through" : "none" }} numberOfLines={2}>{task.title}</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12, marginTop: 3 }}>{eventType} · {format(parseISO(stamp), "p")}</Text></View><Ionicons name="chevron-forward" size={17} color={theme.colors.mutedForeground} /></View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7, marginTop: 11, marginLeft: 40 }}><View style={{ minHeight: 25, paddingHorizontal: 8, borderRadius: 999, backgroundColor: `${statusColor}18`, flexDirection: "row", alignItems: "center", gap: 4 }}><Text style={{ color: statusColor, fontSize: 11, fontWeight: "800" }}>{STATUS_LABELS[status]}</Text></View><View style={{ minHeight: 25, paddingHorizontal: 8, borderRadius: 999, backgroundColor: priority.tint, flexDirection: "row", alignItems: "center", gap: 5 }}><View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: priority.dot }} /><Text style={{ color: priority.ink, fontSize: 11, fontWeight: "800" }}>{priority.label}</Text></View>{task.dueAt ? <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><Ionicons name="time-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11, fontWeight: "600" }}>{format(parseISO(task.dueAt), "MMM d, h:mm a")}</Text></View> : null}{board ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 11, fontWeight: "600" }}>· {board.label}</Text> : null}</View>
       </Pressable>;

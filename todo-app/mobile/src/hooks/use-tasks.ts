@@ -905,7 +905,16 @@ export function useTasks(): TasksApi {
     saveQueueRef.current = saveQueueRef.current.then(() => saveProjects(next));
     if (!activate) return;
     const active = activeProject(next);
-    if (!active) return;
+    if (!active) {
+      activeIdRef.current = "";
+      tasksRef.current = [];
+      sectionsRef.current = [];
+      boardsRef.current = [];
+      setTasks([]);
+      setSections([]);
+      setBoards([]);
+      return;
+    }
     activeIdRef.current = active.id;
     tasksRef.current = active.workspace.tasks;
     sectionsRef.current = active.workspace.sections;

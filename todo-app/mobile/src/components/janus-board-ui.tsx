@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
+import { mobileBottomNavClearance } from "@/theme/layout";
 import { useOpenSession } from "@/hooks/use-open-session";
 import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { Button } from "@/components/ui/button";
@@ -174,6 +175,7 @@ export function TaskEditor({
   onAutoSave,
   onDelete,
   onCancelTask,
+  presentation = "sheet",
 }: {
   visible: boolean;
   task: Task | null;
@@ -185,10 +187,11 @@ export function TaskEditor({
   onAutoSave?: (draft: TaskDraft, sectionId: string | null) => void;
   onDelete?: () => void;
   onCancelTask?: () => void;
+  presentation?: "sheet" | "panel";
 }) {
   const session = useOpenSession(visible);
   const editorKey = `${session}:${task?.id ?? "new"}:${initialDueAt ?? ""}`;
-  return <TaskEditorForm key={editorKey} visible={visible} task={task} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={onClose} onSave={onSave} onAutoSave={onAutoSave} onDelete={onDelete} onCancelTask={onCancelTask} />;
+  return <TaskEditorForm key={editorKey} visible={visible} task={task} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={onClose} onSave={onSave} onAutoSave={onAutoSave} onDelete={onDelete} onCancelTask={onCancelTask} presentation={presentation} />;
 }
 
 function TaskEditorForm({
@@ -202,6 +205,7 @@ function TaskEditorForm({
   onAutoSave,
   onDelete,
   onCancelTask,
+  presentation,
 }: {
   visible: boolean;
   task: Task | null;
@@ -213,6 +217,7 @@ function TaskEditorForm({
   onAutoSave?: (draft: TaskDraft, sectionId: string | null) => void;
   onDelete?: () => void;
   onCancelTask?: () => void;
+  presentation: "sheet" | "panel";
 }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -233,6 +238,10 @@ function TaskEditorForm({
   }, [onAutoSave]);
   const savedSignatureRef = useRef<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<(() => void) | null>(null);
+  // Switching Activity cards replaces the keyed form. Save its last draft with
+  // the old task's callback, never the newly selected task's callback.
+  useEffect(() => () => pendingSaveRef.current?.(), []);
   const dateValue = dueAt && isValid(parseISO(dueAt)) ? parseISO(dueAt) : new Date();
   const buildDraft = useCallback((): TaskDraft => ({
     title: title.trim(),
@@ -275,6 +284,12 @@ function TaskEditorForm({
     if (!task || !autoSave || !title.trim()) return;
     const draft = buildDraft();
     const signature = JSON.stringify({ draft, sectionId });
+    pendingSaveRef.current = () => {
+      if (signature !== savedSignatureRef.current) {
+        autoSave(draft, sectionId);
+        savedSignatureRef.current = signature;
+      }
+    };
     if (savedSignatureRef.current === null) {
       savedSignatureRef.current = signature;
       return;
@@ -297,17 +312,27 @@ function TaskEditorForm({
     setSubtasks((current) => [...current, { id: `local-${Date.now()}`, title: subtaskTitle.trim(), done: false }]);
     setSubtaskTitle("");
   };
-  return (
-    <BottomSheetModal visible={visible} onClose={closeEditor} style={styles.taskEditorSheet}>
-      <View style={[styles.taskEditorHandle, { backgroundColor: theme.colors.borderStrong }]} />
+  const footer = <View style={[styles.taskEditorFooter, { borderTopColor: theme.colors.border, paddingBottom: presentation === "panel" ? 12 : Math.max(insets.bottom, 12) }]}>
+    {task ? <View style={styles.taskEditorFooterActions}>
+      <Button variant="secondary" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} style={styles.taskEditorFooterPrimary} />
+      <Button variant="ghost" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={styles.taskEditorDeleteButton}>
+        <Ionicons name="trash-outline" size={17} color={theme.colors.destructive} />
+        <Text style={{ color: theme.colors.destructive, fontSize: 14, fontWeight: "600" }}>Delete</Text>
+      </Button>
+    </View> : <Button label="Add task" onPress={save} />}
+  </View>;
+  const content = <>
+      {presentation === "sheet" ? <View style={[styles.taskEditorHandle, { backgroundColor: theme.colors.borderStrong }]} /> : null}
             <View style={styles.taskEditorHeader}>
               <View style={styles.taskEditorHeaderCopy}>
-                <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task details" : "Add task"}</Text>
+                <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task" : "Create"}</Text>
                 <Text style={[styles.taskEditorSubtitle, { color: theme.colors.mutedForeground }]}>{task ? "Changes save automatically" : "Start with a title. Details can wait."}</Text>
               </View>
-              <IconButton icon="close" label="Close task editor" onPress={closeEditor} size={40} />
+              {presentation === "sheet" ? <IconButton icon="close" label="Close task editor" onPress={closeEditor} size={40} /> : null}
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} style={styles.taskEditorScroll} contentContainerStyle={styles.taskEditorContent}>
+            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={presentation === "panel"} style={[styles.taskEditorScroll, presentation === "panel" ? { flex: 1 } : null]} contentContainerStyle={[styles.taskEditorContent, presentation === "panel" ? { paddingBottom: mobileBottomNavClearance + insets.bottom } : null]}>
+              <View style={presentation === "panel" ? { flexDirection: "row", flexWrap: "wrap", gap: 12 } : undefined}>
+              <View style={presentation === "panel" ? { flexGrow: 1, flexBasis: 240, minWidth: 0 } : undefined}>
               <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
               <TextInput
                 autoFocus={!task}
@@ -321,6 +346,8 @@ function TaskEditorForm({
                 style={[styles.taskEditorTitleInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: titleError ? theme.colors.destructive : theme.colors.border }]}
               />
               {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
+              </View>
+              <View style={presentation === "panel" ? { flexGrow: 1, flexBasis: 240, minWidth: 0 } : undefined}>
               <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>
               <TextInput
                 value={description}
@@ -328,8 +355,12 @@ function TaskEditorForm({
                 placeholder="Add a little context"
                 placeholderTextColor={theme.colors.mutedForeground}
                 multiline
-                style={[styles.taskEditorNotes, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
+                style={[styles.taskEditorNotes, presentation === "panel" ? { minHeight: 64, height: 64, paddingVertical: 10 } : null, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
               />
+              </View>
+              </View>
+              <View style={presentation === "panel" ? { flexDirection: "row", flexWrap: "wrap", columnGap: 16 } : undefined}>
+              <View style={presentation === "panel" ? { flexGrow: 1, flexBasis: 240, minWidth: 0 } : undefined}>
               <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground, marginTop: 18 }]}>ORGANIZE</Text>
               <View style={[styles.taskEditorSection, { borderColor: theme.colors.border, marginTop: 6 }]}>
                 <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
@@ -339,6 +370,8 @@ function TaskEditorForm({
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}</ScrollView>
               </View>
+              </View>
+              <View style={presentation === "panel" ? { flexGrow: 1, flexBasis: 240, minWidth: 0 } : undefined}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>SCHEDULE</Text>
                 <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>OPTIONAL</Text>
@@ -357,6 +390,8 @@ function TaskEditorForm({
                 </View>
                 {picker ? <View style={styles.taskEditorPicker}><DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /></View> : null}
               </View>
+              </View>
+              </View>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>CHECKLIST</Text>
                 {subtasks.length ? <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>{subtasks.filter((item) => item.done).length}/{subtasks.length} DONE</Text> : null}
@@ -365,22 +400,12 @@ function TaskEditorForm({
                 {subtasks.length ? <View style={[styles.taskEditorChecklist, { borderColor: theme.colors.border, backgroundColor: theme.colors.input, marginTop: 0 }]}>{subtasks.map((subtask, index) => <View key={subtask.id} style={[styles.taskEditorSubtaskRow, index > 0 ? { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.taskEditorSubtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><TextInput value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} placeholderTextColor={theme.colors.mutedForeground} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.taskEditorSubtaskInput, { color: theme.colors.foreground, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} style={({ pressed }) => [styles.taskEditorSubtaskDelete, { opacity: pressed ? 0.6 : 1 }]}><Ionicons name="trash-outline" size={17} color={theme.colors.mutedForeground} /></Pressable></View>)}</View> : null}
                 <View style={styles.taskEditorAddSubtask}><TextInput value={subtaskTitle} onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a step" placeholderTextColor={theme.colors.mutedForeground} returnKeyType="done" style={[styles.taskEditorAddSubtaskInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add subtask" onPress={addSubtaskLocal}><Ionicons name="add" size={19} color={theme.colors.primary} /></Button></View>
               </View>
+              {presentation === "panel" ? <View style={{ marginTop: 16 }}>{footer}</View> : null}
             </ScrollView>
-            <View style={[styles.taskEditorFooter, { borderTopColor: theme.colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
-              {task ? (
-                <View style={styles.taskEditorFooterActions}>
-                  <Button variant="secondary" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} style={styles.taskEditorFooterPrimary} />
-                  <Button variant="ghost" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={styles.taskEditorDeleteButton}>
-                    <Ionicons name="trash-outline" size={17} color={theme.colors.destructive} />
-                    <Text style={{ color: theme.colors.destructive, fontSize: 14, fontWeight: "600" }}>Delete</Text>
-                  </Button>
-                </View>
-              ) : (
-                <Button label="Add task" onPress={save} />
-              )}
-            </View>
-    </BottomSheetModal>
-  );
+            {presentation === "sheet" ? footer : null}
+    </>;
+  if (presentation === "panel") return visible ? <View style={{ flex: 1, minHeight: 0, paddingTop: 12, backgroundColor: theme.colors.card }}>{content}</View> : null;
+  return <BottomSheetModal visible={visible} onClose={closeEditor} style={styles.taskEditorSheet}>{content}</BottomSheetModal>;
 }
 
 export function OptionSheet({ visible, title, options, onClose }: { visible: boolean; title: string; options: { label: string; icon?: keyof typeof Ionicons.glyphMap; destructive?: boolean; onPress: () => void }[]; onClose: () => void }) {
