@@ -40,39 +40,103 @@ function nodes(node) {
 const byLabel = (tree, label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
 const byText = (tree, text) => nodes(tree).find((node) => node.type === "Text" && node.props.children === text);
 
-test("theme picker expands, searches, selects and closes without decorative icons", async () => {
+test("theme picker shows a sun/moon switch and only the palettes for that mode", async () => {
   const state = hooks();
   const choices = [];
-  const catalog = ["system", "matrix", "neon-circuit"].map((id) => ({ id, name: id === "matrix" ? "Matrix" : id }));
-  const theme = { scheme: "dark", colors: { background: "#101020", card: "#202030", primary: "#00ff41", borderStrong: "#999999" } };
+  let preference = "matrix";
+  const entries = [
+    { id: "system", name: "System", scheme: "light" },
+    { id: "light", name: "Light", scheme: "light" },
+    { id: "dark", name: "Dark", scheme: "dark" },
+    { id: "matrix", name: "Matrix", scheme: "dark" },
+    { id: "neon-circuit", name: "Neon Circuit", scheme: "dark" },
+    { id: "solarized-light", name: "Solarized Light", scheme: "light" },
+  ];
+  const darkTheme = { scheme: "dark", colors: { background: "#101020", card: "#202030", primary: "#00ff41", borderStrong: "#999999" } };
+  const lightTheme = { scheme: "light", colors: { background: "#f7f7f7", card: "#ffffff", primary: "#6d28d9", borderStrong: "#999999" } };
   const { ThemePicker } = await load("../src/components/settings/theme-picker.tsx", {
     react: state.react, "react-native": native,
+    "@expo/vector-icons": { Ionicons: "Ionicons" },
     "@/components/ui/input": { Input: "Input" },
     "@/components/reference/reference-theme": reference,
-    "@/providers/theme-provider": { useTheme: () => ({ preference: "matrix", theme, setPreference: (id) => choices.push(id) }) },
-    "@/theme/palettes": { themes: catalog }, "@/theme/tokens": { getThemeById: () => theme },
+    "@/providers/theme-provider": { useTheme: () => ({ preference, theme: entries.find((entry) => entry.id === preference)?.scheme === "light" ? lightTheme : darkTheme, setPreference: (id) => { choices.push(id); preference = id; } }) },
+    "@/theme/palettes": { themes: entries }, "@/theme/tokens": { getThemeById: (id) => entries.find((entry) => entry.id === id)?.scheme === "light" ? lightTheme : darkTheme },
   });
   let tree = state.render(ThemePicker, {});
+  // Dark is the active mode, so its palettes are shown and light-only ones are hidden.
+  assert.equal(byLabel(tree, "Use dark appearance").props.accessibilityState.checked, true);
+  assert.equal(byLabel(tree, "Use light appearance").props.accessibilityState.checked, false);
+  assert.equal(nodes(tree).filter((node) => node.type === "Ionicons").length, 2, "the switch shows sun and moon icons");
   assert.equal(byLabel(tree, "Choose interface theme").props.accessibilityState.expanded, false);
   byLabel(tree, "Choose interface theme").props.onPress();
   tree = state.render(ThemePicker, {});
   assert.equal(byLabel(tree, "Matrix").props.accessibilityState.checked, true);
+  assert.ok(byLabel(tree, "Dark"), "dark palettes are listed");
+  assert.equal(byLabel(tree, "Solarized Light"), undefined, "light palettes are hidden in dark mode");
   byLabel(tree, "Search themes").props.onChangeText("neon");
   tree = state.render(ThemePicker, {});
   assert.equal(byLabel(tree, "Matrix"), undefined);
-  byLabel(tree, "neon-circuit").props.onPress();
+  byLabel(tree, "Neon Circuit").props.onPress();
   assert.deepEqual(choices, ["neon-circuit"]);
   tree = state.render(ThemePicker, {});
   assert.equal(byLabel(tree, "Choose interface theme").props.accessibilityState.expanded, false);
-  assert.equal(nodes(tree).some((node) => node.type === "Icon"), false);
+  // Switching mode selects a light palette and filters the list to light themes.
+  byLabel(tree, "Use light appearance").props.onPress();
+  assert.equal(choices.at(-1), "light");
+  tree = state.render(ThemePicker, {});
+  assert.equal(byLabel(tree, "Use light appearance").props.accessibilityState.checked, true);
   byLabel(tree, "Choose interface theme").props.onPress();
   tree = state.render(ThemePicker, {});
-  byLabel(tree, "Search themes").props.onChangeText("not-a-theme");
+  assert.ok(byLabel(tree, "Solarized Light"));
+  assert.equal(byLabel(tree, "Matrix"), undefined, "the previous dark palette is hidden");
+  assert.equal(byLabel(tree, "Neon Circuit"), undefined);
+  byLabel(tree, "Solarized Light").props.onPress();
+  tree = state.render(ThemePicker, {});
+  // Returning to dark restores the dark palette last used in that mode.
+  byLabel(tree, "Use dark appearance").props.onPress();
+  assert.equal(choices.at(-1), "neon-circuit");
+  tree = state.render(ThemePicker, {});
+  byLabel(tree, "Choose interface theme").props.onPress();
+  tree = state.render(ThemePicker, {});
+  assert.ok(byLabel(tree, "Neon Circuit"));
+  assert.equal(byLabel(tree, "Solarized Light"), undefined);
+  byLabel(tree, "Search themes").props.onChangeText("solar");
   tree = state.render(ThemePicker, {});
   assert.ok(byText(tree, "No themes match your search."));
-  assert.equal(nodes(tree).some((node) => node.props?.accessibilityRole === "radio"), false);
   tree = state.render(ThemePicker, { disabled: true });
   assert.equal(byLabel(tree, "Choose interface theme").props.disabled, true);
+  assert.equal(byLabel(tree, "Use light appearance").props.disabled, true);
+});
+
+test("System remains available in either mode and follows the device appearance", async () => {
+  const state = hooks();
+  let preference = "system";
+  const choices = [];
+  const entries = [
+    { id: "system", name: "System", scheme: "light" },
+    { id: "light", name: "Light", scheme: "light" },
+    { id: "solarized-light", name: "Solarized Light", scheme: "light" },
+    { id: "dark", name: "Dark", scheme: "dark" },
+    { id: "matrix", name: "Matrix", scheme: "dark" },
+  ];
+  const lightTheme = { scheme: "light", colors: { background: "#f7f7f7", card: "#ffffff", primary: "#6d28d9", borderStrong: "#999999" } };
+  const { ThemePicker } = await load("../src/components/settings/theme-picker.tsx", {
+    react: state.react, "react-native": native,
+    "@expo/vector-icons": { Ionicons: "Ionicons" },
+    "@/components/ui/input": { Input: "Input" },
+    "@/components/reference/reference-theme": reference,
+    "@/providers/theme-provider": { useTheme: () => ({ preference, theme: lightTheme, setPreference: (id) => { choices.push(id); preference = id; } }) },
+    "@/theme/palettes": { themes: entries }, "@/theme/tokens": { getThemeById: () => lightTheme },
+  });
+  let tree = state.render(ThemePicker, {});
+  assert.equal(byLabel(tree, "Use light appearance").props.accessibilityState.checked, true, "System resolves to the device scheme");
+  byLabel(tree, "Choose interface theme").props.onPress();
+  tree = state.render(ThemePicker, {});
+  assert.ok(byLabel(tree, "System"), "System is offered while following the device");
+  assert.ok(byLabel(tree, "Solarized Light"));
+  assert.equal(byLabel(tree, "Matrix"), undefined);
+  byLabel(tree, "System").props.onPress();
+  assert.deepEqual(choices, ["system"]);
 });
 
 test("settings sections keep calendar, export and import actions functional", async () => {

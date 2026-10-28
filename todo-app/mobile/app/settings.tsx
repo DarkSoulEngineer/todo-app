@@ -125,12 +125,12 @@ export default function SettingsRoute() {
           </Pressable>)}
         </ScrollView>
         {section === "Appearance" ? <View style={styles.sectionBlock}>
-          <SectionHeading title="Theme & appearance" subtitle="Choose a palette. Changes save automatically on this device." />
+          <SectionHeading title="Theme & appearance" subtitle="Switch between Light and Dark, then pick a palette for that mode. Changes save automatically on this device." />
           <View style={styles.sectionCard}>
             <Text style={[type.caption, styles.settingLabelFirst]}>Interface theme</Text>
             <ThemePicker disabled={busy} />
           </View>
-          <Text style={[type.caption, { color: colors.muted }]}>Your theme applies to every board and view. Choose System to follow your device’s light or dark appearance.</Text>
+          <Text style={[type.caption, { color: colors.muted }]}>The sun and moon buttons switch your appearance; the selector then lists only palettes that match it. System follows your device’s light or dark appearance.</Text>
         </View> : null}
 
         {section === "Calendar" ? <View style={styles.sectionBlock}>
