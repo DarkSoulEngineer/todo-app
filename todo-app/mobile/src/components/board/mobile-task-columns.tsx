@@ -45,7 +45,8 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const cardContentStyle = styles.cards;
-  const columnContentStyle = [styles.columns, { paddingBottom: mobileBottomNavClearance + insets.bottom }];
+  const columnContentStyle = [styles.columns, { paddingBottom: 12 + insets.bottom }];
+  const holderContentStyle = [styles.columnContent, { paddingBottom: mobileBottomNavClearance + insets.bottom }];
   const focused = props.focused;
   const enabled = width >= 768 && (props.dragEnabled ?? true) && !props.selectionMode && !focused;
   const { host: previewHost, layer: previewLayer, overlay: previewOverlay } = useNativeDragPreview();
@@ -136,7 +137,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   // register duplicate draggable cards and steal the real lists' scroll refs.
   const sectionPreview = (section: BoardSection, index: number) => <View style={styles.columnStack}>
     {heading(section)}
-    <ScrollView scrollEnabled={false} contentOffset={{ x: 0, y: autoScroll.listOffset(section.id) }} style={styles.cardScroll} contentContainerStyle={styles.columnContent}>
+    <ScrollView scrollEnabled={false} contentOffset={{ x: 0, y: autoScroll.listOffset(section.id) }} style={styles.cardScroll} contentContainerStyle={holderContentStyle}>
     <View style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: c.border }]}>
     <View style={cardContentStyle}>
       {(grouped.get(section.id) ?? []).map((task) => <MobileColumnTaskCard key={task.id} task={task} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={false} onPress={() => {}} onMenu={() => {}} onSelect={() => {}} onToggleSubtask={() => {}} onMoveLeft={props.showMoveArrows && index > 0 ? () => {} : undefined} onMoveRight={props.showMoveArrows && index < columns.length - 1 ? () => {} : undefined} />)}
@@ -149,7 +150,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   return <View ref={previewHost} collapsable={false} style={styles.root}>
     {focused && active ? <>
       <ScrollView ref={tabs} horizontal onContentSizeChange={scrollToNewColumn} showsHorizontalScrollIndicator={false} style={styles.tabsRail} contentContainerStyle={styles.tabs}>{columns.map((section, index) => <Pressable key={section.id} accessibilityRole="tab" accessibilityLabel={`${section.title}, ${grouped.get(section.id)?.length ?? 0} cards`} aria-selected={index === activeIndex} onPress={() => selectColumn(index)} style={[styles.tab, { backgroundColor: c.backgroundAlt, borderColor: index === activeIndex ? c.primary : c.border }]}><Text style={{ color: index === activeIndex ? c.primary : c.mutedForeground, fontSize: 12, fontWeight: index === activeIndex ? "600" : "400" }}>{section.title}</Text></Pressable>)}</ScrollView>
-      <View style={[styles.columnStack, styles.focusColumn, { marginBottom: mobileBottomNavClearance + insets.bottom }]}>{heading(active)}<ScrollView testID="janus-focused-scroll" style={styles.cardScroll} contentContainerStyle={styles.columnContent} keyboardShouldPersistTaps="handled"><View style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: c.border }]}><View style={cardContentStyle}>{cards(active, activeIndex)}</View></View>{addCard(active)}</ScrollView></View>
+      <View style={[styles.columnStack, styles.focusColumn, { marginBottom: 12 + insets.bottom }]}>{heading(active)}<ScrollView testID="janus-focused-scroll" style={styles.cardScroll} contentContainerStyle={holderContentStyle} keyboardShouldPersistTaps="handled"><View style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: c.border }]}><View style={cardContentStyle}>{cards(active, activeIndex)}</View></View>{addCard(active)}</ScrollView></View>
     </> : <BoardDropZone id="viewport" register={drag.register} style={styles.root}><BoardColumnCarousel carouselRef={carousel} columns={columns} interval={interval} scrollEnabled={!drag.drag} onContentSizeChange={scrollToNewColumn} onScroll={(event) => {
       autoScroll.trackCarousel(event.nativeEvent.contentOffset.x);
       if (focusRef.current) return;
@@ -157,7 +158,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
       if (columns[index]) setSelectedId(columns[index].id);
     }} style={styles.carousel} contentContainerStyle={columnContentStyle}>
       {columns.map((section, index) => <JanusDragCell key={section.id} id={sectionDragId(section.id)} name={section.title} width={columnWidth} enabled={enabled} active={drag.drag?.id === sectionDragId(section.id)} target={drag.drag?.target?.kind === "section" && drag.drag.target.sectionId === section.id} floating constrainHeight handleHeight={60} renderPreview={() => sectionPreview(section, index)} previewLayer={previewLayer} onRegister={drag.register} onStart={dragStart} onMove={dragMove} onDrop={drag.drop} onCancel={drag.cancel}>
-        <View testID={`janus-column-holder-${section.id}`} style={styles.columnStack}>{heading(section)}<ScrollView ref={(node) => autoScroll.registerList(section.id, node)} testID={`janus-column-scroll-${section.id}`} onScroll={(event) => autoScroll.trackList(section.id, event.nativeEvent.contentOffset.y)} scrollEventThrottle={16} scrollEnabled={!drag.drag} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.cardScroll} contentContainerStyle={styles.columnContent}><View testID={`janus-column-${section.id}`} style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: drag.drag?.target?.kind === "task" && drag.drag.target.sectionId === section.id ? c.primary : c.border }]}><View style={cardContentStyle}>{cards(section, index)}</View></View>{addCard(section)}</ScrollView></View>
+        <View testID={`janus-column-holder-${section.id}`} style={styles.columnStack}>{heading(section)}<ScrollView ref={(node) => autoScroll.registerList(section.id, node)} testID={`janus-column-scroll-${section.id}`} onScroll={(event) => autoScroll.trackList(section.id, event.nativeEvent.contentOffset.y)} scrollEventThrottle={16} scrollEnabled={!drag.drag} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.cardScroll} contentContainerStyle={holderContentStyle}><View testID={`janus-column-${section.id}`} style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: drag.drag?.target?.kind === "task" && drag.drag.target.sectionId === section.id ? c.primary : c.border }]}><View style={cardContentStyle}>{cards(section, index)}</View></View>{addCard(section)}</ScrollView></View>
       </JanusDragCell>)}
       <Pressable accessibilityRole="button" accessibilityLabel="Add list" onPress={props.onAddSection} style={[styles.addSection, { width: columnWidth, borderColor: c.border }]}><Ionicons name="add" size={20} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground }}>Add list</Text></Pressable>
     </BoardColumnCarousel></BoardDropZone>}

@@ -64,13 +64,13 @@ test("list backgrounds wrap their content with navigation clearance outside the 
     const scroll = nodes(holder).find((node) => node.type === "ScrollView");
     assert.equal(scroll.props.style.flexGrow, 0);
     assert.equal(scroll.props.style.flexShrink, 1);
-    assert.equal(scroll.props.contentContainerStyle.paddingBottom, 4);
+    assert.equal(Object.assign({}, ...scroll.props.contentContainerStyle).paddingBottom, 132, "navigation clearance stays inside the scroller");
     assert.ok(!nodes(column).some((node) => node.props?.testID === `janus-add-card-footer-${id}`), "creation tile must be outside the column background");
     assert.ok(nodes(cell).some((node) => node.props?.testID === `janus-add-card-footer-${id}`));
   }
   const contentStyle = Object.assign({}, ...nodes(tree).find((node) => node.type === "Carousel").props.contentContainerStyle);
   assert.equal(contentStyle.alignItems, "flex-start");
-  assert.equal(contentStyle.paddingBottom, 132, "navigation clearance is transparent space outside the columns");
+  assert.equal(contentStyle.paddingBottom, 32, "holders extend to a 12-point bottom gap plus the safe area");
 });
 
 test("header and trailing Add card buttons target the correct list in normal and focused views", () => {
