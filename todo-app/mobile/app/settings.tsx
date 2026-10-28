@@ -127,10 +127,8 @@ export default function SettingsRoute() {
         {section === "Appearance" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Theme & appearance" subtitle="Switch between Light and Dark, then pick a palette for that mode. Changes save automatically on this device." />
           <View style={styles.sectionCard}>
-            <Text style={[type.caption, styles.settingLabelFirst]}>Interface theme</Text>
             <ThemePicker disabled={busy} />
           </View>
-          <Text style={[type.caption, { color: colors.muted }]}>The switch toggles between Light and Dark; the selector then lists only palettes that match it. System follows your device’s light or dark appearance.</Text>
         </View> : null}
 
         {section === "Calendar" ? <View style={styles.sectionBlock}>
