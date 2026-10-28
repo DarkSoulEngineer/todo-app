@@ -150,7 +150,7 @@ test("board switch selects the new board default, even when task IDs overlap", (
   const other = { ...task, title: "Other board task", priority: "high" };
   const tree = render(1200, "list", task, true, [other], [], { boardId: "other", owner: "board" });
   assert.equal(editor(tree).props.task.title, "Other board task");
-  assert.equal(find(tree, (node) => node.props?.style?.flex === 6)[0].key, "other");
+  assert.equal(find(tree, (node) => node.props?.testID === "workspace-editor-pane")[0].key, "other");
 });
 test("filters do not replace an existing selection or change the board-wide default", () => {
   const high = { ...task, id: "high", priority: "high" };
@@ -164,8 +164,8 @@ test("filters do not replace an existing selection or change the board-wide defa
 });
 test("pane widths stay identical for closed and deleted selections while cards remain", () => {
   for (const [selected, visible, tasks] of [[task, true, [task]], [task, false, [task]], [{ ...task, id: "deleted" }, true, [task]], [null, false, [task]]]) {
-    const panel = find(render(1200, "list", selected, visible, tasks), (node) => node.props?.style?.flex === 6)[0];
-    assert.equal(panel.props.style.minWidth, 440);
+    const panel = find(render(1200, "list", selected, visible, tasks), (node) => node.props?.testID === "workspace-editor-pane")[0];
+    assert.equal(panel.props.style.minWidth, 0);
     assert.equal(panel.props.style.width, undefined);
   }
 });
@@ -179,7 +179,7 @@ test("desktop uses uncapped feed width and compact cards while retaining the ori
   const nav = find(tree, (node) => node.type === "MobileBoardBottomNav");
   assert.equal(nav.length, 1);
   assert.equal(nav[0].props.inline, undefined);
-  const panel = find(tree, (node) => node.props?.style?.flex === 6)[0];
+  const panel = find(tree, (node) => node.props?.testID === "workspace-editor-pane")[0];
   assert.equal(panel.props.style.marginBottom, 12);
   assert.equal(panel.props.style.maxWidth, undefined);
   const mobileNav = find(render(390), (node) => node.type === "MobileBoardBottomNav");
@@ -196,6 +196,24 @@ test("resizing keeps the editor in the same tree position and retains its select
   return readFile(new URL("../src/components/janus-board-ui.tsx", import.meta.url), "utf8").then((text) => {
     assert.match(text, /const editorKey = `\$\{session\}:\$\{task\?\.id \?\? "new"\}:\$\{initialDueAt \?\? ""\}`/);
   });
+});
+
+test("Activity and Calendar allocate equal space to the feed and editor throughout the split breakpoint", () => {
+  for (const width of [900, 1024, 1440, 1920]) {
+    for (const mode of ["list", "calendar"]) {
+      const tree = render(width, mode);
+      const feed = find(tree, (node) => node.props?.testID === "workspace-feed-pane")[0];
+      const editorPane = find(tree, (node) => node.props?.testID === "workspace-editor-pane")[0];
+      assert.equal(feed.props.style.flex, 1);
+      assert.equal(editorPane.props.style.flex, 1);
+      assert.equal(feed.props.style.minWidth, 0);
+      assert.equal(editorPane.props.style.minWidth, 0);
+      assert.equal(editorPane.props.style.width, undefined);
+    }
+  }
+  const mobile = render(390, "calendar");
+  assert.equal(find(mobile, (node) => node.props?.testID === "workspace-editor-pane")[0].props.style, undefined);
+  assert.equal(editor(mobile).props.presentation, "sheet");
 });
 
 test("switching cards flushes a debounced draft to the previous task, not the next task", async () => {
