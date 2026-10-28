@@ -194,9 +194,7 @@ export default function SettingsRoute() {
             <View style={{ alignItems: "center" }}><JanusLogo size={56} /></View>
             <Text style={[type.bodyStrong, { color: colors.text }]}>The story of Janus</Text>
             <Text style={[type.caption, { color: colors.muted, lineHeight: 20 }]}>
-              Janus guards every doorway with two faces. One face remembers what is done. The other watches what is still open. In this board the good face carries your completed tasks. The bad face carries what is unfinished or overdue. The logo keeps both in one mark, so neither side can be ignored.
-
-              The lesson comes from the archer who lost his bow. He could no longer shoot, yet he kept aiming at the target. Without the tool he learned that the shot lives in the hand and the eye, not in the wood. A board works the same way. It holds your lists, but the choice to finish or delay belongs to you. The faces of Janus do not judge. They only show where you stand, so you can take the next honest step.
+              Janus is the two faced keeper of doorways. One face looks back at what is finished, the other looks ahead at what remains. In this board the good face marks tasks you have completed and done. The bad face marks what is still unfinished and overdue. The logo carries both faces in a single mark, so progress and neglect stay visible at a glance.
             </Text>
           </View>
         </View> : null}
