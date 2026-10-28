@@ -35,10 +35,10 @@ export function parseSettingsJson(raw: string): AppSettings | null {
     const settings = payload.settings;
     if (!isRecord(settings)) return null;
     const { theme, calendarDefaultView, calendarWeekStart } = settings;
-    if (theme !== "system" && theme !== "light" && theme !== "dark") return null;
+    if (typeof theme !== "string") return null;
     if (calendarDefaultView !== "month" && calendarDefaultView !== "week") return null;
     if (calendarWeekStart !== 0 && calendarWeekStart !== 1) return null;
-    return { theme, calendarDefaultView, calendarWeekStart };
+    return { theme: theme as ThemePreference, calendarDefaultView, calendarWeekStart };
   } catch {
     return null;
   }

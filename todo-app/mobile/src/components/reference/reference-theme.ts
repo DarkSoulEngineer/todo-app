@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { useTheme } from "@/providers/theme-provider";
-import { themes } from "@/theme/tokens";
+import { themes, type Theme } from "@/theme/tokens";
 
 /** Reference components adapt the app palette instead of owning another theme. */
-export function getReferenceColors(scheme: "light" | "dark") {
-  const c = themes[scheme].colors;
+export function getReferenceColors(selected: Theme | "light" | "dark") {
+  const theme = typeof selected === "string" ? themes[selected] : selected;
+  const { scheme, colors: c } = theme;
   const inverse = themes[scheme === "light" ? "dark" : "light"].colors;
   return {
     surface: c.background, surfaceBright: c.cardElevated, surfaceDim: c.backgroundAlt,
@@ -76,7 +77,7 @@ export type ReferenceType = typeof referenceType;
 export function useReferenceTheme() {
   const { theme, toggle } = useTheme();
   return useMemo(() => {
-    const colors = getReferenceColors(theme.scheme);
+    const colors = getReferenceColors(theme);
     const type = Object.fromEntries(Object.entries(referenceType).map(([key, value]) => [key, { ...value, color: colors.onSurface }])) as ReferenceType;
     const card = {
       backgroundColor: colors.surfaceContainerLowest,
@@ -90,7 +91,7 @@ export function useReferenceTheme() {
       elevation: 1,
     } as const;
     return { scheme: theme.scheme, colors, type, card, radii: referenceRadii, spacing: referenceSpacing, toggle };
-  }, [theme.scheme, toggle]);
+  }, [theme, toggle]);
 }
 
 export const referenceCard = {

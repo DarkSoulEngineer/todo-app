@@ -9,9 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import { useColorScheme } from "react-native";
-import { themes, type Theme, type ThemePreference } from "@/theme/tokens";
+import { getThemeById, themes, type Theme, type ThemePreference } from "@/theme/tokens";
 
-const THEME_KEY = "janus.theme.v1";
+const THEME_KEY = "janus.theme.v2";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -26,7 +26,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
-  const [preference, setPreferenceState] = useState<ThemePreference>("system");
+  const [preference, setPreferenceState] = useState<ThemePreference>("dark");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -34,12 +34,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     void AsyncStorage.getItem(THEME_KEY)
       .then((value) => {
         if (cancelled) return;
-        if (value === "light" || value === "dark" || value === "system") {
+        if (value) {
           setPreferenceState(value);
+        } else {
+          void AsyncStorage.getItem("janus.theme.v1").then((old) => {
+            if (cancelled) return;
+            if (old === "light" || old === "dark" || old === "system") {
+              setPreferenceState(old);
+            }
+          });
         }
       })
       .catch(() => {
-        // Storage may be unavailable; keep the system theme.
+        // Storage may be unavailable; keep defaults.
       })
       .finally(() => {
         if (!cancelled) setHydrated(true);
@@ -59,14 +66,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPreferenceState(next);
   }, []);
 
-  const resolved = preference === "system" ? (system === "dark" ? "dark" : "light") : preference;
+  const resolvedScheme = preference === "system" ? (system === "dark" ? "dark" : "light") : undefined;
+  const resolved = preference === "system" ? (resolvedScheme === "light" ? themes.light : themes.dark) : getThemeById(preference);
 
   const toggle = useCallback(() => {
-    setPreference(preference === "system" ? "light" : preference === "light" ? "dark" : "system");
+    setPreference(preference === "system" ? "dark" : preference === "dark" ? "light" : "system");
   }, [preference, setPreference]);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme: themes[resolved], preference, setPreference, savePreference, toggle }),
+    () => ({ theme: resolved, preference, setPreference, savePreference, toggle }),
     [resolved, preference, setPreference, savePreference, toggle],
   );
 

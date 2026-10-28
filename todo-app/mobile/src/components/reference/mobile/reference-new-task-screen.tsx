@@ -105,7 +105,7 @@ export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current boa
                 const active = category === board.id;
                 return <Pressable key={board.id} accessibilityRole="button" aria-pressed={active} accessibilityState={{ selected: active }} onPress={() => setCategory(active ? null : board.id)} style={[styles.boardOption, active && { backgroundColor: tone.tint, borderColor: tone.ring }]}>
                   <View style={[styles.boardSwatch, { backgroundColor: tone.dot }]}><Ionicons name={active ? "checkmark" : "layers-outline"} size={14} color="#fff" /></View>
-                  <Text style={[type.caption, { color: active ? tone.ink : colors.text, fontWeight: active ? "700" : "500" }]} numberOfLines={1}>{board.label}</Text>
+                  <Text style={[type.caption, { color: active && scheme === "light" ? tone.ink : colors.text, fontWeight: active ? "700" : "500" }]} numberOfLines={1}>{board.label}</Text>
                 </Pressable>;
               })}
             </ScrollView>

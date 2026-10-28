@@ -452,14 +452,14 @@ export function BoardCard({ label, count, completed, createdAt, overdue = 0, due
                 <Text style={[styles.boardCardNewCountText, { color: theme.colors.foreground }]}><Text style={{ fontWeight: "600" }}>{openCount}</Text> open</Text>
               </View>
               <View style={styles.boardCardNewCountItem}>
-                <Ionicons name="checkmark-circle" size={14} color={theme.scheme === "dark" ? "#4ade80" : "#16a34a"} />
-                <Text style={[styles.boardCardNewCountText, { color: theme.scheme === "dark" ? "#4ade80" : "#16a34a" }]}><Text style={{ fontWeight: "600" }}>{completed}</Text> done</Text>
+                <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} />
+                <Text style={[styles.boardCardNewCountText, { color: theme.colors.success }]}><Text style={{ fontWeight: "600" }}>{completed}</Text> done</Text>
               </View>
             </View>
             <Text style={[styles.boardCardNewPct, { color: theme.colors.mutedForeground }]}>{Math.round(progress * 100)}%</Text>
           </View>
           <View style={[styles.boardCardNewProgressBar, { backgroundColor: theme.colors.secondary }]}>
-            <View style={[styles.boardCardNewProgressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: theme.scheme === "dark" ? (label === "My board" ? "#ec4899" : "#22c55e") : "#22c55e" }]} />
+            <View style={[styles.boardCardNewProgressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: theme.colors.success }]} />
           </View>
         </View>
         
@@ -467,14 +467,14 @@ export function BoardCard({ label, count, completed, createdAt, overdue = 0, due
           <View style={styles.boardCardNewAlertsLeft}>
             {overdue > 0 ? (
               <View style={styles.boardCardNewAlertItem}>
-                <Ionicons name="warning-outline" size={12} color={theme.scheme === "dark" ? "#f87171" : "#dc2626"} />
-                <Text style={[styles.boardCardNewAlertText, { color: theme.scheme === "dark" ? "#f87171" : "#dc2626" }]}>{overdue} overdue</Text>
+                <Ionicons name="warning-outline" size={12} color={theme.colors.destructive} />
+                <Text style={[styles.boardCardNewAlertText, { color: theme.colors.destructive }]}>{overdue} overdue</Text>
               </View>
             ) : null}
             {dueSoon > 0 ? (
               <View style={styles.boardCardNewAlertItem}>
-                <Ionicons name="time-outline" size={12} color={theme.scheme === "dark" ? "#38bdf8" : "#0284c7"} />
-                <Text style={[styles.boardCardNewAlertText, { color: theme.scheme === "dark" ? "#38bdf8" : "#0284c7" }]}>{dueSoon} due soon</Text>
+                <Ionicons name="time-outline" size={12} color={theme.colors.info} />
+                <Text style={[styles.boardCardNewAlertText, { color: theme.colors.info }]}>{dueSoon} due soon</Text>
               </View>
             ) : null}
           </View>
@@ -493,7 +493,7 @@ export function BoardCard({ label, count, completed, createdAt, overdue = 0, due
           </TouchableOpacity>
         </View>
         <TouchableOpacity>
-          <Text style={[styles.boardCardNewRemoveText, { color: theme.scheme === "dark" ? "#f87171" : "#dc2626" }]}>Remove</Text>
+          <Text style={[styles.boardCardNewRemoveText, { color: theme.colors.destructive }]}>Remove</Text>
         </TouchableOpacity>
       </View>
     </View>

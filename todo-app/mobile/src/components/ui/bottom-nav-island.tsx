@@ -27,9 +27,9 @@ export function BottomNavIsland({ children, tabCount = 3, blurTarget }: { childr
         style={styles.fadeEdge}
       />
     </View>
-    <View testID="navigation-island-surface" style={[styles.surface, { maxWidth: Math.min(600, tabCount * 80 + 48), shadowColor: c.shadow, backgroundColor: dark ? "rgba(18, 15, 11, 0.70)" : "rgba(255, 255, 255, 0.70)", borderColor: c.border }]}>
+    <View testID="navigation-island-surface" style={[styles.surface, { maxWidth: Math.min(600, tabCount * 80 + 48), shadowColor: c.shadow, backgroundColor: `${c.card}B3`, borderColor: c.border }]}>
       <View style={[styles.glass, {
-        backgroundColor: dark ? "rgba(18, 15, 11, 0.70)" : "rgba(255, 255, 255, 0.70)",
+        backgroundColor: `${c.card}B3`,
         borderColor: c.border,
       }]}>
         <LinearGradient

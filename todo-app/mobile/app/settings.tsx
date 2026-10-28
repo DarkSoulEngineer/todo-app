@@ -17,12 +17,12 @@ import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import type { ThemePreference } from "@/theme/tokens";
+import { themes } from "@/theme/palettes";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: "system", label: "System", icon: "phone-portrait-outline" },
-  { value: "light", label: "Light", icon: "sunny-outline" },
-  { value: "dark", label: "Dark", icon: "moon-outline" },
+  ...themes.filter((t) => t.id !== "system").map((t) => ({ value: t.id, label: t.name, icon: t.scheme === "dark" ? "moon-outline" as const : "sunny-outline" as const })),
 ];
 
 const CALENDAR_VIEW_OPTIONS: { value: CalendarDefaultView; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -128,10 +128,10 @@ export default function SettingsRoute() {
           <SectionHeading
             title="Appearance"
             subtitle="Choose how Janus looks on this device. Your choice is saved automatically."
-            right={<Pill label={preference === "system" ? "Auto" : preference === "light" ? "Light" : "Dark"} tone="primary" />}
+            right={<Pill label={preference === "system" ? "Auto" : themes.find((theme) => theme.id === preference)?.name ?? "Theme"} tone="primary" />}
           />
           <SurfaceCard style={styles.sectionCard}>
-            <View style={styles.segmented}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeScroll}>
               {THEME_OPTIONS.map((option) => {
                 const selected = preference === option.value;
                 return (
@@ -140,16 +140,16 @@ export default function SettingsRoute() {
                     accessibilityRole="button"
                     disabled={busy}
                     accessibilityState={{ selected }}
-                    accessibilityLabel={`Use ${option.label.toLowerCase()} theme`}
+                    accessibilityLabel={`Use ${option.label} theme`}
                     onPress={() => setPreference(option.value)}
-                    style={[styles.segment, selected && styles.segmentSelected]}
+                    style={[styles.themeChip, selected && styles.themeChipSelected, { borderColor: selected ? colors.primary : colors.outlineVariant }]}
                   >
-                    <Ionicons name={option.icon} size={17} color={selected ? colors.primary : colors.muted} />
-                    <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
+                    <Ionicons name={option.icon} size={16} color={selected ? colors.primary : colors.muted} />
+                    <Text style={[type.caption, { color: selected ? colors.primary : colors.muted }]} numberOfLines={1}>{option.label}</Text>
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
           </SurfaceCard>
         </View>
 
@@ -250,6 +250,9 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   segmented: { padding: 4, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 3 },
   segment: { flex: 1, minHeight: 44, paddingHorizontal: 6, borderRadius: referenceRadii.md, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
   segmentSelected: { backgroundColor: colors.card, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 5, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  themeScroll: { flexDirection: "row", gap: 8 },
+  themeChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, minHeight: 38, borderRadius: referenceRadii.pill, borderWidth: 1, backgroundColor: colors.surfaceLow },
+  themeChipSelected: { backgroundColor: colors.card },
   actionRow: { minHeight: 58, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
   infoRow: { minHeight: 58, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
   actionIcon: { width: 38, height: 38, borderRadius: referenceRadii.md, backgroundColor: colors.surfaceLow, alignItems: "center", justifyContent: "center" },
