@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { JanusLogo } from "@/components/ui/janus-logo";
@@ -15,7 +15,7 @@ import { pickWorkspaceFile } from "@/lib/data/transfer";
 import { mobileContentStyle } from "@/theme/layout";
 
 export function WelcomeScreen() {
-  const { theme } = useTheme();
+  const { theme, toggle } = useTheme();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
   const api = useTasksContext();
@@ -48,6 +48,14 @@ export function WelcomeScreen() {
     <View style={[styles.root, { backgroundColor: c.background }]}>
       <ThemeAtmosphere />
       <View style={[styles.content, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
+        <View style={styles.topBar}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => router.push("/settings")} style={[styles.topButton, { backgroundColor: c.card }]}>
+            <Ionicons name="settings-outline" size={22} color={c.foreground} />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={theme.scheme === "dark" ? "Use light theme" : "Use dark theme"} onPress={toggle} style={[styles.topButton, { backgroundColor: c.card }]}>
+            <Ionicons name={theme.scheme === "dark" ? "sunny-outline" : "moon-outline"} size={22} color={c.foreground} />
+          </Pressable>
+        </View>
         <View style={styles.header}>
           <View style={[styles.logoWrap, { backgroundColor: "transparent" }]}>
             <JanusLogo size={200} />
@@ -109,6 +117,21 @@ const styles = StyleSheet.create({
     gap: 48,
     ...mobileContentStyle,
     paddingHorizontal: 24,
+  },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    width: "100%",
+    maxWidth: 400,
+    alignSelf: "center",
+  },
+  topButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   header: {
     alignItems: "center",
