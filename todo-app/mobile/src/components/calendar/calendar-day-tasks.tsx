@@ -127,7 +127,6 @@ function CalendarDayTaskTile({
 
   return (
     <Pressable
-      accessibilityRole="button"
       accessibilityLabel={`${status === "completed" ? "Completed task" : "Edit task"} ${task.title || "Untitled task"}`}
       accessibilityHint="Opens the task editor. Long press for task actions."
       onPress={onPress}
