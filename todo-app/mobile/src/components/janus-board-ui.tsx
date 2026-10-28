@@ -319,7 +319,6 @@ function TaskEditorForm({
   const tagsControl = presentation === "panel" ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
   const listsControl = presentation === "panel" ? <View testID="task-editor-lists-wrap" style={styles.wrapRow}>{listChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{listChips}</ScrollView>;
   const content = <>
-      {presentation === "sheet" ? <View style={[styles.taskEditorHandle, { backgroundColor: theme.colors.borderStrong }]} /> : null}
             <View style={styles.taskEditorHeader}>
               <View style={styles.taskEditorHeaderCopy}>
                 <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task" : "Create"}</Text>
@@ -742,7 +741,6 @@ const styles = StyleSheet.create({
   boardCardNewFooterBtnText: { fontSize: 12 },
   boardCardNewRemoveText: { fontSize: 12, fontWeight: "500" },
   taskEditorSheet: { paddingTop: 10, borderTopLeftRadius: 28, borderTopRightRadius: 28, shadowRadius: 22, shadowOffset: { width: 0, height: -8 }, elevation: 16 },
-  taskEditorHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   taskEditorHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 18, paddingBottom: 4 },
   taskEditorHeaderCopy: { flex: 1, minWidth: 0 },
   taskEditorTitle: { fontSize: 24, lineHeight: 30, fontWeight: "700", letterSpacing: -0.3 },

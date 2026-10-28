@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
   KeyboardAvoidingView,
+  Keyboard,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -20,6 +22,7 @@ const OPEN_MS = 280;
 const CLOSE_MS = 220;
 const BACKDROP_IN_MS = 200;
 const BACKDROP_OUT_MS = 160;
+const WEB_DRAG_STYLE: ViewStyle & { touchAction: "none" } = { touchAction: "none" };
 
 export function BottomSheetModal({
   visible,
@@ -38,8 +41,37 @@ export function BottomSheetModal({
   const [rendered, setRendered] = useState(visible);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(Math.max(windowHeight, 480)));
+  const [dragY] = useState(() => new Animated.Value(0));
+  const sheetHeightRef = useRef(windowHeight);
+  const closingRef = useRef(false);
   const heightRef = useRef(Math.max(windowHeight, 480));
   const useNativeDriver = Platform.OS !== "web";
+  const requestClose = useCallback(() => {
+    if (!visible || closingRef.current) return;
+    closingRef.current = true;
+    Keyboard.dismiss();
+    onClose();
+  }, [onClose, visible]);
+  const swipe = useMemo(() => {
+    const snapBack = () => Animated.spring(dragY, { toValue: 0, tension: 140, friction: 18, useNativeDriver }).start();
+    // PanResponder stores these callbacks; refs are read only when a gesture fires.
+    // eslint-disable-next-line react-hooks/refs
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gesture) => visible && !closingRef.current && gesture.numberActiveTouches === 1 && gesture.dy > 6 && gesture.dy > Math.abs(gesture.dx) * 1.2,
+      onPanResponderGrant: () => { Keyboard.dismiss(); dragY.stopAnimation(); },
+      onPanResponderMove: (_, gesture) => {
+        if (visible && !closingRef.current) dragY.setValue(Math.max(0, gesture.dy));
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const distance = Math.min(96, Math.max(48, sheetHeightRef.current * 0.25));
+        if (gesture.dy >= distance || (gesture.dy > 24 && gesture.vy > 0.9)) requestClose();
+        else snapBack();
+      },
+      onPanResponderTerminate: snapBack,
+      onPanResponderTerminationRequest: () => false,
+    });
+  }, [dragY, requestClose, useNativeDriver, visible]);
 
   useEffect(() => {
     heightRef.current = windowHeight;
@@ -57,6 +89,9 @@ export function BottomSheetModal({
     const offscreenY = Math.max(heightRef.current, 480);
 
     if (visible) {
+      closingRef.current = false;
+      dragY.stopAnimation();
+      dragY.setValue(0);
       backdropOpacity.setValue(0);
       translateY.setValue(offscreenY);
       Animated.parallel([
@@ -93,8 +128,9 @@ export function BottomSheetModal({
     return () => {
       backdropOpacity.stopAnimation();
       translateY.stopAnimation();
+      dragY.stopAnimation();
     };
-  }, [backdropOpacity, rendered, translateY, useNativeDriver, visible]);
+  }, [backdropOpacity, dragY, rendered, translateY, useNativeDriver, visible]);
 
   return (
     <Modal
@@ -104,9 +140,7 @@ export function BottomSheetModal({
       presentationStyle="overFullScreen"
       statusBarTranslucent
       navigationBarTranslucent
-      onRequestClose={() => {
-        if (visible) onClose();
-      }}
+      onRequestClose={requestClose}
     >
       <View style={styles.overlay}>
         <Animated.View
@@ -115,9 +149,7 @@ export function BottomSheetModal({
         >
           <Pressable
             style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.overlay }]}
-            onPress={() => {
-              if (visible) onClose();
-            }}
+            onPress={requestClose}
             accessibilityRole="button"
             accessibilityLabel="Close"
           />
@@ -129,6 +161,8 @@ export function BottomSheetModal({
           style={styles.keyboard}
         >
           <Animated.View
+            testID="bottom-sheet-surface"
+            onLayout={(event) => { sheetHeightRef.current = event.nativeEvent.layout.height; }}
             style={[
               styles.sheet,
               {
@@ -139,9 +173,14 @@ export function BottomSheetModal({
                 shadowColor: theme.colors.shadow,
               },
               style,
-              { transform: [{ translateY }] },
+              { transform: [{ translateY: Animated.add(translateY, dragY) }] },
             ]}
           >
+            <View testID="bottom-sheet-drag-handle" {...swipe.panHandlers} style={[styles.dragArea, Platform.OS === "web" && WEB_DRAG_STYLE]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close sheet" accessibilityHint="Drag down or activate to close" onPress={requestClose} style={styles.handleButton}>
+                <View pointerEvents="none" style={[styles.handle, { backgroundColor: theme.colors.borderStrong }]} />
+              </Pressable>
+            </View>
             {children}
           </Animated.View>
         </KeyboardAvoidingView>
@@ -151,6 +190,9 @@ export function BottomSheetModal({
 }
 
 const styles = StyleSheet.create({
+  dragArea: { flexShrink: 0 },
+  handleButton: { height: 44, alignItems: "center", justifyContent: "center" },
+  handle: { width: 42, height: 4, borderRadius: 2 },
   overlay: {
     flex: 1,
     justifyContent: "flex-end",
