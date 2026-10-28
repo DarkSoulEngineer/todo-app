@@ -51,7 +51,7 @@ const find = (tree, id) => nodes(tree).find((node) => node.props?.testID === id)
 const flatten = (value) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean));
 const projects = Array.from({ length: 7 }, (_, id) => ({ id: `${id}`, name: `Board ${id}`, createdAt: "2026-10-28", workspace: { tasks: [] } }));
 function render(overrides = {}) {
-  return BoardManagerContent({ projects, closedProjects: projects.slice(0, 2), totalBoards: 7, metrics, pinnedIds: new Set(), ready: true, loading: false, editing: false, now: 0, ...overrides });
+  return BoardManagerContent({ projects, statsProjects: projects, closedProjects: projects.slice(0, 2), totalBoards: 7, metrics, pinnedIds: new Set(), ready: true, loading: false, editing: false, now: 0, ...overrides });
 }
 
 test("responsive grid fills available width without overflowing cards or safe areas", () => {
@@ -143,6 +143,24 @@ test("grid keeps ordering and board actions intact", () => {
   assert.deepEqual(calls, [["open", "0"], ["move", "1", -1]]);
   assert.equal(cards[0].props.first, true);
   assert.equal(cards.at(-1).props.last, true);
+});
+
+test("desktop stats stretch to available height without a panel background", () => {
+  width = 1920;
+  const tree = render({ projects: projects.slice(0, 1) });
+  assert.equal(flatten(find(tree, "home-content").props.contentContainerStyle).flexGrow, 1);
+  const dashboard = flatten(find(tree, "home-dashboard").props.style);
+  assert.equal(dashboard.flexGrow, 1);
+  assert.equal(dashboard.alignItems, "stretch");
+  const overview = nodes(tree).find((node) => node.type?.name === "WorkspaceOverview");
+  assert.equal(overview.props.projects.length, 7, "search filtering must not change workspace statistics");
+  const stats = overview.type(overview.props);
+  assert.equal(flatten(stats.props.style).flexGrow, 1);
+  const surface = flatten(find(stats, "home-stats-surface").props.style);
+  assert.equal(surface.flexGrow, 1);
+  assert.equal(surface.backgroundColor, undefined);
+  assert.equal(surface.borderWidth, undefined);
+  assert.ok(find(stats, "home-board-comparison"));
 });
 
 test("outline create card fills a grid slot and opens the existing create action", () => {

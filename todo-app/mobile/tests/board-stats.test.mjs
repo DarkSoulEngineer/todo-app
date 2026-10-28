@@ -12,11 +12,34 @@ const declaration = ast.statements.find((node) => ts.isFunctionDeclaration(node)
 const { outputText } = ts.transpileModule(`export ${declaration.getText(ast)}`, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
 const colors = { success: "#00AA66", destructive: "#FF3344", info: "#3399FF", primary: "#AA55FF", border: "#444444" };
 const exports = {};
+const metricsSource = await readFile(new URL("../src/lib/data/manager-state.ts", import.meta.url), "utf8");
+const metricsAst = ts.createSourceFile("metrics.ts", metricsSource, ts.ScriptTarget.Latest, true);
+const metricsDeclaration = metricsAst.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "getTaskMetrics");
+const metricsExports = {};
+vm.runInNewContext(ts.transpileModule(`export ${metricsDeclaration.getText(metricsAst)}`, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: metricsExports });
 let scheme = "light";
 vm.runInNewContext(outputText, {
-  exports, require, useTheme: () => ({ theme: { colors, scheme } }),
+  exports, require, getTaskMetrics: metricsExports.getTaskMetrics, useTheme: () => ({ theme: { colors, scheme } }),
   View: "View", Text: "Text", Svg: "Svg", Circle: "Circle", SectionHeading: "SectionHeading", serif: "serif",
   styles: new Proxy({}, { get: () => ({}) }),
+});
+
+test("per-board comparison uses exclusive status shares and handles empty boards", () => {
+  const projects = [
+    { id: "populated", name: "Development", workspace: { tasks: [
+      { completed: true }, { dueAt: "2026-01-01" }, {}, { canceled: true, completed: true },
+    ] } },
+    { id: "empty", name: "Empty", workspace: { tasks: [] } },
+  ];
+  const tree = exports.WorkspaceOverview({ metrics: metricsExports.getTaskMetrics(projects[0].workspace.tasks, Date.parse("2026-10-28")), boards: 2, projects, now: Date.parse("2026-10-28") });
+  const populated = find(tree, (node) => node.props?.testID === "board-progress-populated")[0];
+  assert.equal(populated.props.accessibilityLabel, "Development: 1 of 4 tasks completed, 25%, 1 overdue");
+  const segments = populated.props.children[1].props.children;
+  assert.deepEqual(Array.from(segments, (node) => node.props.style.width), ["25%", "25%", "25%", "25%"]);
+  assert.deepEqual(Array.from(segments, (node) => node.props.style.backgroundColor), [colors.success, colors.destructive, colors.info, "#6B7280"]);
+  const empty = find(tree, (node) => node.props?.testID === "board-progress-empty")[0];
+  assert.equal(empty.props.accessibilityLabel, "Empty: 0 of 0 tasks completed, 0%, 0 overdue");
+  assert.ok(empty.props.children[1].props.children.every((node) => node.props.style.width === "0%"));
 });
 function find(node, predicate) {
   if (!node || typeof node !== "object") return [];

@@ -20,6 +20,7 @@ import { BoardDragCell } from "./board-drag-cell";
 
 interface Props {
   projects: JanusProject[];
+  statsProjects: JanusProject[];
   closedProjects: JanusProject[];
   totalBoards: number;
   metrics: TaskMetrics;
@@ -105,7 +106,7 @@ export function BoardManagerContent(props: Props) {
       </> : null}
       </View>
       <View testID="home-stats-panel" style={layout.sidebar ? { width: layout.statsWidth } : undefined}>
-        <WorkspaceOverview metrics={props.metrics} boards={props.totalBoards} wide={layout.wide} sidebar={layout.sidebar} chartSize={layout.statsChartSize} />
+        <WorkspaceOverview metrics={props.metrics} boards={props.totalBoards} projects={props.statsProjects} now={props.now} wide={layout.wide} sidebar={layout.sidebar} chartSize={layout.statsChartSize} />
       </View>
       </View>
     </ScrollView>
@@ -159,7 +160,7 @@ function CardAction({ icon, label, onPress, destructive, disabled }: { icon?: ke
   return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.cardAction, { opacity: disabled ? 0.4 : pressed ? 0.6 : 1 }]}>{icon ? <Ionicons name={icon} size={15} color={color} /> : null}<Text style={{ color, fontSize: 12, fontWeight: "500" }}>{label}</Text></Pressable>;
 }
 
-function WorkspaceOverview({ metrics, boards, wide = false, sidebar = false, chartSize = 240 }: { metrics: TaskMetrics; boards: number; wide?: boolean; sidebar?: boolean; chartSize?: number }) {
+function WorkspaceOverview({ metrics, boards, projects = [], now, wide = false, sidebar = false, chartSize = 240 }: { metrics: TaskMetrics; boards: number; projects?: JanusProject[]; now?: number; wide?: boolean; sidebar?: boolean; chartSize?: number }) {
   const { theme } = useTheme();
   const c = theme.colors;
   // Overdue is a subset of open tasks: do not count it twice in the donut.
@@ -170,7 +171,7 @@ function WorkspaceOverview({ metrics, boards, wide = false, sidebar = false, cha
   let offset = 0;
   return <View style={[styles.overviewSection, sidebar && styles.overviewSidebar]}>
     <SectionHeading title="Board stats" subtitle="Across open boards · includes canceled tasks" style={styles.overviewHeading} />
-    <View style={[styles.overview, wide && { backgroundColor: c.card, borderColor: c.border, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16 }, sidebar && styles.overviewCardSidebar]}>
+    <View testID="home-stats-surface" style={[styles.overview, sidebar && styles.overviewCardSidebar]}>
       <View testID="home-stats-layout" style={[styles.statsContent, wide && !sidebar && styles.statsContentWide]}>
       <View accessible accessibilityLabel={`${metrics.total} tasks: ${metrics.done} completed, ${metrics.overdue} overdue, ${metrics.open - metrics.overdue} open and not overdue, ${metrics.canceled} canceled`} style={[styles.donut, wide && styles.donutWide, sidebar && [styles.donutSidebar, { width: chartSize, maxWidth: chartSize }]]}>
         <Svg width="100%" height="100%" viewBox="0 0 120 120">
@@ -204,6 +205,24 @@ function WorkspaceOverview({ metrics, boards, wide = false, sidebar = false, cha
           </View>;
         })}</View>
       </View>
+      <View testID="home-board-comparison" style={[styles.comparison, { borderColor: c.border }]}>
+        <SectionHeading title="Board progress" subtitle="Completed tasks / total tasks" style={styles.comparisonHeading} />
+        {projects.length ? projects.map((project) => {
+          const boardMetrics = getTaskMetrics(project.workspace.tasks, now);
+          const values = [boardMetrics.done, boardMetrics.overdue, boardMetrics.open - boardMetrics.overdue, boardMetrics.canceled];
+          return <View key={project.id} testID={`board-progress-${project.id}`} accessible accessibilityLabel={`${project.name}: ${boardMetrics.done} of ${boardMetrics.total} tasks completed, ${boardMetrics.completionPercent}%, ${boardMetrics.overdue} overdue`} style={styles.comparisonRow}>
+            <View style={styles.legendMeta}>
+              <Text numberOfLines={1} style={[styles.legendLabel, { color: c.secondaryForeground }]}>{project.name}</Text>
+              <Text style={[styles.comparisonCount, { color: c.mutedForeground }]}>{boardMetrics.done} / {boardMetrics.total}</Text>
+              <Text style={[styles.legendPercent, { color: c.success }]}>{boardMetrics.completionPercent}%</Text>
+            </View>
+            <View style={[styles.comparisonTrack, { backgroundColor: c.border }]}>
+              {values.map((value, index) => <View key={slices[index].label} style={{ height: "100%", width: `${boardMetrics.total ? value / boardMetrics.total * 100 : 0}%`, backgroundColor: slices[index].color }} />)}
+            </View>
+          </View>;
+        }) : <Text style={[styles.comparisonEmpty, { color: c.mutedForeground }]}>Create a board to start tracking progress.</Text>}
+        <Text style={[styles.comparisonNote, { color: c.mutedForeground }]}>Task status colors match the chart above.</Text>
+      </View>
     </View>
   </View>;
 }
@@ -212,14 +231,14 @@ const styles = StyleSheet.create({
   newBoardButton: { width: 44, height: 44, borderRadius: 7, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   themeSwitch: { flexDirection: "row", borderWidth: 1, borderRadius: 10, padding: 2 }, themeButton: { width: 44, height: 44, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   content: mobileContentStyle,
-  contentWide: { maxWidth: "100%", paddingTop: 24 },
+   contentWide: { maxWidth: "100%", paddingTop: 24, flexGrow: 1 },
   boardGrid: { flexDirection: "row", flexWrap: "wrap", alignItems: "stretch" },
   addBoardCard: { minHeight: 220, borderWidth: 1, borderStyle: "dashed", borderRadius: 20, justifyContent: "center", alignItems: "center", padding: 20 },
-  dashboardWide: { flexDirection: "row", alignItems: "flex-start", gap: 24 },
+   dashboardWide: { flexDirection: "row", alignItems: "stretch", gap: 24, flexGrow: 1 },
   boardsPane: { flex: 1, minWidth: 0 },
-  overviewSidebar: { marginTop: 0 },
+   overviewSidebar: { marginTop: 0, flexGrow: 1 },
   donutSidebar: { marginTop: 8, marginBottom: 20 },
-  overviewCardSidebar: { minHeight: 620, padding: 24 },
+   overviewCardSidebar: { flexGrow: 1, paddingHorizontal: 0, paddingVertical: 8, justifyContent: "space-between", gap: 28 },
   legendSidebar: { marginTop: 24, paddingTop: 24, gap: 20 },
   statsBoardCount: { fontSize: 13, textAlign: "center", marginBottom: 8 },
   arrange: { paddingHorizontal: 10, borderRadius: 13 },
@@ -254,5 +273,12 @@ const styles = StyleSheet.create({
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendLabel: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 19 },
   legendValue: { fontSize: 16, fontWeight: "700", textAlign: "right", fontVariant: ["tabular-nums"] },
-  legendPercent: { width: 38, textAlign: "right", fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
+   legendPercent: { width: 38, textAlign: "right", fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
+   comparison: { marginTop: 24, paddingTop: 24, borderTopWidth: StyleSheet.hairlineWidth, gap: 18 },
+   comparisonHeading: { marginBottom: 2 },
+   comparisonRow: { gap: 10 },
+   comparisonCount: { fontSize: 12, fontVariant: ["tabular-nums"] },
+   comparisonTrack: { flexDirection: "row", height: 12, borderRadius: 6, overflow: "hidden" },
+   comparisonEmpty: { fontSize: 13, lineHeight: 20 },
+   comparisonNote: { fontSize: 11, lineHeight: 16 },
 });
