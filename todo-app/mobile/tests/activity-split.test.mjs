@@ -268,7 +268,9 @@ test("desktop uses uncapped feed width and compact cards while retaining the ori
   assert.equal(nav.length, 1);
   assert.equal(nav[0].props.inline, undefined);
   const panel = find(tree, (node) => node.props?.testID === "workspace-editor-pane")[0];
-  assert.equal(panel.props.style.marginBottom, 12);
+  assert.equal(panel.props.style.marginTop, undefined);
+  assert.equal(panel.props.style.marginBottom, undefined);
+  assert.equal(panel.props.style.borderRadius, undefined);
   assert.equal(panel.props.style.maxWidth, undefined);
   const mobileNav = find(render(390), (node) => node.type === "MobileBoardBottomNav");
   assert.equal(mobileNav[0].props.inline, undefined);
@@ -304,19 +306,22 @@ test("Activity and Calendar allocate equal space to the feed and editor througho
   assert.equal(editor(mobile).props.presentation, "sheet");
 });
 
-test("split editors use an 85% opaque alternate surface without fading controls or recoloring mobile sheets", () => {
+test("split editors use a flush classic panel surface while mobile sheets keep their own styling", () => {
   const palettes = [
-    { card: "#211C17", backgroundAlt: "#191510", cardElevated: "#29231D" },
-    { card: "#FFFFFF", backgroundAlt: "#EAE6E0", cardElevated: "#FFFFFF" },
-    { card: "#161B22", backgroundAlt: "#161B22", cardElevated: "#21262D" },
+    { card: "#211C17", backgroundAlt: "#191510", cardElevated: "#29231D", border: "#33291F" },
+    { card: "#FFFFFF", backgroundAlt: "#EAE6E0", cardElevated: "#FFFFFF", border: "#D6D0C8" },
+    { card: "#161B22", backgroundAlt: "#161B22", cardElevated: "#21262D", border: "#30363D" },
   ];
   for (const colors of palettes) for (const mode of ["list", "calendar"]) {
     const tree = render(1200, mode, task, true, [task], [], { colors });
     const pane = find(tree, (node) => node.props?.testID === "workspace-editor-pane")[0];
-    const surface = colors.backgroundAlt === colors.card ? colors.cardElevated : colors.backgroundAlt;
-    assert.equal(pane.props.style.backgroundColor, `${surface}D9`);
-    assert.notEqual(surface, colors.card);
-    assert.equal(pane.props.style.opacity, undefined, "only the background is translucent");
+    assert.equal(pane.props.style.backgroundColor, colors.card);
+    assert.equal(pane.props.style.borderLeftWidth, 0.5);
+    assert.equal(pane.props.style.borderLeftColor, colors.border);
+    assert.equal(pane.props.style.borderRadius, undefined, "the pane reaches the screen edges without rounding");
+    assert.equal(pane.props.style.marginTop, undefined, "the panel background starts right under the ribbon");
+    assert.equal(pane.props.style.marginRight, undefined);
+    assert.equal(pane.props.style.marginBottom, undefined);
     const mobile = render(390, mode, task, true, [task], [], { colors });
     assert.equal(find(mobile, (node) => node.props?.testID === "workspace-editor-pane")[0].props.style, undefined);
   }
