@@ -21,7 +21,7 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
   const fallback = new Proxy({}, { get: (_, key) => key });
   const mocks = {
     react: { useState: (initial) => { const index = state++; return [index in states ? states[index] : typeof initial === "function" ? initial() : initial, (value) => updates.push([index, value])]; }, useRef: (current) => ({ current }), useEffect: (effect) => effects.push(effect), useMemo: (fn) => fn() },
-    "react-native": { View: "View", Text: "Text", ScrollView: "ScrollView", Pressable: "Pressable", Platform: { OS: "web" }, StyleSheet: { create: (v) => v, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width }) },
+    "react-native": { View: "View", Text: "Text", ScrollView: "ScrollView", Pressable: "Pressable", Platform: { OS: "web" }, StyleSheet: { create: (v) => v, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width, height: options.height ?? 1000 }) },
     "expo-router": { useLocalSearchParams: () => ({ id: boardId }), router: { replace: (destination) => options.onNavigate?.(destination) } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: options.colors ?? colors } }) },
@@ -47,6 +47,18 @@ function find(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...find(node.props?.children, predicate)];
 }
 const editor = (tree) => find(tree, (node) => node.type === "TaskEditor")[0];
+test("the workspace stays capped to the visible viewport across screen heights", () => {
+  for (const height of [480, 844, 1000]) for (const width of [390, 1024, 1440]) {
+    const tree = render(width, "board", null, false, [task], [], { height });
+    const viewport = find(tree, (node) => node.props?.testID === "workspace-viewport")[0];
+    const style = Object.assign({}, ...viewport.props.style);
+    assert.equal(style.height, height);
+    assert.equal(style.maxHeight, height);
+    assert.equal(style.minHeight, 0);
+    assert.equal(style.overflow, "hidden", "cards must scroll within the board, not extend the page");
+  }
+});
+
 test("Calendar navigation clears editors and day/action sheets before changing tabs", () => {
   const day = new Date(2026, 9, 28);
   const scheduled = { ...task, dueAt: new Date(2026, 9, 28, 9).toISOString() };

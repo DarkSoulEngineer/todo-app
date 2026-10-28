@@ -38,7 +38,7 @@ import type { BoardSection, Priority, SortKey, Task, TaskDraft, ViewMode } from 
 
 export default function WorkspaceScreen() {
   const { theme } = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const insets = useSafeAreaInsets();
   const now = useNow();
@@ -432,10 +432,10 @@ export default function WorkspaceScreen() {
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="pricetag-outline" label="Add filter/tag" onPress={() => setAddFilterOpen(true)} />{boards.length ? <OptionTool icon="trash-outline" label="Remove tag" tone="danger" onPress={() => setRemoveTagOpen(true)} /> : null}</View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>TAGS</Text></View>
   </ScrollView>;
   return (
-    <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
-      <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
+    <View testID="workspace-viewport" style={[styles.root, { height, maxHeight: height, minHeight: 0, overflow: "hidden", backgroundColor: theme.colors.background }]}>
+      <BlurTargetView ref={blurTarget} style={{ flex: 1, minHeight: 0 }}>
       <ThemeAtmosphere />
-      <View style={{ flex: 1, paddingBottom: mode === "board" ? mobileBottomNavClearance + insets.bottom : 0, paddingLeft: insets.left, paddingRight: insets.right }}>
+      <View style={{ flex: 1, minHeight: 0, paddingLeft: insets.left, paddingRight: insets.right }}>
         <MobileBoardRibbon hiddenSections={sections.filter((section) => section.hidden)} onShowSection={toggleSectionVisibility} selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={() => setBulkSectionMenu(true)} onPriority={() => setBulkPriorityMenu(true)} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={changeMode} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={leaveWorkspace} onSwitchBoard={() => { closeTaskOverlays(); setProjectSwitcherOpen(true); }} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
           {actionsContent}
         </MobileBoardRibbon>

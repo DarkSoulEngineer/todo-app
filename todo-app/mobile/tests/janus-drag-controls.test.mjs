@@ -23,6 +23,8 @@ let width = 1440;
 const native = { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", useWindowDimensions: () => ({ width, height: 1000 }), StyleSheet: { create: (value) => value } };
 const { MobileTaskColumns } = await load("../src/components/board/mobile-task-columns.tsx", {
   react, "react-native": native, "@expo/vector-icons": { Ionicons: "Icon" },
+  "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 20 }) },
+  "@/theme/layout": { mobileBottomNavClearance: 112 },
   "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId },
   "./mobile-board-colors": { useMobileBoardColors: () => ({}) },
   "./mobile-column-task-card": { MobileColumnTaskCard: "Card" },
@@ -47,17 +49,64 @@ test("cards and lists are draggable immediately without an extra arrange row", (
   assert.ok(!JSON.stringify(tree).includes("Arrange cards and lists"));
 });
 
-test("list backgrounds wrap their cards with one dot-row of extra padding and a scrolling height cap", () => {
+test("list backgrounds wrap their content with navigation clearance outside the surface", () => {
   const tree = renderColumns({ sections: [{ id: "a", title: "First" }, { id: "empty", title: "Empty" }] });
   for (const id of ["a", "empty"]) {
     const cell = nodes(tree).find((node) => node.type === "DragCell" && node.props.id === `section:${id}`);
     assert.equal(cell.props.constrainHeight, true);
     const column = nodes(cell).find((node) => node.props?.testID === `janus-column-${id}`);
     const style = Object.assign({}, ...column.props.style);
-    assert.equal(style.height, undefined, "short lists must not stretch to viewport height");
-    assert.equal(style.paddingBottom, 20, "the background dot grid repeats every 20 points");
-    assert.equal(style.maxHeight, "100%");
-    assert.equal(style.flexShrink, 1);
+    assert.equal(style.flex, undefined, "short and empty lists must not stretch into unused space");
+    assert.equal(style.flexShrink, 0, "the surface wraps all its cards inside the scroll holder");
+    assert.equal(style.minHeight, 0);
+    const holder = nodes(cell).find((node) => node.props?.testID === `janus-column-holder-${id}`);
+    assert.equal(holder.props.style.maxHeight, "100%");
+    const scroll = nodes(holder).find((node) => node.type === "ScrollView");
+    assert.equal(scroll.props.style.flexGrow, 0);
+    assert.equal(scroll.props.style.flexShrink, 1);
+    assert.equal(scroll.props.contentContainerStyle.paddingBottom, 4);
+    assert.ok(!nodes(column).some((node) => node.props?.testID === `janus-add-card-footer-${id}`), "creation tile must be outside the column background");
+    assert.ok(nodes(cell).some((node) => node.props?.testID === `janus-add-card-footer-${id}`));
+  }
+  const contentStyle = Object.assign({}, ...nodes(tree).find((node) => node.type === "Carousel").props.contentContainerStyle);
+  assert.equal(contentStyle.alignItems, "flex-start");
+  assert.equal(contentStyle.paddingBottom, 132, "navigation clearance is transparent space outside the columns");
+});
+
+test("header and trailing Add card buttons target the correct list in normal and focused views", () => {
+  for (const focused of [false, true]) {
+    const added = [];
+    const tree = renderColumns({ focused, onAddTask: (id) => added.push(id) });
+    const header = nodes(tree).find((node) => node.props?.testID === "janus-add-card-header-a");
+    const footer = nodes(tree).find((node) => node.props?.testID === "janus-add-card-footer-a");
+    header.props.onPress();
+    nodes(footer).find((node) => node.type === "Pressable").props.onPress();
+    assert.deepEqual(added, ["a", "a"]);
+    const tile = nodes(footer).find((node) => node.type === "Pressable");
+    const style = Object.assign({}, ...tile.props.style({ pressed: false }));
+    assert.equal(style.borderStyle, "dashed");
+    assert.equal(style.borderRadius, 20);
+    assert.equal(style.minHeight, 110);
+    assert.equal(style.alignItems, "center");
+    assert.equal(style.backgroundColor, "transparent");
+    const scroll = nodes(tree).find((node) => node.props?.testID === (focused ? "janus-focused-scroll" : "janus-column-scroll-a"));
+    const fixedHeader = nodes(tree).find((node) => node.props?.testID === "janus-column-header-a");
+    assert.ok(!nodes(scroll).includes(fixedHeader), "header must stay outside the scrolling card area");
+    assert.ok(!nodes(scroll).includes(header), "header Add card remains fixed and accessible while scrolling");
+    assert.ok(nodes(scroll).includes(footer), "Add card scrolls inside the holder");
+    const stack = nodes(tree).find((node) => Array.isArray(node.props?.children) && node.props.children[1] === footer);
+    assert.ok(stack, "creation tile is a sibling below the background surface");
+    assert.equal(stack, scroll, "the surface and tile share one scrolling holder");
+    assert.equal(stack.props.children[0].type, "View");
+  }
+});
+
+test("empty lists keep the header add button but have no bottom creation tile", () => {
+  for (const focused of [false, true]) {
+    const tree = renderColumns({ focused, tasks: [] });
+    assert.ok(nodes(tree).some((node) => node.props?.testID === "janus-add-card-header-a"));
+    const footer = nodes(tree).find((node) => node.props?.testID === "janus-add-card-footer-a");
+    assert.equal(nodes(footer).filter((node) => node.type === "Pressable").length, 0);
   }
 });
 
