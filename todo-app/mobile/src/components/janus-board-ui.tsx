@@ -70,6 +70,7 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={(event) => { event.stopPropagation(); onPress(event); }}
+      onContextMenu={(event) => { event.preventDefault?.(); event.stopPropagation(); onPress(event.nativeEvent as unknown as GestureResponderEvent); }}
       style={({ pressed }) => [styles.iconButton, { width: size, height: size, opacity: pressed ? 0.65 : 1 }]}
     >
       <Ionicons name={icon} size={20} color={color} />
