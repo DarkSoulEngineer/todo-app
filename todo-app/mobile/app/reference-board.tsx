@@ -53,7 +53,6 @@ export default function ReferenceBoardRoute() {
         tasks={api.tasks}
         sections={api.sections}
         title="Board"
-        subtitle="Workspace"
         onTaskPress={(task) => router.push({ pathname: "/task/[id]", params: { id: task.id, origin: "reference-board" } })}
         onToggleComplete={(task) => api.toggleComplete(task.id)}
         onTaskMenu={(task) => setTaskAction(task)}

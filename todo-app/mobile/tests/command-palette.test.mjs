@@ -59,7 +59,7 @@ test("navigation bindings use Shift and disabled quick actions keep commands/hel
 
 test("filter, display, ribbon and bulk shortcuts are browser-safe and obey quick-action preference", () => {
   const plain = { q: "search-tasks", f: "filter-tags", o: "sort-tasks", v: "select-mode", a: "select-all", u: "unselect-all", m: "move-selected", p: "priority-selected", d: "complete-selected", c: "cancel-selected", k: "compact", g: "focus-column", w: "move-arrows", "=": "zoom-in", "-": "zoom-out", "0": "zoom-reset" };
-  const shifted = { f: "clear-filters", l: "add-tag", x: "remove-tag", v: "hidden-tools", o: "actions-tools", u: "home-tools", p: "pin-ribbon", c: "restore-selected", d: "dragging" };
+  const shifted = { f: "clear-filters", l: "add-tag", x: "remove-tag", v: "hidden-tools", o: "actions-tools", u: "home-tools", p: "pin-ribbon", c: "restore-selected", d: "dragging", m: "load-sample" };
   for (const [bindings, shiftKey] of [[plain, false], [shifted, true]]) for (const [key, id] of Object.entries(bindings)) {
     const event = { key, shiftKey };
     assert.equal(logic.commandShortcut(event, false), id);

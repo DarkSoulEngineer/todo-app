@@ -75,7 +75,6 @@ export function BoardManagerContent(props: Props) {
   return <>
     <ScreenHeader
       title="Janus"
-      subtitle="Focused task manager"
       leading={<JanusLogo size={44} />}
       onSearch={() => setShowSearch(prev => !prev)}
       searchActive={showSearch}

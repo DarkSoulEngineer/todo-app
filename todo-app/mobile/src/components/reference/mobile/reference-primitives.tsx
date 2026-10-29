@@ -114,13 +114,12 @@ export function SurfaceCard({ children, style }: { children: React.ReactNode; st
   return <View style={[card, style]}>{children}</View>;
 }
 
-export function ScreenHeader({ title, subtitle, onBack, onSearch, searchActive = false, onNotifications, onMore, onAdd, moreIcon = "ellipsis-horizontal", moreLabel = "More options", showThemeToggle = true, actions, search, leading }: { title: string; subtitle?: string; onBack?: () => void; onSearch?: () => void; searchActive?: boolean; onNotifications?: () => void; onMore?: () => void; onAdd?: () => void; moreIcon?: keyof typeof Ionicons.glyphMap; moreLabel?: string; showThemeToggle?: boolean; actions?: React.ReactNode; search?: React.ReactNode; leading?: React.ReactNode }) {
+export function ScreenHeader({ title, onBack, onSearch, searchActive = false, onNotifications, onMore, onAdd, moreIcon = "ellipsis-horizontal", moreLabel = "More options", showThemeToggle = true, actions, search, leading }: { title: string; onBack?: () => void; onSearch?: () => void; searchActive?: boolean; onNotifications?: () => void; onMore?: () => void; onAdd?: () => void; moreIcon?: keyof typeof Ionicons.glyphMap; moreLabel?: string; showThemeToggle?: boolean; actions?: React.ReactNode; search?: React.ReactNode; leading?: React.ReactNode }) {
   const { toggle, scheme } = useReferenceTheme();
   const hasActions = Boolean(onSearch || onAdd || onNotifications || showThemeToggle || onMore || actions);
   return (
     <MobileTopBar
       title={title}
-      subtitle={subtitle}
       leading={onBack ? <MobileTopBarAction icon="chevron-back" label="Go back" onPress={onBack} /> : leading}
       actions={hasActions ? <>
         {onSearch ? <MobileTopBarAction icon="search-outline" label="Search" onPress={onSearch} active={searchActive} /> : null}

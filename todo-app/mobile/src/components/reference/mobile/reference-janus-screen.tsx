@@ -17,7 +17,6 @@ export interface ReferenceJanusScreenProps {
   tasks: ReferenceTaskInput[];
   sections?: BoardSection[];
   title?: string;
-  subtitle?: string;
   sprintLabel?: string;
   openCount?: number;
   doneCount?: number;
@@ -41,7 +40,6 @@ export function ReferenceJanusScreen({
   tasks,
   sections = [],
   title = "Board",
-  subtitle = "Workspace",
   sprintLabel,
   openCount,
   doneCount,

@@ -179,7 +179,7 @@ test("Priorities shares the board card design and preserves ranks, owner tags an
   const cards = find(tree, "MobileColumnTaskCard");
   assert.equal(cards.length, 3);
   assert.equal(find(tree, "TaskCard").length, 0, "the legacy large cards are no longer used");
-  assert.deepEqual(find(tree, "Text").filter((node) => /^#\d+$/.test(node.props.children)).map((node) => node.props.children), ["#1", "#2", "#3"]);
+  assert.deepEqual(find(tree, "Text").map((node) => Array.isArray(node.props.children) ? node.props.children.join("") : node.props.children).filter((value) => /^#\d+$/.test(value)), ["#1", "#2", "#3"]);
   const remote = cards.find((card) => card.props.task.id === "task-02");
   assert.equal(remote.props.board.id, "tag-b");
   assert.equal(remote.props.board.label, "Design");

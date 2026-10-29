@@ -7,11 +7,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OptionSheet, TaskEditor } from "@/components/janus-board-ui";
 import { MobileColumnTaskCard } from "@/components/board/mobile-column-task-card";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
-import { Pill, ScreenHeader } from "@/components/reference/mobile/reference-primitives";
+import { ScreenHeader } from "@/components/reference/mobile/reference-primitives";
 import { useReferenceTheme } from "@/components/reference/reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SectionHeading } from "@/components/ui/section-heading";
 import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
 import { useAllBoardTasks, type BoardTaskEntry } from "@/hooks/use-all-board-tasks";
 import { useNow } from "@/hooks/use-now";
@@ -79,7 +78,7 @@ export default function TopTasksRoute() {
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
     <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
-    <ScreenHeader title="Priorities" subtitle="Your next priorities across open boards" showThemeToggle={false} actions={<MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={() => setPaletteMode("commands")} />} />
+    <ScreenHeader title="Priorities" showThemeToggle={false} actions={<MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={() => setPaletteMode("commands")} />} />
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
       <View style={[styles.limitSwitch, { backgroundColor: colors.surfaceLow, borderColor: colors.outlineVariant }]}>
         {([3, 10] as const).map((value) => <Pressable key={value} accessibilityRole="tab" accessibilityLabel={`Show top ${value} tasks`} accessibilityState={{ selected: limit === value }} onPress={() => setLimit(value)} style={[styles.limitOption, limit === value && { backgroundColor: colors.card }]}>
@@ -87,7 +86,6 @@ export default function TopTasksRoute() {
           <Text style={[type.bodyStrong, { color: limit === value ? colors.primary : colors.muted }]}>Top {value}</Text>
         </Pressable>)}
       </View>
-      <SectionHeading title="What to focus on" subtitle="High priority first, then earliest deadlines. Completed and canceled tasks stay out of this list." right={<Pill label={`${visible.length} of ${ranked.length}`} tone="primary" />} />
       {api.isLoading ? <ActivityIndicator accessibilityLabel="Loading top tasks" color={colors.primary} /> : visible.length ? visible.map((entry, index) => <View key={`${entry.projectId}:${entry.task.id}`}>
         <View style={styles.taskHeading}><Text style={[styles.rank, { color: colors.primary }]}>#{index + 1}</Text><Text numberOfLines={1} style={[type.caption, { flex: 1, color: colors.muted }]}>{entry.projectName}</Text></View>
         <MobileColumnTaskCard task={entry.task} board={entry.boards.find((board) => board.id === entry.task.category)} now={now} selected={false} selectionMode={false} onSelect={() => {}} onPress={() => openTask(entry)} onMenu={(event) => { setSmallMenuAnchor(event ? anchorFromEvent(event) : null); setMenu({ projectId: entry.projectId, taskId: entry.task.id }); }} onToggleSubtask={(subtaskId) => { activateOwner(entry); api.toggleSubtask(entry.task.id, subtaskId); }} />

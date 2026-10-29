@@ -120,6 +120,7 @@ On web (including tablet browsers with a hardware keyboard):
   in / out / resets. **Shift D** toggles dragging on tablet/desktop Board view.
 - **Shift U/O/V** reveals Home / Actions / Hidden ribbon tools; **Shift P** pins
   or unpins the ribbon. Hidden tools are available only when lists are hidden.
+- **Shift M** loads sample data into the current board, with Undo available.
 - **V** enters/exits card selection. While selecting, use the palette to select
   individual cards; **A/U** selects/unselects all visible cards, **D/C/Shift C**
   completes/cancels/restores selected cards, **M** moves them, and **P** sets priority.

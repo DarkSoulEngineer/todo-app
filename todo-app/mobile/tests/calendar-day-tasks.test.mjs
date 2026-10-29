@@ -102,12 +102,12 @@ test("tiles keep task editing, long-press actions and checklist progress", () =>
   assert.ok(renderedTiles.some((tile) => nodes(tile).some((node) => node.type === "Text" && Array.isArray(node.props?.children) && node.props.children.join("") === "1/1")));
 });
 
-test("a date without tasks shows the clear-day prompt and keeps adding tasks available", () => {
+test("a date without tasks keeps the add card in the grid", () => {
   const { tree, calls } = render({ tasks: [] });
   const labels = nodes(tree).map((node) => node.props?.children).flat().filter((child) => typeof child === "string");
-  assert.ok(labels.includes("No tasks due"));
-  assert.equal(nodes(tree).find((node) => node.props?.testID === "calendar-day-task-grid"), undefined);
-  const add = nodes(tree).find((node) => node.type === "Button");
+  assert.equal(labels.includes("No tasks due"), false);
+  assert.ok(nodes(tree).find((node) => node.props?.testID === "calendar-day-task-grid"));
+  const add = nodes(tree).find((node) => node.props?.testID === "calendar-add-task-card");
   add.props.onPress();
   assert.equal(calls.added, 1);
 });

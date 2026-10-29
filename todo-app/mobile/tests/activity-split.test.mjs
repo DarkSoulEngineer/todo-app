@@ -110,7 +110,9 @@ test("version deletion and tag removal wait for explicit confirmation; sample an
   assert.deepEqual(calls, []);
   remove.children[0].children[0].run();
   removeVersion.children[0].run();
-  commands.find((command) => command.id === "load-sample").run();
+  const sample = commands.find((command) => command.id === "load-sample");
+  assert.equal(sample.shortcut, "Shift M");
+  sample.run();
   toasts.at(-1).action.onPress();
   commands.find((command) => command.id === "clear-done").children[0].run();
   toasts.at(-1).action.onPress();

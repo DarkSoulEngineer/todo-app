@@ -479,7 +479,7 @@ export default function WorkspaceScreen() {
     { id: "actions-tools", label: "Show Actions ribbon tools", shortcut: "Shift O", run: () => ribbonControls.current?.openTab("actions") },
     { id: "pin-ribbon", label: "Toggle ribbon pin", shortcut: "Shift P", run: () => ribbonControls.current?.togglePin() },
     ...(!selectionMode ? [{ id: "expand-ribbon", label: "Expand / collapse ribbon", run: () => ribbonControls.current?.toggleExpanded() }] : []),
-    { id: "load-sample", label: "Load sample workspace", run: () => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); } },
+    { id: "load-sample", label: "Load sample workspace", shortcut: "Shift M", run: () => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); } },
     { id: "export-json", label: "Export board as JSON", run: () => { void exportWorkspace(liveWorkspace, activeProject.name); } },
     { id: "export-csv", label: "Export board as CSV", run: () => { void exportWorkspaceCsv(liveWorkspace, activeProject.name); } },
     { id: "import-board", label: "Import board", run: () => { void importBoard(); } },
