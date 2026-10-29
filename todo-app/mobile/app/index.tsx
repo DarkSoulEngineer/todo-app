@@ -21,7 +21,7 @@ import type { Command } from "@/lib/features/commands";
 import { createNavigationCommands } from "@/lib/features/navigation-commands";
 
 export default function BoardManagerScreen() {
-  const { theme, toggle, setPreference } = useTheme();
+  const { theme, setPreference } = useTheme();
   const toast = useToast();
   const api = useTasksContext();
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);

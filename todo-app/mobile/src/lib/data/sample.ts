@@ -250,6 +250,24 @@ const SEEDS: SampleSeed[] = [
     category: "personal",
     offsetHours: 90,
   },
+  {
+    title: "Fix the production outage",
+    description: "Service is down for customers; coordinate the hotfix and comms.",
+    priority: "critical",
+    category: "work",
+    offsetHours: -2,
+    subtasks: [
+      { title: "Page on-call engineer", done: true },
+      { title: "Post status update", done: false },
+    ],
+  },
+  {
+    title: "Respond to security disclosure",
+    description: "Triage the report and ship a patch before the deadline.",
+    priority: "critical",
+    category: "work",
+    offsetHours: 4,
+  },
 ];
 
 export function createSampleTasks(now: Date = new Date()): Task[] {
@@ -273,7 +291,7 @@ export function createSampleTasks(now: Date = new Date()): Task[] {
       title: draft.title,
       description: draft.description,
       dueAt: base.toISOString(),
-      priority: draft.priority,
+      priority: draft.priority === "high" && Math.random() < 0.12 ? "critical" : draft.priority,
       category: categoryPool[index % categoryPool.length],
       subtasks: (subtasks ?? []).map((item) => ({
         id: makeId(8),
