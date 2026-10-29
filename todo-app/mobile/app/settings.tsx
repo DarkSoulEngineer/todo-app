@@ -17,6 +17,10 @@ import { Button } from "@/components/ui/button";
 import { JanusLogo } from "@/components/ui/janus-logo";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
+import { KeyboardSettings } from "@/components/settings/keyboard-settings";
+import { CommandPalette, type PaletteMode } from "@/components/ui/command-palette";
+import { MobileTopBarAction } from "@/components/ui/mobile-top-bar";
+import { createNavigationCommands } from "@/lib/features/navigation-commands";
 
 const CALENDAR_VIEW_OPTIONS: { value: CalendarDefaultView; label: string }[] = [
   { value: "month", label: "Month" },
@@ -35,7 +39,7 @@ const BACKUP_OPTIONS: { value: BackupScope; label: string; description: string }
   { value: "all", label: "Everything", description: "Preferences and all boards in one JSON file" },
 ];
 
-const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Data & backups", "About"] as const;
+const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Keyboard", "Data & backups", "About"] as const;
 
 export default function SettingsRoute() {
   const api = useTasksContext();
@@ -50,6 +54,7 @@ export default function SettingsRoute() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [scope, setScope] = useState<BackupScope>("all");
   const [section, setSection] = useState<typeof SETTINGS_SECTIONS[number]>("Appearance");
+  const [paletteMode, setPaletteMode] = useState<PaletteMode>(null);
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const taskCount = api.projects.reduce((total, project) => total + (project.id === api.currentProjectId ? api.tasks.length : project.workspace.tasks.length), 0);
@@ -115,10 +120,19 @@ export default function SettingsRoute() {
     }
   };
 
+  const commands = [
+    ...createNavigationCommands({ projects: api.projects, currentProjectId: api.currentProjectId, openBoard: (id) => { api.switchProject(id); router.replace(`/board/${id}`); }, navigate: (destination) => router.replace(destination) }),
+    ...SETTINGS_SECTIONS.map((label) => ({ id: `settings-${label}`, label: `Settings: ${label}`, run: () => setSection(label) })),
+    { id: "calendar-week", label: "Default calendar: week", run: () => setCalendarDefaultView("week") },
+    { id: "calendar-month", label: "Default calendar: month", run: () => setCalendarDefaultView("month") },
+    { id: "week-monday", label: "Start calendar weeks on Monday", run: () => setCalendarWeekStart(1) },
+    { id: "week-sunday", label: "Start calendar weeks on Sunday", run: () => setCalendarWeekStart(0) },
+  ];
+
   return (
     <View style={styles.root}>
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
-      <ScreenHeader title="Settings" showThemeToggle={false} onBack={!hasProjects ? () => router.back() : undefined} />
+      <ScreenHeader title="Settings" showThemeToggle={false} onBack={!hasProjects ? () => router.back() : undefined} actions={<MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={() => setPaletteMode("commands")} />} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
         <ScrollView horizontal accessibilityRole="tablist" accessibilityLabel="Settings sections" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionTabs}>
           {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
@@ -131,6 +145,11 @@ export default function SettingsRoute() {
           <View style={styles.sectionCard}>
             <ThemePicker disabled={busy} />
           </View>
+        </View> : null}
+
+        {section === "Keyboard" ? <View style={styles.sectionBlock}>
+          <SectionHeading title="Keyboard & commands" subtitle="Navigate without leaving the keyboard. Changes save automatically on this device." />
+          <View style={styles.sectionCard}><KeyboardSettings onHelp={() => setPaletteMode("help")} /></View>
         </View> : null}
 
         {section === "Calendar" ? <View style={styles.sectionBlock}>
@@ -202,6 +221,7 @@ export default function SettingsRoute() {
         </View> : null}
       </ScrollView>
       </BlurTargetView>
+      <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={commands} blocked={busy || saveOpen || api.isLoading} />
       {hasProjects ? <ReferenceMobileBottomNav active="settings" onNavigate={navigate} blurTarget={blurTarget} /> : null}
       <Sheet visible={saveOpen} onClose={() => { if (!busy) setSaveOpen(false); }}>
         <Text accessibilityRole="header" style={type.title}>Save backup</Text>

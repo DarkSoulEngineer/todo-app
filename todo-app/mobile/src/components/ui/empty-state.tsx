@@ -9,19 +9,21 @@ export function EmptyState({
   message,
   actionLabel,
   onAction,
+  plain = false,
 }: {
   icon?: keyof typeof Ionicons.glyphMap;
   title: string;
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  plain?: boolean;
 }) {
   const { theme } = useTheme();
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radius.xl }]}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.colors.primarySoft }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radius.xl }, plain && styles.plain]}>
+      {!plain ? <View style={[styles.iconWrap, { backgroundColor: theme.colors.primarySoft }]}>
         <Ionicons name={icon} size={22} color={theme.colors.primary} />
-      </View>
+      </View> : null}
       <Text style={[styles.title, { color: theme.colors.foreground, fontSize: theme.type.title.fontSize }]}>{title}</Text>
       <Text style={[styles.message, { color: theme.colors.mutedForeground, fontSize: theme.type.body.fontSize }]}>{message}</Text>
       {actionLabel && onAction ? <Button label={actionLabel} onPress={onAction} style={{ marginTop: 16 }} /> : null}
@@ -37,6 +39,10 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderStyle: "dashed",
+  },
+  plain: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
   },
   iconWrap: {
     width: 48,

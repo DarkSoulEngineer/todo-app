@@ -90,7 +90,7 @@ export function ReferenceMyTasksScreen({ tasks, boardName, onTaskPress, onTaskLo
         moreIcon="funnel-outline"
         moreLabel="Filter tasks"
         showThemeToggle={false}
-        search={showSearch ? <MobileSearchField value={query} onChangeText={setQuery} placeholder="Search tasks or tags" accessibilityLabel="Search my tasks" /> : null}
+        search={showSearch ? <MobileSearchField autoFocus value={query} onChangeText={setQuery} placeholder="Search tasks or tags" accessibilityLabel="Search my tasks" /> : null}
       />}
       <OptionSheet
         visible={filterMenu}

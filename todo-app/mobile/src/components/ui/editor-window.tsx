@@ -5,12 +5,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
 
 /** Desktop-style frame; the editor owns its draft, scrolling and save behavior. */
-export function EditorWindow({ visible, title, subtitle, onClose, children }: {
+export function EditorWindow({ visible, title, subtitle, onClose, children, width: preferredWidth = 960, height: preferredHeight = 760, icon = "checkbox-outline", closeLabel = "Close task editor", testID = "task-editor-window" }: {
   visible: boolean;
   title: string;
   subtitle?: string;
   onClose: () => void;
   children: ReactNode;
+  width?: number;
+  height?: number;
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
+  closeLabel?: string;
+  testID?: string;
 }) {
   const { theme: { colors: c } } = useTheme();
   const { width, height } = useWindowDimensions();
@@ -22,15 +27,15 @@ export function EditorWindow({ visible, title, subtitle, onClose, children }: {
 
   return <Modal visible={visible} transparent animationType="fade" presentationStyle="overFullScreen" onRequestClose={onClose}>
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={[styles.overlay, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close task editor backdrop" onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
-      <View testID="task-editor-window" accessibilityViewIsModal style={[styles.window, { width: maximized ? availableWidth : Math.min(960, availableWidth), height: maximized ? availableHeight : Math.min(760, availableHeight), backgroundColor: c.card, borderColor: c.borderStrong, shadowColor: c.shadow }]}>
-        <View testID="task-editor-window-titlebar" style={[styles.titlebar, { backgroundColor: c.backgroundAlt, borderBottomColor: c.border }]}>
-          <Ionicons name="checkbox-outline" size={18} color={c.primary} />
+      <Pressable accessibilityRole="button" accessibilityLabel={`${closeLabel} backdrop`} onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
+      <View testID={testID} accessibilityViewIsModal style={[styles.window, { width: maximized ? availableWidth : Math.min(preferredWidth, availableWidth), height: maximized ? availableHeight : Math.min(preferredHeight, availableHeight), backgroundColor: c.card, borderColor: c.borderStrong, shadowColor: c.shadow }]}>
+        <View testID={`${testID}-titlebar`} style={[styles.titlebar, { backgroundColor: c.backgroundAlt, borderBottomColor: c.border }]}>
+          <Ionicons name={icon} size={18} color={c.primary} />
           <Text accessibilityRole="header" numberOfLines={1} style={[styles.title, { color: c.foreground }]}>{title}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={maximized ? "Restore editor window" : "Maximize editor window"} onPress={() => setMaximized((value) => !value)} onHoverIn={() => setHovered("maximize")} onHoverOut={() => setHovered(null)} style={({ pressed }) => [styles.captionButton, { backgroundColor: hovered === "maximize" || pressed ? c.secondary : "transparent" }]}>
             <Ionicons name={maximized ? "copy-outline" : "square-outline"} size={15} color={c.foreground} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close task editor" onPress={onClose} onHoverIn={() => setHovered("close")} onHoverOut={() => setHovered(null)} style={({ pressed }) => [styles.captionButton, { backgroundColor: hovered === "close" || pressed ? c.destructive : "transparent" }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} onHoverIn={() => setHovered("close")} onHoverOut={() => setHovered(null)} style={({ pressed }) => [styles.captionButton, { backgroundColor: hovered === "close" || pressed ? c.destructive : "transparent" }]}>
             {({ pressed }) => <Ionicons name="close" size={20} color={hovered === "close" || pressed ? c.destructiveForeground : c.foreground} />}
           </Pressable>
         </View>

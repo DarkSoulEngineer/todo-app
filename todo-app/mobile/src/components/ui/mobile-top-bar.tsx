@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from "react-native";
+import { useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { Platform, Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
 
@@ -68,27 +68,38 @@ export function MobileSearchField({
   onChangeText,
   placeholder,
   accessibilityLabel,
+  autoFocus = false,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
   accessibilityLabel: string;
+  autoFocus?: boolean;
 }) {
   const { theme } = useTheme();
   const c = theme.colors;
+  const input = useRef<ComponentRef<typeof TextInput> | null>(null);
+  const [focused, setFocused] = useState(false);
   return (
-    <View style={[styles.search, { borderColor: c.borderStrong, backgroundColor: c.input }]}>
+    <View style={[styles.search, { borderColor: focused ? c.primary : c.borderStrong, backgroundColor: c.input }]}>
       <Ionicons name="search-outline" size={16} color={c.mutedForeground} />
       <TextInput
+        ref={input}
+        autoFocus={autoFocus}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        selectionColor={c.primary}
+        cursorColor={c.primary}
+        underlineColorAndroid="transparent"
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={c.mutedForeground}
         accessibilityLabel={accessibilityLabel}
-        style={[styles.input, { color: c.foreground }]}
+        style={[styles.input, { color: c.foreground }, Platform.OS === "web" && { outlineWidth: 0 }]}
       />
       {value ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => onChangeText("")} style={({ pressed }) => [styles.clear, { opacity: pressed ? 0.65 : 1 }]}>
+        <Pressable hitSlop={1} accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { onChangeText(""); input.current?.focus(); }} style={({ pressed }) => [styles.clear, { opacity: pressed ? 0.65 : 1 }]}>
           <Ionicons name="close" size={19} color={c.mutedForeground} />
         </Pressable>
       ) : null}
@@ -105,7 +116,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", alignItems: "center", gap: 4 },
   searchRow: { paddingHorizontal: 12, paddingVertical: 8 },
   action: { width: 44, height: 44, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  search: { width: "100%", minHeight: 44, borderWidth: 1, borderRadius: 9, paddingLeft: 12, flexDirection: "row", alignItems: "center", gap: 9 },
-  input: { flex: 1, minWidth: 0, minHeight: 44, fontSize: 14 },
-  clear: { width: 44, height: 44, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  search: { width: "100%", height: 44, borderWidth: 1, borderRadius: 9, paddingLeft: 12, flexDirection: "row", alignItems: "center", gap: 9 },
+  input: { flex: 1, minWidth: 0, height: 42, paddingVertical: 0, fontSize: 14 },
+  clear: { width: 44, height: 42, borderRadius: 7, alignItems: "center", justifyContent: "center" },
 });

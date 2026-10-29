@@ -9,6 +9,11 @@ import { getThemeById, type ThemeColors } from "@/theme/tokens";
 
 type Mode = "light" | "dark";
 
+const MODES: { value: Mode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: "light", label: "Light", icon: "sunny-outline" },
+  { value: "dark", label: "Dark", icon: "moon-outline" },
+];
+
 function Swatches({ colors }: { colors: ThemeColors }) {
   return <View accessible={false} style={styles.swatches}>
     {[colors.background, colors.card, colors.primary].map((color, index) =>
@@ -28,9 +33,8 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
   const options = catalog.filter((entry) => (entry.id === "system" || entry.scheme === mode)
     && entry.name.toLowerCase().includes(query.trim().toLowerCase()));
 
-  const switchMode = () => {
-    if (disabled) return;
-    const next: Mode = mode === "dark" ? "light" : "dark";
+  const selectMode = (next: Mode) => {
+    if (disabled || next === mode) return;
     const current = catalog.find((entry) => entry.id === preference && entry.id !== "system" && entry.scheme === mode);
     const memory = current ? { ...chosen, [mode]: current.id } : chosen;
     const remembered = catalog.find((entry) => entry.id === memory[next] && entry.id !== "system" && entry.scheme === next);
@@ -41,14 +45,16 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
   };
 
   return <View style={styles.root}>
-    <View style={styles.modeRow}>
-      <Text style={[type.caption, { color: colors.muted }]}>Appearance mode</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={mode === "dark" ? "Use light appearance" : "Use dark appearance"} disabled={disabled}
-        onPress={switchMode}
-        style={({ pressed }) => [styles.modeButton, { backgroundColor: colors.surfaceLow, borderColor: colors.outlineVariant, opacity: pressed ? 0.75 : disabled ? 0.5 : 1 }]}>
-        <Ionicons name={mode === "dark" ? "sunny-outline" : "moon-outline"} size={18} color={colors.primary} />
-        <Text style={[type.bodyStrong, { color: colors.text }]}>{mode === "dark" ? "Dark" : "Light"}</Text>
-      </Pressable>
+    <View accessibilityRole="radiogroup" accessibilityLabel="Appearance mode" style={[styles.modeSwitch, { backgroundColor: colors.surfaceLow }]}>
+      {MODES.map((option) => {
+        const active = mode === option.value;
+        return <Pressable key={option.value} accessibilityRole="radio" accessibilityLabel={`Use ${option.label.toLowerCase()} appearance`} accessibilityState={{ checked: active, disabled }} aria-checked={active} disabled={disabled}
+          onPress={() => selectMode(option.value)}
+          style={({ pressed }) => [styles.modeButton, active && { backgroundColor: colors.card }, { opacity: pressed ? 0.75 : disabled ? 0.5 : 1 }]}>
+          <Ionicons name={option.icon} size={16} color={active ? colors.primary : colors.muted} />
+          <Text style={[type.bodyStrong, { color: active ? colors.text : colors.muted, fontSize: 13 }]}>{option.label}</Text>
+        </Pressable>;
+      })}
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Choose interface theme" accessibilityState={{ expanded: open, disabled }} disabled={disabled}
       onPress={() => { setOpen(!open); setQuery(""); }}
@@ -61,7 +67,7 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
       <Text style={[type.caption, { color: colors.primary }]}>{open ? "Close" : "Change"}</Text>
     </Pressable>
     {open ? <View style={[styles.menu, { borderColor: colors.outlineVariant }]}>
-      <Input value={query} onChangeText={setQuery} placeholder="Search themes" accessibilityLabel="Search themes" autoCorrect={false} />
+      <Input autoFocus value={query} onChangeText={setQuery} placeholder="Search themes" accessibilityLabel="Search themes" autoCorrect={false} />
       <Text style={[type.caption, { color: colors.muted, paddingHorizontal: 4 }]}>{`${mode === "dark" ? "Dark" : "Light"} themes${preference === "system" ? " · System follows this device" : ""}`}</Text>
       <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={styles.options}>
         <View accessibilityRole="radiogroup" accessibilityLabel={`${mode === "dark" ? "Dark" : "Light"} interface themes`}>
@@ -90,8 +96,8 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
 
 const styles = StyleSheet.create({
   root: { gap: 8 },
-  modeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  modeButton: { minHeight: 40, paddingHorizontal: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 8 },
+  modeSwitch: { padding: 4, borderRadius: 999, flexDirection: "row", gap: 4 },
+  modeButton: { flex: 1, minHeight: 36, borderRadius: 999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 10 },
   trigger: { minHeight: 64, padding: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 12 },
   swatches: { flexDirection: "row", gap: 3 },
   swatch: { width: 12, height: 24, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth },

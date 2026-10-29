@@ -9,6 +9,8 @@ const require = createRequire(import.meta.url);
 const source = await readFile(new URL("../app/board/[id].tsx", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
 const ranking = {};
+const navigation = {};
+vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/navigation-commands.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: navigation });
 vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/top-tasks.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: ranking });
 const task = { id: "a", title: "First", priority: "medium", subtasks: [], createdAt: "2026-10-28T10:00:00Z", updatedAt: "2026-10-28T10:00:00Z" };
 const colors = new Proxy({}, { get: () => "#888888" });
@@ -25,13 +27,15 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
     "expo-router": { useLocalSearchParams: () => ({ id: boardId }), router: { replace: (destination) => options.onNavigate?.(destination) } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: options.colors ?? colors } }) },
+    "@/providers/preferences-provider": { usePreferences: () => ({ boardDisplay: options.boardDisplay ?? { compactCards: false, focusedColumn: false, showMoveArrows: false, zoom: 1 }, setBoardDisplayPreferences: (patch) => options.onDisplayChange?.(patch) }) },
     "@/providers/tasks-provider": { useTasksContext: () => api },
     "@/providers/toast-provider": { useToast: () => ({}) },
     "@/hooks/use-now": { useNow: () => new Date("2026-10-28") },
     "@/lib/domain/tasks-selectors": { sortTasks: (items) => items, matchesQuery: (task) => !(options.hiddenIds ?? []).includes(task.id) },
-    "@/lib/domain/sections": { getTaskSectionId: () => undefined },
+    "@/lib/domain/sections": { getTaskSectionId: () => undefined, isCustomSection: () => false },
     "@/lib/features/ribbon-context": { getRibbonContext: () => ({}) },
     "@/lib/features/top-tasks": ranking,
+    "@/lib/features/navigation-commands": { createNavigationCommands: (options) => navigation.createNavigationCommands({ ...options, projects: options.projects.map((project) => ({ workspace: { tasks: [], sections: [] }, ...project })) }) },
     "@/lib/domain/constants": { SORT_OPTIONS: [], PRIORITY_ORDER: [] },
     "@/theme/layout": { mobileContentStyle: {}, mobileBottomNavClearance: 112 },
   };
@@ -47,6 +51,39 @@ function find(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...find(node.props?.children, predicate)];
 }
 const editor = (tree) => find(tree, (node) => node.type === "TaskEditor")[0];
+test("board ribbon restores saved display choices and automatically remembers changes", () => {
+  const saved = { compactCards: true, focusedColumn: true, showMoveArrows: true, zoom: 1.2 };
+  const updates = [];
+  const tree = render(1200, "board", null, false, [task], [], { boardDisplay: saved, onDisplayChange: (patch) => updates.push(patch) });
+  const ribbon = find(tree, (node) => node.type === "MobileBoardRibbon")[0];
+  assert.equal(ribbon.props.compact, true);
+  assert.equal(ribbon.props.focused, true);
+  assert.equal(ribbon.props.showMoveArrows, true);
+  assert.equal(ribbon.props.zoom, 1.2);
+  ribbon.props.onCompact();
+  ribbon.props.onFocused();
+  ribbon.props.onShowMoveArrows();
+  ribbon.props.onZoom(5);
+  assert.equal(JSON.stringify(updates), JSON.stringify([{ compactCards: false }, { focusedColumn: false }, { showMoveArrows: false }, { zoom: 1.3 }]));
+  const columns = find(tree, (node) => node.type === "MobileTaskColumns")[0];
+  assert.equal(columns.props.compact, true);
+  assert.equal(columns.props.focused, true);
+  assert.equal(columns.props.zoom, 1.2);
+});
+
+test("workspace commands navigate views and Home, and inline Calendar selection does not block shortcuts", () => {
+  const updates = [], routes = [];
+  const tree = render(1200, "calendar", task, true, [task], updates, { calendarDay: new Date("2026-10-28"), onNavigate: (route) => routes.push(route) });
+  const palette = find(tree, (node) => node.type === "CommandPalette")[0];
+  assert.equal(palette.props.blocked, false);
+  const commands = palette.props.commands;
+  assert.equal(commands.find((command) => command.id === "view-board").shortcut, "1");
+  commands.find((command) => command.id === "view-board").run();
+  assert.ok(updates.some(([index, value]) => index === 0 && value === "board"));
+  commands.find((command) => command.id === "all-boards").run();
+  assert.deepEqual(routes, ["/"]);
+  assert.ok(updates.some(([index, value]) => index === 12 && value === false), "navigation closes the task editor");
+});
 test("the workspace stays capped to the visible viewport across screen heights", () => {
   for (const height of [480, 844, 1000]) for (const width of [390, 1024, 1440]) {
     const tree = render(width, "board", null, false, [task], [], { height });

@@ -18,15 +18,16 @@ function nodes(node) {
   if (Array.isArray(node)) return node.flatMap(nodes);
   return [node, ...nodes(node.props?.children)];
 }
-const react = { useMemo: (fn) => fn(), useRef: (current) => ({ current }), useState: (initial) => [initial, () => {}], useEffect() {} };
+const react = { useCallback: (fn) => fn, useMemo: (fn) => fn(), useRef: (current) => ({ current }), useState: (initial) => [initial, () => {}], useEffect() {} };
 let width = 1440;
-const native = { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", useWindowDimensions: () => ({ width, height: 1000 }), StyleSheet: { create: (value) => value } };
+let platform = "web";
+const native = { Platform: { get OS() { return platform; } }, View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", useWindowDimensions: () => ({ width, height: 1000 }), StyleSheet: { create: (value) => value } };
 const { MobileTaskColumns } = await load("../src/components/board/mobile-task-columns.tsx", {
   react, "react-native": native, "@expo/vector-icons": { Ionicons: "Icon" },
   "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 20 }) },
   "@/theme/layout": { mobileBottomNavClearance: 112 },
   "@/components/ui/anchored-menu": { anchorFromEvent: (event) => ({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) },
-  "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId },
+  "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId, isCustomSection: (section) => section.status === undefined },
   "./mobile-board-colors": { useMobileBoardColors: () => ({}) },
   "./mobile-column-task-card": { MobileColumnTaskCard: "Card" },
   "./board-column-carousel": { BoardColumnCarousel: "Carousel" },
@@ -40,6 +41,63 @@ const { MobileTaskColumns } = await load("../src/components/board/mobile-task-co
 function renderColumns(overrides = {}) {
   return MobileTaskColumns({ tasks: [{ id: "one", title: "One", sectionId: "a" }], sections: [{ id: "a", title: "First" }], boards: [], now: new Date(), selectionMode: false, selectedTaskIds: new Set(), focused: false, compact: false, zoom: 1, showMoveArrows: false, ...overrides });
 }
+
+test("right-clicking list headers and holders opens list actions at the pointer without hijacking card menus", () => {
+  for (const focused of [false, true]) {
+    const menus = [];
+    const tree = renderColumns({ focused, onSectionMenu: (section, anchor) => menus.push([section.id, anchor.x, anchor.y]) });
+    const header = nodes(tree).find((node) => node.props?.testID === "janus-column-header-a");
+    const holder = focused ? nodes(tree).find((node) => node.props?.children?.[0] === header) : nodes(tree).find((node) => node.props?.testID === "janus-column-holder-a");
+    for (const target of [header, holder]) {
+      let prevented = false, stopped = false;
+      target.props.onContextMenu({ defaultPrevented: false, nativeEvent: { pageX: 200, pageY: 90 }, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+      assert.equal(prevented, true);
+      assert.equal(stopped, true);
+    }
+    assert.deepEqual(menus, [["a", 200, 90], ["a", 200, 90]]);
+    holder.props.onContextMenu({ defaultPrevented: true });
+    assert.equal(menus.length, 2, "card context menu must retain priority");
+  }
+});
+
+test("double-click and tablet double-tap rename the exact list without cross-list clicks", () => {
+  try {
+    for (const os of ["web", "ios"]) {
+      platform = os; width = 1024;
+      for (const focused of [false, true]) {
+        const renamed = [];
+        const tree = renderColumns({ focused, sections: [{ id: "a", title: "First" }, { id: "b", title: "Second" }], onRenameSection: (section) => renamed.push(section.id) });
+        const title = nodes(tree).find((node) => node.props?.testID === "janus-column-name-a");
+        const event = { nativeEvent: { detail: 1 }, stopPropagation() {} };
+        title.props.onPress(event);
+        assert.deepEqual(renamed, []);
+        title.props.onPress(event);
+        assert.deepEqual(renamed, ["a"]);
+        if (!focused) {
+          const other = nodes(tree).find((node) => node.props?.testID === "janus-column-name-b");
+          title.props.onPress(event);
+          other.props.onPress(event);
+          assert.deepEqual(renamed, ["a"]);
+          other.props.onPress(event);
+          assert.deepEqual(renamed, ["a", "b"]);
+        }
+      }
+    }
+  } finally { platform = "web"; width = 1440; }
+});
+
+test("list title long-press opens actions and built-in status lists cannot be renamed", () => {
+  const renamed = [], menus = [];
+  const section = { id: "a", title: "Completed", status: "completed" };
+  const tree = renderColumns({ sections: [section], onRenameSection: (value) => renamed.push(value.id), onSectionMenu: (value) => menus.push(value.id) });
+  const title = nodes(tree).find((node) => node.props?.testID === "janus-column-name-a");
+  const event = { nativeEvent: { pageX: 20, pageY: 30 }, stopPropagation() {} };
+  title.props.onPress(event);
+  title.props.onPress(event);
+  title.props.onLongPress(event);
+  assert.deepEqual(renamed, []);
+  assert.deepEqual(menus, ["a", "a", "a"]);
+});
 
 test("cards and lists are draggable immediately without an extra arrange row", () => {
   const tree = renderColumns();
@@ -169,9 +227,12 @@ test("Board Actions toggle dragging on and off, with no toggle on other views", 
     "@/hooks/use-now": { useNow: () => new Date("2026-10-28") },
     "@/providers/tasks-provider": { useTasksContext: () => api },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
+    "@/providers/preferences-provider": { usePreferences: () => ({ boardDisplay: { compactCards: false, focusedColumn: false, showMoveArrows: false, zoom: 1 }, setBoardDisplayPreferences() {} }) },
     "@/providers/toast-provider": { useToast: () => ({}) },
     "@/lib/domain/tasks-selectors": { sortTasks: (tasks) => tasks },
+    "@/lib/domain/sections": { isCustomSection: (section) => section.status === undefined },
     "@/lib/features/top-tasks": { rankTopTasks: () => [] },
+    "@/lib/features/navigation-commands": { createNavigationCommands: () => [] },
     "@/lib/features/ribbon-context": { getRibbonContext: () => ({}) },
     "@/lib/domain/constants": { SORT_OPTIONS: [], PRIORITY_ORDER: [] },
   }, { get: (target, key) => target[key] ?? fallback });

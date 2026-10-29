@@ -94,6 +94,35 @@ All three top-level screens share the ribbon top-bar/search styling, content
 width, page padding, and bottom-nav clearance from `src/theme/layout.ts`.
 Interacting with a ribbon control resets its auto-hide timer.
 
+## Command palette
+
+Use the file-list icon beside Search on Home or the board ribbon. Search actions,
+then choose a target for rename and move commands. The help button lists the
+shortcuts available on the current screen.
+
+On web (including tablet browsers with a hardware keyboard):
+
+- **Ctrl/⌘ K** or **Ctrl/⌘ Shift P** opens commands; **?** opens shortcut help.
+- **B** creates a board. Inside a board, **N** creates a card, **L** creates a list,
+  **R** chooses a card to rename, and **Shift R** renames the board.
+- **Alt + arrow keys** chooses a card to move: left/right between visible lists,
+  up/down within its list. Moves have Undo and stop at boundaries.
+- **Shift B** (or **Ctrl/⌘ Shift B**) opens searchable board selection on Home,
+  boards, Top Tasks, and Settings. **[ / ]** cycles through open boards.
+- **Alt 1/2/3** opens Home / board selection, Top Tasks, or Settings.
+  **Ctrl/⌘ ,** also opens Settings.
+- Inside a board, **1/2/3/4** switches to Board / Activity / Calendar / Insights.
+  The palette also offers compact cards, focused columns, move arrows, dragging,
+  and zoom controls.
+- In the palette, **↑/↓** or **Ctrl J/K** selects, **Enter** runs, and **Esc** goes
+  back or closes. Typing filters commands and targets.
+
+Global shortcuts pause in text fields and dialogs. Native Android/iOS supports
+the same commands by touch; global hardware-keyboard shortcuts are web-only.
+In **Settings → Keyboard**, single-key shortcuts can be disabled; modified
+shortcuts, commands by touch, and **?** help stay available. This setting is
+device-local and is not included in preference backup files.
+
 ## Lists and cancellation
 
 - Board columns are called **lists** in the UI. The domain type remains

@@ -24,13 +24,17 @@ function load(path) {
   return exports;
 }
 const { useTasks } = load("hooks/use-tasks");
-const { getTaskSectionId } = load("lib/domain/sections");
+const { getTaskSectionId, isCustomSection } = load("lib/domain/sections");
 const { taskDropOrder, sectionDropOrder } = load("lib/features/janus-drag");
+const { createNavigationCommands } = load("lib/features/navigation-commands");
 const source = readFileSync(new URL("../app/board/[id].tsx", import.meta.url), "utf8");
 const ast = ts.createSourceFile("board.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const screen = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "WorkspaceScreen");
 const actions = screen.body.statements.filter((node) => ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => ["dropTask", "dropSection"].includes(declaration.name.getText(ast))));
 const compiled = ts.transpileModule(actions.map((node) => node.getText(ast)).join("\n"), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+const commandNames = ["moveTaskToSection", "reorderTask", "moveSection", "visibleSections", "cardTargets", "neighborList", "commands"];
+const commandSource = screen.body.statements.filter((node) => ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => commandNames.includes(declaration.name.getText(ast))));
+const commandCode = ts.transpileModule(commandSource.map((node) => node.getText(ast)).join("\n"), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 const stamp = "2026-10-28T12:00:00Z";
 const task = (id, sectionId) => ({ id, title: id, description: "Preserve my notes", dueAt: null, priority: "high", category: null, completed: false, canceled: false, completedAt: null, sectionId, createdAt: stamp, updatedAt: stamp, subtasks: [{ id: `sub-${id}`, title: "Checklist", done: true }], tags: ["tag"], attachments: [], activity: [] });
 const sections = [{ id: "a", title: "A" }, { id: "hidden", title: "Hidden", hidden: true }, { id: "b", title: "B" }, { id: "empty", title: "Empty" }, { id: "done", title: "Done", status: "completed" }];
@@ -44,7 +48,14 @@ function harness({ filtered = false, sort = "manual" } = {}) {
     api, before.tasks, before.tasks.filter((task) => !filtered || task.id !== "invisible"), before.sections, new Date(stamp), sort,
     (next) => sorts.push(next), { success: (message, options) => messages.push({ message, options }) }, getTaskSectionId, taskDropOrder, sectionDropOrder,
   );
-  return { api, before, messages, sorts, ...actions };
+  const visibleTasks = before.tasks.filter((task) => !filtered || task.id !== "invisible");
+  const renderedBoardTasks = visibleTasks.filter((task) => !before.sections.find((section) => section.id === getTaskSectionId(task, before.sections, new Date(stamp)))?.hidden);
+  const selected = [];
+  const context = { api, tasks: before.tasks, visibleTasks, renderedBoardTasks, sections: before.sections, now: new Date(stamp), sort, setSort: (next) => sorts.push(next), toast: { success: (message, options) => messages.push({ message, options }) }, getTaskSectionId, isCustomSection, createNavigationCommands, projects: [], id: "board", currentProjectId: "board", boards: [], hasTasks: true, compactCards: false, focusedColumn: false, showMoveArrows: false, zoom: 1, dragEnabled: true,
+    setNewBoardOpen() {}, addNewTask() {}, setAddSectionOpen() {}, setRenameBoardOpen() {}, setRenameCardTarget: (task) => selected.push(task), openEditor() {}, setRenameSectionTarget() {}, switchProject() {}, leaveWorkspace() {}, changeMode() {},
+  };
+  const commands = new Function(...Object.keys(context), `${commandCode}\nreturn commands;`)(...Object.values(context));
+  return { api, before, messages, sorts, commands, selected, ...actions };
 }
 
 test("real Board drop action moves and orders filtered cards without losing other tasks", () => {
@@ -93,6 +104,40 @@ test("real section action preserves hidden slots, persists and supports Undo", (
   h.dropSection("a", "empty");
   assert.deepEqual(h.api.snapshot().sections.map((section) => section.id), ["b", "hidden", "empty", "a", "done"]);
   assert.deepEqual(h.api.snapshot().tasks, h.before.tasks);
+  h.messages[0].options.action.onPress();
+  assert.deepEqual(h.api.snapshot(), h.before);
+});
+
+test("palette moves cards past hidden lists, omits edges, and offers undo", () => {
+  const h = harness({ filtered: true });
+  const left = h.commands.find((command) => command.id === "card-left");
+  assert.equal(left.children.some((target) => target.id === "one"), false);
+  const right = h.commands.find((command) => command.id === "card-right");
+  right.children.find((target) => target.id === "one").run();
+  assert.equal(h.api.snapshot().tasks.find((task) => task.id === "one").sectionId, "b");
+  assert.equal(right.children.some((target) => target.id === "invisible"), false);
+  h.messages[0].options.action.onPress();
+  assert.deepEqual(h.api.snapshot(), h.before);
+});
+
+test("palette reorder uses manual ordering and target selection never mutates cards", () => {
+  const h = harness({ sort: "priority" });
+  h.commands.find((command) => command.id === "rename-card").children[0].run();
+  assert.equal(h.selected[0].id, "one");
+  assert.deepEqual(h.api.snapshot(), h.before);
+  const up = h.commands.find((command) => command.id === "card-up");
+  assert.equal(up.children.some((target) => target.id === "one"), false);
+  up.children.find((target) => target.id === "two").run();
+  assert.deepEqual(h.api.snapshot().tasks.map((task) => task.id), ["two", "invisible", "one", "three"]);
+  assert.deepEqual(h.sorts, ["manual"]);
+  h.messages[0].options.action.onPress();
+  assert.deepEqual(h.api.snapshot(), h.before);
+});
+
+test("palette list reorder uses existing persisted action and supports undo", () => {
+  const h = harness();
+  h.commands.find((command) => command.id === "list-right").children.find((target) => target.id === "a").run();
+  assert.deepEqual(h.api.snapshot().sections.map((section) => section.id), ["hidden", "a", "b", "empty", "done"]);
   h.messages[0].options.action.onPress();
   assert.deepEqual(h.api.snapshot(), h.before);
 });

@@ -26,7 +26,7 @@ let activeDrag = null;
 let boardPaneMeasurement = null;
 const colors = new Proxy({}, { get: () => "#888888" });
 const { BoardManagerContent } = await load("../src/components/board/board-manager-content.tsx", {
-  react: { useState: (value) => value === null ? [boardPaneMeasurement, (next) => { boardPaneMeasurement = next; }] : [value, () => {}] },
+  react: { useRef: (value) => ({ current: value }), useState: (value) => value === null ? [boardPaneMeasurement, (next) => { boardPaneMeasurement = next; }] : [value, () => {}] },
   "react-native": { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", Platform: { get OS() { return platform; }, select: (values) => values.default }, useWindowDimensions: () => ({ width }), StyleSheet: { create: (value) => value, hairlineWidth: 0.5 } },
   "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 20, left: 0, right: 0 }) },
   "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle" },
@@ -34,6 +34,7 @@ const { BoardManagerContent } = await load("../src/components/board/board-manage
   "@/components/janus-board-ui": { IconButton: "IconButton" },
   "@/components/reference/mobile/reference-primitives": { ScreenHeader: "Header" },
   "@/components/ui/button": { Button: "Button" }, "@/components/ui/empty-state": { EmptyState: "EmptyState" },
+  "@/components/ui/janus-logo": { JanusLogo: "JanusLogo" },
   "@/components/ui/mobile-top-bar": { MobileTopBarAction: "Action", MobileSearchField: "Search" },
   "@/components/ui/section-heading": { SectionHeading: "Heading" },
   "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
@@ -217,4 +218,85 @@ test("move arrows vanish on every card while dragging and return without layout 
     }
   }
   activeDrag = null;
+});
+
+test("board context menus preserve pointer coordinates and never open the board", () => {
+  width = 1200;
+  platform = "web";
+  const calls = [];
+  const tree = render({ onMenu: (project, event) => calls.push([project.id, event.nativeEvent.pageX, event.nativeEvent.pageY]), onOpen: () => assert.fail("right-click must not navigate") });
+  const card = find(tree, "home-board-grid").props.children[0].props.children;
+  const surface = card.type(card.props);
+  let prevented = false, stopped = false;
+  surface.props.onContextMenu({ nativeEvent: { pageX: 320, pageY: 180 }, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+  assert.equal(prevented, true);
+  assert.equal(stopped, true);
+  assert.deepEqual(calls, [["0", 320, 180]]);
+  const blocked = card.type({ ...card.props, editing: true });
+  blocked.props.onContextMenu({ nativeEvent: { pageX: 5, pageY: 6 }, preventDefault() {}, stopPropagation() {} });
+  assert.equal(calls.length, 1, "rearranging must not open menus");
+});
+
+test("double-clicking names renames active and closed boards without navigating", () => {
+  width = 1200;
+  platform = "web";
+  const renamed = [], opened = [];
+  const tree = render({ onRename: (project) => renamed.push(project.id), onOpen: (id) => opened.push(id), onMenu() {} });
+  const active = find(tree, "home-board-grid").props.children[0].props.children;
+  const closed = find(tree, "home-closed-board-grid").props.children[0].props.children;
+  const event = { nativeEvent: { detail: 1 }, stopPropagation() {} };
+  for (const card of [active, closed]) {
+    const surface = card.type(card.props);
+    const name = find(surface, `board-name-${card.props.project.id}`);
+    const before = renamed.length;
+    name.props.onPress(event);
+    assert.equal(renamed.length, before, "first click waits for a second name click");
+    name.props.onPress(event);
+    assert.equal(renamed.length, before + 1);
+    assert.deepEqual(opened, []);
+    // Context-menu activation must not leave half of a double-click behind.
+    name.props.onPress(event);
+    surface.props.onContextMenu({ nativeEvent: { pageX: 0, pageY: 0 }, preventDefault() {}, stopPropagation() {} });
+    name.props.onPress(event);
+    assert.equal(renamed.length, before + 1);
+  }
+});
+
+test("tablet names support double-tap while phone name taps still open boards", () => {
+  try {
+    platform = "ios";
+    for (width of [390, 1024]) {
+      let renamed = 0, opened = 0, menus = 0;
+      const tree = render({ onRename: () => renamed++, onOpen: () => opened++, onMenu: () => menus++ });
+      const cell = find(tree, "home-board-grid").props.children[0];
+      const card = cell.props.children;
+      const surface = card.type(card.props);
+      assert.equal(surface.props.onContextMenu, undefined, "DOM events must not reach native views");
+      const name = find(surface, "board-name-0");
+      const event = { nativeEvent: {}, stopPropagation() {} };
+      name.props.onPress(event);
+      name.props.onPress(event);
+      assert.equal(renamed, width >= 768 ? 1 : 0);
+      assert.equal(opened, width >= 768 ? 0 : 2);
+      name.props.onLongPress(event);
+      assert.equal(menus, 1);
+    }
+  } finally { platform = "web"; width = 390; }
+});
+
+test("keyboard can rename directly, and unavailable cards cannot rename", () => {
+  width = 1200;
+  platform = "web";
+  let renamed = 0;
+  const tree = render({ onRename: () => renamed++ });
+  const card = find(tree, "home-board-grid").props.children[0].props.children;
+  const event = { nativeEvent: { detail: 0 }, stopPropagation() {} };
+  find(card.type(card.props), "board-name-0").props.onPress(event);
+  assert.equal(renamed, 1);
+  for (const blocked of [{ editing: true }, { ready: false }]) {
+    const name = find(card.type({ ...card.props, ...blocked }), "board-name-0");
+    assert.equal(name.props.disabled, true);
+    name.props.onPress(event);
+    assert.equal(renamed, 1);
+  }
 });

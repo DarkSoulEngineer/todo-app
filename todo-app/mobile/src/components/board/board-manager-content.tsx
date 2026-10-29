@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format, isValid, parseISO } from "date-fns";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type GestureResponderEvent, type ViewStyle } from "react-native";
-import { useState } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import { IconButton } from "@/components/janus-board-ui";
@@ -19,6 +19,8 @@ import { getHomeLayout } from "@/lib/features/home-layout";
 import { useBoardGridDrag } from "@/hooks/use-board-grid-drag";
 import { BoardDragCell } from "./board-drag-cell";
 
+type BoardMenuEvent = { nativeEvent: { pageX: number; pageY: number } };
+
 interface Props {
   projects: JanusProject[];
   statsProjects: JanusProject[];
@@ -34,13 +36,15 @@ interface Props {
   onQuery: (query: string) => void;
   onEdit: (editing: boolean) => void;
   onCreate: () => void;
+  onCommands?: () => void;
   onImport: () => void;
   onOpen: (id: string) => void;
   onReopen: (project: JanusProject) => void;
   onPin: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
   onReorder?: (id: string, targetId: string) => void;
-  onMenu: (project: JanusProject, event?: GestureResponderEvent) => void;
+  onMenu: (project: JanusProject, event?: BoardMenuEvent) => void;
+  onRename?: (project: JanusProject) => void;
   onSave: (project: JanusProject) => void;
   onDuplicate: (project: JanusProject) => void;
   onRemove: (project: JanusProject) => void;
@@ -77,10 +81,11 @@ export function BoardManagerContent(props: Props) {
       searchActive={showSearch}
       showThemeToggle={false}
       actions={<>
+        {props.onCommands ? <MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={props.onCommands} /> : null}
         <MobileTopBarAction icon="download-outline" label="Import board" onPress={props.onImport} />
         <MobileTopBarAction icon="add" label="New board" onPress={props.onCreate} style={[styles.newBoardButton, { backgroundColor: c.card, borderColor: c.border }]} />
       </>}
-      search={showSearch ? <MobileSearchField value={props.query} onChangeText={props.onQuery} placeholder="Search boards" accessibilityLabel="Search boards" /> : null}
+      search={showSearch ? <MobileSearchField autoFocus value={props.query} onChangeText={props.onQuery} placeholder="Search boards" accessibilityLabel="Search boards" /> : null}
     />
     <ScrollView testID="home-content" scrollEnabled={!gridDrag.drag} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, layout.wide && styles.contentWide, { paddingLeft: layout.padding + insets.left, paddingRight: layout.padding + insets.right, paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
       <View testID="home-dashboard" style={layout.sidebar ? styles.dashboardWide : undefined}>
@@ -98,8 +103,8 @@ export function BoardManagerContent(props: Props) {
         </Button>}
       />
       {props.editing ? <Text style={[styles.editHint, { color: c.primary }]}>{canDrag ? "Drag from anywhere on a card to another grid position, or use the arrows. Pinned boards stay first outside Rearrange." : "Use the arrows to arrange your boards."}</Text> : null}
-      {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState icon={props.query ? "search-outline" : "layers-outline"} title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View testID="home-board-grid" style={[styles.boards, layout.wide && styles.boardGrid, layout.wide && Platform.OS === "web" && webBoardGrid]}>{[...props.projects.map((project, index) => {
-        const card = <ManagerCard project={project} accent={c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} hideMoveArrows={Boolean(gridDrag.drag)} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={(event) => props.onMenu(project, event)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />;
+      {props.loading ? <Text accessibilityLiveRegion="polite" style={[styles.editHint, { color: c.mutedForeground }]}>Loading your boards…</Text> : props.projects.length === 0 && props.closedProjects.length === 0 ? <EmptyState plain={Boolean(props.query)} icon="layers-outline" title={props.query ? "No matching boards" : "No boards yet"} message={props.query ? "Try another name or clear your search." : "Create a board to organize your tasks."} actionLabel={props.query ? "Clear search" : "Create board"} onAction={props.query ? () => props.onQuery("") : props.onCreate} /> : <View testID="home-board-grid" style={[styles.boards, layout.wide && styles.boardGrid, layout.wide && Platform.OS === "web" && webBoardGrid]}>{[...props.projects.map((project, index) => {
+        const card = <ManagerCard project={project} accent={c.success} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={props.pinnedIds.has(project.id)} editing={props.editing} hideMoveArrows={Boolean(gridDrag.drag)} ready={props.ready} first={index === 0} last={index === props.projects.length - 1} onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => props.onPin(project.id)} onMove={(direction) => props.onMove(project.id, direction)} onMenu={(event) => props.onMenu(project, event)} onRename={props.onRename ? () => props.onRename?.(project) : undefined} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} />;
         return layout.wide ? <BoardDragCell key={project.id} id={project.id} name={project.name} width={cardWidth} enabled={canDrag}
           active={gridDrag.drag?.id === project.id} target={gridDrag.drag?.target === project.id}
           onRegister={gridDrag.register} onStart={gridDrag.start} onMove={gridDrag.move} onDrop={gridDrag.drop} onCancel={gridDrag.cancel}>{card}</BoardDragCell>
@@ -111,7 +116,7 @@ export function BoardManagerContent(props: Props) {
       {props.closedProjects.length ? <>
         <SectionHeading title="Closed boards" subtitle={`${props.closedProjects.length} closed`} style={styles.sectionHeading} />
         <Text style={[styles.editHint, { color: c.mutedForeground }]}>Closed boards stay safe with their tasks. Reopen one to keep working on it.</Text>
-        <View testID="home-closed-board-grid" style={[styles.boards, layout.wide && styles.boardGrid, layout.wide && Platform.OS === "web" && webBoardGrid]}>{props.closedProjects.map((project) => <View key={project.id} style={layout.wide ? { width: cardWidth, maxWidth: "100%" } : undefined}><ManagerCard project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={(event) => props.onMenu(project, event)} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>
+        <View testID="home-closed-board-grid" style={[styles.boards, layout.wide && styles.boardGrid, layout.wide && Platform.OS === "web" && webBoardGrid]}>{props.closedProjects.map((project) => <View key={project.id} style={layout.wide ? { width: cardWidth, maxWidth: "100%" } : undefined}><ManagerCard project={project} accent={c.mutedForeground} metrics={getTaskMetrics(project.workspace.tasks, props.now)} pinned={false} editing={false} ready={props.ready} first={false} last={false} closed onOpen={() => props.onOpen(project.id)} onReopen={() => props.onReopen(project)} onPin={() => undefined} onMove={() => undefined} onMenu={(event) => props.onMenu(project, event)} onRename={props.onRename ? () => props.onRename?.(project) : undefined} onSave={() => props.onSave(project)} onDuplicate={() => props.onDuplicate(project)} onRemove={() => props.onRemove(project)} /></View>)}</View>
       </> : null}
       </View>
       <View testID="home-stats-panel" style={layout.sidebar ? { width: layout.statsWidth } : undefined}>
@@ -122,15 +127,36 @@ export function BoardManagerContent(props: Props) {
   </>;
 }
 
-function ManagerCard({ project, accent, metrics, pinned, editing, hideMoveArrows = false, ready, first, last, closed = false, onOpen, onReopen, onPin, onMove, onMenu, onSave, onDuplicate, onRemove }: { project: JanusProject; accent: string; metrics: TaskMetrics; pinned: boolean; editing: boolean; hideMoveArrows?: boolean; ready: boolean; first: boolean; last: boolean; closed?: boolean; onOpen: () => void; onReopen: () => void; onPin: () => void; onMove: (direction: -1 | 1) => void; onMenu: (event?: GestureResponderEvent) => void; onSave: () => void; onDuplicate: () => void; onRemove: () => void }) {
+function ManagerCard({ project, accent, metrics, pinned, editing, hideMoveArrows = false, ready, first, last, closed = false, onOpen, onReopen, onPin, onMove, onMenu, onRename, onSave, onDuplicate, onRemove }: { project: JanusProject; accent: string; metrics: TaskMetrics; pinned: boolean; editing: boolean; hideMoveArrows?: boolean; ready: boolean; first: boolean; last: boolean; closed?: boolean; onOpen: () => void; onReopen: () => void; onPin: () => void; onMove: (direction: -1 | 1) => void; onMenu: (event?: BoardMenuEvent) => void; onRename?: () => void; onSave: () => void; onDuplicate: () => void; onRemove: () => void }) {
   const { theme } = useTheme();
   const c = theme.colors;
+  const { width } = useWindowDimensions();
+  const lastNamePress = useRef<number | null>(null);
+  const canRenameName = Boolean(onRename) && (Platform.OS === "web" || width >= 768);
+  const pressName = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    if (!ready || editing) return;
+    if (!canRenameName) { onOpen(); return; }
+    // Keyboard activation is immediate; pointer users double-click/double-tap.
+    const detail = (event.nativeEvent as typeof event.nativeEvent & { detail?: number }).detail;
+    const now = Date.now();
+    if ((Platform.OS === "web" && detail === 0) || (lastNamePress.current !== null && now - lastNamePress.current <= 350)) {
+      lastNamePress.current = null;
+      onRename?.();
+    } else lastNamePress.current = now;
+  };
+  const webContextMenu = Platform.OS === "web" ? { onContextMenu: (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    lastNamePress.current = null;
+    if (ready && !editing) onMenu(event);
+  } } : {};
   const date = parseISO(project.createdAt);
-  return <View testID={`manager-board-${project.id}`} style={[styles.board, { flexGrow: 1, backgroundColor: c.card, borderColor: c.border }]}>
+  return <View {...webContextMenu} testID={`manager-board-${project.id}`} style={[styles.board, { flexGrow: 1, backgroundColor: c.card, borderColor: c.border }]}>
     {/* A sibling hit surface opens every non-control area without nesting buttons. */}
-    <Pressable accessibilityRole="button" accessibilityLabel={closed ? `${project.name}, closed board` : `Open ${project.name}`} accessibilityHint={closed ? "Shows options to reopen this board" : "Opens board view"} disabled={editing} onPress={onOpen} onLongPress={onMenu} onContextMenu={((event:any) => { event.preventDefault?.(); onMenu(event.nativeEvent as unknown as GestureResponderEvent); })} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: 20, backgroundColor: pressed ? c.primarySoft : "transparent" }]} />
+    <Pressable accessibilityRole="button" accessibilityLabel={closed ? `${project.name}, closed board` : `Open ${project.name}`} accessibilityHint={closed ? "Shows options to reopen this board" : "Opens board view"} disabled={editing || !ready} onPress={onOpen} onLongPress={onMenu} style={({ pressed }) => [StyleSheet.absoluteFill, { borderRadius: 20, backgroundColor: pressed ? c.primarySoft : "transparent" }]} />
     <View pointerEvents="box-none" style={styles.cardHeader}>
-      <View pointerEvents="none" style={styles.cardTitleArea}><Text style={[styles.boardTitle, { color: c.foreground }]} numberOfLines={2}>{project.name}</Text>{closed ? <View style={[styles.closedBadge, { backgroundColor: c.secondary, borderColor: c.border }]}><Ionicons name="lock-closed" size={10} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 9, fontWeight: "700", letterSpacing: 0.5 }}>CLOSED</Text></View> : null}{isValid(date) ? <Text style={[styles.created, { color: c.mutedForeground }]}>Created {format(date, "dd MMM yyyy")}</Text> : null}</View>
+      <View pointerEvents="box-none" style={styles.cardTitleArea}><Pressable testID={`board-name-${project.id}`} accessibilityRole="button" accessibilityLabel={canRenameName ? `Rename ${project.name}` : `Open ${project.name}`} accessibilityHint={canRenameName ? "Double-click or double-tap to rename. Long-press for board actions." : "Opens board view"} disabled={!ready || editing} onPress={pressName} onLongPress={(event) => { lastNamePress.current = null; onMenu(event); }}><Text style={[styles.boardTitle, { color: c.foreground }]} numberOfLines={2}>{project.name}</Text></Pressable>{closed ? <View pointerEvents="none" style={[styles.closedBadge, { backgroundColor: c.secondary, borderColor: c.border }]}><Ionicons name="lock-closed" size={10} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 9, fontWeight: "700", letterSpacing: 0.5 }}>CLOSED</Text></View> : null}{isValid(date) ? <Text pointerEvents="none" style={[styles.created, { color: c.mutedForeground }]}>Created {format(date, "dd MMM yyyy")}</Text> : null}</View>
       {closed ? null : <View pointerEvents="box-none" style={styles.headerActions}>
         {editing ? <View testID={`board-move-arrows-${project.id}`} pointerEvents={hideMoveArrows ? "none" : "box-none"} accessibilityElementsHidden={hideMoveArrows} importantForAccessibility={hideMoveArrows ? "no-hide-descendants" : "auto"} style={[styles.moveArrows, { opacity: hideMoveArrows ? 0 : 1 }]}>
           <BoardMoveButton direction="up" boardName={project.name} disabled={first || !ready} onPress={() => onMove(-1)} />

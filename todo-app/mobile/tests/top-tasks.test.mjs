@@ -14,6 +14,7 @@ async function load(path, mocks = {}) {
   return exports;
 }
 const ranking = await load("../src/lib/features/top-tasks.ts");
+const navigation = await load("../src/lib/features/navigation-commands.ts");
 const task = (id, priority = "medium", dueAt = null, extra = {}) => ({
   id, title: id, description: "Notes", priority, dueAt, completed: false, canceled: false,
   createdAt: "2026-10-01T09:00:00Z", updatedAt: "2026-10-01T09:00:00Z", sectionId: null,
@@ -101,6 +102,10 @@ async function setupRoute(openTasks = Array.from({ length: 12 }, (_, index) => t
     "@/components/reference/reference-theme": { useReferenceTheme: () => ({ colors, type: {} }) },
     "@/components/ui/atmosphere": { ThemeAtmosphere: "Atmosphere" }, "@/components/ui/empty-state": { EmptyState: "EmptyState" },
     "@/components/ui/section-heading": { SectionHeading: "SectionHeading" }, "@/hooks/use-all-board-tasks": hooks,
+    "@/components/ui/anchored-menu": { anchorFromEvent: () => null },
+    "@/components/ui/command-palette": { CommandPalette: "CommandPalette" },
+    "@/components/ui/mobile-top-bar": { MobileTopBarAction: "MobileTopBarAction" },
+    "@/lib/features/navigation-commands": navigation,
     "@/hooks/use-now": { useNow: () => new Date("2026-10-27T12:00:00Z") },
     "@/lib/domain/sections": { getTaskSectionId: () => null }, "@/lib/features/top-tasks": ranking,
     "@/providers/toast-provider": { useToast: () => ({ success: (message) => calls.push(message) }) },
@@ -131,6 +136,20 @@ test("Top Tasks switches 3/10, excludes closed boards, and refills after complet
   tree = render();
   assert.equal(find(tree, "TaskCard").length, 10);
   assert.equal(find(tree, "BottomNav")[0].props.active, "top-tasks");
+});
+
+test("Top Tasks exposes board selection and main navigation commands", async () => {
+  const { render, calls } = await setupRoute();
+  const palette = find(render(), "CommandPalette")[0];
+  assert.equal(palette.props.blocked, false);
+  const commands = palette.props.commands;
+  const change = commands.find((command) => command.id === "switch-board");
+  assert.equal(change.children.some((target) => target.id === "closed"), false);
+  change.children.find((target) => target.id === "b").run();
+  assert.ok(calls.includes("switch:b"));
+  assert.ok(calls.includes("/board/b"));
+  commands.find((command) => command.id === "settings").run();
+  assert.ok(calls.includes("/settings"));
 });
 
 test("editing uses the owning board and changes immediately affect ranking", async () => {

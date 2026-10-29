@@ -1,13 +1,11 @@
 import { router } from "expo-router";
 import { BlurTargetView } from "expo-blur";
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { BoardManagerContent } from "@/components/board/board-manager-content";
 import { OptionSheet, TextEntrySheet } from "@/components/janus-board-ui";
 import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Sheet } from "@/components/ui/sheet";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
 import { WelcomeScreen } from "@/components/setup/welcome-screen";
@@ -18,6 +16,9 @@ import { exportWorkspace, pickWorkspaceFile } from "@/lib/data/transfer";
 import { getWorkspaceMetrics, loadManagerState, saveManagerLayout, saveManagerPins } from "@/lib/data/manager-state";
 import { EMPTY_BOARD_LAYOUT, boardLayoutOrder, dropBoardInLayout, moveBoardInLayout, reconcileBoardLayout, removeBoardFromLayout, type BoardLayout } from "@/lib/features/board-layout";
 import type { JanusProject } from "@/lib/domain/projects";
+import { CommandPalette, type PaletteMode } from "@/components/ui/command-palette";
+import type { Command } from "@/lib/features/commands";
+import { createNavigationCommands } from "@/lib/features/navigation-commands";
 
 export default function BoardManagerScreen() {
   const { theme } = useTheme();
@@ -26,7 +27,6 @@ export default function BoardManagerScreen() {
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { projects, tasks, sections, boards, isLoading, currentProjectId, createProject, importProject, duplicateProject, renameProject, removeProject, switchProject, closeProject, reopenProject } = api;
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
   const [menuProject, setMenuProject] = useState<JanusProject | null>(null);
   const [closedPromptProject, setClosedPromptProject] = useState<JanusProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<JanusProject | null>(null);
@@ -38,6 +38,7 @@ export default function BoardManagerScreen() {
   const [managerStateLoaded, setManagerStateLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
+  const [paletteMode, setPaletteMode] = useState<PaletteMode>(null);
   const managerReady = !isLoading && managerStateLoaded;
 
   useEffect(() => {
@@ -137,10 +138,10 @@ export default function BoardManagerScreen() {
       action: { label: "Undo", onPress: () => reopenProject(project.id) },
     });
   };
-  const create = () => {
-    if (!newName.trim()) return;
-    const id = createProject(newName.trim());
-    setNewName(""); setShowCreate(false);
+  const create = (name: string) => {
+    if (!name.trim()) return;
+    const id = createProject(name.trim());
+    setShowCreate(false);
     if (id) router.push(`/board/${id}`);
   };
   const importBoard = async () => {
@@ -177,13 +178,22 @@ export default function BoardManagerScreen() {
     else if (tab === "settings") router.replace("/settings");
   };
 
+  const commands: Command[] = managerReady ? [
+    { id: "new-board", label: "Create new board", shortcut: "B", run: () => setShowCreate(true) },
+    ...createNavigationCommands({ projects: orderedProjects, currentProjectId, openBoard: openProject, navigate: (destination) => router.replace(destination) }),
+    { id: "rename-board", label: "Rename board", shortcut: "Shift R", children: orderedProjects.map((project) => ({ id: project.id, label: project.name, run: () => setRenameTarget(project) })) },
+    ...([-1, 1] as const).map((direction): Command => ({ id: `board-${direction}`, label: `Move board ${direction === -1 ? "left" : "right"}`, detail: "Change saved board order; pinned boards remain first", children: openProjects.filter((_, index) => direction === -1 ? index > 0 : index < openProjects.length - 1).map((project) => ({ id: project.id, label: project.name, run: () => moveBoard(project.id, direction) })) })),
+    { id: "import", label: "Import board", run: () => { void importBoard(); } },
+  ] : [];
+
   return <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
     <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
-    <BoardManagerContent projects={displayProjects} statsProjects={openProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onReorder={reorderBoard} onMenu={(project, event) => { if (event) setMenuAnchor(anchorFromEvent(event)); setMenuProject(project); }} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
+    <BoardManagerContent onCommands={() => setPaletteMode("commands")} projects={displayProjects} statsProjects={openProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onReorder={reorderBoard} onMenu={(project, event) => { setMenuAnchor(event ? anchorFromEvent(event) : null); setMenuProject(project); }} onRename={setRenameTarget} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
     </BlurTargetView>
+    <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={commands} blocked={!managerReady || showCreate || !!menuProject || !!closedPromptProject || !!deleteTarget || !!renameTarget} />
     <ReferenceMobileBottomNav active="boards" onNavigate={navigate} blurTarget={blurTarget} />
-    <Sheet visible={showCreate} onClose={() => setShowCreate(false)}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>New board</Text><Text style={{ color: theme.colors.mutedForeground, marginTop: 6 }}>Add lists and categories after creating the board.</Text><Input autoFocus value={newName} onChangeText={setNewName} placeholder="Board name" onSubmitEditing={create} style={{ marginTop: 12 }} /><Button variant="outline" label="Create board" onPress={create} disabled={!newName.trim()} style={{ marginTop: 14 }} /></Sheet>
+    <TextEntrySheet visible={showCreate} title="New board" description="Add lists and categories after creating the board." placeholder="Board name" actionLabel="Create board" onClose={() => setShowCreate(false)} onSubmit={create} />
     <OptionSheet visible={menuProject !== null} title={menuProject?.name ?? "Board actions"} options={menuProject ? [
       ...(menuProject.closedAt
         ? [{ label: "Reopen board", icon: "refresh-outline" as const, onPress: () => reopenBoard(menuProject) }]
@@ -200,12 +210,9 @@ export default function BoardManagerScreen() {
       { label: "Reopen board", icon: "refresh-outline" as const, onPress: () => reopenBoard(closedPromptProject) },
       { label: "Keep it closed", icon: "close-outline" as const, onPress: () => undefined },
     ] : []} onClose={() => setClosedPromptProject(null)} />
-    <OptionSheet visible={deleteTarget !== null} title={deleteTarget ? `Delete “${deleteTarget.name}”?` : "Delete board?"} options={deleteTarget ? [
-      { label: "Delete board", icon: "trash-outline" as const, destructive: true, onPress: () => deleteBoard(deleteTarget) },
-      { label: "Keep it", icon: "close-outline" as const, onPress: () => undefined },
-    ] : []} onClose={() => setDeleteTarget(null)} />
+    <ConfirmationDialog visible={deleteTarget !== null} title={deleteTarget ? `Delete “${deleteTarget.name}”?` : "Delete board?"} description="This board and all of its lists and cards will be permanently removed. This cannot be undone." confirmLabel="Delete board" cancelLabel="Keep it" onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) { deleteBoard(deleteTarget); setDeleteTarget(null); } }} />
     <TextEntrySheet visible={renameTarget !== null} title="Rename board" initialValue={renameTarget?.name ?? ""} placeholder="Board name" onClose={() => setRenameTarget(null)} onSubmit={(value) => { if (renameTarget) renameProject(renameTarget.id, value); setRenameTarget(null); }} />
   </View>;
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 }, sheetTitle: { fontSize: 23, fontWeight: "700" } });
+const styles = StyleSheet.create({ root: { flex: 1 } });

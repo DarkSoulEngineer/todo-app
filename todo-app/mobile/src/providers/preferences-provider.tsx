@@ -10,17 +10,26 @@ import {
 } from "react";
 
 import type { AppPreferences, CalendarDefaultView, CalendarWeekStart } from "@/lib/data/settings";
+import { defaultBoardDisplay, normalizeBoardDisplay, type BoardDisplayPreferences } from "@/lib/data/board-display-preferences";
 
 export type { CalendarDefaultView, CalendarWeekStart } from "@/lib/data/settings";
 
 const PREFERENCES_KEY = "janus.preferences.v1";
 
-const DEFAULTS: AppPreferences = {
+type StoredPreferences = AppPreferences & { boardDisplay: BoardDisplayPreferences; singleKeyShortcuts: boolean };
+
+const DEFAULTS: StoredPreferences = {
   calendarWeekStart: 1,
   calendarDefaultView: "month",
+  boardDisplay: defaultBoardDisplay,
+  singleKeyShortcuts: true,
 };
 
 interface PreferencesContextValue extends AppPreferences {
+  singleKeyShortcuts: boolean;
+  setSingleKeyShortcuts: (enabled: boolean) => void;
+  boardDisplay: BoardDisplayPreferences;
+  setBoardDisplayPreferences: (patch: Partial<BoardDisplayPreferences>) => void;
   savePreferences: (value: AppPreferences) => Promise<void>;
   setCalendarWeekStart: (value: CalendarWeekStart) => void;
   setCalendarDefaultView: (value: CalendarDefaultView) => void;
@@ -29,7 +38,7 @@ interface PreferencesContextValue extends AppPreferences {
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [preferences, setPreferences] = useState<AppPreferences>(DEFAULTS);
+  const [preferences, setPreferences] = useState<StoredPreferences>(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -37,8 +46,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     void AsyncStorage.getItem(PREFERENCES_KEY)
       .then((raw) => {
         if (cancelled || !raw) return;
-        const parsed = JSON.parse(raw) as { calendarWeekStart?: unknown; calendarDefaultView?: unknown };
+        const parsed = JSON.parse(raw) as { calendarWeekStart?: unknown; calendarDefaultView?: unknown; boardDisplay?: unknown; singleKeyShortcuts?: unknown };
         const next = { ...DEFAULTS };
+        next.boardDisplay = normalizeBoardDisplay(parsed.boardDisplay);
+        if (typeof parsed.singleKeyShortcuts === "boolean") next.singleKeyShortcuts = parsed.singleKeyShortcuts;
         if (parsed.calendarWeekStart === 0 || parsed.calendarWeekStart === 1) {
           next.calendarWeekStart = parsed.calendarWeekStart;
         }
@@ -58,28 +69,38 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const update = useCallback((patch: Partial<AppPreferences>) => {
+  const update = useCallback((patch: Partial<StoredPreferences>) => {
     setPreferences((current) => {
       const next = { ...current, ...patch };
-      void AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(next));
+      void AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
   }, []);
 
   const savePreferences = useCallback(async (next: AppPreferences) => {
-    const preferences = { calendarWeekStart: next.calendarWeekStart, calendarDefaultView: next.calendarDefaultView };
-    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
-    setPreferences(preferences);
+    const updated = { ...preferences, calendarWeekStart: next.calendarWeekStart, calendarDefaultView: next.calendarDefaultView };
+    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated));
+    setPreferences(updated);
+  }, [preferences]);
+
+  const setBoardDisplayPreferences = useCallback((patch: Partial<BoardDisplayPreferences>) => {
+    setPreferences((current) => {
+      const next = { ...current, boardDisplay: normalizeBoardDisplay({ ...current.boardDisplay, ...patch }) };
+      void AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   }, []);
 
   const value = useMemo<PreferencesContextValue>(
     () => ({
       ...preferences,
       savePreferences,
+      setBoardDisplayPreferences,
+      setSingleKeyShortcuts: (enabled) => update({ singleKeyShortcuts: enabled }),
       setCalendarWeekStart: (value) => update({ calendarWeekStart: value }),
       setCalendarDefaultView: (value) => update({ calendarDefaultView: value }),
     }),
-    [preferences, update, savePreferences],
+    [preferences, update, savePreferences, setBoardDisplayPreferences],
   );
 
   if (!hydrated) return null;

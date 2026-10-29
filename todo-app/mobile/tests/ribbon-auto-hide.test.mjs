@@ -43,10 +43,10 @@ function setup({ width = 400, fontScale = 1 } = {}) {
       });
     },
   };
-  const colors = new Proxy({}, { get: () => "#888888" });
+  const colors = new Proxy({ primary: "#86b840", borderStrong: "#555555" }, { get: (target, key) => target[key] ?? "#888888" });
   const mocks = {
     react, "@expo/vector-icons": { Ionicons: "Icon", MaterialCommunityIcons: "Icon" },
-    "react-native": { Pressable: "Pressable", ScrollView: "ScrollView", View: "View", Text: "Text", TextInput: "TextInput", StyleSheet: { create: (styles) => styles }, useWindowDimensions: () => ({ width, fontScale }) },
+     "react-native": { Platform: { OS: "web" }, Pressable: "Pressable", ScrollView: "ScrollView", View: "View", Text: "Text", TextInput: "TextInput", StyleSheet: { create: (styles) => styles }, useWindowDimensions: () => ({ width, fontScale }) },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0 }) },
     "./mobile-board-colors": { useMobileBoardColors: () => colors }, "@/lib/features/ribbon-context": context,
     "@/components/ui/sheet": { Sheet: "Sheet" },
@@ -71,6 +71,58 @@ function nodes(node) {
 }
 const button = (tree, label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
 const hasSelection = (tree) => JSON.stringify(tree).includes("Selection tools");
+
+test("opening and reopening search requests focus; typing preserves the field", () => {
+  const app = setup();
+  let tree = app.render();
+  const search = (tree) => nodes(tree).find((node) => node.type === "TextInput");
+  assert.equal(search(tree), undefined);
+  button(tree, "Search tasks").props.onPress();
+  tree = app.render();
+  assert.equal(search(tree).props.autoFocus, true);
+  button(tree, "Search tasks").props.onPress();
+  tree = app.render();
+  assert.equal(search(tree), undefined);
+  button(tree, "Search tasks").props.onPress();
+  tree = app.render();
+  assert.equal(search(tree).props.autoFocus, true);
+  let focuses = 0;
+  search(tree).props.ref.current = { focus: () => focuses++ };
+  app.props.onQuery = (query) => { app.props.query = query; };
+  app.props.onQuery("meeting");
+  tree = app.render();
+  assert.equal(search(tree).props.value, "meeting");
+  assert.equal(focuses, 0, "typing does not repeatedly steal focus");
+  button(tree, "Search tasks").props.onPress();
+  assert.equal(focuses, 1, "a visible nonempty search is refocused instead of hidden");
+  tree = app.render();
+  button(tree, "Clear search").props.onPress();
+  tree = app.render();
+  assert.equal(focuses, 2);
+  assert.equal(search(tree).props.value, "");
+  assert.equal(search(tree).props.autoFocus, true);
+});
+
+test("ribbon search focus follows the theme around the whole control at a fixed size", () => {
+  const app = setup();
+  button(app.render(), "Search tasks").props.onPress();
+  let tree = app.render();
+  const input = (tree) => nodes(tree).find((node) => node.type === "TextInput");
+  const surface = (tree) => nodes(tree).find((node) => Array.isArray(node.props?.children) && node.props.children.includes(input(tree)));
+  const flatten = (style) => Object.assign({}, ...[style].flat().filter(Boolean));
+  const original = flatten(surface(tree).props.style);
+  assert.equal(original.borderColor, "#555555");
+  assert.equal(flatten(input(tree).props.style).outlineWidth, 0);
+  input(tree).props.onFocus();
+  tree = app.render();
+  const active = flatten(surface(tree).props.style);
+  assert.equal(active.borderColor, "#86b840");
+  for (const key of ["height", "borderWidth", "borderRadius"]) assert.equal(active[key], original[key]);
+  assert.equal(active.height, 44);
+  assert.equal(flatten(input(tree).props.style).height + active.borderWidth * 2, active.height);
+  input(tree).props.onBlur();
+  assert.equal(flatten(surface(app.render()).props.style).borderColor, "#555555");
+});
 
 test("mobile overflow menu names every available tab even with icon-only labels", () => {
   for (const width of [320, 390, 600]) for (const fontScale of [1, 1.5]) {

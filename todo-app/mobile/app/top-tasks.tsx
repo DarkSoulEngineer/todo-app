@@ -19,6 +19,9 @@ import type { TaskDraft } from "@/lib/domain/types";
 import { rankTopTasks, type TopTasksLimit } from "@/lib/features/top-tasks";
 import { useToast } from "@/providers/toast-provider";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
+import { CommandPalette, type PaletteMode } from "@/components/ui/command-palette";
+import { MobileTopBarAction } from "@/components/ui/mobile-top-bar";
+import { createNavigationCommands } from "@/lib/features/navigation-commands";
 
 type TaskTarget = { projectId: string; taskId: string };
 
@@ -33,6 +36,7 @@ export default function TopTasksRoute() {
   const [editing, setEditing] = useState<TaskTarget | null>(null);
   const [menu, setMenu] = useState<TaskTarget | null>(null);
   const [smallMenuAnchor, setSmallMenuAnchor] = useState<MenuAnchor | null>(null);
+  const [paletteMode, setPaletteMode] = useState<PaletteMode>(null);
   const ranked = useMemo(() => rankTopTasks(entries), [entries]);
   const visible = ranked.slice(0, limit);
   const editorEntry = editing ? entries.find((entry) => entry.projectId === editing.projectId && entry.task.id === editing.taskId) : undefined;
@@ -65,11 +69,16 @@ export default function TopTasksRoute() {
     if (tab === "boards") router.replace("/");
     if (tab === "settings") router.replace("/settings");
   };
+  const commands = [
+    ...createNavigationCommands({ projects: api.projects, currentProjectId: api.currentProjectId, openBoard: (id) => { api.switchProject(id); router.replace(`/board/${id}`); }, navigate: (destination) => router.replace(destination) }),
+    { id: "top-three", label: "Show Top 3 tasks", run: () => setLimit(3) },
+    { id: "top-ten", label: "Show Top 10 tasks", run: () => setLimit(10) },
+  ];
 
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
     <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
-    <ScreenHeader title="Priorities" subtitle="Your next priorities across open boards" showThemeToggle={false} />
+    <ScreenHeader title="Priorities" subtitle="Your next priorities across open boards" showThemeToggle={false} actions={<MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={() => setPaletteMode("commands")} />} />
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
       <View style={[styles.limitSwitch, { backgroundColor: colors.surfaceLow, borderColor: colors.outlineVariant }]}>
         {([3, 10] as const).map((value) => <Pressable key={value} accessibilityRole="tab" accessibilityLabel={`Show top ${value} tasks`} accessibilityState={{ selected: limit === value }} onPress={() => setLimit(value)} style={[styles.limitOption, limit === value && { backgroundColor: colors.card }]}>
@@ -84,6 +93,7 @@ export default function TopTasksRoute() {
       </View>) : <EmptyState icon="checkmark-done-outline" title="Nothing needs your attention" message="There are no unfinished tasks across your open boards. Add a task from Home to get started." actionLabel="Go to Home" onAction={() => router.replace("/")} />}
     </ScrollView>
     </BlurTargetView>
+    <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={commands} blocked={api.isLoading || !!editing || !!menu} />
     <ReferenceMobileBottomNav active="top-tasks" onNavigate={navigate} blurTarget={blurTarget} />
     <OptionSheet visible={Boolean(menuEntry)} title={menuEntry?.task.title ?? "Task actions"} onClose={() => { setMenu(null); setSmallMenuAnchor(null); }} options={menuEntry ? [
       { label: "Edit task", icon: "create-outline", onPress: () => openTask(menuEntry) },

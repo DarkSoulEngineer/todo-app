@@ -442,6 +442,19 @@ export function TextEntrySheet({ visible, title, description, placeholder, initi
 function TextEntrySheetForm({ visible, title, description, placeholder, initialValue = "", actionLabel = "Save", onClose, onSubmit }: { visible: boolean; title: string; description?: string; placeholder?: string; initialValue?: string; actionLabel?: string; onClose: () => void; onSubmit: (value: string) => void }) {
   const { theme } = useTheme();
   const [value, setValue] = useState(() => initialValue);
+  const { width } = useWindowDimensions();
+  const submit = () => { if (value.trim()) onSubmit(value.trim()); };
+  if (width >= 768) return <EditorWindow visible={visible} title={title} icon="pencil-outline" closeLabel={`Close ${title.toLowerCase()}`} testID="text-entry-window" width={560} height={300} onClose={onClose}>
+    <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1, minHeight: 0 }} contentContainerStyle={{ padding: 20 }}>
+      {description ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 14, lineHeight: 20, marginBottom: 16 }}>{description}</Text> : null}
+      <Text style={{ color: theme.colors.mutedForeground, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 8 }}>{(placeholder ?? "Name").toUpperCase()}</Text>
+      <Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} accessibilityLabel={placeholder ?? title} accessibilityHint="Required" returnKeyType="done" onSubmitEditing={submit} style={{ borderRadius: 6 }} />
+    </ScrollView>
+    <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border, backgroundColor: theme.colors.backgroundAlt }}>
+      <Button label="Cancel" variant="secondary" onPress={onClose} style={{ borderRadius: 6 }} />
+      <Button label={actionLabel} disabled={!value.trim()} onPress={submit} style={{ minWidth: 120, borderRadius: 6 }} />
+    </View>
+  </EditorWindow>;
   return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{description ? <Text style={[styles.sheetDescription, { color: theme.colors.mutedForeground }]}>{description}</Text> : null}<Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} onSubmitEditing={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 12 }} /><Button label={actionLabel} disabled={!value.trim()} onPress={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 14 }} /></Sheet>;
 }
 

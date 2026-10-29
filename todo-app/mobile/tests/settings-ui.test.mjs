@@ -150,6 +150,10 @@ test("settings sections keep calendar, export and import actions functional", as
     "@/components/reference/mobile/reference-mobile-bottom-nav": { ReferenceMobileBottomNav: "Navigation" },
     "@/components/reference/mobile/reference-primitives": { ScreenHeader: "Header" },
     "@/components/settings/theme-picker": { ThemePicker: "ThemePicker" },
+    "@/components/settings/keyboard-settings": { KeyboardSettings: "KeyboardSettings" },
+    "@/components/ui/command-palette": { CommandPalette: "CommandPalette" },
+    "@/components/ui/mobile-top-bar": { MobileTopBarAction: "MobileTopBarAction" },
+    "@/lib/features/navigation-commands": { createNavigationCommands: () => [] },
     "@/components/reference/reference-theme": reference,
     "@/providers/preferences-provider": { usePreferences: () => ({ ...settings, setCalendarDefaultView: (value) => calls.push(["view", value]), setCalendarWeekStart: (value) => calls.push(["week", value]), savePreferences: async () => calls.push(["preferences"]) }) },
     "@/providers/tasks-provider": { useTasksContext: () => ({ projects: [], tasks: [] }) },
@@ -170,6 +174,10 @@ test("settings sections keep calendar, export and import actions functional", as
   byLabel(tree, "Open calendar in week view").props.onPress();
   byLabel(tree, "Start weeks on Sunday").props.onPress();
   assert.deepEqual(calls.slice(0, 2), [["view", "week"], ["week", 0]]);
+  section("Keyboard");
+  nodes(tree).find((node) => node.type === "KeyboardSettings").props.onHelp();
+  tree = state.render(Settings);
+  assert.equal(nodes(tree).find((node) => node.type === "CommandPalette").props.mode, "help");
   section("Data & backups");
   byLabel(tree, "Save backup").props.onPress();
   tree = state.render(Settings);
@@ -183,4 +191,22 @@ test("settings sections keep calendar, export and import actions functional", as
   assert.ok(calls.some(([action, value]) => action === "theme" && value === "matrix"));
   section("About");
   assert.ok(nodes(tree).some((node) => node.type === "Heading" && node.props.subtitle === "Version 1.2.0"));
+});
+
+test("keyboard settings toggles the persistent single-key preference and opens help", async () => {
+  let enabled = true, helped = false;
+  const { KeyboardSettings } = await load("../src/components/settings/keyboard-settings.tsx", {
+    "react-native": native,
+    "@/components/ui/button": { Button: "Button" },
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
+    "@/providers/preferences-provider": { usePreferences: () => ({ singleKeyShortcuts: enabled, setSingleKeyShortcuts: (value) => { enabled = value; } }) },
+  });
+  const render = () => KeyboardSettings({ onHelp: () => { helped = true; } });
+  let tree = render();
+  assert.equal(byLabel(tree, "Single-key shortcuts").props.accessibilityState.checked, true);
+  byLabel(tree, "Single-key shortcuts").props.onPress();
+  tree = render();
+  assert.equal(byLabel(tree, "Single-key shortcuts").props.accessibilityState.checked, false);
+  nodes(tree).find((node) => node.type === "Button").props.onPress();
+  assert.equal(helped, true);
 });
