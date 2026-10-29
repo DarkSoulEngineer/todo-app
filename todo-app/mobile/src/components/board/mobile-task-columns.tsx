@@ -157,7 +157,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
     <View style={styles.columnTools}>
       {enabled ? <Ionicons name="reorder-three-outline" size={18} color={c.mutedForeground} style={{ marginRight: 5 }} /> : null}
       <Pressable testID={`janus-column-name-${section.id}`} accessibilityRole="button" accessibilityLabel={`Actions for list ${section.title}`} accessibilityHint={isCustomSection(section) && props.onRenameSection && (Platform.OS === "web" || width >= 768) ? "Double-click or double-tap to rename. Long-press for list actions." : "Shows list actions"} onPress={(event) => pressTitle(section, event)} onLongPress={(event) => openSectionMenu(section, event)} style={styles.columnName}><Text numberOfLines={1} style={[styles.columnTitle, { flex: 0, color: c.foreground, fontSize: 14 * zoom }]}>{section.title}</Text></Pressable>
-      <Pressable testID={`janus-add-card-header-${section.id}`} accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id)} style={styles.addTop}><Ionicons name="add" size={16} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 12 }}>Add card</Text></Pressable>
+      <Pressable testID={`janus-add-card-header-${section.id}`} accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id)} style={styles.icon}><Ionicons name="add" size={18} color={c.mutedForeground} /></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${section.title}`} onPress={(event) => openSectionMenu(section, event)} style={styles.icon}><Ionicons name="ellipsis-horizontal" size={16} color={c.mutedForeground} /></Pressable>
     </View>
     <View style={{ height: 2, backgroundColor: c.borderStrong, borderRadius: 1 }} />
@@ -201,7 +201,6 @@ const styles = StyleSheet.create({
   columnContent: { gap: 8, paddingBottom: 4 },
   headerSurface: { flexShrink: 0, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingHorizontal: 8, paddingTop: 5 },
   column: { flexShrink: 0, minHeight: 0, borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, paddingHorizontal: 8, paddingBottom: 8 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
-  addTop: { flexDirection: "row", alignItems: "center", gap: 3, minHeight: 44, paddingHorizontal: 5 },
   columnName: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center" },
   insertLine: { position: "absolute", top: -5, left: 0, right: 0, height: 3, borderRadius: 2, zIndex: 20 },
   cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { minHeight: 110, borderWidth: 1, borderStyle: "dashed", borderRadius: 20, justifyContent: "center", alignItems: "center", padding: 20 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },

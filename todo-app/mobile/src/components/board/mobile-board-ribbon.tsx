@@ -47,6 +47,8 @@ interface Props {
   onShowMoveArrows: () => void;
   focused: boolean;
   onFocused: () => void;
+  dragEnabled?: boolean;
+  onToggleDrag?: () => void;
   children: ReactNode;
   filters: ReactNode;
   filtersActive: boolean;
@@ -164,6 +166,7 @@ export function MobileBoardRibbon(props: Props) {
     {searchVisible ? <View style={styles.searchRow}><View style={[styles.search, { borderColor: searchFocused ? c.primary : c.borderStrong, backgroundColor: c.input }]}><Ionicons name="search-outline" size={16} color={c.mutedForeground} /><TextInput ref={searchInput} autoFocus onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} selectionColor={c.primary} cursorColor={c.primary} underlineColorAndroid="transparent" accessibilityLabel="Filter tasks and labels" value={props.query} onChangeText={props.onQuery} placeholder="Search tasks…" placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }, Platform.OS === "web" && { outlineWidth: 0 }]} />{props.query ? <Pressable hitSlop={1} accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { clearSearch(); resetHideTimer(); }} style={styles.searchClear}><View style={styles.iconFace}><Ionicons name="close" size={19} color={c.mutedForeground} /></View></Pressable> : null}</View></View> : null}
     {ribbonExpanded ? (shownTab === "home" ? <RibbonScrollView accessibilityLabel="Home ribbon tools" onInteraction={resetHideTimer} contentContainerStyle={styles.tools}>
       <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("add", "New card", props.onNewTask)}{props.mode === "board" ? tool("add-circle-outline", "List", props.onAddSection) : null}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>CREATE</Text></View>
+      {props.mode === "board" && width >= 768 && props.onToggleDrag ? <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("reorder-three-outline", props.dragEnabled ? "Disable dragging" : "Enable dragging", props.onToggleDrag, props.dragEnabled)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DRAG & DROP</Text></View> : null}
       {context.boardDisplay ? <>
         <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("contract-outline", "Compact cards", props.onCompact, props.compact)}{tool("reader-outline", "Focus column", props.onFocused, props.focused)}{tool("swap-horizontal-outline", "Move arrows", props.onShowMoveArrows, props.showMoveArrows)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DISPLAY</Text></View>
         <View style={styles.toolGroup}><View style={styles.toolButtons}>{tool("remove", "Zoom out", () => props.onZoom(props.zoom - 0.1), false, props.zoom <= 0.7)}{tool("refresh-outline", `${Math.round(props.zoom * 100)}%`, () => props.onZoom(1), false, false, `Reset zoom to 100% (currently ${Math.round(props.zoom * 100)}%)`)}{tool("add", "Zoom in", () => props.onZoom(props.zoom + 0.1), false, props.zoom >= 1.3)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>ZOOM</Text></View>
