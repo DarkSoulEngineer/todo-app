@@ -422,7 +422,7 @@ function TaskEditorForm({
             {presentation === "sheet" ? footer : null}
     </>;
   if (presentation === "panel") return visible ? <View style={{ flex: 1, minHeight: 0, paddingTop: 12, backgroundColor: "transparent" }}>{content}</View> : null;
-  if (windowed) return <EditorWindow visible={visible} title={task ? "Edit task" : "Create task"} subtitle={task ? undefined : "Start with a title. Details can wait."} onClose={closeEditor}>{content}</EditorWindow>;
+  if (windowed) return <EditorWindow visible={visible} title={task ? "Edit task" : "Create task"} onClose={closeEditor}>{content}</EditorWindow>;
   return <BottomSheetModal visible={visible} onClose={closeEditor} style={styles.taskEditorSheet}>{content}</BottomSheetModal>;
 }
 

@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { JanusLogo } from "@/components/ui/janus-logo";
-import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
 import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
@@ -110,8 +109,11 @@ export default function WorkspaceScreen() {
     const needle = query.trim().toLowerCase();
     return sortTasks(tasks.filter((task) => (boardFilter === "all" || task.category === boardFilter) && matchesQuery(task, needle)), sort);
   }, [boardFilter, query, sort, tasks]);
-  const calendarTasks = useMemo(() => calendarDay ? visibleTasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), calendarDay)) : [], [calendarDay, visibleTasks]);
-  const calendarDaySelected = mode === "calendar" && calendarDay !== null;
+  // Split Calendar always has a selected date; opening it starts with today,
+  // not the old undated create form or a task from another day.
+  const selectedCalendarDay = calendarDay ?? (splitView && mode === "calendar" ? now : null);
+  const calendarTasks = useMemo(() => selectedCalendarDay ? visibleTasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), selectedCalendarDay)) : [], [selectedCalendarDay, visibleTasks]);
+  const calendarDaySelected = mode === "calendar" && selectedCalendarDay !== null;
   const defaultEditorTask = useMemo(() => {
     if (calendarDaySelected) return calendarTasks.find((task) => !task.completed && !task.canceled) ?? calendarTasks[0] ?? null;
     const entries = tasks.map((task) => ({ task, projectId: currentProjectId, projectName: "", boards }));
@@ -453,7 +455,7 @@ export default function WorkspaceScreen() {
         {mode === "board" ? <View style={{ flex: 1, minHeight: 0 }}>
           {hasRefinements && visibleTasks.length === 0 ? <ScrollView contentContainerStyle={[mobileContentStyle, { paddingBottom: mobileBottomNavClearance + insets.bottom }]}><WorkspaceEmptyState hasRefinements onCreate={() => addNewTask()} onClear={() => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); }} /></ScrollView> : <MobileTaskColumns key={id} tasks={visibleTasks} sections={sections} boards={boards} now={now} compact={compactCards} zoom={zoom} showMoveArrows={showMoveArrows} dragEnabled={dragEnabled} focused={focusedColumn} selectionMode={selectionMode} selectedTaskIds={selectedTaskIds} onToggleSelect={toggleSelectedTask} onTask={openEditor} onLongPress={(task, event) => { if (event) setSmallMenuAnchor(anchorFromEvent(event)); setTaskAction(task); }} onMove={moveTaskToSection} onTaskDrop={dropTask} onSectionDrop={dropSection} onToggleSubtask={api.toggleSubtask} onAddTask={(sectionId) => addNewTask(null, sectionId)} onSectionMenu={(section, anchor) => { setSmallMenuAnchor(anchor ?? null); setSectionMenu(section); }} onAddSection={() => setAddSectionOpen(true)} />}
         </View> : <ScrollView testID="workspace-feed-pane" style={{ flex: 1, minWidth: 0 }} contentContainerStyle={splitView ? { padding: 12, paddingBottom: mobileBottomNavClearance + insets.bottom } : [mobileContentStyle, { paddingBottom: mobileBottomNavClearance + insets.bottom }]} showsVerticalScrollIndicator={splitView} keyboardShouldPersistTaps="handled">
-           {mode === "list" ? <ListView compact={splitView} tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} selectedTaskId={splitView && showEditor ? editorTask?.id : undefined} onTask={openEditor} onTaskAction={(task, event)=>{if(event){setSmallMenuAnchor(anchorFromEvent(event));setTaskAction(task);}else{setTaskAction(task);}}} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={selectCalendarDay} tasks={visibleTasks} boards={boards} split={splitView} onAddTask={addNewTask} onTask={openEditor} onTaskAction={(task, event) => { if (event) setSmallMenuAnchor(anchorFromEvent(event)); setCalendarActionTask(task); }} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
+           {mode === "list" ? <ListView compact={splitView} tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} selectedTaskId={splitView && showEditor ? editorTask?.id : undefined} onTask={openEditor} onTaskAction={(task, event)=>{if(event){setSmallMenuAnchor(anchorFromEvent(event));setTaskAction(task);}else{setTaskAction(task);}}} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={selectedCalendarDay} setSelectedDay={selectCalendarDay} tasks={visibleTasks} boards={boards} split={splitView} onAddTask={addNewTask} onTask={openEditor} onTaskAction={(task, event) => { if (event) setSmallMenuAnchor(anchorFromEvent(event)); setCalendarActionTask(task); }} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
         <View key={currentProjectId} testID="workspace-editor-pane" style={splitView ? { flex: 1, minWidth: 0, minHeight: 0, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.border, backgroundColor: theme.colors.card } : undefined}>
           {splitView && calendarDaySelected && !editorTask && !creatingEditorTask ? <View testID="calendar-empty-day-watermark" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: mobileBottomNavClearance + insets.bottom }}>
@@ -544,7 +546,6 @@ function ListView({ tasks, boards, now, hasRefinements, selectedTaskId, compact 
   </View>;
 }
 function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boards, now, split = false, onAddTask, onTask, onTaskAction }: { month: Date; setMonth: (date: Date) => void; selectedDay: Date | null; setSelectedDay: (date: Date | null) => void; tasks: Task[]; boards: import("@/lib/domain/boards").Board[]; now: Date; split?: boolean; onAddTask: (due?: string | null) => void; onTask: (task: Task) => void; onTaskAction: (task: Task, event?: GestureResponderEvent) => void }) {
-  const { theme } = useTheme();
   const { calendarDefaultView, calendarWeekStart } = usePreferences();
   const [calendarMode, setCalendarMode] = useState<CalendarMode>(calendarDefaultView);
   const addForDay = (day: Date) => { const due = new Date(day); due.setHours(9, 0, 0, 0); onAddTask(due.toISOString()); };
@@ -565,12 +566,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boa
       onTaskLongPress={onTaskAction}
       onToday={() => setMonth(calendarMode === "week" ? startOfWeek(now, { weekStartsOn: calendarWeekStart }) : startOfMonth(now))}
     />
-    {split && selectedDay ? <CalendarDayTasks day={selectedDay} tasks={dayTasks} boards={boards} now={now} onTask={onTask} onTaskAction={onTaskAction} onAddTask={() => addForDay(selectedDay)} /> : <View style={{ marginTop: 15 }}>
-      <SectionHeading title="Plan a day" subtitle={split ? "Tap anywhere on a date to see its tasks and edit the first active task." : "Tap anywhere on a date to see all its tasks. Select a task from the list to edit it."} style={{ marginBottom: 8 }} />
-      <View style={{ borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, backgroundColor: theme.colors.card, padding: 13 }}>
-        <Button variant="soft" label={`Add for ${selectedDay ? format(selectedDay, "MMM d") : "today"}`} onPress={() => addForDay(selectedDay ?? now)}><Ionicons name="add" size={17} color={theme.colors.primary} /><Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Add task</Text></Button>
-      </View>
-    </View>}
+    {split && selectedDay ? <CalendarDayTasks day={selectedDay} tasks={dayTasks} boards={boards} now={now} onTask={onTask} onTaskAction={onTaskAction} onAddTask={() => addForDay(selectedDay)} /> : null}
   </View>;
 }
 function CalendarTaskActions({ task, now, onClose, onComplete, onChooseDate, onToday, onTomorrow, onClearDue, anchor }: { task: Task | null; now: Date; onClose: () => void; onComplete: () => void; onChooseDate: () => void; onToday: () => void; onTomorrow: () => void; onClearDue: () => void; anchor?: MenuAnchor | null }) {

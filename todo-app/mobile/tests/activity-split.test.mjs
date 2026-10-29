@@ -124,10 +124,33 @@ test("Activity and Calendar share the existing 900px desktop split breakpoint", 
   for (const width of [390, 768, 899, 900, 1200]) {
     for (const mode of ["list", "board", "calendar", "insights"]) {
       const split = (mode === "list" || mode === "calendar") && width >= 900;
-      assert.equal(editor(render(width, mode)).props.presentation, split ? "panel" : "sheet");
+      const tree = render(width, mode);
+      if (split && mode === "calendar") {
+        assert.ok(find(tree, (node) => node.props?.testID === "calendar-empty-day-watermark").length);
+        assert.equal(editor(tree), undefined);
+      } else assert.equal(editor(tree).props.presentation, split ? "panel" : "sheet");
     }
   }
 });
+test("Calendar opens in today's selected-day view without the legacy planner or an automatic create form", () => {
+  assert.ok(!source.includes('title="Plan a day"'));
+  for (const width of [900, 1024, 1440]) {
+    const tree = render(width, "calendar", null, false, []);
+    const calendar = find(tree, (node) => typeof node.type === "function" && node.type.name === "CalendarView")[0];
+    assert.equal(calendar.props.selectedDay.toISOString(), "2026-10-28T00:00:00.000Z");
+    assert.equal(editor(tree), undefined);
+    assert.equal(find(tree, (node) => node.props?.testID === "calendar-empty-day-watermark").length, 1);
+    const todayTask = { ...task, dueAt: "2026-10-28T09:00:00.000Z" };
+    const scheduled = render(width, "calendar", null, false, [todayTask]);
+    assert.equal(editor(scheduled).props.task.id, todayTask.id);
+    const creating = render(width, "calendar", null, true, []);
+    assert.equal(editor(creating).props.task, null, "explicit creation still opens the editor");
+    assert.equal(find(creating, (node) => node.props?.testID === "calendar-empty-day-watermark").length, 0);
+  }
+  const mobile = render(390, "calendar", null, false, []);
+  assert.equal(find(mobile, (node) => node.type === "Sheet" && node.props.visible === true).length, 0, "phones must not automatically open a day sheet");
+});
+
 test("desktop Calendar keeps day details inline while mobile keeps the day sheet", () => {
   const day = new Date("2026-10-28T00:00:00");
   const splitTree = render(1200, "calendar", null, false, [task], [], { calendarDay: day });
