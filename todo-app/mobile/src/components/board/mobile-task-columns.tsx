@@ -126,7 +126,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   </>;
   const addCard = (section: { id: string; title: string }) => <View testID={`janus-add-card-footer-${section.id}`}>
     {drag.drag?.target?.kind === "task" && drag.drag.target.sectionId === section.id && drag.drag.target.beforeTaskId === null ? <View testID={`janus-insert-end-${section.id}`} pointerEvents="none" style={[styles.insertLine, { backgroundColor: c.primary }]} /> : null}
-    {grouped.get(section.id)?.length ? <Pressable accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id)} style={({ pressed }) => [styles.add, { borderColor: c.borderStrong, backgroundColor: pressed ? c.primarySoft : "transparent" }]}><Text style={{ color: c.mutedForeground, fontSize: 15, fontWeight: "500" }}>Add card</Text></Pressable> : null}
+    {grouped.get(section.id)?.length ? <Pressable accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id)} style={({ pressed }) => [styles.add, { borderColor: c.borderStrong, backgroundColor: pressed ? c.primarySoft : "transparent" }]}><Ionicons name="add" size={16} color={c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 15, fontWeight: "500" }}>Add card</Text></Pressable> : null}
   </View>;
   const openSectionMenu = useCallback((section: BoardSection, event: { nativeEvent: { pageX: number; pageY: number } }) => {
     lastTitlePress.current = null;
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   column: { flexShrink: 0, minHeight: 0, borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, paddingHorizontal: 8, paddingBottom: 8 }, heading: { gap: 5, marginBottom: 8, paddingHorizontal: 2 }, columnTools: { flexDirection: "row", alignItems: "center" }, icon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, columnTitle: { flex: 1, minWidth: 0, fontWeight: "600", paddingHorizontal: 1 },
   columnName: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center" },
   insertLine: { position: "absolute", top: -5, left: 0, right: 0, height: 3, borderRadius: 2, zIndex: 20 },
-  cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { minHeight: 110, borderWidth: 1, borderStyle: "dashed", borderRadius: 20, justifyContent: "center", alignItems: "center", padding: 20 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },
+  cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { minHeight: 110, borderWidth: 1, borderStyle: "dashed", borderRadius: 20, flexDirection: "row", gap: 6, justifyContent: "center", alignItems: "center", padding: 20 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },
   addSection: { alignSelf: "flex-start", borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   tabsRail: { flexGrow: 0, flexShrink: 0, height: 60 }, tabs: { gap: 5, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" }, tab: { minHeight: 44, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { marginHorizontal: 10, marginBottom: 10 },
 });

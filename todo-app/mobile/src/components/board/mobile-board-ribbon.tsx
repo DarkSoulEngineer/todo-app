@@ -49,6 +49,8 @@ interface Props {
   onFocused: () => void;
   dragEnabled?: boolean;
   onToggleDrag?: () => void;
+  /** Board management tools shown at the end of the Home tab. */
+  homeBoard?: ReactNode;
   children: ReactNode;
   filters: ReactNode;
   filtersActive: boolean;
@@ -169,10 +171,11 @@ export function MobileBoardRibbon(props: Props) {
       {props.mode === "board" && width >= 768 && props.onToggleDrag ? <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("reorder-three-outline", props.dragEnabled ? "Disable dragging" : "Enable dragging", props.onToggleDrag, props.dragEnabled)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DRAG & DROP</Text></View> : null}
       {context.boardDisplay ? <>
         <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("contract-outline", "Compact cards", props.onCompact, props.compact)}{tool("reader-outline", "Focus column", props.onFocused, props.focused)}{tool("swap-horizontal-outline", "Move arrows", props.onShowMoveArrows, props.showMoveArrows)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>DISPLAY</Text></View>
-        <View style={styles.toolGroup}><View style={styles.toolButtons}>{tool("remove", "Zoom out", () => props.onZoom(props.zoom - 0.1), false, props.zoom <= 0.7)}{tool("refresh-outline", `${Math.round(props.zoom * 100)}%`, () => props.onZoom(1), false, false, `Reset zoom to 100% (currently ${Math.round(props.zoom * 100)}%)`)}{tool("add", "Zoom in", () => props.onZoom(props.zoom + 0.1), false, props.zoom >= 1.3)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>ZOOM</Text></View>
+        <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>{tool("remove", "Zoom out", () => props.onZoom(props.zoom - 0.1), false, props.zoom <= 0.7)}{tool("refresh-outline", `${Math.round(props.zoom * 100)}%`, () => props.onZoom(1), false, false, `Reset zoom to 100% (currently ${Math.round(props.zoom * 100)}%)`)}{tool("add", "Zoom in", () => props.onZoom(props.zoom + 0.1), false, props.zoom >= 1.3)}</View><Text style={[styles.caption, { color: c.mutedForeground }]}>ZOOM</Text></View>
       </> : null}
+      {props.homeBoard}
     </RibbonScrollView> : shownTab === "hidden" ? <RibbonScrollView accessibilityLabel="Hidden list tools" onInteraction={resetHideTimer} contentContainerStyle={styles.tools}>
-      <View style={styles.toolGroup}><View style={styles.toolButtons}>
+      <View style={[styles.toolGroup, { borderColor: c.border }]}><View style={styles.toolButtons}>
         {hiddenSections.map((section) => <View key={section.id} style={{ maxWidth: 180 }}>{tool("eye-outline", section.title, () => { if (hiddenSections.length === 1) setTab("home"); props.onShowSection?.(section); }, false, false, `Show ${section.title}`)}</View>)}
       </View><Text style={[styles.caption, { color: c.mutedForeground }]}>HIDDEN LISTS · {hiddenSections.length}</Text></View>
     </RibbonScrollView> : shownTab === "filters" ? props.filters : shownTab === "select" ? (props.selection ?? props.children) : props.children) : null}
