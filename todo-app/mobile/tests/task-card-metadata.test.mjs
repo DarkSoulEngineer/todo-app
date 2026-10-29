@@ -19,6 +19,8 @@ vm.runInNewContext(compile(declaration.getText(ast)), {
   styles: new Proxy({}, { get: () => ({}) }), StyleSheet: { absoluteFill: {} },
   Card: "Card", View: "View", Text: "Text", Pressable: "Pressable", Ionicons: "Ionicons", Chip: "Chip",
   PRIORITY_META: { high: { label: "High" } },
+  PriorityStars: "PriorityStars",
+  StatusIcon: "StatusIcon",
 });
 const now = new Date(2026, 9, 27, 12);
 const base = { id: "card", title: "Test card", description: "Some notes", priority: "high", category: null, tags: [], completed: false, canceled: false, subtasks: [{ id: "sub", title: "Checklist item", done: false }] };
@@ -34,13 +36,13 @@ function text(node) {
   return node && typeof node === "object" ? text(node.props?.children) : "";
 }
 
-test("overdue metadata is one alert badge with duration, not duplicated text or clock", () => {
+test("overdue metadata is one icon-only status badge, not duplicated text or clock", () => {
   for (const [minutes, duration] of [[6 * 24 * 60, "6d"], [3 * 60, "3h"], [45, "45m"]]) {
     const tree = render(new Date(now.getTime() - minutes * 60_000).toISOString());
-    const badges = find(tree, (node) => node.props?.accessibilityLabel?.startsWith("Overdue by"));
+    const badges = find(tree, (node) => node.type === "StatusIcon");
     assert.equal(badges.length, 1);
-    assert.equal(text(badges[0]), duration);
-    assert.equal(find(badges[0], (node) => node.type === "Ionicons" && node.props.name === "alert-circle-outline").length, 1);
+    assert.equal(badges[0].props.status, "overdue");
+    assert.equal(badges[0].props.detail, `Overdue by ${duration}`);
     assert.equal(find(tree, (node) => node.type === "Ionicons" && node.props.name === "time-outline").length, 0);
     assert.equal(text(tree).toLowerCase().includes("overdue"), false);
   }
@@ -72,11 +74,11 @@ test("passive tags and metadata do not intercept the shared card press", () => {
   }
 });
 
-test("upcoming deadlines and completed/canceled status labels are preserved", () => {
+test("upcoming deadlines show no status glyph while completed and canceled do", () => {
   const future = new Date(2026, 9, 27, 15).toISOString();
   const upcoming = render(future);
-  assert.ok(text(upcoming).includes("Upcoming"));
+  assert.equal(find(upcoming, (node) => node.type === "StatusIcon").length, 0);
   assert.equal(find(upcoming, (node) => node.type === "Ionicons" && node.props.name === "time-outline").length, 1);
-  assert.ok(text(render(null, { completed: true })).includes("Completed"));
-  assert.ok(text(render(null, { canceled: true })).includes("Canceled"));
+  assert.equal(find(render(null, { completed: true }), (node) => node.type === "StatusIcon")[0].props.status, "completed");
+  assert.equal(find(render(null, { canceled: true }), (node) => node.type === "StatusIcon")[0].props.status, "canceled");
 });

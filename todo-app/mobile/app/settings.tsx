@@ -44,7 +44,7 @@ const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Keyboard", "Data & backups
 export default function SettingsRoute() {
   const api = useTasksContext();
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
-  const { preference, savePreference } = useTheme();
+  const { preference, savePreference, setPreference } = useTheme();
   const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart, savePreferences } = usePreferences();
   const { colors, type } = useReferenceTheme();
   const insets = useSafeAreaInsets();
@@ -121,7 +121,7 @@ export default function SettingsRoute() {
   };
 
   const commands = [
-    ...createNavigationCommands({ projects: api.projects, currentProjectId: api.currentProjectId, openBoard: (id) => { api.switchProject(id); router.replace(`/board/${id}`); }, navigate: (destination) => router.replace(destination) }),
+    ...createNavigationCommands({ projects: api.projects, currentProjectId: api.currentProjectId, openBoard: (id) => { api.switchProject(id); router.replace(`/board/${id}`); }, navigate: (destination) => router.replace(destination), setTheme: setPreference }),
     ...SETTINGS_SECTIONS.map((label) => ({ id: `settings-${label}`, label: `Settings: ${label}`, run: () => setSection(label) })),
     { id: "calendar-week", label: "Default calendar: week", run: () => setCalendarDefaultView("week") },
     { id: "calendar-month", label: "Default calendar: month", run: () => setCalendarDefaultView("month") },

@@ -6,6 +6,8 @@ import { boardColor, type Board } from "@/lib/domain/boards";
 import { PRIORITY_META } from "@/lib/domain/constants";
 import { deriveStatus } from "@/lib/domain/status";
 import type { Task } from "@/lib/domain/types";
+import { PriorityStars } from "@/components/ui/priority-stars";
+import { StatusIcon } from "@/components/ui/status-icon";
 import { useTheme } from "@/providers/theme-provider";
 import type { ThemeColors } from "@/theme/tokens";
 
@@ -103,15 +105,15 @@ function CalendarDayTaskTile({
   const board = boards.find((item) => item.id === task.category);
   const boardTone = board ? boardColor(board.color) : undefined;
   const done = task.subtasks.filter((subtask) => subtask.done).length;
-  const statusTone =
+  const statusColor =
     status === "completed"
-      ? { color: theme.colors.success, background: theme.colors.successSoft, icon: "checkmark-circle-outline" as const, label: "Done" }
+      ? theme.colors.success
       : status === "canceled"
-        ? { color: theme.colors.mutedForeground, background: theme.colors.secondary, icon: "ban-outline" as const, label: "Canceled" }
+        ? theme.colors.mutedForeground
         : status === "overdue"
-          ? { color: theme.colors.destructive, background: theme.colors.destructiveSoft, icon: "alert-circle-outline" as const, label: "Overdue" }
+          ? theme.colors.destructive
           : null;
-  const accent = statusTone?.color ?? priority.dot;
+  const accent = statusColor ?? priority.dot;
   const sameDay = task.dueAt ? parseISO(task.dueAt).toDateString() === day.toDateString() : false;
 
   return (
@@ -158,16 +160,8 @@ function CalendarDayTaskTile({
       </Text>
 
       <View style={styles.tileMeta}>
-        <View style={[styles.metaPill, { backgroundColor: priority.tint }]}>
-          <View style={[styles.metaDot, { backgroundColor: priority.dot }]} />
-          <Text style={[styles.metaText, { color: priority.ink }]}>{priority.label}</Text>
-        </View>
-        {statusTone ? (
-          <View style={[styles.metaPill, { backgroundColor: statusTone.background }]}>
-            <Ionicons name={statusTone.icon} size={11} color={statusTone.color} />
-            <Text style={[styles.metaText, { color: statusTone.color }]}>{statusTone.label}</Text>
-          </View>
-        ) : null}
+        <PriorityStars priority={task.priority} />
+        {status !== "upcoming" ? <StatusIcon status={status} /> : null}
         {boardTone ? (
           <View style={styles.boardChip}>
             <View style={[styles.metaDot, { backgroundColor: boardTone.dot }]} />
@@ -232,9 +226,7 @@ function createStyles(colors: ThemeColors) {
     timeText: { fontSize: 11, lineHeight: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
     tileTitle: { fontSize: 14, lineHeight: 19, fontWeight: "600" },
     tileMeta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
-    metaPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
     metaDot: { width: 6, height: 6, borderRadius: 3 },
-    metaText: { fontSize: 10, lineHeight: 14, fontWeight: "700" },
     boardChip: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: 140 },
     boardText: { flexShrink: 1, fontSize: 10, lineHeight: 14, fontWeight: "600" },
     progressTrack: { height: 3, borderRadius: 2, overflow: "hidden" },

@@ -26,6 +26,8 @@ const { MobileColumnTaskCard, taskCardBorderRadius } = await load("../src/compon
   "@/lib/domain/constants": constants,
   "@/lib/domain/boards": { boardColor: () => ({ dot: "#aa66ff" }) },
   "./mobile-board-colors": { useMobileBoardColors: () => colors },
+  "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
+  "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
 });
 const now = new Date(2026, 9, 29, 12);
 const task = { id: "card", title: "Draft the design review notes", description: "Keep these details in the editor", priority: "medium", dueAt: new Date(2026, 9, 29, 18, 22).toISOString(), completed: false, canceled: false, subtasks: [] };
@@ -38,7 +40,8 @@ test("board cards match the simple tile hierarchy without descriptions or decora
   const tree = render();
   assert.ok(text(tree).includes("6:22 PM"));
   assert.ok(text(tree).includes(task.title));
-  assert.ok(text(tree).includes("Medium"));
+  const priority = nodes(tree).find((node) => node.type === "PriorityStars");
+  assert.equal(priority.props.priority, "medium", "priority is an icon, not a text grade");
   assert.ok(text(tree).includes("Design"));
   assert.ok(!text(tree).includes(task.description));
   assert.ok(!nodes(tree).some((node) => node.type === "LinearGradient"));
@@ -53,11 +56,10 @@ test("due badges distinguish days, tolerate invalid dates, and status beats prio
   for (const dueAt of [null, "invalid"]) assert.ok(text(render({ dueAt })).includes("Any time"));
   const overdue = { dueAt: new Date(2026, 9, 28, 12).toISOString() };
   assert.equal(style(render(overdue)).borderLeftColor, colors.destructive);
-  assert.ok(text(render(overdue)).includes("Overdue"));
-  for (const [changes, label, accent] of [[{ completed: true }, "Done", colors.success], [{ canceled: true }, "Canceled", colors.mutedForeground]]) {
+  assert.equal(nodes(render(overdue)).find((node) => node.type === "StatusIcon")?.props.status, "overdue");
+  for (const [changes, status, accent] of [[{ completed: true }, "completed", colors.success], [{ canceled: true }, "canceled", colors.mutedForeground]]) {
     const tree = render({ ...overdue, ...changes });
-    assert.ok(text(tree).includes(label));
-    assert.ok(!text(tree).includes("Overdue"));
+    assert.equal(nodes(tree).find((node) => node.type === "StatusIcon")?.props.status, status);
     assert.equal(style(tree).borderLeftColor, accent);
   }
 });
@@ -79,14 +81,14 @@ test("checklist count and slim progress bar reflect zero, partial and full compl
 test("compact mode, zoom, theme contrast and selected state remain available", () => {
   const compact = render({}, { compact: true, zoom: 1.3 });
   assert.ok(text(compact).includes(task.title));
-  assert.ok(!text(compact).includes("Medium"));
+  assert.ok(!nodes(compact).some((node) => node.type === "PriorityStars"));
   const title = nodes(compact).find((node) => node.type === "Text" && node.props.children === task.title);
   assert.equal(style(title).fontSize, 13 * 1.3);
   assert.equal(style(render({}, { selected: true })).backgroundColor, colors.primarySoft);
   try {
     scheme = "light";
-    const priority = nodes(render()).find((node) => node.type === "Text" && node.props.children === "Medium");
-    assert.equal(style(priority).color, constants.PRIORITY_META.medium.ink);
+    const priority = nodes(render()).find((node) => node.type === "PriorityStars");
+    assert.equal(priority.props.priority, "medium");
     platform = "ios";
     assert.equal(render().props.onContextMenu, undefined);
   } finally { scheme = "dark"; platform = "web"; }
@@ -136,6 +138,8 @@ test("real React Native Web renders a group with sibling buttons, never nested H
     "@/lib/domain/constants": constants,
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#aa66ff" }) },
     "./mobile-board-colors": { useMobileBoardColors: () => colors },
+    "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
+  "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
   });
   for (const compact of [false, true]) for (const selectionMode of [false, true]) {
     const html = renderToStaticMarkup(React.createElement(WebCard, {

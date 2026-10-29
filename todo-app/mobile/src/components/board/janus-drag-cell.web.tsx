@@ -12,7 +12,7 @@ interface PointerSession {
   dragging: boolean;
 }
 
-const cursorRules = `.janus-workspace-drag-cell[data-reorder="true"]{cursor:grab}.janus-workspace-drag-cell[data-reorder="true"] *{cursor:inherit!important;user-select:none!important}.janus-workspace-drag-cell[data-dragging="true"]{cursor:grabbing}`;
+const cursorRules = `.janus-workspace-drag-cell[data-reorder="true"]{cursor:grab!important}.janus-workspace-drag-cell[data-reorder="true"] *{cursor:inherit!important;user-select:none!important}.janus-workspace-drag-cell[data-dragging="true"]{cursor:grabbing!important}`;
 
 /** Browser pointer capture + one compositor transform per frame; no RN gesture bridge. */
 export function JanusDragCell(props: JanusDragCellProps) {
@@ -133,7 +133,7 @@ export function JanusDragCell(props: JanusDragCellProps) {
         event.preventDefault(); event.stopPropagation(); suppressClickUntil.current = 0;
       }
     }}
-    style={{ ...styles.cell, width: props.width, maxHeight: props.constrainHeight ? "100%" : undefined, zIndex: active ? 10 : 0, touchAction: enabled ? "none" : "auto", userSelect: enabled ? "none" : "auto" }}>
+    style={{ ...styles.cell, width: props.width, maxHeight: props.constrainHeight ? "100%" : undefined, zIndex: active ? 10 : 0, touchAction: enabled ? "none" : "auto", userSelect: enabled ? "none" : "auto", cursor: enabled ? (active ? "grabbing" : "grab") : "auto" }}>
     <style>{cursorRules}</style>
     {active ? <div data-testid={`board-drag-placeholder-${id}`} style={{ ...styles.outline, borderRadius: props.borderRadius ?? 20, border: `1px dashed ${theme.colors.borderStrong}`, background: theme.colors.primarySoft }} /> : null}
     <div ref={content} style={{ ...styles.content, minHeight: props.constrainHeight ? 0 : undefined, maxHeight: props.constrainHeight ? "100%" : undefined, flexShrink: props.constrainHeight ? 1 : undefined }}>{props.children}</div>

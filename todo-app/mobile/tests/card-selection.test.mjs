@@ -21,6 +21,8 @@ const mocks = {
   "@/lib/domain/constants": { PRIORITY_META: { low: { label: "Low", dot: "#94A3B8", ink: "#64748B", tint: "#64748B22" } } },
   "@/lib/domain/boards": {},
   "./mobile-board-colors": { useMobileBoardColors: () => colors },
+  "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
+  "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
 };
 const exports = {};
 vm.runInNewContext(outputText, { exports, require: (id) => mocks[id] ?? require(id) });

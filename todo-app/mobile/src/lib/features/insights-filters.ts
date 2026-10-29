@@ -9,7 +9,7 @@ export type DateRangePreset = "7d" | "30d" | "90d" | "custom";
 export type StatusFilterOption = "all" | "completed" | "overdue" | "canceled";
 
 /** Priority filter options. */
-export type PriorityFilterOption = "all" | "high" | "medium" | "low";
+export type PriorityFilterOption = "all" | "critical" | "high" | "medium" | "low";
 
 /** Complete filter state for the Insights page. */
 export interface InsightsFilters {
@@ -208,8 +208,8 @@ export function formatPeriodChange(change: number | null): string | null {
 }
 
 /** Get priority counts from tasks. */
-export function getPriorityCounts(tasks: Task[]): Record<"high" | "medium" | "low", number> {
-  const counts = { high: 0, medium: 0, low: 0 };
+export function getPriorityCounts(tasks: Task[]): Record<"critical" | "high" | "medium" | "low", number> {
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const task of tasks) {
     if (task.priority in counts) {
       counts[task.priority]++;

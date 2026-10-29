@@ -88,7 +88,7 @@ export function BulkSelectionToolbar({
       {onMore || onMove || onPriority || onDelete ? group("ORGANIZE", <>
         {onMore ? <ToolButton icon="ellipsis-horizontal" label="More" accessibilityLabel="More actions for selected tasks" onPress={onMore} disabled={disabled} /> : null}
         {onMove ? <ToolButton icon="arrow-forward-outline" label="Move" accessibilityLabel="Move selected tasks" onPress={onMove} disabled={actionDisabled} /> : null}
-        {onPriority ? <ToolButton icon="flag-outline" label="Priority" accessibilityLabel="Set priority for selected tasks" onPress={onPriority} disabled={actionDisabled} /> : null}
+        {onPriority ? <ToolButton icon="star-outline" label="Priority" accessibilityLabel="Set priority for selected tasks" onPress={onPriority} disabled={actionDisabled} /> : null}
         {onDelete ? <ToolButton icon="trash-outline" label="Delete" accessibilityLabel={`Delete ${count} selected ${taskWord}`} onPress={onDelete} tone="danger" disabled={actionDisabled} /> : null}
       </>) : null}
     </RibbonScrollView>

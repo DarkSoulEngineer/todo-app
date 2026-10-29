@@ -29,6 +29,10 @@ interface DateMatch {
 }
 
 const PRIORITY_TOKENS: Record<string, Priority> = {
+  critical: "critical",
+  crit: "critical",
+  c: "critical",
+  "4": "critical",
   high: "high",
   h: "high",
   "1": "high",

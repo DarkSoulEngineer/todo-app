@@ -1,6 +1,6 @@
 import type { Board } from "@/lib/domain/boards";
 
-export type Priority = "low" | "medium" | "high";
+export type Priority = "critical" | "high" | "medium" | "low";
 
 /** Derived task status. Completed and Canceled are explicit; the rest come from the due date. */
 export type TaskStatus = "upcoming" | "overdue" | "completed" | "canceled";

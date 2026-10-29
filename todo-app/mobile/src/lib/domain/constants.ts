@@ -17,19 +17,20 @@ interface PriorityMeta {
   rank: number;
   /** Solid dot color used on cards and selects. */
   dot: string;
-  /** Readable ink tone for the priority pill. */
+  /** Readable ink tone for the priority glyph. */
   ink: string;
-  /** Soft pill fill. */
+  /** Soft accent fill. */
   tint: string;
 }
 
 export const PRIORITY_META: Record<Priority, PriorityMeta> = {
-  high: { label: "High", rank: 0, dot: "#F97316", ink: "#C2410C", tint: "rgba(249,115,22,0.14)" },
-  medium: { label: "Medium", rank: 1, dot: "#F59E0B", ink: "#B45309", tint: "rgba(245,158,11,0.16)" },
-  low: { label: "Low", rank: 2, dot: "#94A3B8", ink: "#64748B", tint: "rgba(100,116,139,0.14)" },
+  critical: { label: "Critical", rank: 0, dot: "#EF4444", ink: "#B91C1C", tint: "rgba(239,68,68,0.14)" },
+  high: { label: "High", rank: 1, dot: "#F97316", ink: "#C2410C", tint: "rgba(249,115,22,0.14)" },
+  medium: { label: "Medium", rank: 2, dot: "#F59E0B", ink: "#B45309", tint: "rgba(245,158,11,0.16)" },
+  low: { label: "Low", rank: 3, dot: "#94A3B8", ink: "#64748B", tint: "rgba(100,116,139,0.14)" },
 };
 
-export const PRIORITY_ORDER: Priority[] = ["high", "medium", "low"];
+export const PRIORITY_ORDER: Priority[] = ["critical", "high", "medium", "low"];
 
 export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "manual", label: "Manual order" },

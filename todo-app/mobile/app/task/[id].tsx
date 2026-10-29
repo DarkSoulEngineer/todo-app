@@ -74,7 +74,7 @@ export default function TaskInspectorRoute() {
         returnToOrigin();
       }}
       onEditProperty={(property, value) => {
-        if (property === "priority" && (value === "low" || value === "medium" || value === "high")) {
+        if (property === "priority" && (value === "critical" || value === "high" || value === "medium" || value === "low")) {
           api.patchTask(task.id, { priority: value as Priority });
           appendActivity(`Changed priority to ${value}`);
         } else if (property === "dueDate" && (value === null || typeof value === "string")) {

@@ -132,6 +132,7 @@ function taskColor(task: Task, colors: ThemeColors, now: Date): string {
   if (status === "canceled") return colors.mutedForeground;
   if (status === "completed") return colors.success;
   if (status === "overdue") return colors.destructive;
+  if (task.priority === "critical") return colors.destructive;
   if (task.priority === "high") return colors.warning;
   return colors.primary;
 }

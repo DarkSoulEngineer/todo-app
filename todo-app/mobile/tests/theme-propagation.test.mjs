@@ -178,6 +178,8 @@ test("board tag labels use readable foregrounds on dark cards", async () => {
     "react-native": { Platform: { OS: "web" }, View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (value) => value } },
     "@/providers/theme-provider": { useTheme: () => ({ theme: active }) },
     "./mobile-board-colors": { useMobileBoardColors: () => active.colors },
+    "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
+    "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
     "@/lib/domain/status": { describeDue: () => null },
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#8B5CF6", ink: "#6D28D9", tint: "rgba(139,92,246,0.16)", ring: "#8B5CF6" }) },
   });

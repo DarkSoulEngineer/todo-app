@@ -43,6 +43,7 @@ function render({ tasks = [makeTask("a")], boards = [], width = 0 } = {}) {
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#123456", tint: "#12345620" }) },
     "@/lib/domain/constants": {
       PRIORITY_META: {
+        critical: { label: "Critical", dot: "#EF4444", ink: "#B91C1C", tint: "rgba(239,68,68,0.14)" },
         high: { label: "High", dot: "#F97316", ink: "#C2410C", tint: "rgba(249,115,22,0.14)" },
         medium: { label: "Medium", dot: "#F59E0B", ink: "#B45309", tint: "rgba(245,158,11,0.16)" },
         low: { label: "Low", dot: "#94A3B8", ink: "#64748B", tint: "rgba(100,116,139,0.14)" },
@@ -51,6 +52,8 @@ function render({ tasks = [makeTask("a")], boards = [], width = 0 } = {}) {
     "@/lib/domain/status": {
       deriveStatus: (task) => task.completed ? "completed" : task.canceled ? "canceled" : task.dueAt && dates.parseISO(task.dueAt) < now ? "overdue" : "upcoming",
     },
+    "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
+    "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
   };
   const exports = {};
   vm.runInNewContext(outputText, {
@@ -98,7 +101,8 @@ test("tiles keep task editing, long-press actions and checklist progress", () =>
   assert.deepEqual(calls.actions.map((task) => task.id), ["late"]);
   const labels = renderedTiles.flatMap((tile) => nodes(tile).map((node) => node.props?.children).flat().filter((child) => typeof child === "string"));
   assert.ok(labels.includes("Product"));
-  assert.ok(labels.includes("Overdue"));
+  const statusIcons = renderedTiles.flatMap((tile) => nodes(tile).filter((node) => node.type === "StatusIcon"));
+  assert.ok(statusIcons.some((node) => node.props.status === "overdue"));
   assert.ok(renderedTiles.some((tile) => nodes(tile).some((node) => node.type === "Text" && Array.isArray(node.props?.children) && node.props.children.join("") === "1/1")));
 });
 

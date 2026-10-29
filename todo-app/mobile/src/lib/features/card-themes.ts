@@ -105,7 +105,8 @@ export const BOARD_WASHES: Record<BoardColorId, string> = {
 };
 
 /** Very soft corner glows by priority (mirrors the web card recipe). */
-export const PRIORITY_WASHES: Record<"high" | "medium" | "low", string> = {
+export const PRIORITY_WASHES: Record<"critical" | "high" | "medium" | "low", string> = {
+  critical: "#EF444414",
   high: "#F9731614",
   medium: "#F59E0B12",
   low: "#64748B0D",

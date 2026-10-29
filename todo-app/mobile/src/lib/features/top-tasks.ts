@@ -2,7 +2,7 @@ import type { BoardTaskEntry } from "@/hooks/use-all-board-tasks";
 import type { Priority } from "@/lib/domain/types";
 
 export type TopTasksLimit = 3 | 10;
-const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+const PRIORITY_RANK: Record<Priority, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
 function timestamp(value: string | null, fallback: number): number {
   const parsed = value ? Date.parse(value) : Number.NaN;

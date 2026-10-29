@@ -5,7 +5,7 @@ import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/d
 import type { ActivityEvent, Attachment, Priority, Subtask, Task, Workspace } from "@/lib/domain/types";
 import { makeId } from "@/lib/utils/id";
 
-const PRIORITIES: Priority[] = ["low", "medium", "high"];
+const PRIORITIES: Priority[] = ["critical", "high", "medium", "low"];
 
 function isPriority(value: unknown): value is Priority {
   return typeof value === "string" && (PRIORITIES as string[]).includes(value);

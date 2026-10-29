@@ -82,7 +82,7 @@ export function cloneTask(task: Task): Task {
 }
 
 function isPriority(value: unknown): value is Task["priority"] {
-  return value === "low" || value === "medium" || value === "high";
+  return value === "critical" || value === "high" || value === "medium" || value === "low";
 }
 
 /** Applies only supported task fields; metadata containers remain append-only. */

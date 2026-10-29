@@ -21,7 +21,7 @@ import type { Command } from "@/lib/features/commands";
 import { createNavigationCommands } from "@/lib/features/navigation-commands";
 
 export default function BoardManagerScreen() {
-  const { theme } = useTheme();
+  const { theme, toggle, setPreference } = useTheme();
   const toast = useToast();
   const api = useTasksContext();
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
@@ -180,7 +180,7 @@ export default function BoardManagerScreen() {
 
   const commands: Command[] = managerReady ? [
     { id: "new-board", label: "Create new board", shortcut: "B", run: () => setShowCreate(true) },
-    ...createNavigationCommands({ projects: orderedProjects, currentProjectId, openBoard: openProject, navigate: (destination) => router.replace(destination) }),
+    ...createNavigationCommands({ projects: orderedProjects, currentProjectId, openBoard: openProject, navigate: (destination) => router.replace(destination), setTheme: setPreference }),
     { id: "rename-board", label: "Rename board", shortcut: "Shift R", children: orderedProjects.map((project) => ({ id: project.id, label: project.name, run: () => setRenameTarget(project) })) },
     ...([-1, 1] as const).map((direction): Command => ({ id: `board-${direction}`, label: `Move board ${direction === -1 ? "left" : "right"}`, detail: "Change saved board order; pinned boards remain first", children: openProjects.filter((_, index) => direction === -1 ? index > 0 : index < openProjects.length - 1).map((project) => ({ id: project.id, label: project.name, run: () => moveBoard(project.id, direction) })) })),
     { id: "import", label: "Import board", run: () => { void importBoard(); } },
