@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, isValid, parseISO } from "date-fns";
-import { useCallback, createElement, useEffect, useMemo, useRef, useState } from "react";
-import { Circle, Svg } from "react-native-svg";
+import { useCallback, createElement, useEffect, useRef, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -19,13 +18,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
 import { mobileBottomNavClearance } from "@/theme/layout";
 import { useOpenSession } from "@/hooks/use-open-session";
-import { AnchoredMenu, useAnchoredMenus, type MenuAnchor, type MenuOption } from "@/components/ui/anchored-menu";
+import { AnchoredMenu, anchorFromEvent, useAnchoredMenus, type MenuAnchor, type MenuOption } from "@/components/ui/anchored-menu";
+import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
+import { ribbonLabel } from "@/lib/utils/ribbon-label";
 import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { InsightsDashboard } from "@/components/insights/insights-dashboard";
 import { Input } from "@/components/ui/input";
-import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { PriorityStars } from "@/components/ui/priority-stars";
 import { StatusIcon } from "@/components/ui/status-icon";
@@ -34,21 +35,13 @@ import { getTaskSectionId } from "@/lib/domain/sections";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
 import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { detectCardTheme } from "@/lib/features/card-themes";
-import { computeInsightsForWindow, getPreviousPeriodPoints } from "@/lib/features/insights";
-import { exportWorkspaceCsv } from "@/lib/data/transfer";
-import { computeStats } from "@/lib/domain/tasks-selectors";
 import {
   DEFAULT_FILTERS,
-  filterTasksByFilters,
-  getPriorityCounts,
-  getWeekdayCompletionCounts,
   hasActiveFilters,
-  computePeriodComparison,
   type DateRangePreset,
   type InsightsFilters,
   type PriorityFilterOption,
   type StatusFilterOption,
-  windowEndFromPreset,
   windowStartFromPreset,
 } from "@/lib/features/insights-filters";
 import type { Board } from "@/lib/domain/boards";
@@ -601,6 +594,7 @@ export interface InsightsPanelProps {
   tasks: Task[];
   boards: Board[];
   now: Date;
+  filters?: InsightsFilters;
   onReset?: () => void;
   onExport?: (tasks: Task[], boards: Board[]) => void | Promise<void>;
 }
@@ -627,200 +621,76 @@ const INSIGHTS_PRIORITY_OPTIONS: { value: PriorityFilterOption; label: string }[
   { value: "low", label: "Low" },
 ];
 
-const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
-
-type ProductivityTab = "categories" | "trends" | "priorities" | "weekdays";
-
-const PRODUCTIVITY_TABS: { value: ProductivityTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: "categories", label: "Categories", icon: "layers-outline" },
-  { value: "trends", label: "Trends", icon: "trending-up-outline" },
-  { value: "priorities", label: "Priorities", icon: "flag-outline" },
-  { value: "weekdays", label: "Weekdays", icon: "calendar-outline" },
-];
-
-function comparisonLabel(change: number | null): string | undefined {
-  if (change === null) return undefined;
-  return `${change > 0 ? "+" : ""}${change}% vs prev`;
-}
-
-export function InsightsPanel({ tasks, boards, now, onReset, onExport }: InsightsPanelProps) {
-  const { theme } = useTheme();
-  const [filters, setFilters] = useState<InsightsFilters>(DEFAULT_FILTERS);
+export function InsightsFiltersRibbon({ filters, onChange, boards, now, onOverlayChange }: {
+  filters: InsightsFilters;
+  onChange: (filters: InsightsFilters) => void;
+  boards: Board[];
+  now: Date;
+  onOverlayChange?: (open: boolean) => void;
+}) {
+  const { theme: { colors } } = useTheme();
+  const { width } = useWindowDimensions();
+  const compact = Platform.OS === "web" && width >= 768;
+  const [menu, setMenu] = useState<{ title: string; options: MenuOption[]; anchor: MenuAnchor } | null>(null);
   const [picker, setPicker] = useState<"start" | "end" | null>(null);
-  const [productivityTab, setProductivityTab] = useState<ProductivityTab>("categories");
-  const [selectedTrendPoint, setSelectedTrendPoint] = useState<{ label: string; count: number; previous: number; isPrevious: boolean } | null>(null);
-
-  const filteredTasks = useMemo(() => filterTasksByFilters(tasks, filters, now), [tasks, filters, now]);
-  const windowStart = windowStartFromPreset(now, filters.dateRange, filters.customStart);
-  const windowEnd = windowEndFromPreset(now, filters.dateRange, filters.customEnd);
-  const period = useMemo(() => computeInsightsForWindow(filteredTasks, windowStart, windowEnd, { metricsTasks: filteredTasks }), [filteredTasks, windowStart, windowEnd]);
-  const previousPeriodPoints = useMemo(() => getPreviousPeriodPoints(filteredTasks, windowStart, windowEnd), [filteredTasks, windowStart, windowEnd]);
-  const stats = useMemo(() => computeStats(filteredTasks, now), [filteredTasks, now]);
-  const completedChange = computePeriodComparison(period.metrics.completed, period.previousMetrics.completed);
-  const days = Math.max(1, period.points.length);
-  const activeFilters = hasActiveFilters(filters);
-  const trendPoints = period.points.slice(-14);
-  const previousTrendPoints = previousPeriodPoints.slice(-trendPoints.length);
-  const maxTrend = Math.max(1, ...trendPoints.map((point) => point.count), ...previousTrendPoints.map((point) => point.count));
-  const weekday = getWeekdayCompletionCounts(filteredTasks, period.windowStart, period.windowEnd);
-  const maxWeekday = Math.max(1, ...weekday);
-  const priorityCounts = getPriorityCounts(filteredTasks);
-  const maxPriority = Math.max(1, ...Object.values(priorityCounts));
-  const categoryCounts = boards
-    .map((board) => ({ board, value: filteredTasks.filter((task) => task.category === board.id).length }))
-    .filter((item) => item.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 8);
-  const maxCategory = Math.max(1, ...categoryCounts.map((item) => item.value));
-  const average = Math.round(stats.completed / days).toString();
-  const dateForPicker = picker === "start" ? filters.customStart ?? windowStart : filters.customEnd ?? windowEnd;
-  const completionPercent = Math.round(stats.completionRate * 100);
-  const periodLabel = filters.dateRange === "custom"
-    ? `Custom range (${filters.customStart ? format(filters.customStart, "MMM d") : "start"} - ${filters.customEnd ? format(filters.customEnd, "MMM d") : "end"})`
-    : `Completed over the last ${days} days`;
-  const completionRingSize = 62;
-  const completionRingStroke = 6;
-  const completionRingRadius = (completionRingSize - completionRingStroke) / 2 - 3;
-  const completionRingCircumference = 2 * Math.PI * completionRingRadius;
-  const completionRingOffset = completionRingCircumference * (1 - stats.completionRate);
-
-  const updateFilters = (patch: Partial<InsightsFilters>) => setFilters((current) => ({ ...current, ...patch }));
-  const chooseDateRange = (dateRange: DateRangePreset) => {
-    updateFilters({ dateRange });
-    if (dateRange === "custom" && !filters.customStart && !filters.customEnd) setPicker("start");
-  };
-  const chooseCustomDate = (date: Date) => {
-    if (picker === "start") {
-      const nextEnd = filters.customEnd && filters.customEnd >= date ? filters.customEnd : date;
-      updateFilters({ dateRange: "custom", customStart: date, customEnd: nextEnd });
-    } else {
-      const nextStart = filters.customStart && filters.customStart <= date ? filters.customStart : date;
-      updateFilters({ dateRange: "custom", customStart: nextStart, customEnd: date });
-    }
+  const overlayOpen = menu !== null || picker !== null;
+  useEffect(() => { onOverlayChange?.(overlayOpen); }, [onOverlayChange, overlayOpen]);
+  useEffect(() => () => onOverlayChange?.(false), [onOverlayChange]);
+  const update = (patch: Partial<InsightsFilters>) => onChange({ ...filters, ...patch });
+  const chooseDate = (date: Date) => {
+    if (picker === "start") update({ dateRange: "custom", customStart: date, customEnd: filters.customEnd && filters.customEnd >= date ? filters.customEnd : date });
+    else update({ dateRange: "custom", customStart: filters.customStart && filters.customStart <= date ? filters.customStart : date, customEnd: date });
     setPicker(null);
   };
-  const reset = () => {
-    setFilters({ ...DEFAULT_FILTERS });
-    setPicker(null);
-    onReset?.();
-  };
-  const exportFiltered = () => {
-    if (onExport) {
-      void onExport(filteredTasks, boards);
-      return;
-    }
-    void exportWorkspaceCsv({ tasks: filteredTasks, boards, sections: [] }, "insights-export");
-  };
-
-  return (
-    <View style={{ gap: 14 }}>
-      <View>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <SectionHeading title="Focus your period" subtitle="Insights filters" style={{ flex: 1 }} titleStyle={{ fontSize: 18, lineHeight: 24 }} />
-          {activeFilters ? <Button variant="ghost" label="Reset" onPress={reset} accessibilityLabel="Reset insights filters" /> : null}
-        </View>
-        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch} accessibilityLabel="Date range filters">
-          {INSIGHTS_DATE_OPTIONS.map((option) => <Chip key={option.value} label={option.label} active={filters.dateRange === option.value} onPress={() => chooseDateRange(option.value)} />)}
-        </ScrollView>
-        {filters.dateRange === "custom" ? <View style={[styles.dateRow, { marginTop: 10 }]}>
-          <Button variant="secondary" label={filters.customStart ? format(filters.customStart, "MMM d, yyyy") : "Start date"} onPress={() => setPicker("start")} style={{ flex: 1 }} />
-          <Text style={{ color: theme.colors.mutedForeground }}>to</Text>
-          <Button variant="secondary" label={filters.customEnd ? format(filters.customEnd, "MMM d, yyyy") : "End date"} onPress={() => setPicker("end")} style={{ flex: 1 }} />
-        </View> : null}
-        <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>STATUS</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch}>
-          {INSIGHTS_STATUS_OPTIONS.map((option) => <Chip key={option.value} label={option.label} active={filters.status === option.value} onPress={() => updateFilters({ status: option.value })} />)}
-        </ScrollView>
-        <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>PRIORITY</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch}>
-          {INSIGHTS_PRIORITY_OPTIONS.map((option) => <Chip key={option.value} label={option.label} active={filters.priority === option.value} color={option.value !== "all" ? PRIORITY_META[option.value].dot : undefined} onPress={() => updateFilters({ priority: option.value })} />)}
-        </ScrollView>
-        <Text style={[styles.fieldLabel, { color: theme.colors.mutedForeground }]}>BOARD</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.insightSwitch}>
-          <Chip label="All boards" active={filters.boardId === "all"} onPress={() => updateFilters({ boardId: "all" })} />
-          {boards.map((board) => <Chip key={board.id} label={board.label} color={boardColor(board.color).dot} active={filters.boardId === board.id} onPress={() => updateFilters({ boardId: board.id })} />)}
-        </ScrollView>
-          {picker ? (Platform.OS === "web" ? createElement("input", {
-            type: "date",
-            value: format(dateForPicker, "yyyy-MM-dd"),
-            max: format(now, "yyyy-MM-dd"),
-            onChange: (event: any) => {
-              const value = event?.target?.value;
-              if (value) {
-                const selected = new Date(`${value}T00:00:00`);
-                if (!Number.isNaN(selected.getTime())) chooseCustomDate(selected);
-              } else {
-                setPicker(null);
-              }
-            },
-            style: { width: "100%", minHeight: 40, paddingHorizontal: 10, borderRadius: 8, border: "1px solid", borderColor: theme.colors.border, backgroundColor: theme.colors.input, color: theme.colors.foreground },
-          }) : <DateTimePicker value={dateForPicker} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} maximumDate={now} onChange={(event, selected) => { if (selected) chooseCustomDate(selected); else setPicker(null); }} />) : null}
-        </Card>
-      </View>
-
-      <View style={styles.statsGrid}>
-        <Stat label="Total tasks" value={stats.total.toString()} accent={theme.colors.primary} />
-        <Stat label="Completed" value={stats.completed.toString()} accent={theme.colors.success} change={comparisonLabel(completedChange)} />
-        <Stat label="Completion rate" value={`${Math.round(stats.completionRate * 100)}%`} accent={theme.colors.info} />
-        <Stat label="Overdue" value={stats.overdue.toString()} accent={theme.colors.destructive} />
-        <Stat label="Upcoming" value={stats.upcoming.toString()} accent={theme.colors.warning} />
-        <Stat label="Average / day" value={average} accent={theme.colors.primary} />
-        <Stat label="Current streak" value={`${period.streak}d`} accent={theme.colors.warning} />
-        <Stat label="Best day" value={period.best.toString()} accent={theme.colors.info} />
-      </View>
-
-      <View>
-        <SectionHeading title="Completion overview" subtitle="A quick read on the work behind this period" style={{ marginBottom: 8 }} />
-        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          <View style={styles.overviewHeader}>
-            <View style={{ flex: 1 }} />
-          <View style={styles.completionRing} accessibilityLabel={`${completionPercent}% complete`}>
-            <Svg width={completionRingSize} height={completionRingSize} viewBox={`0 0 ${completionRingSize} ${completionRingSize}`}>
-              <Circle cx={completionRingSize / 2} cy={completionRingSize / 2} r={completionRingRadius} stroke={theme.colors.secondary} strokeWidth={completionRingStroke} fill="transparent" />
-              <Circle cx={completionRingSize / 2} cy={completionRingSize / 2} r={completionRingRadius} stroke={theme.colors.primary} strokeWidth={completionRingStroke} strokeLinecap="round" fill="transparent" strokeDasharray={`${completionRingCircumference} ${completionRingCircumference}`} strokeDashoffset={completionRingOffset} transform={`rotate(-90 ${completionRingSize / 2} ${completionRingSize / 2})`} />
-            </Svg>
-            <View style={styles.completionRingLabel}><Text style={[styles.completionRingValue, { color: theme.colors.foreground }]}>{completionPercent}%</Text></View>
-          </View>
-        </View>
-        <View style={styles.overviewCopy}><Text style={[styles.overviewMain, { color: theme.colors.foreground }]}>{stats.completed}/{stats.total} done</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{stats.active} open · {stats.canceled} canceled</Text></View>
-        <View style={[styles.overviewTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.overviewFill, { width: `${completionPercent}%`, backgroundColor: theme.colors.primary }]} /></View>
-        <View style={styles.overviewFooter}><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Overall progress</Text><Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: "700" }}>{completionPercent}% complete</Text></View>
-      </Card>
-      </View>
-
-      <View>
-        <SectionHeading title="Completion trend" subtitle={periodLabel} style={{ marginBottom: 8 }} />
-        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          <View style={styles.trendMeta}><View style={styles.legend}><View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Current period</Text><View style={[styles.legendDash, { borderTopColor: theme.colors.primary }]} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Previous period</Text></View></View>
-          {period.windowTotal === 0 && period.previousWindowTotal === 0 ? <Text style={{ color: theme.colors.mutedForeground, textAlign: "center", paddingVertical: 28 }}>No completions in this period</Text> : <View style={styles.chart}>{trendPoints.map((point, index) => { const previous = previousTrendPoints[index]?.count ?? 0; return <View key={point.key} style={styles.chartPoint}><View style={styles.chartValuePair}><Text style={[styles.chartLabel, { color: theme.colors.primary }]}>{point.count || ""}</Text><Text style={[styles.chartLabel, { color: theme.colors.primary }]}>{previous || ""}</Text></View><View style={styles.chartBars}><Pressable accessibilityRole="button" accessibilityLabel={`${point.count} completed on ${point.label}, current period`} onPress={() => setSelectedTrendPoint({ label: point.label, count: point.count, previous, isPrevious: false })} style={[styles.chartBarButton, { height: 76 }]}><View style={[styles.chartBar, { height: Math.max(5, (point.count / maxTrend) * 76), backgroundColor: point.count ? theme.colors.primary : theme.colors.secondary }]} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`${previous} completed on ${point.label}, previous period`} onPress={() => setSelectedTrendPoint({ label: point.label, count: previous, previous, isPrevious: true })} style={[styles.chartPreviousOverlay, { height: Math.max(5, (previous / maxTrend) * 76), borderTopColor: theme.colors.primary }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{point.label}</Text></View>; })}</View>}
-          {selectedTrendPoint ? <Pressable accessibilityRole="button" accessibilityLabel="Dismiss trend detail" onPress={() => setSelectedTrendPoint(null)} style={[styles.trendDetail, { backgroundColor: theme.colors.secondary }]}><View style={[styles.legendDot, { backgroundColor: selectedTrendPoint.isPrevious ? theme.colors.primary : theme.colors.primary }]} /><Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 12 }}>{selectedTrendPoint.isPrevious ? "Previous period" : "Current period"} · {selectedTrendPoint.label}</Text><Text style={{ color: theme.colors.foreground, fontSize: 12, fontWeight: "700" }}>{selectedTrendPoint.count} completed</Text><Ionicons name="close" size={15} color={theme.colors.mutedForeground} /></Pressable> : null}
-         <View style={styles.comparisonCallout}><Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }}>{period.windowTotal} completed this period</Text>{period.periodChange !== null ? <View style={styles.comparisonValue}><Ionicons name="trending-up-outline" size={14} color={theme.colors.success} /><Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: "700" }}>{period.periodChange > 0 ? "+" : ""}{period.periodChange}% vs prev</Text></View> : null}</View>
-        </Card>
-      </View>
-
-      <View>
-        <SectionHeading title="Productivity details" subtitle="Find the shape of your work" style={{ marginBottom: 8 }} />
-        <Card style={[styles.insightCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productivityTabs}>{PRODUCTIVITY_TABS.map((tab) => <Chip key={tab.value} label={tab.label} icon={tab.icon} active={productivityTab === tab.value} onPress={() => setProductivityTab(tab.value)} />)}</ScrollView>
-        {productivityTab === "categories" ? <View style={styles.productivityBody}>{categoryCounts.length === 0 ? <Text style={[styles.emptyChartText, { color: theme.colors.mutedForeground }]}>No category data for these filters</Text> : categoryCounts.map(({ board, value }) => <View key={board.id} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.foreground }]} numberOfLines={1}>{board.label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${Math.max(8, (value / maxCategory) * 100)}%`, backgroundColor: boardColor(board.color).dot }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{value}</Text></View>)}</View> : null}
-        {productivityTab === "priorities" ? <View style={styles.productivityBody}>{PRIORITY_ORDER.map((key) => <View key={key} style={styles.barRow}><Text style={[styles.barLabel, { color: theme.colors.foreground }]}>{PRIORITY_META[key].label}</Text><View style={[styles.barTrack, { backgroundColor: theme.colors.secondary }]}><View style={[styles.barFill, { width: `${priorityCounts[key] ? Math.max(8, (priorityCounts[key] / maxPriority) * 100) : 0}%`, backgroundColor: PRIORITY_META[key].dot }]} /></View><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{priorityCounts[key]}</Text></View>)}</View> : null}
-        {productivityTab === "weekdays" ? <View style={styles.productivityBody}><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>Most productive rhythm across the selected period</Text><View style={styles.weekBars}>{weekday.map((value, index) => <View key={`${WEEKDAY_LABELS[index]}-${index}`} style={styles.weekBarItem}><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{value || ""}</Text><View style={[styles.weekBar, { height: Math.max(5, (value / maxWeekday) * 56), backgroundColor: value ? theme.colors.info : theme.colors.secondary }]} /><Text style={[styles.chartLabel, { color: theme.colors.mutedForeground }]}>{WEEKDAY_LABELS[index]}</Text></View>)}</View></View> : null}
-        {productivityTab === "trends" ? <View style={styles.productivityBody}><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>Current and previous periods stay aligned for an at-a-glance comparison.</Text><View style={styles.miniTrend}><Text style={[styles.miniTrendValue, { color: theme.colors.foreground }]}>{period.windowTotal}</Text><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>completed in this window</Text><View style={[styles.miniTrendDivider, { backgroundColor: theme.colors.border }]} /><Text style={[styles.miniTrendValue, { color: theme.colors.foreground }]}>{period.previousWindowTotal}</Text><Text style={[styles.chartHint, { color: theme.colors.mutedForeground }]}>previous window</Text></View></View> : null}
-        </Card>
-      </View>
-
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <Text style={{ flex: 1, color: theme.colors.mutedForeground, fontSize: 13 }}>{filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"} match current filters</Text>
-        <Button variant="primary" label="Export CSV" onPress={exportFiltered} disabled={filteredTasks.length === 0} accessibilityLabel="Export filtered tasks as CSV" />
-      </View>
-    </View>
-  );
+  const dateValue = picker === "start"
+    ? filters.customStart ?? windowStartFromPreset(now, filters.dateRange, null)
+    : filters.customEnd ?? now;
+  const options = <T extends string,>(items: { value: T; label: string }[], selected: T, choose: (value: T) => void): MenuOption[] => items.map((item) => ({
+    label: item.label, icon: selected === item.value ? "checkmark-circle" : "radio-button-off-outline", onPress: () => { choose(item.value); setMenu(null); },
+  }));
+  const dropdown = (caption: string, label: string, items: MenuOption[], icon: keyof typeof Ionicons.glyphMap) => <View style={[styles.insightRibbonGroup, { borderColor: colors.border }]}>
+    <View style={styles.insightRibbonControlRow}><Pressable accessibilityRole="button" accessibilityLabel={`Insights ${caption.toLowerCase()}: ${label}`} onPress={(event) => setMenu({ title: caption, options: items, anchor: anchorFromEvent(event) })} style={[styles.insightRibbonDropdown, compact && styles.insightRibbonDropdownCompact, { width: caption === "BOARD" ? 132 : caption === "PERIOD" ? 100 : 116, borderColor: colors.border, backgroundColor: colors.input }]}>
+      <Ionicons name={icon} size={14} color={colors.mutedForeground} /><Text numberOfLines={1} ellipsizeMode="tail" style={{ flex: 1, minWidth: 0, color: colors.foreground, fontSize: 12 }}>{ribbonLabel(label)}</Text><Ionicons name="chevron-down" size={13} color={colors.mutedForeground} />
+    </Pressable></View><Text style={[styles.insightRibbonCaption, { color: colors.mutedForeground }]}>{caption}</Text>
+  </View>;
+  return <>
+    <RibbonScrollView accessibilityLabel="Insights filters" contentContainerStyle={styles.insightRibbonTools}>
+      {dropdown("PERIOD", INSIGHTS_DATE_OPTIONS.find((item) => item.value === filters.dateRange)!.label, options(INSIGHTS_DATE_OPTIONS, filters.dateRange, (dateRange) => { update({ dateRange }); if (dateRange === "custom" && !filters.customStart) setPicker("start"); }), "calendar-outline")}
+      {filters.dateRange === "custom" ? <View style={[styles.insightRibbonGroup, { borderColor: colors.border }]}>
+        <View style={[styles.insightRibbonControlRow, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+          <Button variant="secondary" size={compact ? "sm" : "md"} style={styles.insightRibbonDate} label={filters.customStart ? format(filters.customStart, "MMM d, yyyy") : "Start date"} accessibilityLabel="Insights start date" onPress={() => setPicker("start")} />
+          <Button variant="secondary" size={compact ? "sm" : "md"} style={styles.insightRibbonDate} label={filters.customEnd ? format(filters.customEnd, "MMM d, yyyy") : "End date"} accessibilityLabel="Insights end date" onPress={() => setPicker("end")} />
+        </View><Text style={[styles.insightRibbonCaption, { color: colors.mutedForeground }]}>CUSTOM RANGE</Text>
+      </View> : null}
+      {dropdown("STATUS", INSIGHTS_STATUS_OPTIONS.find((item) => item.value === filters.status)!.label, options(INSIGHTS_STATUS_OPTIONS, filters.status, (status) => update({ status })), "checkmark-circle-outline")}
+      {dropdown("PRIORITY", INSIGHTS_PRIORITY_OPTIONS.find((item) => item.value === filters.priority)!.label, options(INSIGHTS_PRIORITY_OPTIONS, filters.priority, (priority) => update({ priority })), "flag-outline")}
+      {dropdown("BOARD", boards.find((board) => board.id === filters.boardId)?.label ?? "All boards", options([{ value: "all", label: "All boards" }, ...boards.map((board) => ({ value: board.id, label: board.label }))], filters.boardId, (boardId) => update({ boardId })), "pricetag-outline")}
+      {hasActiveFilters(filters) ? <Button variant="ghost" size={compact ? "sm" : "md"} label="Reset" accessibilityLabel="Reset insights filters" onPress={() => { onChange({ ...DEFAULT_FILTERS }); setPicker(null); }} /> : null}
+    </RibbonScrollView>
+    <OptionSheet visible={menu !== null} title={menu?.title ?? "Insights filters"} options={menu?.options ?? []} anchor={menu?.anchor} onClose={() => setMenu(null)} />
+    <Sheet visible={picker !== null} onClose={() => setPicker(null)}>
+      <Text style={{ color: colors.foreground, fontWeight: "700", marginBottom: 12 }}>{picker === "start" ? "Start date" : "End date"}</Text>
+      {picker ? Platform.OS === "web" ? createElement("input", {
+        type: "date", "aria-label": `Insights ${picker} date`, value: format(dateValue, "yyyy-MM-dd"), max: format(now, "yyyy-MM-dd"),
+        onChange: (event: { target: { value: string } }) => { const selected = new Date(`${event.target.value}T00:00:00`); if (isValid(selected)) chooseDate(selected); },
+        style: { boxSizing: "border-box", width: "100%", minHeight: 44, padding: 10, borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.input, color: colors.foreground },
+      }) : <DateTimePicker value={dateValue} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} maximumDate={now} onChange={(_, selected) => { if (selected) chooseDate(selected); else setPicker(null); }} /> : null}
+    </Sheet>
+  </>;
 }
 
-function Stat({ label, value, accent, change }: { label: string; value: string; accent: string; change?: string }) { const { theme } = useTheme(); return <View style={[styles.stat, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}><View style={[styles.statAccent, { backgroundColor: accent }]} /><Text style={[styles.statValue, { color: theme.colors.foreground }]}>{value}</Text><Text style={[styles.statLabel, { color: theme.colors.mutedForeground }]}>{label}</Text>{change ? <Text style={{ color: theme.colors.success, fontSize: 11, fontWeight: "700", marginTop: 5 }}>{change}</Text> : null}</View>; }
+export function InsightsPanel(props: InsightsPanelProps) {
+  return <InsightsDashboard {...props} />;
+}
 
 const styles = StyleSheet.create({
+  insightRibbonTools: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingTop: 5, paddingBottom: 4 },
+  insightRibbonGroup: { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 5, gap: 3 },
+  insightRibbonControlRow: { minHeight: 48, justifyContent: "center" },
+  insightRibbonDropdown: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 44, paddingHorizontal: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 6 },
+  insightRibbonDropdownCompact: { minHeight: 36 },
+  insightRibbonDate: { width: 128, paddingHorizontal: 8, borderRadius: 6 },
+  insightRibbonCaption: { textAlign: "center", fontSize: 9, letterSpacing: 0.5 },
   iconButton: { alignItems: "center", justifyContent: "center", borderRadius: 14 },
   boardCardNew: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   boardCardNewPressable: { padding: 16, gap: 12 },

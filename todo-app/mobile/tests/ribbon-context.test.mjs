@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
@@ -27,8 +28,8 @@ test("Activity and Calendar hide selection, sorting, display and zoom tools", ()
   }
 });
 
-test("Insights hides filters and search that do not affect its data", () => {
-  assert.equal(isRibbonTabAvailable("filters", "insights"), false);
+test("Insights exposes its own filters but hides task search and selection", () => {
+  assert.equal(isRibbonTabAvailable("filters", "insights"), true);
   assert.equal(isRibbonTabAvailable("select", "insights"), false);
   assert.equal(isRibbonTabAvailable("hidden", "insights"), false);
   assert.equal(getRibbonContext("insights").search, false);
@@ -41,8 +42,8 @@ test("leaving selection falls back safely instead of showing hidden tools", () =
   assert.equal(resolveRibbonTab("board", "home", "home", true), "select");
   assert.equal(resolveRibbonTab("board", "select", "actions", false), "actions");
   assert.equal(resolveRibbonTab("list", "select", "actions", false), "actions");
-  assert.equal(resolveRibbonTab("insights", "select", "filters", false), "home");
-  assert.equal(resolveRibbonTab("insights", "filters", "home", false), "home");
+  assert.equal(resolveRibbonTab("insights", "select", "filters", false), "filters");
+  assert.equal(resolveRibbonTab("insights", "filters", "home", false), "filters");
   assert.equal(resolveRibbonTab("calendar", "hidden", "home", false), "home");
   assert.equal(resolveRibbonTab("board", "select", "hidden", false), "hidden");
 });

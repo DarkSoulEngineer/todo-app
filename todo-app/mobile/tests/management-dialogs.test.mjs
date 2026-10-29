@@ -46,6 +46,25 @@ test("delete confirmations use responsive windows and never delete on dismissal"
   }
 });
 
+test("mobile confirmation titles truncate very long names without losing the actions or full accessible title", () => {
+  const title = `Delete “${"LongBoardName".repeat(500)}”?`;
+  for (const width of [320, 390, 767]) {
+    let deleted = 0;
+    let canceled = 0;
+    const tree = render("confirm", width, { visible: true, title, description: "This cannot be undone.", confirmLabel: "Delete board", cancelLabel: "Keep it", onClose: () => canceled++, onConfirm: () => deleted++ });
+    const heading = nodes(tree).find((node) => node.props?.accessibilityRole === "header");
+    assert.equal(heading.props.numberOfLines, 2);
+    assert.equal(heading.props.ellipsizeMode, "tail");
+    assert.equal(heading.props.accessibilityLabel, title);
+    assert.equal(heading.props.children, title);
+    nodes(tree).find((node) => node.props?.label === "Keep it").props.onPress();
+    assert.equal(canceled, 1);
+    assert.equal(deleted, 0);
+    nodes(tree).find((node) => node.props?.label === "Delete board").props.onPress();
+    assert.equal(deleted, 1);
+  }
+});
+
 test("rename board and list windows preserve initial values, validation and submission", () => {
   for (const title of ["Rename list", "Rename board"]) {
     for (const initialValue of ["   ", "  New name  "]) {

@@ -28,7 +28,7 @@ export function ConfirmationDialog({ visible, title, description, confirmLabel, 
   </EditorWindow>;
 
   return <Sheet visible={visible} onClose={onClose}>
-    <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+    <Text accessibilityRole="header" accessibilityLabel={title} numberOfLines={2} ellipsizeMode="tail" style={[styles.title, { color: colors.foreground }]}>{title}</Text>
     {copy}
     {actions}
   </Sheet>;

@@ -11,6 +11,8 @@ const { outputText } = ts.transpileModule(source, { compilerOptions: { module: t
 const ranking = {};
 const navigation = {};
 const ribbonContext = {}, constants = {};
+const insightsFilters = {};
+vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/insights-filters.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: insightsFilters, require });
 vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/ribbon-context.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: ribbonContext });
 vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/domain/constants.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: constants });
 vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/navigation-commands.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: navigation });
@@ -38,6 +40,7 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
     "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId, isCustomSection: () => false },
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#888888" }), BOARD_COLORS: [] },
     "@/lib/features/ribbon-context": ribbonContext,
+    "@/lib/features/insights-filters": insightsFilters,
     "@/lib/features/top-tasks": ranking,
     "@/lib/features/navigation-commands": { createNavigationCommands: (options) => navigation.createNavigationCommands({ ...options, projects: options.projects.map((project) => ({ workspace: { tasks: [], sections: [] }, ...project })) }) },
     "@/lib/domain/constants": constants,
@@ -57,6 +60,38 @@ function find(node, predicate) {
 }
 const editor = (tree) => find(tree, (node) => node.type === "TaskEditor")[0];
 const commandsFor = (tree) => find(tree, (node) => node.type === "CommandPalette")[0].props.commands;
+
+test("Insights ribbon and statistics share filters without affecting Board filters", () => {
+  const updates = [];
+  let tree = render(1200, "insights", null, false, [task], updates);
+  const ribbon = (tree) => find(tree, (node) => node.type === "MobileBoardRibbon")[0];
+  const panel = (tree) => find(tree, (node) => node.type === "InsightsPanel")[0];
+  assert.equal(ribbon(tree).props.filters.type, "InsightsFiltersRibbon");
+  assert.equal(ribbon(tree).props.filters.props.filters, panel(tree).props.filters);
+  const selected = { ...insightsFilters.DEFAULT_FILTERS, status: "completed" };
+  ribbon(tree).props.filters.props.onChange(selected);
+  const [index, value] = updates.at(-1);
+  tree = render(1200, "insights", null, false, [task], [], { states: { [index]: value } });
+  assert.equal(panel(tree).props.filters.status, "completed");
+  assert.equal(ribbon(tree).props.filtersActive, true);
+  tree = render(1200, "board", null, false, [task], [], { states: { [index]: value } });
+  assert.equal(ribbon(tree).props.filtersActive, false);
+  assert.equal(ribbon(tree).props.filters.props.accessibilityLabel, "Board filters");
+});
+
+test("Insights uses the full workspace width on tablets and desktop, not the phone content column", () => {
+  for (const width of [768, 900, 1200, 1920]) {
+    const tree = render(width, "insights", null, false);
+    const feed = find(tree, (node) => node.props?.testID === "workspace-feed-pane")[0];
+    assert.equal(feed.props.contentContainerStyle.maxWidth, undefined);
+    assert.equal(feed.props.contentContainerStyle.padding, 20);
+    assert.equal(feed.props.contentContainerStyle.paddingBottom, 112);
+    assert.equal(feed.props.showsVerticalScrollIndicator, true);
+    assert.equal(find(tree, (node) => node.props?.testID === "workspace-editor-pane")[0].props.style, undefined);
+  }
+  const phone = render(390, "insights", null, false);
+  assert.ok(Array.isArray(find(phone, (node) => node.props?.testID === "workspace-feed-pane")[0].props.contentContainerStyle));
+});
 
 test("ribbon command coverage follows the current view and includes filters, data, versions and selection", () => {
   const expected = ["search-tasks", "filter-tags", "clear-filters", "filters-tools", "add-tag", "sort-tasks", "home-tools", "actions-tools", "pin-ribbon", "expand-ribbon", "load-sample", "export-json", "export-csv", "import-board", "save-version", "clear-done", "close-board", "select-mode", "list-visibility"];

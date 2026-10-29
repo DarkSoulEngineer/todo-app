@@ -74,6 +74,21 @@ function nodes(node) {
 const button = (tree, label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
 const hasSelection = (tree) => JSON.stringify(tree).includes("Selection tools");
 
+test("Insights uses the same tab and action heights as other workspace ribbons", () => {
+  const flatten = (style) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+  for (const width of [390, 1024]) {
+    const app = setup({ width });
+    const board = app.render();
+    app.props.mode = "insights";
+    const insights = app.render();
+    for (const label of ["Home tools", "Actions tools", "Filters tools", "Back to boards", "Pin ribbon open"]) {
+      const normal = flatten(button(board, label).props.style);
+      const insight = flatten(button(insights, label).props.style);
+      assert.equal(insight.height ?? insight.minHeight, normal.height ?? normal.minHeight, label);
+    }
+  }
+});
+
 test("saved ribbon pin survives remounts and disables auto-hide until unpinned", () => {
   const preferences = { ribbonPinned: true };
   const app = setup({ preferences });
@@ -205,7 +220,7 @@ test("overflow menu respects the current view and desktop keeps its full ribbon"
   tree = app.render();
   assert.ok(button(tree, "Show Home ribbon tab"));
   assert.ok(button(tree, "Show Actions ribbon tab"));
-  assert.equal(button(tree, "Show Filters ribbon tab"), undefined);
+  assert.ok(button(tree, "Show Filters ribbon tab"));
   assert.equal(button(tree, "Show Select ribbon tab"), undefined);
   assert.equal(button(tree, "Show Hidden ribbon tab"), undefined);
 });
@@ -238,6 +253,35 @@ test("leaving Select resumes normal auto-hide", () => {
   app.elapse();
   tree = app.render();
   assert.equal(JSON.stringify(tree).includes("Action tools"), false);
+});
+
+test("filter menus and date pickers pause ribbon auto-hide until dismissed", () => {
+  const app = setup();
+  let tree = app.render();
+  button(tree, "Filters tools").props.onPress();
+  app.props.toolsOverlayOpen = true;
+  app.render();
+  assert.equal(app.timers.size, 0);
+  app.elapse();
+  assert.ok(JSON.stringify(app.render()).includes("Filter tools"));
+  app.props.toolsOverlayOpen = false;
+  tree = app.render();
+  assert.equal(app.timers.size, 1);
+  app.elapse();
+  tree = app.render();
+  assert.equal(JSON.stringify(tree).includes("Filter tools"), false);
+});
+
+test("Insights desktop ribbon keeps compact spacing without shrinking its height", () => {
+  const flatten = (style) => Object.assign({}, ...[style].flat().filter(Boolean));
+  for (const [width, mode, height] of [[1024, "insights", 44], [390, "insights", 44], [1024, "board", 44]]) {
+    const app = setup({ width });
+    app.props.mode = mode;
+    const tree = app.render();
+    assert.equal(flatten(button(tree, "Home tools").props.style).minHeight, height);
+    assert.equal(flatten(button(tree, "Back to boards").props.style).height, height);
+    assert.equal(flatten(button(tree, "Pin ribbon open").props.style).height, height);
+  }
 });
 
 test("selection forces an already collapsed ribbon open", () => {

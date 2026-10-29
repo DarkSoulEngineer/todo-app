@@ -13,6 +13,10 @@ import { getThemeById, themes, type Theme, type ThemePreference } from "@/theme/
 
 const THEME_KEY = "janus.theme.v2";
 
+import { getFontFamily } from "@/theme/fonts";
+
+const FONT_KEY = "janus.font.v1";
+
 interface ThemeContextValue {
   theme: Theme;
   preference: ThemePreference;
@@ -20,6 +24,9 @@ interface ThemeContextValue {
   savePreference: (preference: ThemePreference) => Promise<void>;
   /** Cycles system -> light -> dark -> system. */
   toggle: () => void;
+  font: string;
+  setFont: (font: string) => void;
+  saveFont: (font: string) => Promise<void>;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -27,6 +34,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference>("dark");
+  const [font, setFontState] = useState<string>("system");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -51,6 +59,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         if (!cancelled) setHydrated(true);
       });
+    void AsyncStorage.getItem(FONT_KEY)
+      .then((value) => {
+        if (cancelled) return;
+        if (value) setFontState(value);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -66,16 +80,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPreferenceState(next);
   }, []);
 
+  const setFont = useCallback((next: string) => {
+    setFontState(next);
+    void AsyncStorage.setItem(FONT_KEY, next);
+  }, []);
+
+  const saveFont = useCallback(async (next: string) => {
+    await AsyncStorage.setItem(FONT_KEY, next);
+    setFontState(next);
+  }, []);
+
   const resolvedScheme = preference === "system" ? (system === "dark" ? "dark" : "light") : undefined;
-  const resolved = preference === "system" ? (resolvedScheme === "light" ? themes.light : themes.dark) : getThemeById(preference);
+  const baseResolved = preference === "system" ? (resolvedScheme === "light" ? themes.light : themes.dark) : getThemeById(preference);
+  const resolved = { ...baseResolved, fontFamily: getFontFamily(font) };
 
   const toggle = useCallback(() => {
     setPreference(preference === "system" ? "dark" : preference === "dark" ? "light" : "system");
   }, [preference, setPreference]);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme: resolved, preference, setPreference, savePreference, toggle }),
-    [resolved, preference, setPreference, savePreference, toggle],
+    () => ({ theme: resolved, preference, setPreference, savePreference, toggle, font, setFont, saveFont }),
+    [resolved, preference, setPreference, savePreference, toggle, font, setFont, saveFont],
   );
 
   // Avoid a light flash before the saved preference loads.

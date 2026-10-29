@@ -8,7 +8,7 @@ export function getRibbonContext(mode: ViewMode) {
     boardDisplay: mode === "board",
     // Activity and Calendar use their own chronological ordering.
     sorting: mode === "board",
-    filters: mode !== "insights",
+    filters: true,
     search: mode !== "insights",
   };
 }

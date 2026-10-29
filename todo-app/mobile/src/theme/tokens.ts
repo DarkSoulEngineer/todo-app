@@ -8,6 +8,8 @@ export interface Theme {
   colors: ThemeColors;
   radius: { sm: number; md: number; lg: number; xl: number; pill: number };
   space: (steps: number) => number;
+  /** Active font family (empty string means system default). */
+  fontFamily: string;
   type: {
     display: { fontSize: number; lineHeight: number; fontWeight: "700" };
     title: { fontSize: number; lineHeight: number; fontWeight: "700" };

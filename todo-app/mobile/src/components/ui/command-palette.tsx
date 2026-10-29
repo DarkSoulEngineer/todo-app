@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { EditorWindow } from "@/components/ui/editor-window";
 import { commandShortcut, filterCommands, PALETTE_HELP, type Command } from "@/lib/features/commands";
 import { useTheme } from "@/providers/theme-provider";
@@ -18,8 +18,10 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
   const { theme: { colors: c } } = useTheme();
   const { singleKeyShortcuts } = usePreferences();
   const focused = useIsFocused();
-  // Phones and tablets have no hardware keyboard, so shortcuts are web-only.
-  const keyboardShortcuts = Platform.OS === "web";
+  const { width } = useWindowDimensions();
+  const [touchFirst, setTouchFirst] = useState(() => Platform.OS === "web" && typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches);
+  // Mobile browsers are also web: keep their command UI tap-first.
+  const keyboardShortcuts = Platform.OS === "web" && width >= 768 && !touchFirst;
   const help = mode === "help" && keyboardShortcuts;
   const [path, setPath] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -51,6 +53,15 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
   };
 
   useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(pointer: coarse)");
+    const update = () => setTouchFirst(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
     const y = rowLayouts.current[results[activeIndex]?.id];
     if (y !== undefined) scroll.current?.scrollTo({ y: Math.max(0, y - 90), animated: false });
   }, [activeIndex, results]);
@@ -61,7 +72,7 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
       if (event.isComposing || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
       if (mode) {
         if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); back(); return; }
-        if (mode === "help") return;
+        if (help) return;
         const down = event.key === "ArrowDown" && !event.shiftKey;
         const up = event.key === "ArrowUp" && !event.shiftKey;
         if (down || up) {

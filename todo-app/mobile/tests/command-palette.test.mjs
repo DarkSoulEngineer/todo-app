@@ -87,7 +87,7 @@ test("board selection shows current board, excludes closed boards, and cycles op
   assert.equal(empty.find((command) => command.id === "switch-board").children.length, 0);
 });
 
-async function palette(singleKeyShortcuts = true) {
+async function palette(singleKeyShortcuts = true, { os = "web", width = 1280, touch = false } = {}) {
   const slots = [], refs = [], listeners = new Set();
   let cursor = 0, refCursor = 0, focused = true;
   let props = { mode: null, commands: [], blocked: false, onMode(mode) { props.mode = mode; } };
@@ -95,18 +95,18 @@ async function palette(singleKeyShortcuts = true) {
   const doc = { addEventListener(_, fn) { listeners.add(fn); }, removeEventListener(_, fn) { listeners.delete(fn); } };
   const { CommandPalette } = await load("../src/components/ui/command-palette.tsx", {
     react: {
-      useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], (next) => { slots[i] = typeof next === "function" ? next(slots[i]) : next; }]; },
+      useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === "function" ? initial() : initial; return [slots[i], (next) => { slots[i] = typeof next === "function" ? next(slots[i]) : next; }]; },
       useRef(initial) { const i = refCursor++; return refs[i] ??= { current: initial }; },
       useEffect(fn) { effects.push(fn); },
     },
     "expo-router": { useIsFocused: () => focused },
     "@expo/vector-icons": { Ionicons: "Icon" },
-    "react-native": { Platform: { OS: "web" }, Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput", View: "View", StyleSheet: { create: (value) => value } },
+    "react-native": { Platform: { OS: os }, useWindowDimensions: () => ({ width }), Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput", View: "View", StyleSheet: { create: (value) => value } },
     "@/components/ui/editor-window": { EditorWindow: "EditorWindow" },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
     "@/providers/preferences-provider": { usePreferences: () => ({ singleKeyShortcuts }) },
     "@/lib/features/commands": logic,
-  }, { document: doc });
+  }, { document: doc, window: { matchMedia: () => ({ matches: touch, addEventListener() {}, removeEventListener() {} }) } });
   let cleanup = [];
   const render = () => { cleanup.forEach((fn) => fn?.()); cleanup = []; effects.length = 0; cursor = refCursor = 0; const tree = CommandPalette(props); cleanup = effects.map((effect) => effect()); return tree; };
   const key = (key, extra = {}) => { const event = { key, target: { closest: () => null }, preventDefault() { this.prevented = true; }, stopPropagation() {}, ...extra }; [...listeners].forEach((fn) => fn(event)); return event; };
@@ -191,4 +191,38 @@ test("slash opens commands and Shift slash opens help without stealing typed pun
   app.key("?", { shiftKey: true });
   assert.equal(app.props.mode, "help");
   assert.equal(app.render().props.title, "Keyboard shortcuts");
+});
+
+const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
+
+for (const device of [
+  { os: "ios", width: 390 },
+  { os: "android", width: 1024 },
+  { os: "web", width: 390 },
+  { os: "web", width: 1024, touch: true },
+]) test(`commands stay tap-first without keyboard hints on ${JSON.stringify(device)}`, async () => {
+  const app = await palette(true, device);
+  const ran = [];
+  app.props.mode = "help";
+  app.props.commands = [{ id: "create", label: "Create new card", shortcut: "N", run: () => ran.push("create") }];
+  const tree = app.render();
+  assert.equal(tree.props.title, "Commands");
+  const rendered = nodes(tree);
+  assert.equal(rendered.some((node) => node.props.children === "N"), false);
+  assert.equal(rendered.some((node) => node.props.accessibilityLabel === "Keyboard shortcut help"), false);
+  assert.equal(rendered.some((node) => node.props.children === "↑ ↓ select · Enter run · Esc back"), false);
+  assert.equal(rendered.some((node) => node.props.children === "Tap a command to run it"), true);
+  rendered.find((node) => node.props.accessibilityLabel === "Create new card").props.onPress();
+  assert.deepEqual(ran, ["create"]);
+  assert.equal(app.props.mode, null);
+});
+
+test("desktop browsers retain shortcut badges and keyboard instructions", async () => {
+  const app = await palette();
+  app.props.mode = "commands";
+  app.props.commands = [{ id: "create", label: "Create new card", shortcut: "N" }];
+  const rendered = nodes(app.render());
+  assert.equal(rendered.some((node) => node.props.children === "N"), true);
+  assert.equal(rendered.some((node) => node.props.accessibilityLabel === "Keyboard shortcut help"), true);
+  assert.equal(rendered.some((node) => node.props.children === "↑ ↓ select · Enter run · Esc back"), true);
 });

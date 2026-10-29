@@ -133,3 +133,35 @@ test("today keeps a themed date outline when another day is selected", () => {
   assert.equal(appearance.borderColor, colors.primary);
   assert.equal(appearance.backgroundColor, undefined);
 });
+
+test("Today confirms selection with a checkmark, selected styling and a disabled button", () => {
+  for (const mode of ["month", "week"]) for (const split of [false, true]) {
+    const result = render(mode, split, dates.addDays(day, -1));
+    const button = nodes(result.tree).find((node) => node.props?.accessibilityLabel === "Jump to today");
+    assert.equal(button.props.disabled, false);
+    button.props.onPress();
+    const updated = render(mode, split, result.selected[0], tasks, { month: result.anchors[0] });
+    const selected = nodes(updated.tree).find((node) => node.props?.accessibilityLabel === "Jump to today");
+    assert.equal(selected.props.disabled, true);
+    assert.equal(selected.props.accessibilityState.disabled, true);
+    assert.equal(selected.props.accessibilityState.selected, true);
+    assert.equal(selected.props.onPress, undefined);
+    assert.ok(nodes(selected).some((node) => node.props?.name === "checkmark-circle"));
+    assert.ok(nodes(selected).some((node) => node.props?.children === "Today selected" && node.props.accessibilityLiveRegion === "polite"));
+    const appearance = Object.assign({}, ...selected.props.style({ pressed: false }).filter(Boolean));
+    assert.equal(appearance.backgroundColor, colors.primarySoft);
+    assert.equal(appearance.borderColor, colors.primary);
+  }
+});
+
+test("Today stays available with no selection, a different day, or a different visible period", () => {
+  for (const mode of ["month", "week"]) for (const selectedDay of [null, dates.addDays(day, 1), day]) {
+    const month = selectedDay === day ? dates.addMonths(day, 2) : day;
+    const { tree } = render(mode, true, selectedDay, [], { month });
+    const button = nodes(tree).find((node) => node.props?.accessibilityLabel === "Jump to today");
+    assert.equal(button.props.disabled, false);
+    assert.equal(typeof button.props.onPress, "function");
+    assert.ok(nodes(button).some((node) => node.props?.name === "today-outline"));
+    assert.ok(nodes(button).some((node) => node.props?.children === "Today"));
+  }
+});

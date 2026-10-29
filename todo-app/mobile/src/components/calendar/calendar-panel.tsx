@@ -42,6 +42,8 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
   const weekdayLabels = weekStartsOn === 1 ? ["M", "T", "W", "T", "F", "S", "S"] : ["S", "M", "T", "W", "T", "F", "S"];
   const title = mode === "week" ? `${format(days[0], "MMM d")} to ${format(days[6], "MMM d, yyyy")}` : format(anchor, "MMMM yyyy");
   const shift = (delta: number) => onAnchorChange(mode === "week" ? addWeeks(anchor, delta) : addMonths(anchor, delta));
+  const showingToday = mode === "month" ? isSameMonth(anchor, now) : isSameDay(firstDay, startOfWeek(now, { weekStartsOn }));
+  const todaySelected = showingToday && selectedDay !== null && isSameDay(selectedDay, now);
 
   return (
     <View style={styles.wrapper}>
@@ -58,9 +60,9 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
 
       <View style={styles.panel}>
       <View style={styles.controlsRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Jump to today" onPress={onToday} style={({ pressed }) => [styles.todayButton, { opacity: pressed ? 0.65 : 1 }]}>
-          <Ionicons name="today-outline" size={15} color={colors.primary} />
-          <Text style={styles.todayText}>Today</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Jump to today" accessibilityHint={todaySelected ? "Today is already selected" : "Select today and show its calendar period"} accessibilityState={{ disabled: todaySelected, selected: todaySelected }} disabled={todaySelected} onPress={todaySelected ? undefined : onToday} style={({ pressed }) => [styles.todayButton, todaySelected && styles.todayButtonSelected, { opacity: pressed ? 0.65 : 1 }]}>
+          <Ionicons name={todaySelected ? "checkmark-circle" : "today-outline"} size={15} color={colors.primary} />
+          <Text accessibilityLiveRegion="polite" style={styles.todayText}>{todaySelected ? "Today selected" : "Today"}</Text>
         </Pressable>
         <View accessibilityLabel="Calendar view" style={styles.modeSwitch}>
           {(["month", "week"] as CalendarMode[]).map((value) => {
@@ -149,6 +151,7 @@ function createStyles(colors: ThemeColors) {
     eyebrow: { color: colors.mutedForeground, fontSize: 11, lineHeight: 15, fontWeight: "600", marginTop: 1 },
     controlsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 12 },
     todayButton: { minHeight: 40, paddingHorizontal: 13, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.backgroundAlt, flexDirection: "row", alignItems: "center", gap: 6 },
+    todayButtonSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
     todayText: { color: colors.primary, fontSize: 13, fontWeight: "700" },
     modeSwitch: { flexDirection: "row", alignItems: "center", gap: 2, padding: 3, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.backgroundAlt },
     modeOption: { minHeight: 34, minWidth: 62, paddingHorizontal: 12, borderRadius: 9, alignItems: "center", justifyContent: "center" },
