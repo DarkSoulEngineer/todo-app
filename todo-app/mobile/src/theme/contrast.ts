@@ -42,6 +42,9 @@ export function readableInk(ink: string, surfaces: string[], minimum = 4.5): str
 /** Palette foregrounds must match the UI surfaces, not syntax-highlighter roles. */
 export function withReadableText(colors: ThemeColors): ThemeColors {
   const c = { ...colors };
+  // Menu rows use secondary for hover/press feedback on card surfaces.
+  // Syntax palettes often reuse the card color here, hiding that feedback.
+  c.secondary = readableInk(c.secondary, [c.card, c.cardElevated], 1.35);
   const surfaces = [c.background, c.backgroundAlt, c.card, c.cardElevated, c.input, c.secondary];
   c.foreground = readableInk(c.foreground, surfaces);
   c.mutedForeground = readableInk(c.mutedForeground, surfaces);

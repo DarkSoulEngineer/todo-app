@@ -78,6 +78,23 @@ test("contrast correction leaves readable colors and source palettes unchanged",
   assert.equal(JSON.stringify(palettes.themesById["tokyo-night"].colors), original);
 });
 
+test("menu hover surfaces remain distinct in every theme without changing palette sources", () => {
+  for (const [id, { colors: c }] of Object.entries(tokens.themes)) {
+    for (const surface of [c.card, c.cardElevated]) {
+      assert.ok(contrast.contrastRatio(c.secondary, surface) >= 1.35, `${id}: menu hover must stand out from ${surface}`);
+    }
+    for (const ink of [c.foreground, c.primary, c.destructive]) {
+      assert.ok(contrast.contrastRatio(ink, c.secondary) >= 4.5, `${id}: hovered menu labels and icons must remain readable`);
+    }
+    const original = palettes.themesById[id].colors;
+    assert.equal(c.card, original.card);
+    assert.equal(c.cardElevated, original.cardElevated);
+    if ([original.card, original.cardElevated].every((surface) => contrast.contrastRatio(original.secondary, surface) >= 1.35)) {
+      assert.equal(c.secondary, original.secondary, `${id}: already distinct hover colors should stay unchanged`);
+    }
+  }
+});
+
 test("theme catalog has unique ids, names and visual palettes; System is a mode, not another palette", () => {
   assert.equal(new Set(palettes.themes.map((theme) => theme.id)).size, palettes.themes.length);
   assert.equal(new Set(palettes.themes.map((theme) => theme.name.toLowerCase())).size, palettes.themes.length);

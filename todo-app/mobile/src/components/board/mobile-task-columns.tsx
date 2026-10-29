@@ -8,7 +8,7 @@ import { getTaskSectionId } from "@/lib/domain/sections";
 import type { Board } from "@/lib/domain/boards";
 import type { BoardSection, Task } from "@/lib/domain/types";
 import { useMobileBoardColors } from "./mobile-board-colors";
-import { MobileColumnTaskCard } from "./mobile-column-task-card";
+import { MobileColumnTaskCard, taskCardBorderRadius } from "./mobile-column-task-card";
 import { BoardColumnCarousel } from "./board-column-carousel";
 import { JanusDragCell } from "./janus-drag-cell";
 import { BoardDropZone } from "./board-drop-zone";
@@ -115,7 +115,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
     props.onMove(task, target.id);
   };
   const cards = (section: { id: string; title: string }, index: number) => <>
-    {(grouped.get(section.id) ?? []).map((task) => <JanusDragCell key={task.id} id={taskDragId(task.id)} name={task.title} width="100%" enabled={enabled} active={drag.drag?.id === taskDragId(task.id)} target={false} floating previewLayer={previewLayer} onRegister={drag.register} onStart={dragStart} onMove={dragMove} onDrop={drag.drop} onCancel={drag.cancel}>
+    {(grouped.get(section.id) ?? []).map((task) => <JanusDragCell key={task.id} id={taskDragId(task.id)} name={task.title} width="100%" borderRadius={taskCardBorderRadius} enabled={enabled} active={drag.drag?.id === taskDragId(task.id)} target={false} floating previewLayer={previewLayer} onRegister={drag.register} onStart={dragStart} onMove={dragMove} onDrop={drag.drop} onCancel={drag.cancel}>
       {drag.drag?.target?.kind === "task" && drag.drag.target.beforeTaskId === task.id ? <View testID={`janus-insert-before-${task.id}`} pointerEvents="none" style={[styles.insertLine, { backgroundColor: c.primary }]} /> : null}
       <MobileColumnTaskCard task={task} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} hideMoveArrows={Boolean(drag.drag)} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={(event)=>props.selectionMode?props.onToggleSelect(task.id):props.onLongPress(task,event)} onSelect={() => props.onToggleSelect(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />
     </JanusDragCell>)}

@@ -80,6 +80,26 @@ function pointer(x, y, extra = {}) {
   return { pointerId: 1, button: 0, isPrimary: true, clientX: x, clientY: y, preventDefault() {}, stopPropagation() {}, ...extra };
 }
 
+test("drag outlines match task card corners and fill only the card cell", async () => {
+  const h = harness();
+  const tree = h.render({ active: true, target: true, borderRadius: 9 });
+  for (const outline of [tree.props.children[1], tree.props.children[3]]) {
+    assert.equal(outline.props.style.borderRadius, 9);
+    assert.equal(outline.props.style.inset, 0);
+    assert.equal(outline.props.style.boxSizing, "border-box");
+    assert.equal(outline.props.style.pointerEvents, "none");
+  }
+  const section = h.render({ active: true, target: true });
+  assert.equal(section.props.children[1].props.style.borderRadius, 20);
+  const card = await readFile(new URL("../src/components/board/mobile-column-task-card.tsx", import.meta.url), "utf8");
+  const columns = await readFile(new URL("../src/components/board/mobile-task-columns.tsx", import.meta.url), "utf8");
+  assert.match(card, /taskCardBorderRadius = 9/);
+  assert.match(card, /borderRadius: taskCardBorderRadius/);
+  assert.match(columns, /borderRadius=\{taskCardBorderRadius\}/);
+  const native = await readFile(new URL("../src/components/board/janus-drag-cell.tsx", import.meta.url), "utf8");
+  assert.equal((native.match(/borderRadius: props.borderRadius \?\? 20/g) ?? []).length, 2);
+});
+
 test("web drag keeps its pickup offset and coalesces pointer bursts into one frame", () => {
   const h = harness();
   const tree = h.render();

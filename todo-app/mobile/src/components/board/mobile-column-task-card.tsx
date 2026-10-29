@@ -66,8 +66,10 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   </Pressable>;
 }
 
+export const taskCardBorderRadius = 9;
+
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: 9, overflow: "hidden", padding: 9 },
+  card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: taskCardBorderRadius, overflow: "hidden", padding: 9 },
   topRow: { flexDirection: "row", alignItems: "flex-start", gap: 2 }, titleArea: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center" }, checkbox: { width: 36, height: 44, alignItems: "center", justifyContent: "center", flexShrink: 0 }, title: { fontWeight: "600", letterSpacing: -0.2 },
   actions: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", flexShrink: 0, gap: 2 }, action: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 7 },
   description: { marginTop: 6, marginBottom: 9 }, meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 4 }, pill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 6, minHeight: 19, flexDirection: "row", alignItems: "center", gap: 4 }, tagDot: { width: 6, height: 6, borderRadius: 3 }, pillText: { fontSize: 10, lineHeight: 15, fontWeight: "500" }, checklistToggle: { marginLeft: "auto", minHeight: 44 },

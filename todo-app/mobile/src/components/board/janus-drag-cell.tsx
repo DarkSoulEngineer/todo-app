@@ -7,6 +7,8 @@ export interface JanusDragCellProps {
   id: string;
   name: string;
   width: number | "100%";
+  /** Match the outline to the dragged surface rather than the default section shape. */
+  borderRadius?: number;
   /** Only start a section drag from its heading, never from its nested cards. */
   handleHeight?: number;
   floating?: boolean;
@@ -105,9 +107,9 @@ export function JanusDragCell(props: JanusDragCellProps) {
   return <View ref={node} {...responder.panHandlers} testID={`board-drag-cell-${props.id}`}
     accessibilityHint={props.enabled ? `Drag ${props.name} onto another grid position, or use its move buttons.` : undefined}
     style={[styles.cell, props.constrainHeight && { maxHeight: "100%" }, { width: props.width, zIndex: props.active ? 10 : 0 }]}>
-    {props.active ? <View testID={`board-drag-placeholder-${props.id}`} pointerEvents="none" style={[styles.placeholder, { borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.primarySoft }]} /> : null}
+    {props.active ? <View testID={`board-drag-placeholder-${props.id}`} pointerEvents="none" style={[styles.placeholder, { borderRadius: props.borderRadius ?? 20, borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.primarySoft }]} /> : null}
     <Animated.View style={[styles.content, props.constrainHeight && { minHeight: 0, maxHeight: "100%", flexShrink: 1 }, { opacity: props.active ? props.previewLayer ? 0.2 : 0.9 : 1, transform: props.previewLayer ? undefined : position.getTranslateTransform() }]}>{props.children}</Animated.View>
-    {props.target ? <View testID={`board-drop-target-${props.id}`} pointerEvents="none" style={[styles.target, { borderColor: theme.colors.primary }]} /> : null}
+    {props.target ? <View testID={`board-drop-target-${props.id}`} pointerEvents="none" style={[styles.target, { borderRadius: props.borderRadius ?? 20, borderColor: theme.colors.primary }]} /> : null}
   </View>;
 }
 
