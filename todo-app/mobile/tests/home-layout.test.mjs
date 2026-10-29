@@ -42,6 +42,7 @@ const { BoardManagerContent } = await load("../src/components/board/board-manage
   "@/theme/layout": { mobileContentStyle: { maxWidth: 600, width: "100%" }, mobileBottomNavClearance: 112 },
   "@/lib/features/home-layout": layoutModule,
   "./board-drag-cell": { BoardDragCell: "BoardDragCell" },
+  "./bulk-selection-toolbar": { BulkSelectionToolbar: "BulkSelectionToolbar" },
   "@/hooks/use-board-grid-drag": { useBoardGridDrag: () => ({ drag: activeDrag, register() {}, start() {}, move() {}, drop() {}, cancel() {} }) },
 });
 function nodes(node) {
@@ -110,7 +111,8 @@ test("Home retains phone sizing and uses full-width grids for active and closed 
   for (width of [390, 767, 768, 1024, 1440, 1920]) {
     const tree = render();
     const layout = getHomeLayout(width);
-    const content = flatten(find(tree, "home-content").props.contentContainerStyle);
+    const container = find(tree, "home-content");
+    const content = flatten(container.props.contentContainerStyle ?? container.props.style);
     assert.equal(content.maxWidth, layout.wide ? "100%" : 600);
     assert.equal(content.paddingBottom, 132);
     for (const id of ["home-board-grid", "home-closed-board-grid"]) {
@@ -165,22 +167,98 @@ test("grid keeps ordering and board actions intact", () => {
   assert.equal(cards.at(-1).props.last, true);
 });
 
-test("desktop stats stretch to available height without a panel background", () => {
+test("desktop stats keep their natural height inside the original aligned columns", () => {
   width = 1920;
   const tree = render({ projects: projects.slice(0, 1) });
-  assert.equal(flatten(find(tree, "home-content").props.contentContainerStyle).flexGrow, 1);
+  assert.equal(flatten(find(tree, "home-content").props.style).flex, 1);
   const dashboard = flatten(find(tree, "home-dashboard").props.style);
-  assert.equal(dashboard.flexGrow, 1);
+  assert.equal(dashboard.flex, 1);
   assert.equal(dashboard.alignItems, "stretch");
   const overview = nodes(tree).find((node) => node.type?.name === "WorkspaceOverview");
   assert.equal(overview.props.projects.length, 7, "search filtering must not change workspace statistics");
   const stats = overview.type(overview.props);
-  assert.equal(flatten(stats.props.style).flexGrow, 1);
+  assert.equal(flatten(stats.props.style).flexGrow, undefined);
   const surface = flatten(find(stats, "home-stats-surface").props.style);
-  assert.equal(surface.flexGrow, 1);
+  assert.equal(surface.flexGrow, undefined);
+  assert.equal(surface.justifyContent, undefined);
+  assert.equal(surface.gap, 28);
   assert.equal(surface.backgroundColor, undefined);
   assert.equal(surface.borderWidth, undefined);
   assert.ok(find(stats, "home-board-comparison"));
+});
+
+test("duplicating boards cannot stretch the stats surface or insert space above Board progress", () => {
+  for (width of [1320, 1920]) for (const count of [2, 10, 100]) {
+    const many = Array.from({ length: count }, (_, id) => ({ ...projects[0], id: String(id) }));
+    const tree = render({ projects: many, statsProjects: many, totalBoards: count });
+    const overview = nodes(tree).find((node) => node.type?.name === "WorkspaceOverview");
+    const stats = overview.type(overview.props);
+    const sectionStyle = flatten(stats.props.style);
+    const surface = find(stats, "home-stats-surface");
+    const surfaceStyle = flatten(surface.props.style);
+    assert.equal(sectionStyle.flexGrow, undefined);
+    assert.equal(surfaceStyle.flexGrow, undefined);
+    assert.equal(surfaceStyle.justifyContent, undefined, "space-between would push progress to the bottom of the growing grid");
+    assert.equal(surfaceStyle.gap, 28);
+    assert.equal(surface.props.children[1].props.testID, "home-board-comparison", "progress follows the stats immediately");
+    assert.equal(find(tree, "home-stats-panel").props.style.width, getHomeLayout(width).statsWidth);
+    assert.equal(flatten(find(tree, "home-boards-scroll").props.style).flex, 1);
+  }
+});
+
+test("desktop Home keeps equal-width panes while the board grid scrolls independently", () => {
+  for (width of [390, 768, 1319, 1320, 1920]) {
+    const tree = render();
+    const page = find(tree, "home-content");
+    const boards = find(tree, "home-boards-scroll");
+    const stats = find(tree, "home-stats-panel");
+    if (getHomeLayout(width).sidebar) {
+      assert.equal(page.type, "View", "no shared desktop page scroll moves statistics with the board grid");
+      assert.equal(flatten(page.props.style).flex, 1);
+      assert.equal(flatten(page.props.style).minHeight, 0);
+      assert.equal(boards.type, "ScrollView");
+      assert.equal(stats.type, "ScrollView");
+      assert.equal(flatten(boards.props.style).flex, 1);
+      assert.equal(stats.props.style.width, getHomeLayout(width).statsWidth);
+      assert.equal(stats.props.style.flexGrow, 0, "ScrollView's default growth must not make statistics consume extra width");
+      assert.equal(stats.props.style.flexShrink, 0);
+      assert.equal(flatten(find(tree, "home-dashboard").props.style).flex, 1);
+    } else {
+      assert.equal(page.type, "ScrollView");
+      assert.equal(page.props.scrollEnabled, true);
+      assert.equal(boards.type, "View");
+      assert.equal(stats.type, "View");
+    }
+  }
+});
+
+test("Board progress uses the right pane's single scrollbar and keeps every row accessible", () => {
+  for (width of [390, 1920]) for (const count of [0, 2, 4, 5, 100]) {
+    const many = Array.from({ length: count }, (_, id) => ({ ...projects[0], id: String(id), name: `Board ${id}` }));
+    const tree = render({ projects: many, statsProjects: many, totalBoards: count });
+    const overview = nodes(tree).find((node) => node.type?.name === "WorkspaceOverview");
+    const stats = overview.type(overview.props);
+    const list = find(stats, "home-board-progress-list");
+    assert.equal(list.type, "View");
+    assert.equal(flatten(list.props.style).maxHeight, undefined, "progress expands inside the existing pane scroll");
+    assert.equal(nodes(stats).filter((node) => node.type === "ScrollView").length, 0, "no nested scrollbars inside statistics");
+    assert.equal(find(stats, "home-board-progress-scroll"), undefined);
+    assert.equal(nodes(list).filter((node) => node.props?.testID?.startsWith("board-progress-")).length, count);
+    assert.equal(nodes(stats).some((node) => Array.isArray(node.props?.children) && node.props.children.join("") === `Scroll to see all ${count} boards.`), false);
+    if (!count) assert.ok(nodes(list).some((node) => node.props?.children === "Create a board to start tracking progress."));
+  }
+});
+
+test("board-grid scrolling pauses while dragging without changing the statistics pane", () => {
+  width = 1920;
+  try {
+    for (const dragging of [false, true, false]) {
+      activeDrag = dragging ? { id: "0", target: "1" } : null;
+      const tree = render({ editing: true });
+      assert.equal(find(tree, "home-boards-scroll").props.scrollEnabled, !dragging);
+      assert.equal(find(tree, "home-stats-panel").type, "ScrollView");
+    }
+  } finally { activeDrag = null; width = 390; }
 });
 
 test("outline create card fills a grid slot and opens the existing create action", () => {
@@ -299,4 +377,84 @@ test("keyboard can rename directly, and unavailable cards cannot rename", () => 
     name.props.onPress(event);
     assert.equal(renamed, 1);
   }
+});
+
+test("Home selection checkboxes toggle active and closed boards without opening or renaming them", () => {
+  try {
+    for (platform of ["web", "ios", "android"]) for (width of [390, 1200]) {
+      const toggled = [];
+      let opened = 0, renamed = 0, menus = 0;
+      const tree = render({ selecting: true, selectedIds: new Set(["0"]), onToggleSelection: (id) => toggled.push(id), onOpen: () => opened++, onRename: () => renamed++, onMenu: () => menus++ });
+      for (const grid of ["home-board-grid", "home-closed-board-grid"]) {
+        const card = find(tree, grid).props.children[0].props.children;
+        const surface = card.type(card.props);
+        const checkbox = nodes(surface).find((node) => node.props?.accessibilityRole === "checkbox");
+        assert.equal(checkbox.props.accessibilityState.checked, true);
+        assert.equal(flatten(checkbox.props.style).width, 44);
+        checkbox.props.onPress();
+        nodes(surface).find((node) => node.type === "Pressable" && !node.props.testID).props.onPress();
+        const name = find(surface, "board-name-0");
+        name.props.onPress({ stopPropagation() {}, nativeEvent: {} });
+        name.props.onLongPress({ nativeEvent: {} });
+        surface.props.onContextMenu?.({ preventDefault() {}, stopPropagation() {} });
+        assert.equal(nodes(surface).some((node) => node.props?.label === "Remove"), false);
+      }
+      assert.equal(toggled.length, 8);
+      assert.equal(opened + renamed + menus, 0);
+      assert.equal(find(tree, "home-add-board-card"), undefined);
+    }
+  } finally { platform = "web"; width = 390; }
+});
+
+test("selection uses the shared ribbon toolbar and keeps rearrange separate", () => {
+  let selecting = false;
+  const tree = render({ onSelecting: (active) => { selecting = active; } });
+  const heading = nodes(tree).find((node) => node.type === "Heading" && node.props.title === "Your boards");
+  nodes(heading.props.right).find((node) => node.props?.label === "Select").props.onPress();
+  assert.equal(selecting, true);
+  for (const count of [0, 2]) {
+    const selected = render({ selecting: true, selectedIds: new Set(projects.slice(0, count).map((project) => project.id)), onSelecting() {} });
+    const toolbar = find(selected, "home-board-selection");
+    const ribbon = nodes(toolbar).find((node) => node.type === "BulkSelectionToolbar");
+    assert.equal(ribbon.props.entity, "board");
+    assert.equal(ribbon.props.selectedCount, count);
+    assert.equal(ribbon.props.disabled, false);
+    const heading = nodes(selected).find((node) => node.type === "Heading" && node.props.title === "Your boards");
+    const arrange = nodes(heading.props.right).find((node) => node.props?.label === "Rearrange");
+    assert.ok(arrange);
+    assert.equal(arrange.props.disabled, true);
+  }
+});
+
+test("Home hides card checkboxes outside Select mode and places an icon before the Select label", () => {
+  try {
+    for (width of [390, 1200]) {
+      for (const selecting of [false, true]) {
+        const tree = render({ selecting, onSelecting() {}, onToggleSelection() {} });
+        for (const grid of ["home-board-grid", "home-closed-board-grid"]) {
+          const card = find(tree, grid).props.children[0].props.children;
+          const surface = card.type(card.props);
+          assert.equal(nodes(surface).some((node) => node.props?.accessibilityRole === "checkbox"), selecting);
+        }
+        const heading = nodes(tree).find((node) => node.type === "Heading" && node.props.title === "Your boards");
+        const button = nodes(heading.props.right).find((node) => node.props?.accessibilityLabel === (selecting ? "Finish selecting boards" : "Select boards"));
+        assert.equal(button.props.children[0].type, "Icon");
+        assert.equal(button.props.children[0].props.name, selecting ? "checkmark" : "checkbox-outline");
+        assert.equal(button.props.children[1].props.children, selecting ? "Done" : "Select");
+        assert.equal(flatten(button.props.style).width, 88);
+        assert.equal(heading.props.right.props.children[0], button);
+        const arrange = heading.props.right.props.children[1];
+        assert.equal(arrange.props.label, "Rearrange");
+        assert.equal(arrange.props.disabled, selecting);
+      }
+    }
+  } finally { width = 390; }
+});
+
+test("Select stays visible but disabled during Rearrange", () => {
+  const tree = render({ editing: true, onSelecting() {} });
+  const heading = nodes(tree).find((node) => node.type === "Heading" && node.props.title === "Your boards");
+  const select = nodes(heading.props.right).find((node) => node.props?.accessibilityLabel === "Select boards");
+  assert.equal(select.props.disabled, true);
+  assert.equal(flatten(select.props.style).width, 88);
 });

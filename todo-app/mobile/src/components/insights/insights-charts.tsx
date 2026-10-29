@@ -49,7 +49,7 @@ export function ProgressRing({ value, total, color, label }: { value: number; to
   const { theme: { colors: c } } = useTheme();
   const fraction = ringFraction(value, total), radius = 30, length = 2 * Math.PI * radius;
   return <View style={styles.smallRing} accessible accessibilityLabel={`${label}: ${value} of ${total}, ${Math.round(fraction * 100)} percent`}>
-    <Svg width={76} height={76} viewBox="0 0 76 76"><Circle cx={38} cy={38} r={radius} fill="none" stroke={c.secondary} strokeWidth={6} />{fraction > 0 ? <Circle cx={38} cy={38} r={radius} fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeDasharray={[length * fraction, length]} rotation={-90} origin="38, 38" /> : null}</Svg>
+    <Svg width={76} height={76} viewBox="0 0 76 76"><Circle cx={38} cy={38} r={radius} fill="none" stroke={c.secondary} strokeWidth={6} />{fraction > 0 ? <Circle cx={38} cy={38} r={radius} fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeDasharray={[length * fraction, length]} transform="rotate(-90 38 38)" /> : null}</Svg>
     <View style={styles.ringCenter}><Text style={{ color: c.foreground, fontSize: 16, fontWeight: "800" }}>{Math.round(fraction * 100)}%</Text></View>
     <Text style={{ color: c.mutedForeground, fontSize: 10, marginTop: 3 }}>{label}</Text>
   </View>;
@@ -61,7 +61,7 @@ export function RadialDiagram({ slices, total }: { slices: ChartSlice[]; total: 
     <Svg fontFamily={fontFamily || undefined} width="100%" height={235} viewBox="0 0 240 240">
       {slices.map((slice, index) => {
         const radius = 103 - index * 17, length = Math.PI * 2 * radius, fraction = ringFraction(slice.value, total);
-        return <G key={slice.label}><Circle cx={120} cy={120} r={radius} fill="none" stroke={c.secondary} strokeWidth={9} />{fraction > 0 ? <Circle cx={120} cy={120} r={radius} fill="none" stroke={slice.color} strokeWidth={9} strokeLinecap="round" strokeDasharray={[length * fraction, length]} rotation={-90} origin="120, 120" /> : null}</G>;
+        return <G key={slice.label}><Circle cx={120} cy={120} r={radius} fill="none" stroke={c.secondary} strokeWidth={9} />{fraction > 0 ? <Circle cx={120} cy={120} r={radius} fill="none" stroke={slice.color} strokeWidth={9} strokeLinecap="round" strokeDasharray={[length * fraction, length]} transform="rotate(-90 120 120)" /> : null}</G>;
       })}
       <SvgText x={120} y={122} textAnchor="middle" fill={c.foreground} fontSize={30} fontWeight="800">{total}</SvgText>
       <SvgText x={120} y={141} textAnchor="middle" fill={c.mutedForeground} fontSize={11}>total tasks</SvgText>
@@ -91,7 +91,7 @@ export function DonutDiagram({ slices, total }: { slices: ChartSlice[]; total: n
     <Svg fontFamily={fontFamily || undefined} width={128} height={128} viewBox="0 0 128 128"><Circle cx={64} cy={64} r={44} fill="none" stroke={c.secondary} strokeWidth={19} />{slices.map((slice, index) => {
       const segment = ringFraction(slice.value, total) * length;
       const start = slices.slice(0, index).reduce((sum, item) => sum + ringFraction(item.value, total) * length, 0);
-      return segment > 0 ? <Circle key={slice.label} cx={64} cy={64} r={44} fill="none" stroke={slice.color} strokeWidth={19} strokeDasharray={[Math.max(0, segment - 2), length]} strokeDashoffset={-start} rotation={-90} origin="64, 64" /> : null;
+      return segment > 0 ? <Circle key={slice.label} cx={64} cy={64} r={44} fill="none" stroke={slice.color} strokeWidth={19} strokeDasharray={[Math.max(0, segment - 2), length]} strokeDashoffset={-start} transform="rotate(-90 64 64)" /> : null;
     })}<SvgText x={64} y={65} textAnchor="middle" fill={c.foreground} fontSize={22} fontWeight="800">{total}</SvgText><SvgText x={64} y={82} textAnchor="middle" fill={c.mutedForeground} fontSize={9}>tasks</SvgText></Svg>
   </View>;
 }

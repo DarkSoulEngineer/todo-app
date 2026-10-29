@@ -5,6 +5,16 @@ import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type Sty
 import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
 
 export interface BulkSelectionToolbarProps {
+  entity?: "task" | "board";
+  selectAllDisabled?: boolean;
+  boardActions?: {
+    onClose: () => void;
+    onReopen: () => void;
+    onDuplicate: () => void;
+    canClose: boolean;
+    canReopen: boolean;
+    canDuplicate: boolean;
+  };
   /** Keeps the toolbar out of the tree when the board is not selecting tasks. */
   selectionMode?: boolean;
   selectedCount: number;
@@ -29,13 +39,16 @@ export interface BulkSelectionToolbarProps {
 type ActionTone = "neutral" | "success" | "danger";
 
 /**
- * Bulk task actions for a board's mobile selection state.
+ * Shared bulk actions for task selection and Home board selection.
  *
  * Laid out like the ribbon's other tool strips: one group of 48dp tools per
  * action family, a 9px caption underneath, and hairline separators between
  * groups. Parents own selection and mutation state through the callbacks.
  */
 export function BulkSelectionToolbar({
+  entity = "task",
+  selectAllDisabled = false,
+  boardActions,
   selectionMode = true,
   selectedCount,
   allSelected = false,
@@ -59,7 +72,7 @@ export function BulkSelectionToolbar({
   const count = Math.max(0, selectedCount);
   const hasSelection = count > 0;
   const clearSelection = onClearSelection ?? onClear;
-  const taskWord = count === 1 ? "task" : "tasks";
+  const taskWord = count === 1 ? entity : `${entity}s`;
   const actionDisabled = disabled || !hasSelection;
 
   const group = (label: string, children: ReactNode) => (
@@ -73,19 +86,24 @@ export function BulkSelectionToolbar({
     <RibbonScrollView
       contentContainerStyle={styles.tools}
       accessibilityRole="toolbar"
-      accessibilityLabel="Bulk task actions"
+      accessibilityLabel={`Bulk ${entity} actions`}
       style={style}
     >
       {onSelectAll || clearSelection ? group(`${count} SELECTED`, <>
-        {onSelectAll ? <ToolButton icon={allSelected ? "checkmark-done-outline" : "checkbox-outline"} label="Select all" accessibilityLabel="Select all visible tasks" onPress={onSelectAll} selected={allSelected} disabled={disabled} /> : null}
-        {clearSelection ? <ToolButton icon="close-circle-outline" label="Unselect all" accessibilityLabel="Unselect all tasks" onPress={clearSelection} disabled={actionDisabled} /> : null}
+        {onSelectAll ? <ToolButton icon={allSelected ? "checkmark-done-outline" : "checkbox-outline"} label="Select all" accessibilityLabel={`Select all visible ${entity}s`} onPress={onSelectAll} selected={allSelected} disabled={disabled || selectAllDisabled} /> : null}
+        {clearSelection ? <ToolButton icon="close-circle-outline" label="Unselect all" accessibilityLabel={`Unselect all ${entity}s`} onPress={clearSelection} disabled={actionDisabled} /> : null}
       </>) : null}
       {onComplete || onCancel || onRestore ? group("STATUS", <>
         {onComplete ? <ToolButton icon="checkmark-done-outline" label="Complete" accessibilityLabel={`Complete ${count} selected ${taskWord}`} onPress={onComplete} tone="success" disabled={actionDisabled} /> : null}
         {onCancel ? <ToolButton icon="remove-circle-outline" label="Cancel" accessibilityLabel={`Cancel ${count} selected ${taskWord}`} onPress={onCancel} tone="danger" disabled={actionDisabled} /> : null}
         {onRestore ? <ToolButton icon="refresh-outline" label="Restore" accessibilityLabel={`Restore ${count} selected ${taskWord}`} onPress={onRestore} tone="success" disabled={actionDisabled} /> : null}
       </>) : null}
-      {onMore || onMove || onPriority || onDelete ? group("ORGANIZE", <>
+      {boardActions ? group("STATUS", <>
+        <ToolButton icon="archive-outline" label="Close" accessibilityLabel="Close selected boards" onPress={boardActions.onClose} disabled={actionDisabled || !boardActions.canClose} />
+        <ToolButton icon="refresh-outline" label="Reopen" accessibilityLabel="Reopen selected boards" onPress={boardActions.onReopen} disabled={actionDisabled || !boardActions.canReopen} />
+      </>) : null}
+      {onMore || onMove || onPriority || onDelete || boardActions ? group("ORGANIZE", <>
+        {boardActions ? <ToolButton icon="copy-outline" label="Duplicate" accessibilityLabel="Duplicate selected boards" onPress={boardActions.onDuplicate} disabled={actionDisabled || !boardActions.canDuplicate} /> : null}
         {onMore ? <ToolButton icon="ellipsis-horizontal" label="More" accessibilityLabel="More actions for selected tasks" onPress={onMore} disabled={disabled} /> : null}
         {onMove ? <ToolButton icon="arrow-forward-outline" label="Move" accessibilityLabel="Move selected tasks" onPress={onMove} disabled={actionDisabled} /> : null}
         {onPriority ? <ToolButton icon="star-outline" label="Priority" accessibilityLabel="Set priority for selected tasks" onPress={onPriority} disabled={actionDisabled} /> : null}

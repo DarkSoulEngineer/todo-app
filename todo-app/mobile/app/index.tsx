@@ -33,6 +33,9 @@ export default function BoardManagerScreen() {
   const [renameTarget, setRenameTarget] = useState<JanusProject | null>(null);
   const [query, setQuery] = useState("");
   const [editMode, setEditMode] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<string[] | null>(null);
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [layout, setLayout] = useState<BoardLayout>(EMPTY_BOARD_LAYOUT);
   const [managerStateLoaded, setManagerStateLoaded] = useState(false);
@@ -72,6 +75,7 @@ export default function BoardManagerScreen() {
   const activePins = useMemo(() => new Set([...pinnedIds].filter((id) => boardIds.includes(id))), [boardIds, pinnedIds]);
   const displayProjects = editMode ? openProjects : [...visibleProjects.filter((project) => activePins.has(project.id)), ...visibleProjects.filter((project) => !activePins.has(project.id))];
   const metrics = useMemo(() => getWorkspaceMetrics(openProjects, now), [openProjects, now]);
+  const selectedBoardIds = useMemo(() => new Set(boardIds.filter((id) => selectedIds.has(id))), [boardIds, selectedIds]);
 
   useEffect(() => {
     if (!managerReady) return;
@@ -156,6 +160,36 @@ export default function BoardManagerScreen() {
   const askDelete = (project: JanusProject) => {
     setDeleteTarget(project);
   };
+  const changeSelecting = (active: boolean) => {
+    if (active && editMode) return;
+    setSelecting(active);
+    setEditMode(false);
+    if (!active) setSelectedIds(new Set());
+  };
+  const toggleSelection = (id: string) => {
+    if (!managerReady || editMode) return;
+    changeSelecting(true);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const removeSelected = () => {
+    if (!managerReady || !bulkDeleteIds) return;
+    // Project actions update their live registry refs synchronously, so each
+    // removal sees the previous one, including when deleting the current board.
+    const removed = new Set(bulkDeleteIds.filter((id) => removeProject(id)));
+    if (removed.size) {
+      const nextPins = new Set([...pinnedIds].filter((id) => !removed.has(id)));
+      const nextLayout = [...removed].reduce(removeBoardFromLayout, resolvedLayout);
+      setPinnedIds(nextPins); void saveManagerPins(nextPins);
+      setLayout(nextLayout); void saveManagerLayout(nextLayout);
+      toast.success(`${removed.size} board${removed.size === 1 ? "" : "s"} deleted`);
+    }
+    setBulkDeleteIds(null);
+    changeSelecting(false);
+  };
   const deleteBoard = (project: JanusProject) => {
     if (!managerReady) return;
     if (!removeProject(project.id)) { toast.error("Keep at least one board"); return; }
@@ -164,6 +198,13 @@ export default function BoardManagerScreen() {
     const nextLayout = removeBoardFromLayout(resolvedLayout, project.id);
     setLayout(nextLayout); void saveManagerLayout(nextLayout);
     toast.success("Board deleted");
+  };
+  const runBoardSelectionAction = (action: "close" | "reopen" | "duplicate") => {
+    if (!managerReady || editMode) return;
+    const targets = orderedProjects.filter((project) => selectedBoardIds.has(project.id) && (action === "reopen" ? Boolean(project.closedAt) : !project.closedAt));
+    const run = action === "close" ? closeProject : action === "reopen" ? reopenProject : duplicateProject;
+    const count = targets.filter((project) => run(project.id)).length;
+    if (count) toast.success(`${count} board${count === 1 ? "" : "s"} ${action === "close" ? "closed" : action === "reopen" ? "reopened" : "duplicated"}`);
   };
   const saveProject = (project: JanusProject) => {
     void exportWorkspace(project.id === currentProjectId ? { tasks, sections, boards } : project.workspace, project.name)
@@ -189,9 +230,18 @@ export default function BoardManagerScreen() {
   return <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
     <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
-    <BoardManagerContent onCommands={() => setPaletteMode("commands")} projects={displayProjects} statsProjects={openProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={setEditMode} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onReorder={reorderBoard} onMenu={(project, event) => { setMenuAnchor(event ? anchorFromEvent(event) : null); setMenuProject(project); }} onRename={setRenameTarget} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
+    <BoardManagerContent
+      boardSelectionActions={{
+        onClose: () => runBoardSelectionAction("close"),
+        onReopen: () => runBoardSelectionAction("reopen"),
+        onDuplicate: () => runBoardSelectionAction("duplicate"),
+        canClose: openProjects.some((project) => selectedBoardIds.has(project.id)),
+        canReopen: closedProjects.some((project) => selectedBoardIds.has(project.id)),
+        canDuplicate: openProjects.some((project) => selectedBoardIds.has(project.id)),
+      }}
+      selecting={selecting} selectedIds={selectedBoardIds} onSelecting={changeSelecting} onToggleSelection={toggleSelection} onSelectAll={() => setSelectedIds((current) => new Set([...current, ...visibleProjects.map((project) => project.id), ...visibleClosedProjects.map((project) => project.id)]))} onClearSelection={() => setSelectedIds(new Set())} onRemoveSelected={() => { if (selectedBoardIds.size) setBulkDeleteIds([...selectedBoardIds]); }} onCommands={() => setPaletteMode("commands")} projects={displayProjects} statsProjects={openProjects} closedProjects={visibleClosedProjects} totalBoards={openProjects.length} metrics={metrics} pinnedIds={activePins} ready={managerReady} loading={isLoading} editing={editMode} query={query} now={now} onQuery={setQuery} onEdit={(editing) => { changeSelecting(false); setEditMode(editing); }} onCreate={() => setShowCreate(true)} onImport={() => { void importBoard(); }} onOpen={openProject} onReopen={reopenBoard} onPin={togglePin} onMove={moveBoard} onReorder={reorderBoard} onMenu={(project, event) => { setMenuAnchor(event ? anchorFromEvent(event) : null); setMenuProject(project); }} onRename={setRenameTarget} onSave={saveProject} onDuplicate={duplicate} onRemove={askDelete} />
     </BlurTargetView>
-    <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={commands} blocked={!managerReady || showCreate || !!menuProject || !!closedPromptProject || !!deleteTarget || !!renameTarget} />
+    <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={commands} blocked={!managerReady || showCreate || !!menuProject || !!closedPromptProject || !!deleteTarget || !!renameTarget || bulkDeleteIds !== null} />
     <ReferenceMobileBottomNav active="boards" onNavigate={navigate} blurTarget={blurTarget} />
     <TextEntrySheet visible={showCreate} title="New board" description="Add lists and categories after creating the board." placeholder="Board name" actionLabel="Create board" onClose={() => setShowCreate(false)} onSubmit={create} />
     <OptionSheet visible={menuProject !== null} title={menuProject?.name ?? "Board actions"} options={menuProject ? [
@@ -211,6 +261,7 @@ export default function BoardManagerScreen() {
       { label: "Keep it closed", icon: "close-outline" as const, onPress: () => undefined },
     ] : []} onClose={() => setClosedPromptProject(null)} />
     <ConfirmationDialog visible={deleteTarget !== null} title={deleteTarget ? `Delete “${deleteTarget.name}”?` : "Delete board?"} description="This board and all of its lists and cards will be permanently removed. This cannot be undone." confirmLabel="Delete board" cancelLabel="Keep it" onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) { deleteBoard(deleteTarget); setDeleteTarget(null); } }} />
+    <ConfirmationDialog visible={bulkDeleteIds !== null} title={`Delete ${bulkDeleteIds?.length ?? 0} selected board${bulkDeleteIds?.length === 1 ? "" : "s"}?`} description="Only the selected boards and all of their lists and cards will be permanently removed. This cannot be undone." confirmLabel="Remove selected" cancelLabel="Keep boards" onClose={() => setBulkDeleteIds(null)} onConfirm={removeSelected} />
     <TextEntrySheet visible={renameTarget !== null} title="Rename board" initialValue={renameTarget?.name ?? ""} placeholder="Board name" onClose={() => setRenameTarget(null)} onSubmit={(value) => { if (renameTarget) renameProject(renameTarget.id, value); setRenameTarget(null); }} />
   </View>;
 }

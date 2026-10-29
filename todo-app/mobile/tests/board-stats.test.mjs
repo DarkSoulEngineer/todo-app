@@ -20,7 +20,7 @@ vm.runInNewContext(ts.transpileModule(`export ${metricsDeclaration.getText(metri
 let scheme = "light";
 vm.runInNewContext(outputText, {
   exports, require, getTaskMetrics: metricsExports.getTaskMetrics, useTheme: () => ({ theme: { colors, scheme } }),
-  View: "View", Text: "Text", Svg: "Svg", Circle: "Circle", SectionHeading: "SectionHeading", serif: "serif",
+  View: "View", Text: "Text", ScrollView: "ScrollView", Svg: "Svg", Circle: "Circle", SectionHeading: "SectionHeading", serif: "serif",
   styles: new Proxy({}, { get: () => ({}) }),
 });
 

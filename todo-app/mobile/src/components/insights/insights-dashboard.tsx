@@ -18,6 +18,10 @@ export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTER
   const { theme: { colors: c } } = useTheme();
   const { width } = useWindowDimensions();
   const desktop = width >= 1100, tablet = width >= 700;
+  const showCompletions = filters.status === "all" || filters.status === "completed";
+  const showStatusBreakdown = filters.status === "all";
+  const showCategories = filters.boardId === "all";
+  const showPriorities = filters.priority === "all";
   const [selection, setSelection] = useState<{ key: string; period: string } | null>(null);
   const filtered = useMemo(() => filterTasksByFilters(tasks, filters, now), [tasks, filters, now]);
   const start = windowStartFromPreset(now, filters.dateRange, filters.customStart);
@@ -58,18 +62,18 @@ export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTER
       <Button variant="outline" size={tablet ? "md" : "sm"} label={tablet ? "Export report" : "Export"} accessibilityLabel="Export filtered tasks as CSV" onPress={exportFiltered} disabled={!filtered.length} />
     </View>
 
-    <View testID="insights-top-row" style={[styles.row, desktop && styles.horizontal]}>
+    {showCompletions ? <View testID="insights-top-row" style={[styles.row, desktop && styles.horizontal]}>
       <View testID="insights-summary-column" style={[styles.summaryColumn, desktop ? { flex: 0.85 } : tablet && styles.horizontal]}>
         <DiagramCard title="Completed tasks" caption="THIS PERIOD" testID="insights-completed-card" style={tablet ? { flex: 1 } : undefined}>
           <View style={styles.summaryMetric}><Text style={[styles.bigNumber, { color: c.foreground }]}>{period.windowTotal}</Text><ChangeBadge change={period.periodChange} /></View>
           <AreaDiagram compact points={points} />
           <View style={styles.split}><Text style={[styles.small, { color: c.mutedForeground }]}>Previous period</Text><Text style={[styles.small, { color: c.foreground, fontWeight: "700" }]}>{period.previousWindowTotal} completed</Text></View>
         </DiagramCard>
-        <Card testID="insights-health-rings" style={[styles.healthCard, tablet && !desktop && { flex: 1, alignItems: "center" }]}>
+        {showStatusBreakdown ? <Card testID="insights-health-rings" style={[styles.healthCard, tablet && !desktop && { flex: 1, alignItems: "center" }]}>
           <ProgressRing value={stats.completed} total={stats.total} color={c.primary} label="Completed" />
           <ProgressRing value={stats.active} total={stats.total} color={c.info} label="Active" />
           <ProgressRing value={stats.canceled} total={stats.total} color={c.mutedForeground} label="Canceled" />
-        </Card>
+        </Card> : null}
       </View>
 
       <DiagramCard title="Performance overview" caption={`${period.points.length} DAYS`} testID="insights-performance" style={desktop ? { flex: 2 } : undefined}>
@@ -82,28 +86,28 @@ export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTER
           {selected ? <Pressable testID="insights-trend-detail" accessibilityRole="button" accessibilityLabel="Dismiss trend detail" onPress={() => setSelection(null)} style={styles.selectedDetail}><Text accessibilityLiveRegion="polite" style={[styles.small, { flex: 1, color: c.foreground }]}>{selected.label} · {selected.count} current / {previous[selectedIndex]?.count ?? 0} previous</Text><Ionicons name="close" size={16} color={c.mutedForeground} /></Pressable> : <Text style={[styles.small, { color: c.mutedForeground }]}>{period.windowTotal || period.previousWindowTotal ? "Tap a date to compare periods" : "No completions in this period"}</Text>}
         </View>
       </DiagramCard>
-    </View>
+    </View> : null}
 
     <View testID="insights-bottom-row" style={[styles.row, tablet && styles.horizontal, tablet && !desktop && { flexWrap: "wrap" }]}>
-      <DiagramCard title="Task balance" caption="ALL MATCHING TASKS" testID="insights-balance" style={tablet ? { flex: 1, minWidth: desktop ? 0 : "44%" } : undefined}>
+      {showStatusBreakdown ? <DiagramCard title="Task balance" caption="ALL MATCHING TASKS" testID="insights-balance" style={tablet ? { flex: 1, minWidth: desktop ? 0 : "44%" } : undefined}>
         <RadialDiagram slices={balance} total={stats.total} />
         <View style={styles.balanceLegend}>{balance.map((slice) => <View key={slice.label} style={styles.split}><LegendDot label={slice.label} color={slice.color} /><Text style={[styles.small, { color: c.foreground, fontWeight: "700" }]}>{slice.value}<Text style={{ color: c.mutedForeground, fontWeight: "400" }}> / {stats.total}</Text></Text></View>)}</View>
         <View style={[styles.chartFooter, { borderColor: c.border }]}><Text style={[styles.small, { color: c.mutedForeground }]}>{Math.round(stats.completionRate * 100)}% of matching tasks completed</Text></View>
-      </DiagramCard>
+      </DiagramCard> : null}
 
-      <DiagramCard title="Weekly rhythm" caption="COMPLETIONS" testID="insights-weekly" style={tablet ? { flex: 1.2, minWidth: desktop ? 0 : "44%" } : undefined}>
+      {showCompletions ? <DiagramCard title="Weekly rhythm" caption="COMPLETIONS" testID="insights-weekly" style={tablet ? { flex: 1.2, minWidth: desktop ? 0 : "44%" } : undefined}>
         <WeekdayDiagram values={weekday} />
         <View style={[styles.rhythmMetrics, { borderColor: c.border }]}>
           <RhythmMetric icon="flame-outline" label="Current streak" value={`${period.streak} days`} color={c.warning} />
           <RhythmMetric icon="trophy-outline" label="Best day" value={`${period.best} done`} color={c.primary} />
         </View>
         <View style={[styles.periodCompare, { backgroundColor: c.backgroundAlt }]}><View style={{ flex: 1, gap: 4 }}><Text style={[styles.small, { color: c.mutedForeground }]}>Current / previous period</Text><Text style={{ color: c.foreground, fontSize: 18, fontWeight: "700" }}>{period.windowTotal}<Text style={{ color: c.mutedForeground, fontWeight: "400" }}> / {period.previousWindowTotal}</Text></Text></View><ChangeBadge change={period.periodChange} /></View>
-      </DiagramCard>
+      </DiagramCard> : null}
 
-      <DiagramCard title="Task distribution" caption="CATEGORIES & PRIORITY" testID="insights-distribution" style={tablet ? { flex: 1, minWidth: desktop ? 0 : "100%" } : undefined}>
-        <View testID="insights-category-bars" style={styles.categoryList}>{visibleCategories.length ? visibleCategories.map((item, index) => <View key={item.label} testID="insights-category-item" style={{ gap: 6 }}><View style={styles.split}><Text numberOfLines={1} style={[styles.small, { flex: 1, color: c.foreground }]}>{item.label}</Text><Text style={[styles.small, { color: c.mutedForeground }]}>{item.value} · {Math.round(ringFraction(item.value, stats.total) * 100)}%</Text></View><View style={[styles.categoryTrack, { backgroundColor: c.secondary }]}><View style={{ height: "100%", width: `${ringFraction(item.value, stats.total) * 100}%`, backgroundColor: palette[index % palette.length], borderRadius: 4 }} /></View></View>) : <Text style={[styles.small, { color: c.mutedForeground }]}>No category data for these filters</Text>}</View>
-        <View style={[styles.prioritySection, { borderColor: c.border }]}><DonutDiagram slices={priorities} total={stats.total} /><View style={{ flex: 1, gap: 10 }}>{priorities.map((slice) => <View key={slice.label} style={styles.split}><LegendDot label={slice.label} color={slice.color} /><Text style={[styles.small, { color: c.foreground }]}>{slice.value}</Text></View>)}</View></View>
-      </DiagramCard>
+      {showCategories || showPriorities ? <DiagramCard title="Task distribution" caption={showCategories && showPriorities ? "CATEGORIES & PRIORITY" : showCategories ? "CATEGORIES" : "PRIORITY"} testID="insights-distribution" style={tablet ? { flex: 1, minWidth: desktop ? 0 : "100%" } : undefined}>
+        {showCategories ? <View testID="insights-category-bars" style={styles.categoryList}>{visibleCategories.length ? visibleCategories.map((item, index) => <View key={item.label} testID="insights-category-item" style={{ gap: 6 }}><View style={styles.split}><Text numberOfLines={1} style={[styles.small, { flex: 1, color: c.foreground }]}>{item.label}</Text><Text style={[styles.small, { color: c.mutedForeground }]}>{item.value} · {Math.round(ringFraction(item.value, stats.total) * 100)}%</Text></View><View style={[styles.categoryTrack, { backgroundColor: c.secondary }]}><View style={{ height: "100%", width: `${ringFraction(item.value, stats.total) * 100}%`, backgroundColor: palette[index % palette.length], borderRadius: 4 }} /></View></View>) : <Text style={[styles.small, { color: c.mutedForeground }]}>No category data for these filters</Text>}</View> : null}
+        {showPriorities ? <View style={[styles.prioritySection, !showCategories && styles.standalonePriority, { borderColor: c.border }]}><DonutDiagram slices={priorities} total={stats.total} /><View style={{ flex: 1, gap: 10 }}>{priorities.map((slice) => <View key={slice.label} style={styles.split}><LegendDot label={slice.label} color={slice.color} /><Text style={[styles.small, { color: c.foreground }]}>{slice.value}</Text></View>)}</View></View> : null}
+      </DiagramCard> : null}
     </View>
     <View style={styles.split}><View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Ionicons name="funnel-outline" size={12} color={c.mutedForeground} /><Text style={[styles.small, { color: c.mutedForeground }]}>{filtered.length} task{filtered.length === 1 ? "" : "s"} match current filters</Text></View><Text style={[styles.small, { color: c.mutedForeground }]}>Updated {format(now, "HH:mm")}</Text></View>
   </View>;
@@ -160,4 +164,5 @@ const styles = StyleSheet.create({
   categoryList: { gap: 13, flexGrow: 1, minHeight: 160 },
   categoryTrack: { height: 6, borderRadius: 4, overflow: "hidden" },
   prioritySection: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 18, paddingTop: 16 },
+  standalonePriority: { borderTopWidth: 0, marginTop: 0, paddingTop: 0 },
 });

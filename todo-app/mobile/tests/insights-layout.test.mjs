@@ -146,6 +146,64 @@ test("board filters apply to every diagram and exported data, including comparis
   assert.equal(app.exported[0][0].category, "work");
 });
 
+test("status filters hide irrelevant charts and restore them when cleared on mobile and desktop", () => {
+  for (const width of [390, 1200]) {
+    const app = setup(width);
+    const defaults = app.load("@/lib/features/insights-filters").DEFAULT_FILTERS;
+    const completed = app.props.tasks[0];
+    app.props.tasks.push({ ...completed, id: "canceled", completed: false, completedAt: null, canceled: true });
+    app.props.tasks.push({ ...completed, id: "overdue", completed: false, completedAt: null, dueAt: "2026-10-20T10:00:00Z" });
+    for (const status of ["canceled", "overdue", "completed", "all"]) {
+      app.props.filters = { ...defaults, status };
+      const tree = app.render();
+      for (const id of ["insights-completed-card", "insights-performance", "insights-weekly"]) {
+        assert.equal(Boolean(field(tree, id)), status === "all" || status === "completed", `${id} for ${status}`);
+      }
+      for (const id of ["insights-health-rings", "insights-balance"]) {
+        assert.equal(Boolean(field(tree, id)), status === "all", `${id} for ${status}`);
+      }
+      assert.ok(field(tree, "insights-distribution"));
+      nodes(tree).find((node) => node.props?.accessibilityLabel === "Export filtered tasks as CSV").props.onPress();
+      assert.equal(app.exported.at(-1).length, status === "all" ? 3 : 1);
+    }
+  }
+});
+
+test("fixed category and priority filters hide only their own breakdowns", () => {
+  for (const width of [390, 1200]) {
+    const app = setup(width);
+    const defaults = app.load("@/lib/features/insights-filters").DEFAULT_FILTERS;
+    for (const boardId of ["all", "work"]) for (const priority of ["all", "high"]) {
+      app.props.filters = { ...defaults, boardId, priority };
+      const tree = app.render();
+      assert.equal(Boolean(field(tree, "insights-category-bars")), boardId === "all");
+      assert.equal(Boolean(field(tree, "insights-priority-donut")), priority === "all");
+      assert.equal(Boolean(field(tree, "insights-distribution")), boardId === "all" || priority === "all");
+      assert.ok(field(tree, "insights-performance"));
+    }
+  }
+});
+
+test("ring charts rotate with SVG transforms, not deprecated origin DOM attributes", () => {
+  const app = setup(1200);
+  const { ProgressRing, RadialDiagram, DonutDiagram } = app.load("@/components/insights/insights-charts");
+  const slices = [{ label: "High", value: 1, color: app.colors.primary }];
+  for (const [tree, expected] of [
+    [ProgressRing({ value: 1, total: 2, color: app.colors.primary, label: "Completed" }), "rotate(-90 38 38)"],
+    [RadialDiagram({ slices, total: 2 }), "rotate(-90 120 120)"],
+    [DonutDiagram({ slices, total: 2 }), "rotate(-90 64 64)"],
+  ]) {
+    const arcs = nodes(tree).filter((node) => node.type === "Circle" && node.props?.strokeDasharray);
+    assert.equal(arcs.length, 1);
+    assert.equal(arcs[0].props.transform, expected);
+    for (const node of nodes(tree)) {
+      assert.equal(node.props?.origin, undefined);
+      assert.equal(node.props?.rotation, undefined);
+      assert.equal(node.props?.["transform-origin"], undefined);
+    }
+  }
+});
+
 test("geometry preserves whole-period totals and keeps smoothing within chart bounds", () => {
   const app = setup(1200);
   const { bucketChartPoints, chartCoordinates, smoothChartPath, ringFraction } = app.load("@/lib/features/insights-chart-geometry");
