@@ -611,7 +611,7 @@ function OptionTool({ icon, dot, label, onPress, selected = false, tone = "defau
 function WorkspaceEmptyState({ hasRefinements, onCreate, onClear }: { hasRefinements: boolean; onCreate: () => void; onClear: () => void }) { return hasRefinements ? <EmptyState plain title="No matching tasks" message="Try a different search or clear the current board filter." actionLabel="Clear search and filters" onAction={onClear} /> : <EmptyState icon="checkmark-done-outline" title="Your board is ready" message="Add a task to give this workspace its first next step." actionLabel="Create a task" onAction={onCreate} />; }
 
 function ListView({ tasks, boards, now, hasRefinements, selectedTaskId, compact = false, onTask, onClear, onTaskAction }: { tasks: Task[]; boards: import("@/lib/domain/boards").Board[]; now: Date; hasRefinements: boolean; selectedTaskId?: string; compact?: boolean; onTask: (task: Task) => void; onClear: () => void; onTaskAction?: (task: Task, event?: GestureResponderEvent) => void }) {
-  const { theme, setPreference } = useTheme();
+  const { theme } = useTheme();
   const groupedByDay = useMemo(() => {
     const entries = [...tasks].sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
     const groups = new Map<string, Task[]>();
