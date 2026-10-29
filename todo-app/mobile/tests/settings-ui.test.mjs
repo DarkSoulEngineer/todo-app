@@ -174,10 +174,10 @@ test("settings sections keep calendar, export and import actions functional", as
   byLabel(tree, "Open calendar in week view").props.onPress();
   byLabel(tree, "Start weeks on Sunday").props.onPress();
   assert.deepEqual(calls.slice(0, 2), [["view", "week"], ["week", 0]]);
-  section("Keyboard");
-  nodes(tree).find((node) => node.type === "KeyboardSettings").props.onHelp();
+  section("Commands");
+  byLabel(tree, "Open commands").props.onPress();
   tree = state.render(Settings);
-  assert.equal(nodes(tree).find((node) => node.type === "CommandPalette").props.mode, "help");
+  assert.equal(nodes(tree).find((node) => node.type === "CommandPalette").props.mode, "commands");
   section("Data & backups");
   byLabel(tree, "Save backup").props.onPress();
   tree = state.render(Settings);

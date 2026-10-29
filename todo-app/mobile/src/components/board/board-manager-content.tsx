@@ -80,7 +80,7 @@ export function BoardManagerContent(props: Props) {
       searchActive={showSearch}
       showThemeToggle={false}
       actions={<>
-        {props.onCommands ? <MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={props.onCommands} /> : null}
+        {props.onCommands ? <MobileTopBarAction icon="reader-outline" label="Commands" onPress={props.onCommands} /> : null}
         <MobileTopBarAction icon="download-outline" label="Import board" onPress={props.onImport} />
         <MobileTopBarAction icon="add" label="New board" onPress={props.onCreate} style={[styles.newBoardButton, { backgroundColor: c.card, borderColor: c.border }]} />
       </>}

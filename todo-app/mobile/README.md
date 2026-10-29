@@ -97,8 +97,8 @@ Interacting with a ribbon control resets its auto-hide timer.
 ## Command palette
 
 Use the file-list icon beside Search on Home or the board ribbon. Search actions,
-then choose a target for rename and move commands. The help button lists the
-shortcuts available on the current screen.
+then choose a target for rename and move commands. On web, the help button lists
+the shortcuts available in the current view.
 
 On web (including tablet browsers with a hardware keyboard):
 
@@ -135,9 +135,9 @@ Global shortcuts pause in text fields and dialogs. Native Android/iOS supports
 the same commands by touch; global hardware-keyboard shortcuts are web-only.
 Ctrl, Command, and Alt combinations are never intercepted, including while the
 palette is open, so browser shortcuts keep working.
-In **Settings → Keyboard**, quick-action single-key shortcuts (including Shift
-combinations) can be disabled; **/** commands, commands by touch, and **?** help stay available. This setting is
-device-local and is not included in preference backup files.
+Keybind configuration is hidden on mobile because phones have no hardware
+keyboard. The **Commands** entry in Settings opens the same tap-friendly command
+palette, and all actions remain available by touch.
 
 ## Lists and cancellation
 

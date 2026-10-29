@@ -297,6 +297,25 @@ test("Hidden tab keeps its dot while collapsed and restores lists from the ribbo
   assert.ok(!JSON.stringify(tree).includes("HIDDEN LISTS"));
 });
 
+test("each ribbon tab mounts its own lane so horizontal scroll restarts at the first item", () => {
+  const app = setup();
+  const lane = (tree) => nodes(tree).find((node) => node.props?.testID === "ribbon-tab-body");
+  let tree = app.render();
+  assert.equal(lane(tree).key, "home");
+  button(tree, "Actions tools").props.onPress();
+  tree = app.render();
+  assert.equal(lane(tree).key, "actions");
+  assert.equal(JSON.stringify(lane(tree)).includes("Action tools"), true);
+  button(tree, "Filters tools").props.onPress();
+  tree = app.render();
+  assert.equal(lane(tree).key, "filters");
+  assert.equal(JSON.stringify(lane(tree)).includes("Filter tools"), true);
+  button(tree, "Select tasks").props.onPress();
+  tree = app.render();
+  assert.equal(lane(tree).key, "select");
+  assert.equal(hasSelection(lane(tree)), true);
+});
+
 test("Hidden tab exists only for hidden lists and sits after Select", () => {
   const app = setup();
   const tabs = (tree) => nodes(tree).filter((node) => node.props?.accessibilityRole === "tab").map((node) => node.props.accessibilityLabel);

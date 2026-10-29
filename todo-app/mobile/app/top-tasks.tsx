@@ -78,7 +78,7 @@ export default function TopTasksRoute() {
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
     <BlurTargetView ref={blurTarget} style={styles.root}>
     <ThemeAtmosphere />
-    <ScreenHeader title="Priorities" showThemeToggle={false} actions={<MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={() => setPaletteMode("commands")} />} />
+    <ScreenHeader title="Priorities" showThemeToggle={false} actions={<MobileTopBarAction icon="reader-outline" label="Commands" onPress={() => setPaletteMode("commands")} />} />
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
       <View style={[styles.limitSwitch, { backgroundColor: colors.surfaceLow, borderColor: colors.outlineVariant }]}>
         {([3, 10] as const).map((value) => <Pressable key={value} accessibilityRole="tab" accessibilityLabel={`Show top ${value} tasks`} accessibilityState={{ selected: limit === value }} onPress={() => setLimit(value)} style={[styles.limitOption, limit === value && { backgroundColor: colors.card }]}>

@@ -474,7 +474,7 @@ export default function WorkspaceScreen() {
   };
   // Reuse the same actions as the ribbon. Target pickers remain searchable and
   // destructive commands require a second, explicit selection before running.
-  const confirmCommand = (id: string, label: string, run: () => void): Command => ({ id, label, children: [{ id: `${id}-confirm`, label: `Confirm: ${label}`, detail: "Press Esc to cancel", run }] });
+  const confirmCommand = (id: string, label: string, run: () => void): Command => ({ id, label, children: [{ id: `${id}-confirm`, label: `Confirm: ${label}`, detail: "Choose Confirm to run it", run }] });
   const ribbonContext = getRibbonContext(mode);
   const ribbonCommands: Command[] = [
     { id: "home-tools", label: "Show Home ribbon tools", shortcut: "Shift U", run: () => ribbonControls.current?.openTab("home") },

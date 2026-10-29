@@ -18,6 +18,9 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
   const { theme: { colors: c } } = useTheme();
   const { singleKeyShortcuts } = usePreferences();
   const focused = useIsFocused();
+  // Phones and tablets have no hardware keyboard, so shortcuts are web-only.
+  const keyboardShortcuts = Platform.OS === "web";
+  const help = mode === "help" && keyboardShortcuts;
   const [path, setPath] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
@@ -42,7 +45,7 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
     } else { close(); command.run?.(); }
   };
   const back = () => {
-    if (mode === "help") { onMode("commands"); return; }
+    if (help) { onMode("commands"); return; }
     if (!path.length) { close(); return; }
     setPath((current) => current.slice(0, -1)); setQuery(""); setIndex(0);
   };
@@ -89,13 +92,13 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
   });
 
   if (!mode || !focused) return null;
-  return <EditorWindow visible title={mode === "help" ? "Keyboard shortcuts" : title} icon="reader-outline" closeLabel="Close command palette" testID="command-palette" width={640} height={540} onClose={close}>
+  return <EditorWindow visible title={help ? "Keyboard shortcuts" : title} icon="reader-outline" closeLabel="Close command palette" testID="command-palette" width={640} height={540} onClose={close}>
     <View style={[styles.toolbar, { borderColor: c.border }]}>
-      {path.length || mode === "help" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to commands" onPress={back} style={styles.icon}><Ionicons name="arrow-back" size={20} color={c.foreground} /></Pressable> : null}
-      {mode === "commands" ? <TextInput ref={input} autoFocus value={query} onChangeText={(value) => { setQuery(value); setIndex(0); }} onSubmitEditing={() => { if (Platform.OS !== "web" && results[activeIndex]) choose(results[activeIndex]); }} accessibilityLabel={`Search ${title.toLowerCase()}`} placeholder={path.length ? "Find a target…" : "Type a command…"} placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }]} /> : <Text style={{ flex: 1, color: c.mutedForeground }}>Quick reference</Text>}
-      <Pressable accessibilityRole="button" accessibilityLabel={mode === "help" ? "Show commands" : "Keyboard shortcut help"} onPress={() => onMode(mode === "help" ? "commands" : "help")} style={styles.icon}><Ionicons name={mode === "help" ? "reader-outline" : "help-circle-outline"} size={22} color={c.primary} /></Pressable>
+      {path.length || help ? <Pressable accessibilityRole="button" accessibilityLabel="Back to commands" onPress={back} style={styles.icon}><Ionicons name="arrow-back" size={20} color={c.foreground} /></Pressable> : null}
+      {!help ? <TextInput ref={input} autoFocus value={query} onChangeText={(value) => { setQuery(value); setIndex(0); }} onSubmitEditing={() => { if (Platform.OS !== "web" && results[activeIndex]) choose(results[activeIndex]); }} accessibilityLabel={`Search ${title.toLowerCase()}`} placeholder={path.length ? "Find a target…" : "Type a command…"} placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }]} /> : <Text style={{ flex: 1, color: c.mutedForeground }}>Quick reference</Text>}
+      {keyboardShortcuts ? <Pressable accessibilityRole="button" accessibilityLabel={help ? "Show commands" : "Keyboard shortcut help"} onPress={() => onMode(help ? "commands" : "help")} style={styles.icon}><Ionicons name={help ? "reader-outline" : "help-circle-outline"} size={22} color={c.primary} /></Pressable> : null}
     </View>
-    {mode === "help" ? <ScrollView contentContainerStyle={styles.content}>
+    {help ? <ScrollView contentContainerStyle={styles.content}>
       <Text style={[styles.hint, { color: c.mutedForeground }]}>Shortcuts work on web, including tablet browsers with a keyboard. They pause while typing or using dialogs. On native tablets, tap commands instead.</Text>
       {!singleKeyShortcuts ? <Text style={[styles.hint, { color: c.primary }]}>Quick-action shortcuts are disabled in Settings → Keyboard. / commands and ? help remain available.</Text> : null}
       {[...PALETTE_HELP, ...commands.filter((command) => command.shortcut).map((command) => [command.shortcut!, command.label])].map(([keys, label]) => <View key={keys} style={[styles.helpRow, { borderColor: c.border }]}><Text style={{ flex: 1, color: c.foreground }}>{label}</Text><Text style={[styles.keys, { color: c.primary, backgroundColor: c.secondary }]}>{keys}</Text></View>)}
@@ -105,11 +108,11 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
       {results.map((command, position) => <Pressable key={command.id} onLayout={(event) => { rowLayouts.current[command.id] = event.nativeEvent.layout.y; }} accessibilityRole="button" accessibilityLabel={`${command.label}${command.detail ? `, ${command.detail}` : ""}`} accessibilityState={{ selected: position === activeIndex }} onPress={() => choose(command)} style={({ pressed }) => [styles.result, { backgroundColor: pressed || position === activeIndex ? c.primarySoft : "transparent" }]}>
         <Ionicons name={command.selected ? "checkmark-circle" : command.children ? "folder-open-outline" : "chevron-forward"} size={18} color={c.primary} />
         <View style={{ flex: 1 }}><Text style={{ color: c.foreground, fontSize: 14, fontWeight: "600" }}>{command.label}</Text>{command.detail ? <Text style={{ color: c.mutedForeground, fontSize: 12, marginTop: 3 }}>{command.detail}</Text> : null}</View>
-        {command.shortcut ? <Text style={[styles.keys, { color: c.mutedForeground, backgroundColor: c.secondary }]}>{command.shortcut}</Text> : null}
+        {keyboardShortcuts && command.shortcut ? <Text style={[styles.keys, { color: c.mutedForeground, backgroundColor: c.secondary }]}>{command.shortcut}</Text> : null}
       </Pressable>)}
       {!results.length ? <Text style={[styles.hint, { color: c.mutedForeground }]}>{entries.length ? "No matches. Try another search." : "No available targets for this command."}</Text> : null}
     </ScrollView>}
-    <View style={[styles.footer, { borderColor: c.border }]}><Text style={{ color: c.mutedForeground, fontSize: 11 }}>↑ ↓ select · Enter run · Esc back</Text></View>
+    <View style={[styles.footer, { borderColor: c.border }]}><Text style={{ color: c.mutedForeground, fontSize: 11 }}>{keyboardShortcuts ? "↑ ↓ select · Enter run · Esc back" : "Tap a command to run it"}</Text></View>
   </EditorWindow>;
 }
 

@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { JanusLogo } from "@/components/ui/janus-logo";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
-import { KeyboardSettings } from "@/components/settings/keyboard-settings";
 import { CommandPalette, type PaletteMode } from "@/components/ui/command-palette";
 import { MobileTopBarAction } from "@/components/ui/mobile-top-bar";
 import { createNavigationCommands } from "@/lib/features/navigation-commands";
@@ -39,7 +38,7 @@ const BACKUP_OPTIONS: { value: BackupScope; label: string; description: string }
   { value: "all", label: "Everything", description: "Preferences and all boards in one JSON file" },
 ];
 
-const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Keyboard", "Data & backups", "About"] as const;
+const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Commands", "Data & backups", "About"] as const;
 
 export default function SettingsRoute() {
   const api = useTasksContext();
@@ -132,7 +131,7 @@ export default function SettingsRoute() {
   return (
     <View style={styles.root}>
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
-      <ScreenHeader title="Settings" showThemeToggle={false} onBack={!hasProjects ? () => router.back() : undefined} actions={<MobileTopBarAction icon="reader-outline" label="Commands and keyboard shortcuts" onPress={() => setPaletteMode("commands")} />} />
+      <ScreenHeader title="Settings" showThemeToggle={false} onBack={!hasProjects ? () => router.back() : undefined} actions={<MobileTopBarAction icon="reader-outline" label="Commands" onPress={() => setPaletteMode("commands")} />} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
         <ScrollView horizontal accessibilityRole="tablist" accessibilityLabel="Settings sections" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionTabs}>
           {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
@@ -147,9 +146,14 @@ export default function SettingsRoute() {
           </View>
         </View> : null}
 
-        {section === "Keyboard" ? <View style={styles.sectionBlock}>
-          <SectionHeading title="Keyboard & commands" subtitle="Navigate without leaving the keyboard. Changes save automatically on this device." />
-          <View style={styles.sectionCard}><KeyboardSettings onHelp={() => setPaletteMode("help")} /></View>
+        {section === "Commands" ? <View style={styles.sectionBlock}>
+          <SectionHeading title="Commands" subtitle="Search and run any action without leaving this screen." />
+          <View style={styles.sectionCard}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open commands" onPress={() => setPaletteMode("commands")} style={({ pressed }) => [styles.actionRow, styles.firstRow, { opacity: pressed ? 0.7 : 1 }]}>
+              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Open commands</Text><Text style={[type.caption, { color: colors.muted }]}>Find boards, tasks, views, themes and settings</Text></View>
+              <Text style={[type.caption, { color: colors.primary }]}>Open</Text>
+            </Pressable>
+          </View>
         </View> : null}
 
         {section === "Calendar" ? <View style={styles.sectionBlock}>

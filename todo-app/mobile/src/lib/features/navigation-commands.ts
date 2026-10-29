@@ -49,7 +49,7 @@ export function createNavigationCommands({ projects, currentProjectId, openBoard
       { id: "change-theme-light", label: "Light", children: lightThemes.map((entry) => ({ id: entry.id, label: entry.name ?? entry.id, run: () => applyTheme(entry.id) })) },
       { id: "change-theme-dark", label: "Dark", children: darkThemes.map((entry) => ({ id: entry.id, label: entry.name ?? entry.id, run: () => applyTheme(entry.id) })) },
     ] },
-    { id: "switch-board", label: "Change board", shortcut: "Shift B", detail: "Search open boards, then select with ↑/↓ and Enter", children: open.map((project) => ({
+    { id: "switch-board", label: "Change board", shortcut: "Shift B", detail: "Search open boards, then choose one", children: open.map((project) => ({
       id: project.id, label: project.name, selected: project.id === currentProjectId,
       detail: `${project.id === currentProjectId ? "Current board · " : ""}${project.workspace.tasks.length} cards · ${project.workspace.sections.length} lists`,
       run: () => openBoard(project.id),
