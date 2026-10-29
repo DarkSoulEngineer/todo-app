@@ -454,14 +454,28 @@ function TaskEditorForm({
 export function OptionSheet({ visible, title, options, onClose, anchor }: { visible: boolean; title: string; options: MenuOption[]; onClose: () => void; anchor?: MenuAnchor | null }) {
   const { theme } = useTheme();
   const anchoredMenus = useAnchoredMenus();
-  if (anchoredMenus && anchor) return <AnchoredMenu visible={visible} title={title} options={options} onClose={onClose} anchor={anchor} />;
-  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{options.map((option) => <Pressable key={option.label} accessibilityRole="button" onPress={() => { option.onPress(); onClose(); }} style={({ pressed, hovered }) => [styles.option, { borderBottomColor: theme.colors.border, backgroundColor: (pressed || hovered) ? theme.colors.secondary : "transparent", opacity: pressed ? 0.85 : 1 }]}><Ionicons name={option.icon ?? "chevron-forward-outline"} size={20} color={option.destructive ? theme.colors.destructive : theme.colors.primary} /><Text style={{ color: option.destructive ? theme.colors.destructive : theme.colors.foreground, fontSize: 15, fontWeight: "600" }}>{option.label}</Text></Pressable>)}</Sheet>;
+  // Keep the last visible title/options/anchor through the close animation so
+  // callers can clear their selected item without the menu flashing fallbacks.
+  const lastVisible = useRef({ title, options, anchor });
+  // eslint-disable-next-line react-hooks/refs
+  if (visible) lastVisible.current = { title, options, anchor };
+  // eslint-disable-next-line react-hooks/refs
+  const shown = visible ? { title, options, anchor } : lastVisible.current;
+  if (anchoredMenus && shown.anchor) return <AnchoredMenu visible={visible} title={shown.title} options={shown.options} onClose={onClose} anchor={shown.anchor} />;
+  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{shown.title}</Text>{shown.options.map((option) => <Pressable key={option.label} accessibilityRole="button" onPress={() => { option.onPress(); onClose(); }} style={({ pressed, hovered }) => [styles.option, { borderBottomColor: theme.colors.border, backgroundColor: (pressed || hovered) ? theme.colors.secondary : "transparent", opacity: pressed ? 0.85 : 1 }]}><Ionicons name={option.icon ?? "chevron-forward-outline"} size={20} color={option.destructive ? theme.colors.destructive : theme.colors.primary} /><Text style={{ color: option.destructive ? theme.colors.destructive : theme.colors.foreground, fontSize: 15, fontWeight: "600" }}>{option.label}</Text></Pressable>)}</Sheet>;
 }
 
 export function TextEntrySheet({ visible, title, description, placeholder, initialValue = "", actionLabel = "Save", onClose, onSubmit }: { visible: boolean; title: string; description?: string; placeholder?: string; initialValue?: string; actionLabel?: string; onClose: () => void; onSubmit: (value: string) => void }) {
   const session = useOpenSession(visible);
-  const entryKey = `${session}:${initialValue}`;
-  return <TextEntrySheetForm key={entryKey} visible={visible} title={title} description={description} placeholder={placeholder} initialValue={initialValue} actionLabel={actionLabel} onClose={onClose} onSubmit={onSubmit} />;
+  // Callers often clear the selected item (and its initial value) on close.
+  // Retaining it keeps the filled-in form mounted while the sheet exits.
+  const lastVisible = useRef({ title, description, placeholder, initialValue, actionLabel });
+  // eslint-disable-next-line react-hooks/refs
+  if (visible) lastVisible.current = { title, description, placeholder, initialValue, actionLabel };
+  // eslint-disable-next-line react-hooks/refs
+  const shown = visible ? { title, description, placeholder, initialValue, actionLabel } : lastVisible.current;
+  const entryKey = `${session}:${shown.initialValue}`;
+  return <TextEntrySheetForm key={entryKey} visible={visible} title={shown.title} description={shown.description} placeholder={shown.placeholder} initialValue={shown.initialValue} actionLabel={shown.actionLabel} onClose={onClose} onSubmit={onSubmit} />;
 }
 
 function TextEntrySheetForm({ visible, title, description, placeholder, initialValue = "", actionLabel = "Save", onClose, onSubmit }: { visible: boolean; title: string; description?: string; placeholder?: string; initialValue?: string; actionLabel?: string; onClose: () => void; onSubmit: (value: string) => void }) {

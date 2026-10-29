@@ -42,6 +42,13 @@ export function BottomSheetModal({
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(Math.max(windowHeight, 480)));
   const [dragY] = useState(() => new Animated.Value(0));
+  // Keep the last visible content mounted through the exit animation so the
+  // sheet does not flash placeholder/empty content while it slides away.
+  const lastChildren = useRef(children);
+  // eslint-disable-next-line react-hooks/refs
+  if (visible) lastChildren.current = children;
+  // eslint-disable-next-line react-hooks/refs
+  const sheetContent = visible ? children : lastChildren.current;
   const sheetHeightRef = useRef(windowHeight);
   const closingRef = useRef(false);
   const heightRef = useRef(Math.max(windowHeight, 480));
@@ -181,7 +188,7 @@ export function BottomSheetModal({
                 <View pointerEvents="none" style={[styles.handle, { backgroundColor: theme.colors.borderStrong }]} />
               </Pressable>
             </View>
-            {children}
+            {sheetContent}
           </Animated.View>
         </KeyboardAvoidingView>
       </View>

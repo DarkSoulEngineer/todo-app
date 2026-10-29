@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
@@ -22,6 +22,12 @@ export function EditorWindow({ visible, title, subtitle, onClose, children, widt
   const insets = useSafeAreaInsets();
   const [maximized, setMaximized] = useState(false);
   const [hovered, setHovered] = useState<"maximize" | "close" | null>(null);
+  // Keep the last visible window content while the modal fades out.
+  const lastVisible = useRef({ title, subtitle, children });
+  // eslint-disable-next-line react-hooks/refs
+  if (visible) lastVisible.current = { title, subtitle, children };
+  // eslint-disable-next-line react-hooks/refs
+  const shown = visible ? { title, subtitle, children } : lastVisible.current;
   const availableWidth = Math.max(0, width - insets.left - insets.right - 32);
   const availableHeight = Math.max(0, height - insets.top - insets.bottom - 32);
 
@@ -31,7 +37,7 @@ export function EditorWindow({ visible, title, subtitle, onClose, children, widt
       <View testID={testID} accessibilityViewIsModal style={[styles.window, { width: maximized ? availableWidth : Math.min(preferredWidth, availableWidth), height: maximized ? availableHeight : Math.min(preferredHeight, availableHeight), backgroundColor: c.card, borderColor: c.borderStrong, shadowColor: c.shadow }]}>
         <View testID={`${testID}-titlebar`} style={[styles.titlebar, { backgroundColor: c.backgroundAlt, borderBottomColor: c.border }]}>
           <Ionicons name={icon} size={18} color={c.primary} />
-          <Text accessibilityRole="header" numberOfLines={1} style={[styles.title, { color: c.foreground }]}>{title}</Text>
+          <Text accessibilityRole="header" numberOfLines={1} style={[styles.title, { color: c.foreground }]}>{shown.title}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={maximized ? "Restore editor window" : "Maximize editor window"} onPress={() => setMaximized((value) => !value)} onHoverIn={() => setHovered("maximize")} onHoverOut={() => setHovered(null)} style={({ pressed }) => [styles.captionButton, { backgroundColor: hovered === "maximize" || pressed ? c.secondary : "transparent" }]}>
             <Ionicons name={maximized ? "copy-outline" : "square-outline"} size={15} color={c.foreground} />
           </Pressable>
@@ -39,10 +45,10 @@ export function EditorWindow({ visible, title, subtitle, onClose, children, widt
             {({ pressed }) => <Ionicons name="close" size={20} color={hovered === "close" || pressed ? c.destructiveForeground : c.foreground} />}
           </Pressable>
         </View>
-        {subtitle ? <View style={[styles.toolbar, { borderBottomColor: c.border, backgroundColor: c.backgroundAlt }]}>
-          <Text style={[styles.subtitle, { color: c.mutedForeground }]}>{subtitle}</Text>
+        {shown.subtitle ? <View style={[styles.toolbar, { borderBottomColor: c.border, backgroundColor: c.backgroundAlt }]}>
+          <Text style={[styles.subtitle, { color: c.mutedForeground }]}>{shown.subtitle}</Text>
         </View> : null}
-        {children}
+        {shown.children}
       </View>
     </KeyboardAvoidingView>
   </Modal>;
