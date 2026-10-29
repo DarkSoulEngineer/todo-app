@@ -324,7 +324,32 @@ function TaskEditorForm({
       </Button>
     </View> : <Button label="Add task" onPress={save} style={windowed ? styles.taskEditorWindowPrimary : undefined} />}
   </View>;
-  const priorityControl = <View style={styles.wrapRow}>{PRIORITY_ORDER.map((item) => <Chip key={item} label={PRIORITY_META[item].label} active={priority === item} color={PRIORITY_META[item].dot} onPress={() => setPriority(item)} />)}</View>;
+  const priorityControl = (
+    <View style={styles.wrapRow}>
+      {PRIORITY_ORDER.map((item) => (
+        <Pressable
+          key={item}
+          accessibilityRole="button"
+          accessibilityState={{ selected: priority === item }}
+          onPress={() => setPriority(item)}
+          style={({ pressed }) => [
+            styles.chip,
+            {
+              backgroundColor: priority === item ? theme.colors.primarySoft : theme.colors.secondary,
+              borderColor: priority === item ? theme.colors.primary : theme.colors.border,
+              opacity: pressed ? 0.75 : 1,
+              gap: 6,
+            },
+          ]}
+        >
+          <PriorityStars priority={item} size={13} zoom={1} />
+          <Text style={{ color: priority === item ? theme.colors.accentForeground : theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>
+            {PRIORITY_META[item].label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
   const tagChips = boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
   const listChips = sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />);
   const tagsControl = wideForm ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
