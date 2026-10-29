@@ -140,7 +140,18 @@ test("desktop Calendar keeps day details inline while mobile keeps the day sheet
   assert.equal(find(splitTree, (node) => node.type === "Sheet" && node.props.visible === true).length, 0);
   assert.ok(find(mobileTree, (node) => node.type === "Sheet" && node.props.visible === true).length > 0);
   assert.equal(editor(splitTree), undefined, "an empty date must not show an unrelated board task");
-  assert.equal(find(splitTree, (node) => node.type === "EmptyState" && node.props.title === "A clear day").length, 1);
+  assert.equal(find(splitTree, (node) => node.type === "EmptyState" && node.props.title === "A clear day").length, 0, "the right pane must not duplicate the empty-day message below the calendar");
+  const watermark = find(splitTree, (node) => node.props?.testID === "calendar-empty-day-watermark")[0];
+  assert.ok(watermark);
+  assert.equal(watermark.props.pointerEvents, "none");
+  assert.equal(watermark.props.importantForAccessibility, "no-hide-descendants");
+  assert.equal(watermark.props.style.backgroundColor, undefined, "the icon must blend into the pane, not sit on another surface");
+  assert.equal(watermark.props.children.props.style.opacity, 0.08);
+  assert.equal(watermark.props.children.props.style.shadowOpacity, undefined, "the container must not cast a square shadow");
+  assert.equal(watermark.props.children.props.children.props.shadow, true);
+  assert.equal(watermark.props.children.props.children.type, "JanusLogo");
+  assert.equal(watermark.props.children.props.children.props.size, 400, "the logo spans two-thirds of the 600-point right pane");
+  assert.equal(find(mobileTree, (node) => node.props?.testID === "calendar-empty-day-watermark").length, 0);
 });
 
 test("web and tablet date selection opens the first active task only from that day", () => {

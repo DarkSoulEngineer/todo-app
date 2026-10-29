@@ -12,6 +12,7 @@ import { InsightsPanel, OptionSheet, TaskCard, TaskEditor, TextEntrySheet } from
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { JanusLogo } from "@/components/ui/janus-logo";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
@@ -455,7 +456,9 @@ export default function WorkspaceScreen() {
            {mode === "list" ? <ListView compact={splitView} tasks={visibleTasks} boards={boards} now={now} hasRefinements={hasRefinements} selectedTaskId={splitView && showEditor ? editorTask?.id : undefined} onTask={openEditor} onTaskAction={(task, event)=>{if(event){setSmallMenuAnchor(anchorFromEvent(event));setTaskAction(task);}else{setTaskAction(task);}}} onClear={() => { setQuery(""); setBoardFilter("all"); }} /> : mode === "calendar" ? <CalendarView month={calendarMonth} setMonth={setCalendarMonth} selectedDay={calendarDay} setSelectedDay={selectCalendarDay} tasks={visibleTasks} boards={boards} split={splitView} onAddTask={addNewTask} onTask={openEditor} onTaskAction={(task, event) => { if (event) setSmallMenuAnchor(anchorFromEvent(event)); setCalendarActionTask(task); }} now={now} /> : <InsightsPanel tasks={tasks} boards={boards} now={now} />}
         </ScrollView>}
         <View key={currentProjectId} testID="workspace-editor-pane" style={splitView ? { flex: 1, minWidth: 0, minHeight: 0, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.border, backgroundColor: theme.colors.card } : undefined}>
-          {splitView && calendarDaySelected && !editorTask && !creatingEditorTask ? <EmptyState icon="sunny-outline" title="A clear day" message="Select another day or add a task for this day." /> : taskEditor}
+          {splitView && calendarDaySelected && !editorTask && !creatingEditorTask ? <View testID="calendar-empty-day-watermark" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: mobileBottomNavClearance + insets.bottom }}>
+            <View style={{ opacity: 0.08 }}><JanusLogo size={Math.max(0, (width - insets.left - insets.right) / 3)} color={theme.colors.foreground} surfaceColor={theme.colors.card} shadow /></View>
+          </View> : taskEditor}
         </View>
         </View>
       </View>
