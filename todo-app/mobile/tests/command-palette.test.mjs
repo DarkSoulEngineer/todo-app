@@ -17,12 +17,13 @@ const logic = await load("../src/lib/features/commands.ts");
 const navigation = await load("../src/lib/features/navigation-commands.ts");
 
 test("shortcuts use exact modifiers and leave editing, IME, repeats and browser shortcuts alone", () => {
-  for (const key of ["n", "b", "l", "r", "?", "k"]) assert.equal(logic.commandShortcut({ key, ctrlKey: key === "k" }, true), null);
+  for (const key of ["n", "b", "l", "r", "?", "/"]) assert.equal(logic.commandShortcut({ key }, true), null);
   for (const flag of ["isComposing", "repeat", "defaultPrevented"]) assert.equal(logic.commandShortcut({ key: "n", [flag]: true }, false), null);
-  assert.equal(logic.commandShortcut({ key: "k", metaKey: true }, false), "palette");
-  assert.equal(logic.commandShortcut({ key: "P", ctrlKey: true, shiftKey: true }, false), "palette");
+  assert.equal(logic.commandShortcut({ key: "/" }, false), "palette");
+  assert.equal(logic.commandShortcut({ key: "?", shiftKey: true }, false), "help");
+  assert.equal(logic.commandShortcut({ key: "/", shiftKey: true }, false), "help");
   assert.equal(logic.commandShortcut({ key: "r", shiftKey: true }, false), "rename-board");
-  assert.equal(logic.commandShortcut({ key: "ArrowLeft", altKey: true }, false), "card-left");
+  assert.equal(logic.commandShortcut({ key: "ArrowLeft", shiftKey: true }, false), "card-left");
   for (const event of [{ key: "r", ctrlKey: true }, { key: "n", metaKey: true }, { key: "n", shiftKey: true }, { key: "k", ctrlKey: true, altKey: true }]) assert.equal(logic.commandShortcut(event, false), null);
 });
 
@@ -33,14 +34,19 @@ test("command search matches all words across labels and context without executi
   assert.equal(logic.filterCommands(commands, " ").length, 2);
 });
 
-test("navigation bindings and disabled single keys keep modified shortcuts available", () => {
+test("navigation bindings use Shift and disabled quick actions keep commands/help available", () => {
   for (const [event, id] of [
-    [{ key: "B", ctrlKey: true, shiftKey: true }, "switch-board"],
-    [{ key: ",", metaKey: true }, "settings"],
-    [{ key: "1", altKey: true }, "all-boards"],
-    [{ key: "2", altKey: true }, "top-tasks"],
-    [{ key: "3", altKey: true }, "settings"],
-  ]) assert.equal(logic.commandShortcut(event, false, false), id);
+    [{ key: "B", shiftKey: true }, "switch-board"],
+    [{ key: "H", shiftKey: true }, "all-boards"],
+    [{ key: "T", shiftKey: true }, "top-tasks"],
+    [{ key: "S", shiftKey: true }, "settings"],
+    ...["Left", "Right", "Up", "Down"].map((direction) => [{ key: `Arrow${direction}`, shiftKey: true }, `card-${direction.toLowerCase()}`]),
+  ]) {
+    assert.equal(logic.commandShortcut(event, false), id);
+    assert.equal(logic.commandShortcut(event, false, false), null);
+  }
+  assert.equal(logic.commandShortcut({ key: "/" }, false, false), "palette");
+  assert.equal(logic.commandShortcut({ key: "?", shiftKey: true }, false, false), "help");
   for (const [key, id] of [["1", "view-board"], ["2", "view-list"], ["3", "view-calendar"], ["4", "view-insights"], ["[", "previous-board"], ["]", "next-board"]]) {
     assert.equal(logic.commandShortcut({ key }, false), id);
     assert.equal(logic.commandShortcut({ key }, false, false), null);
@@ -49,6 +55,18 @@ test("navigation bindings and disabled single keys keep modified shortcuts avail
   assert.equal(logic.commandShortcut({ key: "ArrowOops", altKey: true }, false), null);
   assert.equal(logic.commandShortcut({ key: "B", shiftKey: true }, false), "switch-board");
   assert.equal(logic.commandShortcut({ key: "B", shiftKey: true }, false, false), null);
+});
+
+test("filter, display, ribbon and bulk shortcuts are browser-safe and obey quick-action preference", () => {
+  const plain = { q: "search-tasks", f: "filter-tags", o: "sort-tasks", v: "select-mode", a: "select-all", u: "unselect-all", m: "move-selected", p: "priority-selected", d: "complete-selected", c: "cancel-selected", k: "compact", g: "focus-column", w: "move-arrows", "=": "zoom-in", "-": "zoom-out", "0": "zoom-reset" };
+  const shifted = { f: "clear-filters", l: "add-tag", x: "remove-tag", v: "hidden-tools", o: "actions-tools", u: "home-tools", p: "pin-ribbon", c: "restore-selected", d: "dragging" };
+  for (const [bindings, shiftKey] of [[plain, false], [shifted, true]]) for (const [key, id] of Object.entries(bindings)) {
+    const event = { key, shiftKey };
+    assert.equal(logic.commandShortcut(event, false), id);
+    assert.equal(logic.commandShortcut(event, true), null);
+    assert.equal(logic.commandShortcut(event, false, false), null);
+    for (const modifier of ["ctrlKey", "metaKey", "altKey"]) assert.equal(logic.commandShortcut({ ...event, [modifier]: true }, false), null);
+  }
 });
 
 test("board selection shows current board, excludes closed boards, and cycles open boards", () => {
@@ -69,7 +87,7 @@ test("board selection shows current board, excludes closed boards, and cycles op
   assert.equal(empty.find((command) => command.id === "switch-board").children.length, 0);
 });
 
-async function palette() {
+async function palette(singleKeyShortcuts = true) {
   const slots = [], refs = [], listeners = new Set();
   let cursor = 0, refCursor = 0, focused = true;
   let props = { mode: null, commands: [], blocked: false, onMode(mode) { props.mode = mode; } };
@@ -86,7 +104,7 @@ async function palette() {
     "react-native": { Platform: { OS: "web" }, Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput", View: "View", StyleSheet: { create: (value) => value } },
     "@/components/ui/editor-window": { EditorWindow: "EditorWindow" },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
-    "@/providers/preferences-provider": { usePreferences: () => ({ singleKeyShortcuts: true }) },
+    "@/providers/preferences-provider": { usePreferences: () => ({ singleKeyShortcuts }) },
     "@/lib/features/commands": logic,
   }, { document: doc });
   let cleanup = [];
@@ -121,7 +139,7 @@ test("Escape backs out, empty target lists are safe, focus and overlay guards re
   app.key("Escape"); assert.equal(app.render().props.title, "Commands");
   app.key("Escape"); assert.equal(app.props.mode, null);
   app.props.blocked = true; app.render();
-  assert.equal(app.key("k", { ctrlKey: true }).prevented, undefined);
+  assert.equal(app.key("/").prevented, undefined);
   app.props.blocked = false; app.setFocused(false); app.render();
   assert.equal(app.listeners.size, 0);
 });
@@ -130,7 +148,7 @@ test("change-board shortcut opens searchable selection and Enter selects a filte
   const app = await palette();
   const selected = [];
   app.props.commands = navigation.createNavigationCommands({ projects: ["Work", "Personal"].map((name) => ({ id: name, name, workspace: { tasks: [], sections: [] } })), currentProjectId: "Work", openBoard: (id) => selected.push(id), navigate() {} });
-  app.render(); app.key("B", { ctrlKey: true, shiftKey: true });
+  app.render(); app.key("B", { shiftKey: true });
   let tree = app.render();
   assert.equal(tree.props.title, "Change board");
   const children = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(children) : [node, ...children(node.props?.children)];
@@ -140,4 +158,37 @@ test("change-board shortcut opens searchable selection and Enter selects a filte
   app.key("Enter", { target: app.refs[0].current });
   assert.deepEqual(selected, ["Personal"]);
   assert.equal(app.props.mode, null);
+});
+
+test("browser modifier combinations are never intercepted, even in the open palette", async () => {
+  const app = await palette();
+  const browserKeys = [
+    ["P", { ctrlKey: true, shiftKey: true }], ["P", { metaKey: true, shiftKey: true }],
+    ["k", { ctrlKey: true }], ["k", { metaKey: true }], ["j", { ctrlKey: true }],
+    ["B", { ctrlKey: true, shiftKey: true }], [",", { metaKey: true }],
+    ["ArrowLeft", { altKey: true }], ["ArrowRight", { altKey: true }],
+    ["1", { altKey: true }], ["/", { ctrlKey: true }], ["?", { altKey: true }],
+    ["ArrowDown", { ctrlKey: true }],
+  ];
+  for (const mode of [null, "commands", "help"]) {
+    app.props.mode = mode; app.render();
+    for (const [key, modifiers] of browserKeys) {
+      assert.equal(logic.commandShortcut({ key, ...modifiers }, false), null);
+      assert.equal(app.key(key, modifiers).prevented, undefined, `${key} stays browser-owned in ${mode}`);
+      assert.equal(app.props.mode, mode);
+    }
+  }
+});
+
+test("slash opens commands and Shift slash opens help without stealing typed punctuation", async () => {
+  const app = await palette(false);
+  app.render();
+  assert.equal(app.key("/", { target: { closest: () => ({}) } }).prevented, undefined);
+  assert.equal(app.props.mode, null);
+  assert.equal(app.key("/").prevented, true);
+  assert.equal(app.props.mode, "commands");
+  app.render(); app.key("Escape"); app.render();
+  app.key("?", { shiftKey: true });
+  assert.equal(app.props.mode, "help");
+  assert.equal(app.render().props.title, "Keyboard shortcuts");
 });

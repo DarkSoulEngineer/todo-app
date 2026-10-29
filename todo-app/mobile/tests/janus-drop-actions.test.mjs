@@ -27,6 +27,7 @@ const { useTasks } = load("hooks/use-tasks");
 const { getTaskSectionId, isCustomSection } = load("lib/domain/sections");
 const { taskDropOrder, sectionDropOrder } = load("lib/features/janus-drag");
 const { createNavigationCommands } = load("lib/features/navigation-commands");
+const { getRibbonContext } = load("lib/features/ribbon-context");
 const source = readFileSync(new URL("../app/board/[id].tsx", import.meta.url), "utf8");
 const ast = ts.createSourceFile("board.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const screen = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "WorkspaceScreen");
@@ -51,7 +52,7 @@ function harness({ filtered = false, sort = "manual" } = {}) {
   const visibleTasks = before.tasks.filter((task) => !filtered || task.id !== "invisible");
   const renderedBoardTasks = visibleTasks.filter((task) => !before.sections.find((section) => section.id === getTaskSectionId(task, before.sections, new Date(stamp)))?.hidden);
   const selected = [];
-  const context = { api, tasks: before.tasks, visibleTasks, renderedBoardTasks, sections: before.sections, now: new Date(stamp), sort, setSort: (next) => sorts.push(next), toast: { success: (message, options) => messages.push({ message, options }) }, getTaskSectionId, isCustomSection, createNavigationCommands, projects: [], id: "board", currentProjectId: "board", boards: [], hasTasks: true, compactCards: false, focusedColumn: false, showMoveArrows: false, zoom: 1, dragEnabled: true,
+  const context = { api, tasks: before.tasks, visibleTasks, renderedBoardTasks, sections: before.sections, now: new Date(stamp), sort, setSort: (next) => sorts.push(next), toast: { success: (message, options) => messages.push({ message, options }) }, getTaskSectionId, isCustomSection, createNavigationCommands, getRibbonContext, mode: "board", width: 1200, projects: [], id: "board", currentProjectId: "board", boards: [], hasTasks: true, compactCards: false, focusedColumn: false, showMoveArrows: false, zoom: 1, dragEnabled: true,
     setNewBoardOpen() {}, addNewTask() {}, setAddSectionOpen() {}, setRenameBoardOpen() {}, setRenameCardTarget: (task) => selected.push(task), openEditor() {}, setRenameSectionTarget() {}, switchProject() {}, leaveWorkspace() {}, changeMode() {},
   };
   const commands = new Function(...Object.keys(context), `${commandCode}\nreturn commands;`)(...Object.values(context));

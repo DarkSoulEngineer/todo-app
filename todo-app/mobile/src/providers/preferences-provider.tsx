@@ -16,16 +16,19 @@ export type { CalendarDefaultView, CalendarWeekStart } from "@/lib/data/settings
 
 const PREFERENCES_KEY = "janus.preferences.v1";
 
-type StoredPreferences = AppPreferences & { boardDisplay: BoardDisplayPreferences; singleKeyShortcuts: boolean };
+type StoredPreferences = AppPreferences & { boardDisplay: BoardDisplayPreferences; singleKeyShortcuts: boolean; ribbonPinned: boolean };
 
 const DEFAULTS: StoredPreferences = {
   calendarWeekStart: 1,
   calendarDefaultView: "month",
   boardDisplay: defaultBoardDisplay,
   singleKeyShortcuts: true,
+  ribbonPinned: false,
 };
 
 interface PreferencesContextValue extends AppPreferences {
+  ribbonPinned: boolean;
+  setRibbonPinned: (pinned: boolean) => void;
   singleKeyShortcuts: boolean;
   setSingleKeyShortcuts: (enabled: boolean) => void;
   boardDisplay: BoardDisplayPreferences;
@@ -46,10 +49,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     void AsyncStorage.getItem(PREFERENCES_KEY)
       .then((raw) => {
         if (cancelled || !raw) return;
-        const parsed = JSON.parse(raw) as { calendarWeekStart?: unknown; calendarDefaultView?: unknown; boardDisplay?: unknown; singleKeyShortcuts?: unknown };
+        const parsed = JSON.parse(raw) as { calendarWeekStart?: unknown; calendarDefaultView?: unknown; boardDisplay?: unknown; singleKeyShortcuts?: unknown; ribbonPinned?: unknown };
         const next = { ...DEFAULTS };
         next.boardDisplay = normalizeBoardDisplay(parsed.boardDisplay);
         if (typeof parsed.singleKeyShortcuts === "boolean") next.singleKeyShortcuts = parsed.singleKeyShortcuts;
+        if (typeof parsed.ribbonPinned === "boolean") next.ribbonPinned = parsed.ribbonPinned;
         if (parsed.calendarWeekStart === 0 || parsed.calendarWeekStart === 1) {
           next.calendarWeekStart = parsed.calendarWeekStart;
         }
@@ -97,6 +101,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       savePreferences,
       setBoardDisplayPreferences,
       setSingleKeyShortcuts: (enabled) => update({ singleKeyShortcuts: enabled }),
+      setRibbonPinned: (pinned) => update({ ribbonPinned: pinned }),
       setCalendarWeekStart: (value) => update({ calendarWeekStart: value }),
       setCalendarDefaultView: (value) => update({ calendarDefaultView: value }),
     }),

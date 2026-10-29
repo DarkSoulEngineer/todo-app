@@ -173,12 +173,12 @@ test("board tag labels use readable foregrounds on dark cards", async () => {
     "react/jsx-runtime": createRequire(import.meta.url)("react/jsx-runtime"),
     react: { useState: (value) => [value, () => {}] },
     "@expo/vector-icons": { Ionicons: "Icon" },
-    "expo-linear-gradient": { LinearGradient: "LinearGradient" },
-    "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (value) => value } },
+    "date-fns": createRequire(import.meta.url)("date-fns"),
+    "@/lib/domain/constants": await load("../src/lib/domain/constants.ts"),
+    "react-native": { Platform: { OS: "web" }, View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (value) => value } },
     "@/providers/theme-provider": { useTheme: () => ({ theme: active }) },
     "./mobile-board-colors": { useMobileBoardColors: () => active.colors },
     "@/lib/domain/status": { describeDue: () => null },
-    "@/lib/features/card-themes": { detectCardTheme: () => null },
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#8B5CF6", ink: "#6D28D9", tint: "rgba(139,92,246,0.16)", ring: "#8B5CF6" }) },
   });
   function nodes(node) {

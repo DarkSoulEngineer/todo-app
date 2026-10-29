@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
-import { Button } from "@/components/ui/button";
 import { boardColor, type Board } from "@/lib/domain/boards";
 import { PRIORITY_META } from "@/lib/domain/constants";
 import { deriveStatus } from "@/lib/domain/status";
@@ -45,18 +44,8 @@ export function CalendarDayTasks({ day, tasks, boards, now, onTask, onTaskAction
           <Text accessibilityRole="header" style={styles.title}>{format(day, "EEEE, MMM d")}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
-        <Button
-          variant="soft"
-          size="sm"
-          accessibilityLabel={`Add task for ${format(day, "MMMM d")}`}
-          onPress={onAddTask}
-        >
-          <Ionicons name="add" size={16} color={theme.colors.primary} />
-          <Text style={styles.addText}>Add task</Text>
-        </Button>
       </View>
 
-      {tasks.length ? (
         <View
           testID="calendar-day-task-grid"
           onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}
@@ -74,18 +63,18 @@ export function CalendarDayTasks({ day, tasks, boards, now, onTask, onTaskAction
               />
             </View>
           ))}
-        </View>
-      ) : (
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="sunny-outline" size={20} color={theme.colors.primary} />
+          <View style={[styles.cell, { width: `${100 / columns}%` }]}>
+            <Pressable
+              testID="calendar-add-task-card"
+              accessibilityRole="button"
+              accessibilityLabel={`Add task for ${format(day, "MMMM d")}`}
+              onPress={onAddTask}
+              style={({ pressed }) => [styles.addTaskCard, { backgroundColor: pressed ? theme.colors.primarySoft : "transparent" }]}
+            >
+              <Text style={styles.addText}>Add new task</Text>
+            </Pressable>
           </View>
-          <View style={styles.emptyCopy}>
-            <Text style={styles.emptyTitle}>No tasks due</Text>
-            <Text style={styles.emptyText}>Nothing is scheduled for {format(day, "EEEE")} yet. Use Add task to plan it.</Text>
-          </View>
         </View>
-      )}
     </View>
   );
 }
@@ -219,7 +208,8 @@ function createStyles(colors: ThemeColors) {
     eyebrow: { color: colors.primary, fontSize: 10, lineHeight: 14, fontWeight: "800", letterSpacing: 1 },
     title: { color: colors.foreground, fontSize: 18, lineHeight: 24, fontWeight: "800", letterSpacing: -0.2 },
     subtitle: { color: colors.mutedForeground, fontSize: 12, lineHeight: 17, fontWeight: "500", marginTop: 1 },
-    addText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+    addText: { color: colors.mutedForeground, fontSize: 15, fontWeight: "500" },
+    addTaskCard: { flexGrow: 1, minHeight: 108, borderWidth: 1, borderStyle: "dashed", borderColor: colors.borderStrong, borderRadius: 12, justifyContent: "center", alignItems: "center", padding: 20 },
     grid: { flexDirection: "row", flexWrap: "wrap", rowGap: 10, marginHorizontal: -5 },
     cell: { paddingHorizontal: 5 },
     tile: {
@@ -249,10 +239,5 @@ function createStyles(colors: ThemeColors) {
     boardText: { flexShrink: 1, fontSize: 10, lineHeight: 14, fontWeight: "600" },
     progressTrack: { height: 3, borderRadius: 2, overflow: "hidden" },
     progressFill: { height: "100%", borderRadius: 2 },
-    empty: { flexDirection: "row", alignItems: "center", gap: 11, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderColor: colors.border, borderRadius: 12, backgroundColor: colors.card },
-    emptyIcon: { width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: colors.primarySoft },
-    emptyCopy: { flex: 1, minWidth: 0 },
-    emptyTitle: { color: colors.foreground, fontSize: 14, lineHeight: 19, fontWeight: "700" },
-    emptyText: { color: colors.mutedForeground, fontSize: 12, lineHeight: 17, marginTop: 1 },
   });
 }

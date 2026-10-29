@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useCallback, useEffect, useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type ReactNode, type Ref } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BoardSection, ViewMode } from "@/lib/domain/types";
@@ -7,6 +7,7 @@ import { getRibbonContext, isRibbonTabAvailable, resolveRibbonTab, type RibbonTa
 import { useMobileBoardColors } from "./mobile-board-colors";
 import { Sheet } from "@/components/ui/sheet";
 import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
+import { usePreferences } from "@/providers/preferences-provider";
 
 const CONTROL_SIZE = 44;
 
@@ -20,7 +21,15 @@ const TABS: { value: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[
   { value: "hidden", label: "Hidden", icon: "eye-off-outline" },
 ];
 
+export interface RibbonControls {
+  openTab: (tab: RibbonTab) => void;
+  focusSearch: () => void;
+  togglePin: () => void;
+  toggleExpanded: () => void;
+}
+
 interface Props {
+  controlsRef?: Ref<RibbonControls>;
   mode: ViewMode;
   onMode: (mode: ViewMode) => void;
   query: string;
@@ -60,7 +69,7 @@ export function MobileBoardRibbon(props: Props) {
   const { fontScale, width } = useWindowDimensions();
   const [tab, setTab] = useState<Tab>("home");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [pinned, setPinned] = useState(false);
+  const { ribbonPinned: pinned, setRibbonPinned: setPinned } = usePreferences();
   const [expanded, setExpanded] = useState(true);
   const [previousTab, setPreviousTab] = useState<Tab>("home");
   const [moreOpen, setMoreOpen] = useState(false);
@@ -122,6 +131,19 @@ export function MobileBoardRibbon(props: Props) {
     setExpanded(true);
     resetHideTimer();
   };
+  const togglePin = () => {
+    setPinned(!pinned);
+    if (!pinned) {
+      setExpanded(true);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    }
+  };
+  useImperativeHandle(props.controlsRef, () => ({
+    openTab,
+    focusSearch: () => { if (context.search) { setSearchOpen(true); setExpanded(true); searchInput.current?.focus(); } },
+    togglePin,
+    toggleExpanded: () => { if (!selectionActive) setExpanded((value) => !value); },
+  }));
   const tool = (name: keyof typeof Ionicons.glyphMap, label: string, onPress: () => void, selected = false, disabled = false, accessibilityLabel = label) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={accessibilityLabel} aria-pressed={selected} disabled={disabled} onPress={() => { onPress(); resetHideTimer(); }} style={[styles.tool, { opacity: disabled ? 0.35 : 1 }]}><Ionicons name={name} size={19} color={selected ? c.primary : c.mutedForeground} /><Text numberOfLines={2} style={[styles.toolText, { color: selected ? c.primary : c.mutedForeground }]}>{label}</Text></Pressable>;
 
   return <View onTouchStartCapture={resetHideTimer} onPointerDown={resetHideTimer} style={{ paddingTop: insets.top, backgroundColor: c.card, borderTopWidth: 1, borderTopColor: c.primary, borderBottomWidth: 1, borderBottomColor: c.border }}>
@@ -137,7 +159,7 @@ export function MobileBoardRibbon(props: Props) {
       {context.search ? <Pressable accessibilityRole="button" accessibilityLabel="Search tasks" onPress={() => { if (props.query.length > 0) { setSearchOpen(true); searchInput.current?.focus(); } else { setSearchOpen((value) => !value); setSearchFocused(false); } resetHideTimer(); }} style={[styles.tabAction, searchVisible && { backgroundColor: c.input }]}>
         <Ionicons name="search-outline" size={18} color={searchVisible ? c.primary : c.foreground} />
       </Pressable> : null}
-      <Pressable accessibilityRole="switch" accessibilityLabel={pinned ? "Unpin ribbon" : "Pin ribbon open"} accessibilityHint={pinned ? "The ribbon will auto-hide after some seconds of inactivity." : "The ribbon will stay open continuously."} accessibilityState={{ checked: pinned }} onPress={() => { if (pinned) { setPinned(false); resetHideTimer(); } else { setPinned(true); setExpanded(true); if (hideTimerRef.current) clearTimeout(hideTimerRef.current); } }} style={styles.tabAction}>{pinned ? <MaterialCommunityIcons name="pin" size={18} color={c.primary} /> : <MaterialCommunityIcons name="pin-off-outline" size={18} color={c.mutedForeground} />}</Pressable>
+      <Pressable accessibilityRole="switch" accessibilityLabel={pinned ? "Unpin ribbon" : "Pin ribbon open"} accessibilityHint={pinned ? "The ribbon will auto-hide after some seconds of inactivity." : "The ribbon will stay open continuously."} accessibilityState={{ checked: pinned }} onPress={togglePin} style={styles.tabAction}>{pinned ? <MaterialCommunityIcons name="pin" size={18} color={c.primary} /> : <MaterialCommunityIcons name="pin-off-outline" size={18} color={c.mutedForeground} />}</Pressable>
     </View>
     {searchVisible ? <View style={styles.searchRow}><View style={[styles.search, { borderColor: searchFocused ? c.primary : c.borderStrong, backgroundColor: c.input }]}><Ionicons name="search-outline" size={16} color={c.mutedForeground} /><TextInput ref={searchInput} autoFocus onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} selectionColor={c.primary} cursorColor={c.primary} underlineColorAndroid="transparent" accessibilityLabel="Filter tasks and labels" value={props.query} onChangeText={props.onQuery} placeholder="Search tasks…" placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }, Platform.OS === "web" && { outlineWidth: 0 }]} />{props.query ? <Pressable hitSlop={1} accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { clearSearch(); resetHideTimer(); }} style={styles.searchClear}><View style={styles.iconFace}><Ionicons name="close" size={19} color={c.mutedForeground} /></View></Pressable> : null}</View></View> : null}
     {ribbonExpanded ? (shownTab === "home" ? <RibbonScrollView accessibilityLabel="Home ribbon tools" onInteraction={resetHideTimer} contentContainerStyle={styles.tools}>

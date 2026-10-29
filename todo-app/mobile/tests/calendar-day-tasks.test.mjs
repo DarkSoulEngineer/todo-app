@@ -90,7 +90,7 @@ test("tiles keep task editing, long-press actions and checklist progress", () =>
   const tileElements = nodes(tree).filter((node) => typeof node.type === "function" && node.type.name === "CalendarDayTaskTile");
   assert.equal(tileElements.length, 2);
   const renderedTiles = tileElements.map((element) => element.type(element.props));
-  const tiles = renderedTiles.flatMap((tile) => nodes(tile).filter((node) => node.type === "Pressable"));
+  const tiles = renderedTiles.filter((tile) => tile.type === "Pressable");
   assert.equal(tiles.length, 2);
   tiles[0].props.onPress();
   tiles[1].props.onLongPress();

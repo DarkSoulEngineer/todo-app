@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { addDays, addMonths, addWeeks, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns";
-import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
+import { useMemo, type MouseEvent } from "react";
+import { Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
 import { deriveStatus } from "@/lib/domain/status";
 import type { Task } from "@/lib/domain/types";
@@ -85,27 +85,27 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
           return (
             <View
               key={day.toISOString()}
+              testID={`calendar-day-${format(day, "yyyy-MM-dd")}`}
               style={[
                 styles.cell,
                 mode === "week" && styles.cellWeek,
-                selected && styles.cellSelected,
                 outside && styles.cellOutside,
                 index % 7 === 6 && styles.cellLastColumn,
                 index >= days.length - 7 && styles.cellLastRow,
               ]}
             >
-              <Pressable accessibilityRole="button" accessibilityLabel={`Select ${format(day, "EEEE, MMMM d")}`} aria-pressed={selected} accessibilityState={{ selected }} onPress={() => onSelectDay(day)} style={StyleSheet.absoluteFill} />
+              <Pressable accessibilityRole="button" accessibilityLabel={`Select ${format(day, "EEEE, MMMM d")}`} accessibilityHint={current ? "Today" : undefined} aria-pressed={selected} accessibilityState={{ selected }} onPress={() => onSelectDay(day)} style={StyleSheet.absoluteFill} />
               <View pointerEvents="none" style={styles.cellHeader}>
-                <View style={[styles.dayBadge, current && !selected && styles.dayBadgeToday, selected && styles.dayBadgeSelected]}>
+                <View testID={`calendar-date-${format(day, "yyyy-MM-dd")}`} style={[styles.dayBadge, current && !selected && styles.dayBadgeToday, selected && styles.dayBadgeSelected]}>
                   <Text style={[styles.dayNumber, current && !selected && styles.dayNumberToday, selected && styles.dayNumberSelected]}>{format(day, "d")}</Text>
                 </View>
                 {dayTasks.length > (mode === "week" ? 5 : 2) ? <Text style={styles.moreLabel}>+{dayTasks.length - (mode === "week" ? 5 : 2)}</Text> : null}
               </View>
               {dayTasks.slice(0, mode === "week" ? 5 : 2).map((task) => {
                 const color = taskColor(task, colors, now);
-                return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={daySelectionOnly ? `View tasks for ${format(day, "EEEE, MMMM d")}` : `Open ${task.title}`} onPress={(event) => { event.stopPropagation(); if (daySelectionOnly) onSelectDay(day); else onTaskPress(task); }} onLongPress={!daySelectionOnly && onTaskLongPress ? (event) => { event.stopPropagation(); onTaskLongPress(task, event); } : undefined} onContextMenu={!daySelectionOnly && onTaskLongPress ? (event) => { event.preventDefault?.(); event.stopPropagation(); onTaskLongPress(task, event.nativeEvent as unknown as GestureResponderEvent); } : undefined} style={({ pressed }) => [styles.taskChip, { backgroundColor: `${color}1A`, opacity: pressed ? 0.6 : 1 }]}>
-                  <View style={[styles.taskDot, { backgroundColor: color }]} />
-                  <Text style={[styles.taskText, task.completed && styles.taskTextDone]} numberOfLines={1}>{task.title || "Untitled task"}</Text>
+                const contextMenu = Platform.OS === "web" && !daySelectionOnly && onTaskLongPress ? { onContextMenu: (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); onTaskLongPress(task, event as unknown as GestureResponderEvent); } } : {};
+                return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={daySelectionOnly ? `View tasks for ${format(day, "EEEE, MMMM d")}` : `Open ${task.title}`} onPress={(event) => { event.stopPropagation(); if (daySelectionOnly) onSelectDay(day); else onTaskPress(task); }} onLongPress={!daySelectionOnly && onTaskLongPress ? (event) => { event.stopPropagation(); onTaskLongPress(task, event); } : undefined} {...contextMenu} style={({ pressed }) => [styles.taskChip, { opacity: pressed ? 0.6 : 1 }]}>
+                  <Text style={[styles.taskText, { color }, task.completed && styles.taskTextDone]} numberOfLines={1}>{task.title || "Untitled task"}</Text>
                 </Pressable>;
               })}
             </View>
@@ -163,20 +163,18 @@ function createStyles(colors: ThemeColors) {
     grid: { flexDirection: "row", flexWrap: "wrap", marginTop: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 14, overflow: "hidden", backgroundColor: colors.card },
     cell: { width: "14.2857%", minHeight: 84, padding: 5, borderRightWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.card },
     cellWeek: { minHeight: 136 },
-    cellSelected: { backgroundColor: colors.primarySoft },
     cellOutside: { opacity: 0.42 },
     cellLastColumn: { borderRightWidth: 0 },
     cellLastRow: { borderBottomWidth: 0 },
     cellHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
-    dayBadge: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-    dayBadgeToday: { backgroundColor: colors.primarySoft },
+    dayBadge: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: "transparent", alignItems: "center", justifyContent: "center" },
+    dayBadgeToday: { borderColor: colors.primary },
     dayBadgeSelected: { backgroundColor: colors.primary },
     dayNumber: { color: colors.foreground, fontSize: 12, lineHeight: 16, fontWeight: "700" },
     dayNumberToday: { color: colors.primary, fontWeight: "800" },
     dayNumberSelected: { color: colors.primaryForeground, fontWeight: "800" },
     moreLabel: { color: colors.mutedForeground, fontSize: 10, lineHeight: 13, fontWeight: "700" },
-    taskChip: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 3, marginTop: 3 },
-    taskDot: { width: 5, height: 5, borderRadius: 3 },
+    taskChip: { minWidth: 0, paddingVertical: 3, marginTop: 3 },
     taskText: { flex: 1, color: colors.foreground, fontSize: 10, lineHeight: 13, fontWeight: "700" },
     taskTextDone: { textDecorationLine: "line-through", color: colors.mutedForeground },
   });

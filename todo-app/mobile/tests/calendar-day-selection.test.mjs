@@ -7,9 +7,9 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 const dates = require("date-fns");
-const colors = new Proxy({}, { get: () => "#888888" });
+const colors = new Proxy({ primary: "#0066aa", card: "#ffffff", primarySoft: "#ddeeff" }, { get: (target, key) => target[key] ?? "#888888" });
 const react = { useMemo: (fn) => fn() };
-const native = { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (value) => value, absoluteFill: {}, hairlineWidth: 0.5 } };
+const native = { Platform: { OS: "web" }, View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (value) => value, absoluteFill: {}, hairlineWidth: 0.5 } };
 const panelSource = await readFile(new URL("../src/components/calendar/calendar-panel.tsx", import.meta.url), "utf8");
 const panelExports = {};
 vm.runInNewContext(ts.transpileModule(panelSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
@@ -30,20 +30,21 @@ function nodes(node) {
   if (Array.isArray(node)) return node.flatMap(nodes);
   return [node, ...nodes(node.props?.children)];
 }
-function render(mode, split, selectedDay = null, entries = tasks) {
+function render(mode, split, selectedDay = null, entries = tasks, { now = day, month = day, weekStartsOn = 1 } = {}) {
   const selected = [];
+  const anchors = [];
   const edited = [];
   const actions = [];
   const exports = {};
   vm.runInNewContext(viewCode, {
     exports, require, ...dates, useTheme: () => ({ theme: { colors } }),
-    usePreferences: () => ({ calendarDefaultView: mode, calendarWeekStart: 1 }),
+    usePreferences: () => ({ calendarDefaultView: mode, calendarWeekStart: weekStartsOn }),
     useMemo: react.useMemo, useState: (initial) => [initial, () => {}],
     View: "View", Text: "Text", Button: "Button", SectionHeading: "Heading", Ionicons: "Icon", CalendarPanel: "CalendarPanel", CalendarDayTasks: "CalendarDayTasks", TaskCard: "TaskCard", StyleSheet: {},
   });
-  const tree = exports.CalendarView({ month: day, selectedDay, tasks: entries, boards: [], now: day, split, setSelectedDay: (day) => selected.push(day), onTask: (task) => edited.push(task), onTaskAction: (task) => actions.push(task) });
+  const tree = exports.CalendarView({ month, setMonth: (day) => anchors.push(day), selectedDay, tasks: entries, boards: [], now, split, setSelectedDay: (day) => selected.push(day), onTask: (task) => edited.push(task), onTaskAction: (task) => actions.push(task) });
   const props = nodes(tree).find((node) => node.type === "CalendarPanel").props;
-  return { tree: panelExports.CalendarPanel(props), view: tree, selected, edited, actions, props };
+  return { tree: panelExports.CalendarPanel(props), view: tree, selected, anchors, edited, actions, props };
 }
 
 test("mobile month and week task chips select the day instead of opening tiny task targets", () => {
@@ -92,4 +93,43 @@ test("empty mobile dates still open day selection without opening an editor", ()
   nodes(tree).find((node) => node.props?.accessibilityLabel === `Select ${dates.format(emptyDay, "EEEE, MMMM d")}`).props.onPress();
   assert.ok(dates.isSameDay(selected[0], emptyDay));
   assert.equal(edited.length, 0);
+});
+
+test("Today navigates and selects the current date in month/week, mobile/split and either week-start setting", () => {
+  const now = new Date(2026, 10, 1, 15, 45);
+  const stale = new Date(2026, 9, 22);
+  for (const mode of ["month", "week"]) for (const split of [false, true]) for (const weekStartsOn of [0, 1]) {
+    const result = render(mode, split, stale, [], { now, month: stale, weekStartsOn });
+    nodes(result.tree).find((node) => node.props?.accessibilityLabel === "Jump to today").props.onPress();
+    assert.equal(result.selected.length, 1);
+    assert.equal(result.selected[0].getTime(), dates.startOfDay(now).getTime());
+    assert.equal(result.anchors.length, 1);
+    const expected = mode === "week" ? dates.startOfWeek(now, { weekStartsOn }) : dates.startOfMonth(now);
+    assert.equal(result.anchors[0].getTime(), expected.getTime());
+    assert.equal(result.edited.length, 0, "Today does not open an arbitrary task");
+  }
+});
+
+test("selection is confined to the date circle and task previews have no backgrounds or dots", () => {
+  const flatten = (styles) => Object.assign({}, ...[styles].flat().filter(Boolean));
+  const { tree } = render("month", true, day);
+  const cell = nodes(tree).find((node) => node.props?.testID === `calendar-day-${dates.format(day, "yyyy-MM-dd")}`);
+  assert.equal(flatten(cell.props.style).backgroundColor, colors.card, "selected day has no full-cell tint");
+  const badge = nodes(cell).find((node) => node.props?.testID === `calendar-date-${dates.format(day, "yyyy-MM-dd")}`);
+  assert.equal(flatten(badge.props.style).backgroundColor, colors.primary);
+  assert.equal(flatten(badge.props.style).borderRadius, flatten(badge.props.style).width / 2);
+  const previews = nodes(cell).filter((node) => node.props?.accessibilityLabel === `View tasks for ${dates.format(day, "EEEE, MMMM d")}`);
+  for (const preview of previews) {
+    assert.equal(flatten(preview.props.style({ pressed: false })).backgroundColor, undefined);
+    assert.equal(nodes(preview).filter((node) => node.type === "View").length, 0, "no colored dot beside the task");
+    assert.equal(nodes(preview).find((node) => node.type === "Text").props.numberOfLines, 1);
+  }
+});
+
+test("today keeps a themed date outline when another day is selected", () => {
+  const { tree } = render("month", true, dates.addDays(day, -6));
+  const badge = nodes(tree).find((node) => node.props?.testID === `calendar-date-${dates.format(day, "yyyy-MM-dd")}`);
+  const appearance = Object.assign({}, ...badge.props.style.filter(Boolean));
+  assert.equal(appearance.borderColor, colors.primary);
+  assert.equal(appearance.backgroundColor, undefined);
 });

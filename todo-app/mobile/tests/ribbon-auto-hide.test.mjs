@@ -14,7 +14,7 @@ vm.runInNewContext(await compile("../src/lib/features/ribbon-context.ts"), { exp
 const source = await compile("../src/components/board/mobile-board-ribbon.tsx");
 const sameDeps = (a, b) => a && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
 
-function setup({ width = 400, fontScale = 1 } = {}) {
+function setup({ width = 400, fontScale = 1, preferences = { ribbonPinned: false } } = {}) {
   const slots = [];
   const timers = new Map();
   let cursor = 0;
@@ -24,6 +24,7 @@ function setup({ width = 400, fontScale = 1 } = {}) {
   props.onSelect = () => { props.selecting = true; };
   props.onDeselect = () => { props.selecting = false; };
   const react = {
+    useImperativeHandle(ref, create) { if (ref) ref.current = create(); },
     useState(initial) {
       const index = cursor++;
       if (!(index in slots)) slots[index] = initial;
@@ -51,6 +52,7 @@ function setup({ width = 400, fontScale = 1 } = {}) {
     "./mobile-board-colors": { useMobileBoardColors: () => colors }, "@/lib/features/ribbon-context": context,
     "@/components/ui/sheet": { Sheet: "Sheet" },
     "@/components/ui/ribbon-scroll-view": { RibbonScrollView: "RibbonScrollView" },
+    "@/providers/preferences-provider": { usePreferences: () => ({ ribbonPinned: preferences.ribbonPinned, setRibbonPinned: (pinned) => { preferences.ribbonPinned = pinned; } }) },
   };
   const exports = {};
   vm.runInNewContext(source, {
@@ -71,6 +73,50 @@ function nodes(node) {
 }
 const button = (tree, label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
 const hasSelection = (tree) => JSON.stringify(tree).includes("Selection tools");
+
+test("saved ribbon pin survives remounts and disables auto-hide until unpinned", () => {
+  const preferences = { ribbonPinned: true };
+  const app = setup({ preferences });
+  let tree = app.render();
+  assert.equal(button(tree, "Unpin ribbon").props.accessibilityState.checked, true);
+  assert.equal(app.timers.size, 0);
+  app.elapse();
+  assert.ok(nodes(app.render()).some((node) => node.props?.accessibilityLabel === "Home ribbon tools"));
+  button(tree, "Unpin ribbon").props.onPress();
+  tree = app.render();
+  assert.equal(preferences.ribbonPinned, false);
+  assert.equal(app.timers.size, 1);
+  const reopened = setup({ preferences });
+  tree = reopened.render();
+  assert.ok(button(tree, "Pin ribbon open"));
+  assert.equal(reopened.timers.size, 1);
+  button(tree, "Pin ribbon open").props.onPress();
+  reopened.render();
+  assert.equal(preferences.ribbonPinned, true);
+  assert.equal(reopened.timers.size, 0);
+  const restarted = setup({ preferences });
+  assert.ok(button(restarted.render(), "Unpin ribbon"));
+  assert.equal(restarted.timers.size, 0);
+});
+
+test("command controls reveal tabs, focus search, pin, and preserve selection expansion", () => {
+  const app = setup();
+  app.props.controlsRef = { current: null };
+  app.render(); app.elapse(); app.render();
+  app.props.controlsRef.current.openTab("filters");
+  assert.ok(JSON.stringify(app.render()).includes("Filter tools"));
+  app.props.controlsRef.current.focusSearch();
+  let tree = app.render();
+  assert.ok(nodes(tree).some((node) => node.type === "TextInput" && node.props.autoFocus));
+  app.props.controlsRef.current.togglePin();
+  tree = app.render();
+  assert.equal(button(tree, "Unpin ribbon").props.accessibilityState.checked, true);
+  assert.equal(app.timers.size, 0);
+  app.props.controlsRef.current.openTab("select");
+  assert.ok(hasSelection(app.render()));
+  app.props.controlsRef.current.toggleExpanded();
+  assert.ok(hasSelection(app.render()));
+});
 
 test("opening and reopening search requests focus; typing preserves the field", () => {
   const app = setup();

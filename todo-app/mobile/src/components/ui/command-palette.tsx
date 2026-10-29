@@ -55,12 +55,12 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
   useEffect(() => {
     if (Platform.OS !== "web" || !focused || typeof document === "undefined") return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.isComposing || event.defaultPrevented) return;
+      if (event.isComposing || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
       if (mode) {
         if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); back(); return; }
         if (mode === "help") return;
-        const down = event.key === "ArrowDown" || (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "j");
-        const up = event.key === "ArrowUp" || (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "k");
+        const down = event.key === "ArrowDown" && !event.shiftKey;
+        const up = event.key === "ArrowUp" && !event.shiftKey;
         if (down || up) {
           event.preventDefault();
           setIndex(results.length ? (activeIndex + (down ? 1 : -1) + results.length) % results.length : 0);
@@ -97,7 +97,7 @@ export function CommandPalette({ mode, onMode, commands, blocked = false }: {
     </View>
     {mode === "help" ? <ScrollView contentContainerStyle={styles.content}>
       <Text style={[styles.hint, { color: c.mutedForeground }]}>Shortcuts work on web, including tablet browsers with a keyboard. They pause while typing or using dialogs. On native tablets, tap commands instead.</Text>
-      {!singleKeyShortcuts ? <Text style={[styles.hint, { color: c.primary }]}>Single-key shortcuts are disabled in Settings → Keyboard. Modified shortcuts and ? help remain available.</Text> : null}
+      {!singleKeyShortcuts ? <Text style={[styles.hint, { color: c.primary }]}>Quick-action shortcuts are disabled in Settings → Keyboard. / commands and ? help remain available.</Text> : null}
       {[...PALETTE_HELP, ...commands.filter((command) => command.shortcut).map((command) => [command.shortcut!, command.label])].map(([keys, label]) => <View key={keys} style={[styles.helpRow, { borderColor: c.border }]}><Text style={{ flex: 1, color: c.foreground }}>{label}</Text><Text style={[styles.keys, { color: c.primary, backgroundColor: c.secondary }]}>{keys}</Text></View>)}
       <Text style={[styles.hint, { color: c.mutedForeground }]}>Rename and move commands ask you to choose a target. Left/right moves cards between visible lists; up/down reorders cards within a list. Moves stop at the edges.</Text>
     </ScrollView> : <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>

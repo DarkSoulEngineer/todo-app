@@ -25,7 +25,7 @@ import { BOARD_COLORS, boardColor } from "@/lib/domain/boards";
 import { BulkSelectionToolbar } from "@/components/board/bulk-selection-toolbar";
 import { MobileBoardBottomNav } from "@/components/board/mobile-board-bottom-nav";
 import { MobileTaskColumns } from "@/components/board/mobile-task-columns";
-import { MobileBoardRibbon } from "@/components/board/mobile-board-ribbon";
+import { MobileBoardRibbon, type RibbonControls } from "@/components/board/mobile-board-ribbon";
 import { CreateListDialog } from "@/components/board/create-list-dialog";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, SORT_OPTIONS } from "@/lib/domain/constants";
@@ -104,6 +104,7 @@ export default function WorkspaceScreen() {
   const [newBoardOpen, setNewBoardOpen] = useState(false);
   const [renameBoardOpen, setRenameBoardOpen] = useState(false);
   const [renameCardTarget, setRenameCardTarget] = useState<Task | null>(null);
+  const ribbonControls = useRef<RibbonControls | null>(null);
   const openSmallMenu = (event: GestureResponderEvent, open: () => void) => {
     setSmallMenuAnchor(anchorFromEvent(event));
     open();
@@ -438,19 +439,21 @@ export default function WorkspaceScreen() {
     { id: "rename-card", label: "Rename card", shortcut: "R", children: cardTargets(setRenameCardTarget) },
     { id: "edit-card", label: "Edit card", children: cardTargets(openEditor) },
     { id: "complete-card", label: "Toggle card complete", children: cardTargets((task) => api.toggleComplete(task.id), (task) => !task.canceled) },
-    ...([-1, 1] as const).map((direction): Command => ({ id: direction === -1 ? "card-left" : "card-right", label: `Move card ${direction === -1 ? "left" : "right"}`, shortcut: `Alt ${direction === -1 ? "←" : "→"}`, detail: "Choose a card to move to the neighboring visible list", children: cardTargets((task) => { const target = neighborList(task, direction); if (target) moveTaskToSection(task, target.id); }, (task) => !!neighborList(task, direction)) })),
-    ...(["up", "down"] as const).map((direction): Command => ({ id: `card-${direction}`, label: `Move card ${direction}`, shortcut: `Alt ${direction === "up" ? "↑" : "↓"}`, detail: "Reorder within its list", children: cardTargets((task) => reorderTask(task, direction), (task) => { const siblings = visibleTasks.filter((item) => getTaskSectionId(item, sections, now) === getTaskSectionId(task, sections, now)); const from = siblings.findIndex((item) => item.id === task.id); return direction === "up" ? from > 0 : from < siblings.length - 1; }) })),
+    ...([-1, 1] as const).map((direction): Command => ({ id: direction === -1 ? "card-left" : "card-right", label: `Move card ${direction === -1 ? "left" : "right"}`, shortcut: `Shift ${direction === -1 ? "←" : "→"}`, detail: "Choose a card to move to the neighboring visible list", children: cardTargets((task) => { const target = neighborList(task, direction); if (target) moveTaskToSection(task, target.id); }, (task) => !!neighborList(task, direction)) })),
+    ...(["up", "down"] as const).map((direction): Command => ({ id: `card-${direction}`, label: `Move card ${direction}`, shortcut: `Shift ${direction === "up" ? "↑" : "↓"}`, detail: "Reorder within its list", children: cardTargets((task) => reorderTask(task, direction), (task) => { const siblings = visibleTasks.filter((item) => getTaskSectionId(item, sections, now) === getTaskSectionId(task, sections, now)); const from = siblings.findIndex((item) => item.id === task.id); return direction === "up" ? from > 0 : from < siblings.length - 1; }) })),
     { id: "rename-list", label: "Rename list", children: sections.filter(isCustomSection).map((section) => ({ id: section.id, label: section.title, run: () => setRenameSectionTarget(section) })) },
     ...(["left", "right"] as const).map((direction): Command => ({ id: `list-${direction}`, label: `Move list ${direction}`, children: sections.filter((_, index) => direction === "left" ? index > 0 : index < sections.length - 1).map((section) => ({ id: section.id, label: section.title, run: () => moveSection(section, direction) })) })),
     ...createNavigationCommands({ projects: projects.map((project) => project.id === currentProjectId ? { ...project, workspace: { tasks, sections, boards } } : project), currentProjectId: id, openBoard: switchProject, navigate: (destination) => { closeTaskOverlays(); exitSelectionMode(); router.replace(destination); } }),
     ...(["board", "list", "calendar", "insights"] as const).filter((value) => value !== "list" || hasTasks).map((value): Command => ({ id: `view-${value}`, label: `View ${value === "list" ? "activity" : value}`, shortcut: String(["board", "list", "calendar", "insights"].indexOf(value) + 1), run: () => changeMode(value) })),
-    { id: "compact", label: compactCards ? "Use comfortable cards" : "Use compact cards", run: () => setCompactCards(!compactCards) },
-    { id: "focus-column", label: focusedColumn ? "Show all columns" : "Focus one column", run: () => setFocusedColumn(!focusedColumn) },
-    { id: "move-arrows", label: showMoveArrows ? "Hide move arrows" : "Show move arrows", run: () => setShowMoveArrows(!showMoveArrows) },
-    { id: "zoom-in", label: "Zoom in", run: () => setZoom(Math.min(1.3, Math.round((zoom + 0.1) * 10) / 10)) },
-    { id: "zoom-out", label: "Zoom out", run: () => setZoom(Math.max(0.7, Math.round((zoom - 0.1) * 10) / 10)) },
-    { id: "zoom-reset", label: "Reset zoom to 100%", run: () => setZoom(1) },
-    { id: "dragging", label: dragEnabled ? "Disable dragging" : "Enable dragging", run: () => { setDragEnabled(!dragEnabled); if (!dragEnabled) setFocusedColumn(false); } },
+    ...(getRibbonContext(mode).boardDisplay ? [
+      { id: "compact", label: compactCards ? "Use comfortable cards" : "Use compact cards", shortcut: "K", run: () => setCompactCards(!compactCards) },
+      { id: "focus-column", label: focusedColumn ? "Show all columns" : "Focus one column", shortcut: "G", run: () => setFocusedColumn(!focusedColumn) },
+      { id: "move-arrows", label: showMoveArrows ? "Hide move arrows" : "Show move arrows", shortcut: "W", run: () => setShowMoveArrows(!showMoveArrows) },
+      { id: "zoom-in", label: "Zoom in", shortcut: "=", run: () => setZoom(Math.min(1.3, Math.round((zoom + 0.1) * 10) / 10)) },
+      { id: "zoom-out", label: "Zoom out", shortcut: "-", run: () => setZoom(Math.max(0.7, Math.round((zoom - 0.1) * 10) / 10)) },
+      { id: "zoom-reset", label: "Reset zoom to 100%", shortcut: "0", run: () => setZoom(1) },
+      ...(width >= 768 ? [{ id: "dragging", label: dragEnabled ? "Disable dragging" : "Enable dragging", shortcut: "Shift D", run: () => { setDragEnabled(!dragEnabled); if (!dragEnabled) setFocusedColumn(false); } }] : []),
+    ] : []),
   ];
   // `projects` is the persisted registry projection and may lag one render
   // behind the live task state. Exports must include the edits visible on this
@@ -467,6 +470,59 @@ export default function WorkspaceScreen() {
     });
     router.replace("/");
   };
+  // Reuse the same actions as the ribbon. Target pickers remain searchable and
+  // destructive commands require a second, explicit selection before running.
+  const confirmCommand = (id: string, label: string, run: () => void): Command => ({ id, label, children: [{ id: `${id}-confirm`, label: `Confirm: ${label}`, detail: "Press Esc to cancel", run }] });
+  const ribbonContext = getRibbonContext(mode);
+  const ribbonCommands: Command[] = [
+    { id: "home-tools", label: "Show Home ribbon tools", shortcut: "Shift U", run: () => ribbonControls.current?.openTab("home") },
+    { id: "actions-tools", label: "Show Actions ribbon tools", shortcut: "Shift O", run: () => ribbonControls.current?.openTab("actions") },
+    { id: "pin-ribbon", label: "Toggle ribbon pin", shortcut: "Shift P", run: () => ribbonControls.current?.togglePin() },
+    ...(!selectionMode ? [{ id: "expand-ribbon", label: "Expand / collapse ribbon", run: () => ribbonControls.current?.toggleExpanded() }] : []),
+    { id: "load-sample", label: "Load sample workspace", run: () => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); } },
+    { id: "export-json", label: "Export board as JSON", run: () => { void exportWorkspace(liveWorkspace, activeProject.name); } },
+    { id: "export-csv", label: "Export board as CSV", run: () => { void exportWorkspaceCsv(liveWorkspace, activeProject.name); } },
+    { id: "import-board", label: "Import board", run: () => { void importBoard(); } },
+    { id: "save-version", label: "Save board version", run: () => { api.createVersion(); toast.success("Version saved"); } },
+    confirmCommand("clear-done", "Clear completed cards", clearCompleted),
+    confirmCommand("close-board", "Close current board", closeBoard),
+    ...(api.versions.length ? [
+      confirmCommand("restore-version", `Restore version: ${api.versions[0].label}`, () => { api.restoreVersion(api.versions[0].id); toast.success("Version restored"); }),
+      confirmCommand("delete-version", `Delete version: ${api.versions[0].label}`, () => { api.deleteVersion(api.versions[0].id); toast.success("Version deleted"); }),
+    ] : []),
+    ...(ribbonContext.search ? [{ id: "search-tasks", label: "Search tasks and labels", shortcut: "Q", run: () => ribbonControls.current?.focusSearch() }] : []),
+    ...(ribbonContext.filters ? [
+    { id: "filter-tags", label: "Filter by tag", shortcut: "F", children: [
+      { id: "all", label: "All tags (no filter)", selected: boardFilter === "all", run: () => { setBoardFilter("all"); setSelectedTaskIds(new Set()); } },
+      ...boards.map((board) => ({ id: board.id, label: board.label, selected: boardFilter === board.id, run: () => { setBoardFilter(board.id); setSelectedTaskIds(new Set()); } })),
+    ] },
+    { id: "clear-filters", label: "Clear search and tag filter", shortcut: "Shift F", run: () => { setQuery(""); setBoardFilter("all"); setSelectedTaskIds(new Set()); } },
+    { id: "filters-tools", label: "Show Filters ribbon tools", run: () => ribbonControls.current?.openTab("filters") },
+    { id: "add-tag", label: "Add filter / tag", shortcut: "Shift L", run: () => setAddFilterOpen(true) },
+    ...(boards.length ? [{ id: "remove-tag", label: "Remove filter / tag", shortcut: "Shift X", children: boards.map((board) => confirmCommand(board.id, `Remove tag: ${board.label}`, () => removeTag(board))) }] : []),
+    ] : []),
+    ...(ribbonContext.sorting ? [{ id: "sort-tasks", label: "Sort cards", shortcut: "O", children: SORT_OPTIONS.map((option) => ({ id: option.value, label: option.label, selected: sort === option.value, run: () => setSort(option.value) })) }] : []),
+    ...(ribbonContext.boardDisplay ? [
+    { id: "list-visibility", label: "Show / hide list", children: sections.map((section) => ({ id: section.id, label: `${section.hidden ? "Show" : "Hide"}: ${section.title}`, run: () => toggleSectionVisibility(section) })) },
+    ...(sections.some((section) => section.hidden) ? [{ id: "hidden-tools", label: "Show Hidden lists ribbon tools", shortcut: "Shift V", run: () => ribbonControls.current?.openTab("hidden") }] : []),
+    ] : []),
+    ...(ribbonContext.selection ? [
+      { id: "select-mode", label: selectionMode ? "Exit card selection" : "Select cards", shortcut: "V", run: () => { if (selectionMode) exitSelectionMode(); else ribbonControls.current?.openTab("select"); } },
+      ...(selectionMode ? [
+      { id: "toggle-card-selection", label: "Select / unselect a card", children: cardTargets((task) => toggleSelectedTask(task.id)).map((entry) => ({ ...entry, selected: selectedTaskIds.has(entry.id) })) },
+      { id: "select-all", label: "Select all visible cards", shortcut: "A", run: selectAllVisible },
+      ...(selectedTasks.length ? [
+        { id: "unselect-all", label: "Unselect all cards", shortcut: "U", run: () => setSelectedTaskIds(new Set<string>()) },
+        { id: "complete-selected", label: "Complete selected cards", shortcut: "D", run: () => runBulkStatus("completed", "Tasks completed") },
+        { id: "cancel-selected", label: "Cancel selected cards", shortcut: "C", run: () => runBulkStatus("canceled", "Tasks canceled") },
+        { id: "restore-selected", label: "Restore selected cards", shortcut: "Shift C", run: () => runBulkStatus("open", "Tasks restored") },
+        { id: "move-selected", label: "Move selected cards to list", shortcut: "M", children: sections.map((section) => ({ id: section.id, label: section.title, run: () => runBulkMove(section.id) })) },
+        { id: "priority-selected", label: "Set selected cards priority", shortcut: "P", children: PRIORITY_ORDER.map((priority) => ({ id: priority, label: PRIORITY_META[priority].label, run: () => runBulkPriority(priority) })) },
+        confirmCommand("delete-selected", "Delete selected cards", deleteSelected),
+      ] : []),
+      ] : []),
+    ] : []),
+  ];
   const actionsContent = <RibbonScrollView accessibilityLabel="Board actions" contentContainerStyle={styles.optionTools}>
     {mode === "board" && width >= 768 ? <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="reorder-three-outline" label={dragEnabled ? "Disable dragging" : "Enable dragging"} selected={dragEnabled} onPress={() => { setDragEnabled((enabled) => !enabled); if (!dragEnabled) setFocusedColumn(false); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DRAG & DROP</Text></View> : null}
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="sparkles-outline" label="Load sample" onPress={() => { const before = api.snapshot(); api.loadSample(); toast.show("Sample workspace loaded", { action: { label: "Undo", onPress: () => api.restore(before) } }); }} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>CREATE</Text></View>
@@ -489,7 +545,7 @@ export default function WorkspaceScreen() {
       <BlurTargetView ref={blurTarget} style={{ flex: 1, minHeight: 0 }}>
       <ThemeAtmosphere />
       <View style={{ flex: 1, minHeight: 0, paddingLeft: insets.left, paddingRight: insets.right }}>
-        <MobileBoardRibbon onCommands={() => setPaletteMode("commands")} hiddenSections={sections.filter((section) => section.hidden)} onShowSection={toggleSectionVisibility} selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={(event) => openSmallMenu(event, () => setBulkSectionMenu(true))} onPriority={(event) => openSmallMenu(event, () => setBulkPriorityMenu(true))} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={changeMode} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={leaveWorkspace} onSwitchBoard={(event) => { closeTaskOverlays(); if (event) setSmallMenuAnchor(anchorFromEvent(event)); setProjectSwitcherOpen(true); }} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
+        <MobileBoardRibbon controlsRef={ribbonControls} onCommands={() => setPaletteMode("commands")} hiddenSections={sections.filter((section) => section.hidden)} onShowSection={toggleSectionVisibility} selection={selectionMode ? <BulkSelectionToolbar selectedCount={selectedTasks.length} allSelected={allVisibleSelected} onSelectAll={selectAllVisible} onClear={() => setSelectedTaskIds(new Set())} onComplete={() => runBulkStatus("completed", "Tasks completed")} onCancel={() => runBulkStatus("canceled", "Tasks canceled")} onRestore={() => runBulkStatus("open", "Tasks restored")} onDelete={deleteSelected} onMove={(event) => openSmallMenu(event, () => setBulkSectionMenu(true))} onPriority={(event) => openSmallMenu(event, () => setBulkPriorityMenu(true))} onClose={exitSelectionMode} /> : null} selecting={selectionMode} onSelect={enterSelectionMode} onDeselect={exitSelectionMode} filters={filtersContent} filtersActive={boardFilter !== "all"} mode={mode} onMode={changeMode} query={query} onQuery={(value) => { setQuery(value); setSelectedTaskIds(new Set()); }} onBoards={leaveWorkspace} onSwitchBoard={(event) => { closeTaskOverlays(); if (event) setSmallMenuAnchor(anchorFromEvent(event)); setProjectSwitcherOpen(true); }} onNewTask={() => addNewTask()} onAddSection={() => setAddSectionOpen(true)} zoom={zoom} onZoom={(next) => setZoom(Math.min(1.3, Math.max(0.7, Math.round(next * 10) / 10)))} compact={compactCards} onCompact={() => setCompactCards(!compactCards)} showMoveArrows={showMoveArrows} onShowMoveArrows={() => setShowMoveArrows(!showMoveArrows)} focused={focusedColumn} onFocused={() => setFocusedColumn(!focusedColumn)}>
           {actionsContent}
         </MobileBoardRibbon>
         <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
@@ -506,7 +562,7 @@ export default function WorkspaceScreen() {
         </View>
       </View>
       </BlurTargetView>
-       <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={commands} blocked={(!splitView && editorVisible) || !!taskAction || !!sectionMenu || projectSwitcherOpen || !!renameSectionTarget || !!deleteSectionTarget || addSectionOpen || filterMenu || addFilterOpen || removeTagOpen || sortMenu || bulkSectionMenu || bulkPriorityMenu || (!splitView && !!calendarDay) || !!calendarActionTask || !!calendarPickerTask || newBoardOpen || renameBoardOpen || !!renameCardTarget} />
+       <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={[...commands, ...ribbonCommands]} blocked={(!splitView && editorVisible) || !!taskAction || !!sectionMenu || projectSwitcherOpen || !!renameSectionTarget || !!deleteSectionTarget || addSectionOpen || filterMenu || addFilterOpen || removeTagOpen || sortMenu || bulkSectionMenu || bulkPriorityMenu || (!splitView && !!calendarDay) || !!calendarActionTask || !!calendarPickerTask || newBoardOpen || renameBoardOpen || !!renameCardTarget} />
        <TextEntrySheet visible={newBoardOpen} title="New board" placeholder="Board name" actionLabel="Create board" onClose={() => setNewBoardOpen(false)} onSubmit={(name) => { const nextId = api.createProject(name); setNewBoardOpen(false); if (nextId) { closeTaskOverlays(); router.replace(`/board/${nextId}`); } }} />
        <TextEntrySheet visible={renameBoardOpen} title="Rename board" initialValue={activeProject.name} placeholder="Board name" onClose={() => setRenameBoardOpen(false)} onSubmit={(name) => { api.renameProject(activeProject.id, name); setRenameBoardOpen(false); }} />
        <TextEntrySheet visible={renameCardTarget !== null} title="Rename card" initialValue={renameCardTarget?.title ?? ""} placeholder="Card name" onClose={() => setRenameCardTarget(null)} onSubmit={(title) => { if (renameCardTarget && tasks.some((task) => task.id === renameCardTarget.id)) api.patchTask(renameCardTarget.id, { title }); setRenameCardTarget(null); }} />
@@ -602,7 +658,7 @@ function CalendarView({ month, setMonth, selectedDay, setSelectedDay, tasks, boa
       onSelectDay={setSelectedDay}
       onTaskPress={onTask}
       onTaskLongPress={onTaskAction}
-      onToday={() => setMonth(calendarMode === "week" ? startOfWeek(now, { weekStartsOn: calendarWeekStart }) : startOfMonth(now))}
+      onToday={() => { setMonth(calendarMode === "week" ? startOfWeek(now, { weekStartsOn: calendarWeekStart }) : startOfMonth(now)); setSelectedDay(startOfDay(now)); }}
     />
     {split && selectedDay ? <CalendarDayTasks day={selectedDay} tasks={dayTasks} boards={boards} now={now} onTask={onTask} onTaskAction={onTaskAction} onAddTask={() => addForDay(selectedDay)} /> : null}
   </View>;

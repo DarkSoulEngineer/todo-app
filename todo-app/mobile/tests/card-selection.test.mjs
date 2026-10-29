@@ -14,12 +14,11 @@ const colors = new Proxy({}, { get: () => "#888888" });
 let expanded = false;
 const mocks = {
   react: { useState: () => [expanded, () => {}] },
-  "react-native": { Pressable: "Pressable", Text: "Text", View: "View", StyleSheet: { create: (value) => value } },
+  "react-native": { Platform: { OS: "web" }, Pressable: "Pressable", Text: "Text", View: "View", StyleSheet: { create: (value) => value } },
   "@expo/vector-icons": { Ionicons: "Ionicons" },
-  "expo-linear-gradient": { LinearGradient: "LinearGradient" },
   "@/providers/theme-provider": { useTheme: () => ({ theme: { scheme: "light" } }) },
   "@/lib/domain/status": { describeDue: () => null },
-  "@/lib/features/card-themes": { detectCardTheme: () => null },
+  "@/lib/domain/constants": { PRIORITY_META: { low: { label: "Low", dot: "#94A3B8", ink: "#64748B", tint: "#64748B22" } } },
   "@/lib/domain/boards": {},
   "./mobile-board-colors": { useMobileBoardColors: () => colors },
 };

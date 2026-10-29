@@ -4,7 +4,8 @@ import { router } from "expo-router";
 import { useMemo, useRef, useState, type ComponentRef } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { OptionSheet, TaskCard, TaskEditor } from "@/components/janus-board-ui";
+import { OptionSheet, TaskEditor } from "@/components/janus-board-ui";
+import { MobileColumnTaskCard } from "@/components/board/mobile-column-task-card";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
 import { Pill, ScreenHeader } from "@/components/reference/mobile/reference-primitives";
 import { useReferenceTheme } from "@/components/reference/reference-theme";
@@ -89,7 +90,7 @@ export default function TopTasksRoute() {
       <SectionHeading title="What to focus on" subtitle="High priority first, then earliest deadlines. Completed and canceled tasks stay out of this list." right={<Pill label={`${visible.length} of ${ranked.length}`} tone="primary" />} />
       {api.isLoading ? <ActivityIndicator accessibilityLabel="Loading top tasks" color={colors.primary} /> : visible.length ? visible.map((entry, index) => <View key={`${entry.projectId}:${entry.task.id}`}>
         <View style={styles.taskHeading}><Text style={[styles.rank, { color: colors.primary }]}>#{index + 1}</Text><Text numberOfLines={1} style={[type.caption, { flex: 1, color: colors.muted }]}>{entry.projectName}</Text></View>
-        <TaskCard task={entry.task} boards={entry.boards} now={now} onPress={() => openTask(entry)} onLongPress={(event) => { if (event) setSmallMenuAnchor(anchorFromEvent(event)); setMenu({ projectId: entry.projectId, taskId: entry.task.id }); }} onActionPress={(event) => { setSmallMenuAnchor(anchorFromEvent(event)); setMenu({ projectId: entry.projectId, taskId: entry.task.id }); }} />
+        <MobileColumnTaskCard task={entry.task} board={entry.boards.find((board) => board.id === entry.task.category)} now={now} selected={false} selectionMode={false} onSelect={() => {}} onPress={() => openTask(entry)} onMenu={(event) => { setSmallMenuAnchor(event ? anchorFromEvent(event) : null); setMenu({ projectId: entry.projectId, taskId: entry.task.id }); }} onToggleSubtask={(subtaskId) => { activateOwner(entry); api.toggleSubtask(entry.task.id, subtaskId); }} />
       </View>) : <EmptyState icon="checkmark-done-outline" title="Nothing needs your attention" message="There are no unfinished tasks across your open boards. Add a task from Home to get started." actionLabel="Go to Home" onAction={() => router.replace("/")} />}
     </ScrollView>
     </BlurTargetView>

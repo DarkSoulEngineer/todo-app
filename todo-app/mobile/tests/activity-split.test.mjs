@@ -10,6 +10,9 @@ const source = await readFile(new URL("../app/board/[id].tsx", import.meta.url),
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
 const ranking = {};
 const navigation = {};
+const ribbonContext = {}, constants = {};
+vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/ribbon-context.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: ribbonContext });
+vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/domain/constants.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: constants });
 vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/navigation-commands.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: navigation });
 vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/lib/features/top-tasks.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: ranking });
 const task = { id: "a", title: "First", priority: "medium", subtasks: [], createdAt: "2026-10-28T10:00:00Z", updatedAt: "2026-10-28T10:00:00Z" };
@@ -19,7 +22,7 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
   const effects = [];
   const boardId = options.boardId ?? "board";
   const states = { 0: mode, 11: selected, 12: visible, 24: options.calendarDay ?? null, 31: options.owner ?? boardId, ...options.states };
-  const api = { tasks, sections: [], boards: [], versions: [], projects: options.projects ?? [{ id: boardId, name: "Board" }], currentProjectId: boardId };
+  const api = { tasks, sections: options.sections ?? [], boards: options.boards ?? [], versions: options.versions ?? [], projects: options.projects ?? [{ id: boardId, name: "Board" }], currentProjectId: boardId, ...options.api };
   const fallback = new Proxy({}, { get: (_, key) => key });
   const mocks = {
     react: { useState: (initial) => { const index = state++; return [index in states ? states[index] : typeof initial === "function" ? initial() : initial, (value) => updates.push([index, value])]; }, useRef: (current) => ({ current }), useEffect: (effect) => effects.push(effect), useMemo: (fn) => fn() },
@@ -29,14 +32,16 @@ function render(width, mode = "list", selected = task, visible = true, tasks = [
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: options.colors ?? colors } }) },
     "@/providers/preferences-provider": { usePreferences: () => ({ boardDisplay: options.boardDisplay ?? { compactCards: false, focusedColumn: false, showMoveArrows: false, zoom: 1 }, setBoardDisplayPreferences: (patch) => options.onDisplayChange?.(patch) }) },
     "@/providers/tasks-provider": { useTasksContext: () => api },
-    "@/providers/toast-provider": { useToast: () => ({}) },
+    "@/providers/toast-provider": { useToast: () => options.toast ?? {} },
     "@/hooks/use-now": { useNow: () => new Date("2026-10-28") },
     "@/lib/domain/tasks-selectors": { sortTasks: (items) => items, matchesQuery: (task) => !(options.hiddenIds ?? []).includes(task.id) },
-    "@/lib/domain/sections": { getTaskSectionId: () => undefined, isCustomSection: () => false },
-    "@/lib/features/ribbon-context": { getRibbonContext: () => ({}) },
+    "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId, isCustomSection: () => false },
+    "@/lib/domain/boards": { boardColor: () => ({ dot: "#888888" }), BOARD_COLORS: [] },
+    "@/lib/features/ribbon-context": ribbonContext,
     "@/lib/features/top-tasks": ranking,
     "@/lib/features/navigation-commands": { createNavigationCommands: (options) => navigation.createNavigationCommands({ ...options, projects: options.projects.map((project) => ({ workspace: { tasks: [], sections: [] }, ...project })) }) },
-    "@/lib/domain/constants": { SORT_OPTIONS: [], PRIORITY_ORDER: [] },
+    "@/lib/domain/constants": constants,
+    "@/lib/data/transfer": { exportWorkspace: async (workspace, name) => options.onExport?.("json", workspace, name), exportWorkspaceCsv: async (workspace, name) => options.onExport?.("csv", workspace, name) },
     "@/theme/layout": { mobileContentStyle: {}, mobileBottomNavClearance: 112 },
   };
   const exports = {};
@@ -51,6 +56,82 @@ function find(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...find(node.props?.children, predicate)];
 }
 const editor = (tree) => find(tree, (node) => node.type === "TaskEditor")[0];
+const commandsFor = (tree) => find(tree, (node) => node.type === "CommandPalette")[0].props.commands;
+
+test("ribbon command coverage follows the current view and includes filters, data, versions and selection", () => {
+  const expected = ["search-tasks", "filter-tags", "clear-filters", "filters-tools", "add-tag", "sort-tasks", "home-tools", "actions-tools", "pin-ribbon", "expand-ribbon", "load-sample", "export-json", "export-csv", "import-board", "save-version", "clear-done", "close-board", "select-mode", "list-visibility"];
+  const board = commandsFor(render(1200, "board", null, false));
+  for (const id of expected) assert.ok(board.some((command) => command.id === id), id);
+  const activity = commandsFor(render(1200, "list"));
+  assert.ok(activity.some((command) => command.id === "filter-tags"));
+  for (const id of ["sort-tasks", "select-mode", "compact", "dragging"]) assert.equal(activity.some((command) => command.id === id), false, id);
+  const insights = commandsFor(render(1200, "insights"));
+  for (const id of ["search-tasks", "filter-tags", "clear-filters", "sort-tasks", "list-visibility"]) assert.equal(insights.some((command) => command.id === id), false, id);
+  assert.equal(commandsFor(render(390, "board", null, false)).some((command) => command.id === "dragging"), false);
+});
+
+test("filter and sort pickers apply choices and clear stale bulk selection", () => {
+  const updates = [];
+  const commands = commandsFor(render(1200, "board", null, false, [task], updates, { boards: [{ id: "work", label: "Work" }], states: { 1: "needle", 7: "work" } }));
+  const filters = commands.find((command) => command.id === "filter-tags");
+  assert.equal(filters.children.find((target) => target.id === "work").selected, true);
+  filters.children.find((target) => target.id === "all").run();
+  assert.ok(updates.some(([index, value]) => index === 7 && value === "all"));
+  assert.ok(updates.some(([index, value]) => index === 28 && value.size === 0));
+  commands.find((command) => command.id === "sort-tasks").children.find((target) => target.id === "priority").run();
+  assert.ok(updates.some(([index, value]) => index === 6 && value === "priority"));
+  commands.find((command) => command.id === "clear-filters").run();
+  assert.ok(updates.some(([index, value]) => index === 1 && value === ""));
+});
+
+test("ribbon commands delegate tab/search/pin actions and exports use live workspace data", async () => {
+  const calls = [];
+  const tree = render(1200, "board", null, false, [task], [], { onExport: (format, workspace) => calls.push([format, workspace.tasks[0].id]) });
+  const ribbon = find(tree, (node) => node.type === "MobileBoardRibbon")[0];
+  ribbon.props.controlsRef.current = { openTab: (tab) => calls.push(tab), focusSearch: () => calls.push("search"), togglePin: () => calls.push("pin"), toggleExpanded: () => calls.push("expand") };
+  const commands = commandsFor(tree);
+  for (const id of ["home-tools", "actions-tools", "filters-tools", "search-tasks", "pin-ribbon", "expand-ribbon", "export-json", "export-csv"]) commands.find((command) => command.id === id).run();
+  await Promise.resolve();
+  assert.deepEqual(calls, ["home", "actions", "filters", "search", "pin", "expand", ["json", "a"], ["csv", "a"]]);
+});
+
+test("version deletion and tag removal wait for explicit confirmation; sample and clear support Undo", () => {
+  const calls = [], toasts = [];
+  const before = { tasks: [task] };
+  const commands = commandsFor(render(1200, "board", null, false, [task], [], {
+    versions: [{ id: "version", label: "Saved version" }], boards: [{ id: "work", label: "Work" }],
+    api: { snapshot: () => before, loadSample: () => calls.push("sample"), restore: (value) => calls.push(value), clearCompleted: () => 2, deleteVersion: (id) => calls.push(id), deleteBoard: (id) => { calls.push(id); return { label: "Work", affected: 1 }; } },
+    toast: { show: (_, options) => toasts.push(options), success: (_, options) => toasts.push(options) },
+  }));
+  const remove = commands.find((command) => command.id === "remove-tag");
+  const removeVersion = commands.find((command) => command.id === "delete-version");
+  assert.equal(remove.children[0].run, undefined);
+  assert.equal(removeVersion.run, undefined);
+  assert.deepEqual(calls, []);
+  remove.children[0].children[0].run();
+  removeVersion.children[0].run();
+  commands.find((command) => command.id === "load-sample").run();
+  toasts.at(-1).action.onPress();
+  commands.find((command) => command.id === "clear-done").children[0].run();
+  toasts.at(-1).action.onPress();
+  assert.deepEqual(calls, ["work", "version", "sample", before, before]);
+});
+
+test("selection commands only affect selected visible cards and require confirmation for deletion", () => {
+  const first = { ...task, sectionId: "list" }, second = { ...task, id: "b", sectionId: "list" };
+  const calls = [], updates = [];
+  const commands = commandsFor(render(1200, "board", null, false, [first, second], updates, {
+    sections: [{ id: "list", title: "List" }], states: { 27: true, 28: new Set(["a"]) },
+    api: { snapshot: () => ({}), toggleComplete: (id) => calls.push(["complete", id]), patchTask: (id, patch) => calls.push([id, patch.priority]), deleteTask: (id) => calls.push(["delete", id]) }, toast: { success() {} },
+  }));
+  commands.find((command) => command.id === "complete-selected").run();
+  commands.find((command) => command.id === "priority-selected").children.find((target) => target.id === "high").run();
+  const remove = commands.find((command) => command.id === "delete-selected");
+  assert.equal(remove.run, undefined);
+  remove.children[0].run();
+  assert.deepEqual(calls, [["complete", "a"], ["a", "high"], ["delete", "a"]]);
+  assert.ok(updates.some(([index, value]) => index === 27 && value === false));
+});
 test("board ribbon restores saved display choices and automatically remembers changes", () => {
   const saved = { compactCards: true, focusedColumn: true, showMoveArrows: true, zoom: 1.2 };
   const updates = [];

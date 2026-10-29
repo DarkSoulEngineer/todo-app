@@ -82,3 +82,18 @@ test("single-key shortcut setting defaults safely, persists, and survives calend
   await app.render().savePreferences({ calendarWeekStart: 0, calendarDefaultView: "week" });
   assert.equal((await provider(app.stored())).render().singleKeyShortcuts, false);
 });
+
+test("ribbon pin defaults safely and both states survive restarts and other preference saves", async () => {
+  for (const raw of [null, JSON.stringify({ ribbonPinned: "true" })]) {
+    assert.equal((await provider(raw)).render().ribbonPinned, false);
+  }
+  const app = await provider(null);
+  app.render().setRibbonPinned(true);
+  assert.equal(app.render().ribbonPinned, true);
+  await app.render().savePreferences({ calendarWeekStart: 0, calendarDefaultView: "week" });
+  app.render().setBoardDisplayPreferences({ compactCards: true });
+  const restarted = await provider(app.stored());
+  assert.equal(restarted.render().ribbonPinned, true);
+  restarted.render().setRibbonPinned(false);
+  assert.equal((await provider(restarted.stored())).render().ribbonPinned, false);
+});

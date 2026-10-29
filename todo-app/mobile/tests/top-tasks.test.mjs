@@ -59,7 +59,7 @@ async function setupRoute(openTasks = Array.from({ length: 12 }, (_, index) => t
   let cursor = 0;
   const projects = [
     { id: "a", name: "Board A", workspace: { tasks: openTasks.slice(0, 2), sections: [], boards: [] } },
-    { id: "b", name: "Board B", workspace: { tasks: openTasks.slice(2), sections: [], boards: [{ id: "tag-b" }] } },
+    { id: "b", name: "Board B", workspace: { tasks: openTasks.slice(2), sections: [], boards: [{ id: "tag-b", label: "Design", color: "violet" }] } },
     { id: "closed", name: "Closed board", closedAt: "2026-10-01", workspace: { tasks: [task("closed-high", "high", "2025-01-01T00:00:00Z")], sections: [], boards: [] } },
   ];
   const api = {
@@ -71,6 +71,7 @@ async function setupRoute(openTasks = Array.from({ length: 12 }, (_, index) => t
       this.currentProjectId = id; this.tasks = project.workspace.tasks; this.sections = project.workspace.sections; this.boards = project.workspace.boards;
     },
     toggleComplete(id) { calls.push(`complete:${this.currentProjectId}:${id}`); this.tasks = this.tasks.map((task) => task.id === id ? { ...task, completed: !task.completed } : task); },
+    toggleSubtask(id, subtaskId) { calls.push(`subtask:${this.currentProjectId}:${id}:${subtaskId}`); this.tasks = this.tasks.map((task) => task.id === id ? { ...task, subtasks: task.subtasks.map((subtask) => subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask) } : task); },
     updateTask(id, draft) { calls.push(`edit:${this.currentProjectId}:${id}`); this.tasks = this.tasks.map((task) => task.id === id ? { ...task, ...draft } : task); },
     assignTaskToSection() {}, setTaskSectionId() {},
   };
@@ -96,7 +97,8 @@ async function setupRoute(openTasks = Array.from({ length: 12 }, (_, index) => t
     "@expo/vector-icons": { Ionicons: "Ionicons" },
     "react-native": { ActivityIndicator: "Loading", Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", View: "View", StyleSheet: { create: (styles) => styles } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
-    "@/components/janus-board-ui": { OptionSheet: "OptionSheet", TaskCard: "TaskCard", TaskEditor: "TaskEditor" },
+    "@/components/janus-board-ui": { OptionSheet: "OptionSheet", TaskEditor: "TaskEditor" },
+    "@/components/board/mobile-column-task-card": { MobileColumnTaskCard: "MobileColumnTaskCard" },
     "@/components/reference/mobile/reference-mobile-bottom-nav": { ReferenceMobileBottomNav: "BottomNav" },
     "@/components/reference/mobile/reference-primitives": { Pill: "Pill", ScreenHeader: "ScreenHeader" },
     "@/components/reference/reference-theme": { useReferenceTheme: () => ({ colors, type: {} }) },
@@ -120,21 +122,21 @@ test("Top Tasks switches 3/10, excludes closed boards, and refills after complet
   const target = find(tree, "BlurTargetView")[0];
   assert.equal(find(target, "BottomNav").length, 0);
   assert.equal(find(tree, "BottomNav")[0].props.blurTarget, target.props.ref);
-  let cards = find(tree, "TaskCard");
+  let cards = find(tree, "MobileColumnTaskCard");
   assert.equal(cards.length, 3);
   assert.equal(cards.some((card) => card.props.task.id === "closed-high"), false);
   assert.equal(cards[0].props.onComplete, undefined);
-  cards[0].props.onLongPress();
+  cards[0].props.onMenu();
   tree = render();
   find(tree, "OptionSheet")[0].props.options.find((option) => option.label === "Complete task").onPress();
   tree = render();
-  cards = find(tree, "TaskCard");
+  cards = find(tree, "MobileColumnTaskCard");
   assert.equal(cards.length, 3);
   assert.equal(cards.some((card) => card.props.task.id === "task-00"), false);
   assert.ok(calls.includes("complete:a:task-00"));
   find(tree, "Pressable").find((button) => button.props.accessibilityLabel === "Show top 10 tasks").props.onPress();
   tree = render();
-  assert.equal(find(tree, "TaskCard").length, 10);
+  assert.equal(find(tree, "MobileColumnTaskCard").length, 10);
   assert.equal(find(tree, "BottomNav")[0].props.active, "top-tasks");
 });
 
@@ -155,7 +157,7 @@ test("Top Tasks exposes board selection and main navigation commands", async () 
 test("editing uses the owning board and changes immediately affect ranking", async () => {
   const { render, calls } = await setupRoute();
   let tree = render();
-  const card = find(tree, "TaskCard").find((card) => card.props.task.id === "task-02");
+  const card = find(tree, "MobileColumnTaskCard").find((card) => card.props.task.id === "task-02");
   card.props.onPress();
   tree = render();
   const editor = find(tree, "TaskEditor")[0];
@@ -165,13 +167,40 @@ test("editing uses the owning board and changes immediately affect ranking", asy
   editor.props.onAutoSave({ ...editor.props.task, priority: "low" }, null);
   tree = render();
   assert.ok(calls.includes("edit:b:task-02"));
-  assert.equal(find(tree, "TaskCard").some((card) => card.props.task.id === "task-02"), false);
+  assert.equal(find(tree, "MobileColumnTaskCard").some((card) => card.props.task.id === "task-02"), false);
+});
+
+test("Priorities shares the board card design and preserves ranks, owner tags and checklist changes", async () => {
+  const tasks = [task("task-00", "high"), task("task-01", "high"), task("task-02", "high", null, {
+    category: "tag-b", subtasks: [{ id: "step", title: "Review notes", done: false }],
+  })];
+  const { render, calls, api } = await setupRoute(tasks);
+  let tree = render();
+  const cards = find(tree, "MobileColumnTaskCard");
+  assert.equal(cards.length, 3);
+  assert.equal(find(tree, "TaskCard").length, 0, "the legacy large cards are no longer used");
+  assert.deepEqual(find(tree, "Text").filter((node) => /^#\d+$/.test(node.props.children)).map((node) => node.props.children), ["#1", "#2", "#3"]);
+  const remote = cards.find((card) => card.props.task.id === "task-02");
+  assert.equal(remote.props.board.id, "tag-b");
+  assert.equal(remote.props.board.label, "Design");
+  assert.equal(remote.props.selected, false);
+  assert.equal(remote.props.selectionMode, false);
+  assert.equal(remote.props.onMoveLeft, undefined);
+  remote.props.onMenu();
+  tree = render();
+  assert.equal(find(tree, "OptionSheet")[0].props.title, "task-02");
+  assert.equal(api.currentProjectId, "a", "opening actions does not switch the active board");
+  remote.props.onToggleSubtask("step");
+  assert.deepEqual(calls, ["switch:b", "subtask:b:task-02:step"]);
+  tree = render();
+  assert.equal(find(tree, "MobileColumnTaskCard").find((card) => card.props.task.id === "task-02").props.task.subtasks[0].done, true);
+  assert.equal(find(tree, "MobileColumnTaskCard").length, 3, "checking a step does not complete or remove the task");
 });
 
 test("empty overview offers Home rather than a global calendar", async () => {
   const { render, calls } = await setupRoute([]);
   const tree = render();
-  assert.equal(find(tree, "TaskCard").length, 0);
+  assert.equal(find(tree, "MobileColumnTaskCard").length, 0);
   find(tree, "EmptyState")[0].props.onAction();
   assert.deepEqual(calls, ["/"]);
 });
@@ -192,11 +221,13 @@ test("board calendars remain available and honor saved view and week-start prefe
     });
     const now = new Date(2026, 9, 27);
     let anchor;
-    const tree = exports.CalendarView({ month: now, selectedDay: null, tasks: [], now, setMonth: (day) => { anchor = day; } });
+    let selectedDay;
+    const tree = exports.CalendarView({ month: now, selectedDay: null, tasks: [], now, setMonth: (day) => { anchor = day; }, setSelectedDay: (day) => { selectedDay = day; } });
     const panel = find(tree, "CalendarPanel")[0];
     assert.equal(panel.props.mode, calendarDefaultView);
     assert.equal(panel.props.weekStartsOn, calendarWeekStart);
     panel.props.onToday();
+    assert.equal(selectedDay.getTime(), now.getTime());
     if (calendarDefaultView === "week") assert.equal(anchor.getDay(), 0);
     else assert.equal(anchor.getDate(), 1);
   }

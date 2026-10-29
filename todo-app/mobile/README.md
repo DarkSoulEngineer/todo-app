@@ -102,25 +102,40 @@ shortcuts available on the current screen.
 
 On web (including tablet browsers with a hardware keyboard):
 
-- **Ctrl/⌘ K** or **Ctrl/⌘ Shift P** opens commands; **?** opens shortcut help.
+- **/** opens commands; **?** (**Shift + /**) opens shortcut help.
 - **B** creates a board. Inside a board, **N** creates a card, **L** creates a list,
   **R** chooses a card to rename, and **Shift R** renames the board.
-- **Alt + arrow keys** chooses a card to move: left/right between visible lists,
+- **Shift + arrow keys** chooses a card to move: left/right between visible lists,
   up/down within its list. Moves have Undo and stop at boundaries.
-- **Shift B** (or **Ctrl/⌘ Shift B**) opens searchable board selection on Home,
+- **Shift B** opens searchable board selection on Home,
   boards, Top Tasks, and Settings. **[ / ]** cycles through open boards.
-- **Alt 1/2/3** opens Home / board selection, Top Tasks, or Settings.
-  **Ctrl/⌘ ,** also opens Settings.
+- **Shift H/T/S** opens Home / board selection, Top Tasks, or Settings.
 - Inside a board, **1/2/3/4** switches to Board / Activity / Calendar / Insights.
   The palette also offers compact cards, focused columns, move arrows, dragging,
   and zoom controls.
-- In the palette, **↑/↓** or **Ctrl J/K** selects, **Enter** runs, and **Esc** goes
+- **Q** focuses task search, **F** picks a tag filter, **Shift F** clears search
+  and filters, **O** picks card sorting, **Shift L** creates a tag, and **Shift X**
+  removes a tag (after confirmation).
+- **K/G/W** toggles compact cards / focused column / move arrows; **=/-/0** zooms
+  in / out / resets. **Shift D** toggles dragging on tablet/desktop Board view.
+- **Shift U/O/V** reveals Home / Actions / Hidden ribbon tools; **Shift P** pins
+  or unpins the ribbon. Hidden tools are available only when lists are hidden.
+- **V** enters/exits card selection. While selecting, use the palette to select
+  individual cards; **A/U** selects/unselects all visible cards, **D/C/Shift C**
+  completes/cancels/restores selected cards, **M** moves them, and **P** sets priority.
+- Other ribbon actions—including list visibility, sample data, import/export,
+  saved versions, clearing completed cards, and closing a board—are searchable
+  commands. Destructive palette actions have a confirmation step. Commands and
+  help only show actions available in the current view and selection state.
+- In the palette, **↑/↓** selects, **Enter** runs, and **Esc** goes
   back or closes. Typing filters commands and targets.
 
 Global shortcuts pause in text fields and dialogs. Native Android/iOS supports
 the same commands by touch; global hardware-keyboard shortcuts are web-only.
-In **Settings → Keyboard**, single-key shortcuts can be disabled; modified
-shortcuts, commands by touch, and **?** help stay available. This setting is
+Ctrl, Command, and Alt combinations are never intercepted, including while the
+palette is open, so browser shortcuts keep working.
+In **Settings → Keyboard**, quick-action single-key shortcuts (including Shift
+combinations) can be disabled; **/** commands, commands by touch, and **?** help stay available. This setting is
 device-local and is not included in preference backup files.
 
 ## Lists and cancellation

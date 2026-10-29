@@ -11,7 +11,8 @@ export function KeyboardSettings({ onHelp }: { onHelp: () => void }) {
       <View style={{ flex: 1 }}><Text style={{ color: c.foreground, fontWeight: "700" }}>Single-key shortcuts</Text><Text style={[styles.hint, { color: c.mutedForeground }]}>Inside a board: N/B/L/R, 1–4 for views. Shift B opens board selection; [ / ] changes boards. Turn off to avoid accidental actions.</Text></View>
       <Text style={{ color: c.primary, fontWeight: "700" }}>{singleKeyShortcuts ? "On" : "Off"}</Text>
     </Pressable>
-    <Text style={[styles.hint, { color: c.mutedForeground }]}>Ctrl/⌘ K: commands · Ctrl/⌘ Shift B: change board · Alt 1/2/3: Home / Top Tasks / Settings. Shortcuts pause in text fields and dialogs; hardware shortcuts are web-only.</Text>
+    <Text style={[styles.hint, { color: c.mutedForeground }]}>/ opens commands · ? (Shift + /) opens help · Shift B changes board · Shift H/T/S opens Home / Top Tasks / Settings. Ctrl, Command and Alt shortcuts are left to your browser. Shortcuts pause in text fields and dialogs; hardware shortcuts are web-only. / and ? stay available when single-key shortcuts are off.</Text>
+    <Text style={[styles.hint, { color: c.mutedForeground }]}>Board tools: Q search · F tag filter · Shift F clear filters · O sort · V select cards · Shift P pin ribbon. The help view lists every shortcut available in the current view. All other ribbon actions are searchable with /.</Text>
     <Button label="View keyboard shortcuts" variant="outline" onPress={onHelp} />
   </View>;
 }
