@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, isValid, parseISO } from "date-fns";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, createElement, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Svg } from "react-native-svg";
 import {
   Platform,
@@ -418,7 +418,38 @@ function TaskEditorForm({
                   </Pressable>
                   {dueAt ? <Pressable accessibilityRole="button" accessibilityLabel="Clear due date" onPress={() => setDueAt(null)} style={({ pressed }) => [styles.taskEditorClearDue, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}><Ionicons name="close" size={18} color={theme.colors.mutedForeground} /></Pressable> : null}
                 </View>
-                {picker ? <View style={styles.taskEditorPicker}><DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /></View> : null}
+                {picker ? (Platform.OS === "web" ? <View style={styles.taskEditorPicker}>
+                  {picker === "date" ? createElement("input", {
+                    type: "date",
+                    value: format(dateValue, "yyyy-MM-dd"),
+                    onChange: (event: any) => {
+                      const value = event?.target?.value;
+                      if (value) {
+                        const selected = new Date(`${value}T00:00:00`);
+                        if (!Number.isNaN(selected.getTime())) {
+                          selected.setHours(dateValue.getHours(), dateValue.getMinutes(), 0, 0);
+                          updateDate(selected);
+                        }
+                      }
+                      setPicker(null);
+                    },
+                    style: { width: "100%", minHeight: 40, paddingHorizontal: 10, borderRadius: 8, border: "1px solid", borderColor: theme.colors.border, backgroundColor: theme.colors.input, color: theme.colors.foreground },
+                  }) : createElement("input", {
+                    type: "time",
+                    value: format(dateValue, "HH:mm"),
+                    onChange: (event: any) => {
+                      const value = event?.target?.value;
+                      if (value) {
+                        const [hours, minutes] = value.split(":").map((part: string) => Number(part));
+                        const selected = new Date(dateValue);
+                        selected.setHours(Number.isNaN(hours) ? 0 : hours, Number.isNaN(minutes) ? 0 : minutes, 0, 0);
+                        updateDate(selected);
+                      }
+                      setPicker(null);
+                    },
+                    style: { width: "100%", minHeight: 40, paddingHorizontal: 10, borderRadius: 8, border: "1px solid", borderColor: theme.colors.border, backgroundColor: theme.colors.input, color: theme.colors.foreground },
+                  })}
+                </View> : <View style={styles.taskEditorPicker}><DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /></View>) : null}
               </View>
               </View>
               </View>
@@ -710,7 +741,21 @@ export function InsightsPanel({ tasks, boards, now, onReset, onExport }: Insight
           <Chip label="All boards" active={filters.boardId === "all"} onPress={() => updateFilters({ boardId: "all" })} />
           {boards.map((board) => <Chip key={board.id} label={board.label} color={boardColor(board.color).dot} active={filters.boardId === board.id} onPress={() => updateFilters({ boardId: board.id })} />)}
         </ScrollView>
-          {picker ? <DateTimePicker value={dateForPicker} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} maximumDate={now} onChange={(event, selected) => { if (selected) chooseCustomDate(selected); else setPicker(null); }} /> : null}
+          {picker ? (Platform.OS === "web" ? createElement("input", {
+            type: "date",
+            value: format(dateForPicker, "yyyy-MM-dd"),
+            max: format(now, "yyyy-MM-dd"),
+            onChange: (event: any) => {
+              const value = event?.target?.value;
+              if (value) {
+                const selected = new Date(`${value}T00:00:00`);
+                if (!Number.isNaN(selected.getTime())) chooseCustomDate(selected);
+              } else {
+                setPicker(null);
+              }
+            },
+            style: { width: "100%", minHeight: 40, paddingHorizontal: 10, borderRadius: 8, border: "1px solid", borderColor: theme.colors.border, backgroundColor: theme.colors.input, color: theme.colors.foreground },
+          }) : <DateTimePicker value={dateForPicker} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} maximumDate={now} onChange={(event, selected) => { if (selected) chooseCustomDate(selected); else setPicker(null); }} />) : null}
         </Card>
       </View>
 
