@@ -74,6 +74,24 @@ test("list backgrounds wrap their content with navigation clearance outside the 
   assert.equal(contentStyle.paddingBottom, 32, "holders extend to a 12-point bottom gap plus the safe area");
 });
 
+test("focused tabs fit their touch targets without clipping or shrinking into the column", () => {
+  for (const viewport of [390, 768, 1440]) {
+    width = viewport;
+    const tree = renderColumns({ focused: true });
+    const rail = nodes(tree).find((node) => node.type === "ScrollView" && node.props.horizontal);
+    const tab = nodes(rail).find((node) => node.props?.accessibilityRole === "tab");
+    const tabStyle = Object.assign({}, ...tab.props.style);
+    assert.equal(rail.props.style.flexShrink, 0);
+    assert.equal(tabStyle.minHeight, 44);
+    assert.ok(rail.props.style.height >= tabStyle.minHeight + rail.props.contentContainerStyle.paddingVertical * 2);
+    const scroll = nodes(tree).find((node) => node.props?.testID === "janus-focused-scroll");
+    const holder = nodes(tree).find((node) => Array.isArray(node.props?.style) && node.props.children?.includes?.(scroll));
+    assert.equal(holder.props.style[1].marginHorizontal, rail.props.contentContainerStyle.paddingHorizontal);
+    assert.equal(holder.props.style[1].marginTop, undefined);
+  }
+  width = 1440;
+});
+
 test("header and trailing Add card buttons target the correct list in normal and focused views", () => {
   for (const focused of [false, true]) {
     const added = [];

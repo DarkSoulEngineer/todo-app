@@ -12,6 +12,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
   type GestureResponderEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +21,7 @@ import { mobileBottomNavClearance } from "@/theme/layout";
 import { useOpenSession } from "@/hooks/use-open-session";
 import { AnchoredMenu, useAnchoredMenus, type MenuAnchor, type MenuOption } from "@/components/ui/anchored-menu";
 import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
+import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -219,6 +221,9 @@ function TaskEditorForm({
 }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const windowed = presentation === "sheet" && width >= 768;
+  const wideForm = presentation === "panel" || windowed;
   const [title, setTitle] = useState(() => task?.title ?? "");
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
@@ -310,29 +315,29 @@ function TaskEditorForm({
     setSubtasks((current) => [...current, { id: `local-${Date.now()}`, title: subtaskTitle.trim(), done: false }]);
     setSubtaskTitle("");
   };
-  const footer = <View style={[styles.taskEditorFooter, { borderTopColor: theme.colors.border, paddingBottom: presentation === "panel" ? 12 : Math.max(insets.bottom, 12) }]}>
-    {task ? <View style={[styles.taskEditorFooterActions, presentation === "panel" && styles.taskEditorPanelActions]}>
-      <Button variant="secondary" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} style={presentation === "panel" ? styles.taskEditorPanelPrimary : styles.taskEditorFooterPrimary} />
+  const footer = <View style={[styles.taskEditorFooter, windowed && styles.taskEditorWindowFooter, { borderTopColor: theme.colors.border, paddingBottom: wideForm ? 12 : Math.max(insets.bottom, 12), backgroundColor: windowed ? theme.colors.backgroundAlt : undefined }]}>
+    {task ? <View style={[styles.taskEditorFooterActions, wideForm && styles.taskEditorPanelActions]}>
+      <Button variant="secondary" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} style={wideForm ? styles.taskEditorPanelPrimary : styles.taskEditorFooterPrimary} />
       <Button variant="ghost" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={styles.taskEditorDeleteButton}>
         <Ionicons name="trash-outline" size={17} color={theme.colors.destructive} />
         <Text style={{ color: theme.colors.destructive, fontSize: 14, fontWeight: "600" }}>Delete</Text>
       </Button>
-    </View> : <Button label="Add task" onPress={save} />}
+    </View> : <Button label="Add task" onPress={save} style={windowed ? styles.taskEditorWindowPrimary : undefined} />}
   </View>;
   const priorityControl = <View style={styles.wrapRow}>{PRIORITY_ORDER.map((item) => <Chip key={item} label={PRIORITY_META[item].label} active={priority === item} color={PRIORITY_META[item].dot} onPress={() => setPriority(item)} />)}</View>;
   const tagChips = boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
   const listChips = sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />);
-  const tagsControl = presentation === "panel" ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
-  const listsControl = presentation === "panel" ? <View testID="task-editor-lists-wrap" style={styles.wrapRow}>{listChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{listChips}</ScrollView>;
+  const tagsControl = wideForm ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
+  const listsControl = wideForm ? <View testID="task-editor-lists-wrap" style={styles.wrapRow}>{listChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{listChips}</ScrollView>;
   const content = <>
-            <View style={styles.taskEditorHeader}>
+            {!windowed ? <View style={styles.taskEditorHeader}>
               <View style={styles.taskEditorHeaderCopy}>
                 <Text accessibilityRole="header" style={[styles.taskEditorTitle, { color: theme.colors.foreground }]}>{task ? "Task" : "Create"}</Text>
                 <Text style={[styles.taskEditorSubtitle, { color: theme.colors.mutedForeground }]}>{task ? "Changes save automatically" : "Start with a title. Details can wait."}</Text>
               </View>
               {presentation === "sheet" ? <IconButton icon="close" label="Close task editor" onPress={closeEditor} size={40} /> : null}
-            </View>
-            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={presentation === "panel"} style={[styles.taskEditorScroll, presentation === "panel" ? { flex: 1 } : null]} contentContainerStyle={[styles.taskEditorContent, presentation === "panel" ? { paddingBottom: mobileBottomNavClearance + insets.bottom } : null]}>
+            </View> : null}
+            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={wideForm} style={[styles.taskEditorScroll, wideForm ? { flex: 1 } : null]} contentContainerStyle={[styles.taskEditorContent, presentation === "panel" ? { paddingBottom: mobileBottomNavClearance + insets.bottom } : null]}>
               <View testID="task-editor-title-field">
               <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
               <TextInput
@@ -344,7 +349,7 @@ function TaskEditorForm({
                 returnKeyType="next"
                 accessibilityLabel="Task title"
                 accessibilityHint="Required"
-                style={[styles.taskEditorTitleInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: titleError ? theme.colors.destructive : theme.colors.border }]}
+                style={[styles.taskEditorTitleInput, windowed && styles.taskEditorWindowInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: titleError ? theme.colors.destructive : theme.colors.border }]}
               />
               {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
               </View>
@@ -356,16 +361,16 @@ function TaskEditorForm({
                 placeholder="Add a little context"
                 placeholderTextColor={theme.colors.mutedForeground}
                 multiline
-                style={[styles.taskEditorNotes, presentation === "panel" && styles.taskEditorPanelNotes, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
+                style={[styles.taskEditorNotes, wideForm && styles.taskEditorPanelNotes, windowed && styles.taskEditorWindowInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
               />
               </View>
-              <View testID="task-editor-priority-schedule-row" style={presentation === "panel" ? styles.taskEditorPanelRow : undefined}>
-              <View testID="task-editor-priority-field" style={presentation === "panel" ? styles.taskEditorPanelField : undefined}>
-              <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground, marginTop: 18 }]}>{presentation === "panel" ? "PRIORITY" : "ORGANIZE"}</Text>
-              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border, marginTop: 6 }]}>
-                {presentation === "sheet" ? <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground }]}>PRIORITY</Text> : null}
+              <View testID="task-editor-priority-schedule-row" style={wideForm ? styles.taskEditorPanelRow : undefined}>
+              <View testID="task-editor-priority-field" style={wideForm ? styles.taskEditorPanelField : undefined}>
+              <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground, marginTop: 18 }]}>{wideForm ? "PRIORITY" : "ORGANIZE"}</Text>
+                <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border, marginTop: 6 }]}>
+                {!wideForm ? <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground }]}>PRIORITY</Text> : null}
                 {priorityControl}
-                {presentation === "sheet" ? <>
+                {!wideForm ? <>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
                 {tagsControl}
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
@@ -373,12 +378,12 @@ function TaskEditorForm({
                 </> : null}
               </View>
               </View>
-              <View testID="task-editor-schedule-field" style={presentation === "panel" ? styles.taskEditorPanelField : undefined}>
+              <View testID="task-editor-schedule-field" style={wideForm ? styles.taskEditorPanelField : undefined}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>SCHEDULE</Text>
                 <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>OPTIONAL</Text>
               </View>
-              <View style={[styles.taskEditorSection, { borderColor: theme.colors.border, marginTop: 6 }]}>
+              <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border, marginTop: 6 }]}>
                 <View style={styles.taskEditorDateRow}>
                   <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due ${format(dateValue, "MMMM d, yyyy")}` : "Set due date"} onPress={() => setPicker("date")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}>
                     <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
@@ -394,14 +399,14 @@ function TaskEditorForm({
               </View>
               </View>
               </View>
-              {presentation === "panel" ? <View testID="task-editor-tags-list-row" style={styles.taskEditorPanelRow}>
+              {wideForm ? <View testID="task-editor-tags-list-row" style={styles.taskEditorPanelRow}>
                 <View style={styles.taskEditorPanelField}>
                   <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
-                  <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>{tagsControl}</View>
+                  <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border }]}>{tagsControl}</View>
                 </View>
                 <View style={styles.taskEditorPanelField}>
                   <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
-                  <View style={[styles.taskEditorSection, { borderColor: theme.colors.border }]}>{listsControl}</View>
+                  <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border }]}>{listsControl}</View>
                 </View>
               </View> : null}
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
@@ -417,6 +422,7 @@ function TaskEditorForm({
             {presentation === "sheet" ? footer : null}
     </>;
   if (presentation === "panel") return visible ? <View style={{ flex: 1, minHeight: 0, paddingTop: 12, backgroundColor: "transparent" }}>{content}</View> : null;
+  if (windowed) return <EditorWindow visible={visible} title={task ? "Edit task" : "Create task"} subtitle={task ? undefined : "Start with a title. Details can wait."} onClose={closeEditor}>{content}</EditorWindow>;
   return <BottomSheetModal visible={visible} onClose={closeEditor} style={styles.taskEditorSheet}>{content}</BottomSheetModal>;
 }
 
@@ -749,6 +755,9 @@ const styles = StyleSheet.create({
   boardCardNewFooterBtnText: { fontSize: 12 },
   boardCardNewRemoveText: { fontSize: 12, fontWeight: "500" },
   taskEditorSheet: { paddingTop: 10, borderTopLeftRadius: 28, borderTopRightRadius: 28, shadowRadius: 22, shadowOffset: { width: 0, height: -8 }, elevation: 16 },
+  taskEditorWindowFooter: { flexShrink: 0, alignItems: "flex-end" },
+  taskEditorWindowPrimary: { minWidth: 140, borderRadius: 6 },
+  taskEditorWindowInput: { borderRadius: 6, fontSize: 15 },
   taskEditorHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 18, paddingBottom: 4 },
   taskEditorHeaderCopy: { flex: 1, minWidth: 0 },
   taskEditorTitle: { fontSize: 24, lineHeight: 30, fontWeight: "700", letterSpacing: -0.3 },

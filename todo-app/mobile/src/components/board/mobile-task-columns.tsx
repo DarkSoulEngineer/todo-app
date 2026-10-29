@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   insertLine: { position: "absolute", top: -5, left: 0, right: 0, height: 3, borderRadius: 2, zIndex: 20 },
   cardScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 }, cards: { gap: 8, paddingHorizontal: 1, paddingBottom: 4 }, add: { minHeight: 110, borderWidth: 1, borderStyle: "dashed", borderRadius: 20, justifyContent: "center", alignItems: "center", padding: 20 }, empty: { borderWidth: 1, borderStyle: "dashed", borderRadius: 8, paddingVertical: 25, paddingHorizontal: 12, textAlign: "center", fontSize: 12 },
   addSection: { alignSelf: "flex-start", borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
-  tabsRail: { flexGrow: 0, maxHeight: 45 }, tabs: { gap: 5, padding: 8 }, tab: { minHeight: 30, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { margin: 10 },
+  tabsRail: { flexGrow: 0, flexShrink: 0, height: 60 }, tabs: { gap: 5, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" }, tab: { minHeight: 44, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { marginHorizontal: 10, marginBottom: 10 },
 });
 
 

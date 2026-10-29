@@ -328,6 +328,7 @@ test("split editors use a flush classic panel surface while mobile sheets keep t
 });
 
 test("switching cards flushes a debounced draft to the previous task, not the next task", async () => {
+  let editorWidth = 390;
   const editorSource = await readFile(new URL("../src/components/janus-board-ui.tsx", import.meta.url), "utf8");
   const compiled = ts.transpileModule(editorSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const slots = [];
@@ -342,7 +343,7 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
   const editorColors = new Proxy({ card: "#211C17", backgroundAlt: "#191510", cardElevated: "#29231D" }, { get: (target, key) => target[key] ?? "#888888" });
   const mocks = {
     react,
-    "react-native": { View: "View", Text: "Text", TextInput: "TextInput", ScrollView: "ScrollView", Pressable: "Pressable", Platform: { OS: "web" }, StyleSheet: { create: (v) => v } },
+    "react-native": { View: "View", Text: "Text", TextInput: "TextInput", ScrollView: "ScrollView", Pressable: "Pressable", Platform: { OS: "web" }, StyleSheet: { create: (v) => v }, useWindowDimensions: () => ({ width: editorWidth, height: 900 }) },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: editorColors } }) },
     "@/hooks/use-open-session": { useOpenSession: () => 0 },
@@ -390,6 +391,16 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
   find(tree, (node) => node.props?.accessibilityLabel === "Task title")[0].props.onChangeText("Edited just before switching");
   tree = renderForm(props);
   // A layout resize preserves the form hooks and doesn't save prematurely.
+  editorWidth = 1200;
+  tree = renderForm({ ...props, presentation: "sheet" });
+  assert.equal(tree.type, "EditorWindow");
+  assert.equal(tree.props.title, "Edit task");
+  assert.equal(tree.props.subtitle, undefined);
+  assert.equal(find(tree, (node) => node.props?.testID === "task-editor-tags-list-row").length, 1);
+  assert.equal(find(tree, (node) => node.type === "ScrollView" && node.props.horizontal).length, 0);
+  assert.equal(find(tree, (node) => node.props?.accessibilityLabel === "Task title")[0].props.value, "Edited just before switching");
+  assert.equal(saves.length, 0);
+  editorWidth = 390;
   tree = renderForm({ ...props, presentation: "sheet" });
   assert.equal(tree.props.style.backgroundColor, undefined, "mobile sheet keeps its own original surface");
   assert.equal(find(tree, (node) => node.props?.label === "Close task editor").length, 1);
