@@ -532,15 +532,11 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
   assert.equal(pairedRow.props.children[1].props.testID, "task-editor-schedule-field");
   assert.equal(field("task-editor-tags-list-row").props.style.flexWrap, "wrap");
   assert.equal(field("task-editor-tags-wrap").props.style.flexWrap, "wrap");
-  assert.equal(field("task-editor-lists-wrap").props.style.flexWrap, "wrap");
-  find(tree, (node) => node.props?.label === "High")[0].props.onPress();
-  find(tree, (node) => node.props?.label === "Second list")[0].props.onPress();
   find(tree, (node) => node.props?.accessibilityRole === "checkbox")[0].props.onPress();
   find(tree, (node) => node.props?.accessibilityLabel === "Set due date")[0].props.onPress();
   tree = renderForm(props);
   assert.equal(find(tree, (node) => node.props?.mode === "date").length, 1, "schedule picker still opens");
   assert.equal(find(tree, (node) => node.props?.label === "High")[0].props.active, true);
-  assert.equal(find(tree, (node) => node.props?.label === "Second list")[0].props.active, true);
   assert.equal(find(tree, (node) => node.props?.accessibilityRole === "checkbox")[0].props.accessibilityState.checked, true);
   find(tree, (node) => node.props?.accessibilityLabel === "Task title")[0].props.onChangeText("Edited just before switching");
   tree = renderForm(props);
@@ -561,7 +557,6 @@ test("switching cards flushes a debounced draft to the previous task, not the ne
   assert.equal(find(tree, (node) => node.props?.testID === "task-editor-tags-list-row").length, 0);
   assert.equal(find(tree, (node) => node.type === "ScrollView" && node.props.horizontal).length, 2, "mobile keeps its horizontal tag and list rails");
   assert.equal(find(tree, (node) => node.props?.label === "High")[0].props.active, true);
-  assert.equal(find(tree, (node) => node.props?.label === "Second list")[0].props.active, true);
   assert.equal(saves.length, 0);
   assert.equal(find(tree, (node) => node.props?.accessibilityLabel === "Task title")[0].props.value, "Edited just before switching");
   slots.forEach((slot) => slot?.cleanup?.());

@@ -228,7 +228,7 @@ function TaskEditorForm({
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [category, setCategory] = useState<string | null>(() => task?.category ?? null);
-  const [sectionId, setSectionId] = useState<string | null>(() => task ? getTaskSectionId(task, sections, new Date()) ?? null : null);
+  const [sectionId] = useState<string | null>(() => task ? getTaskSectionId(task, sections, new Date()) ?? null : null);
   const [dueAt, setDueAt] = useState<string | null>(() => task?.dueAt ?? initialDueAt ?? null);
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => task?.subtasks.map((item) => ({ ...item })) ?? []);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -351,9 +351,9 @@ function TaskEditorForm({
     </View>
   );
   const tagChips = boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
-  const listChips = sections.map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />);
+
   const tagsControl = wideForm ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
-  const listsControl = wideForm ? <View testID="task-editor-lists-wrap" style={styles.wrapRow}>{listChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{listChips}</ScrollView>;
+
   const content = <>
             {!windowed ? <View style={styles.taskEditorHeader}>
               <View style={styles.taskEditorHeaderCopy}>
@@ -398,8 +398,6 @@ function TaskEditorForm({
                 {!wideForm ? <>
                 <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
                 {tagsControl}
-                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
-                {listsControl}
                 </> : null}
               </View>
               </View>
@@ -428,10 +426,6 @@ function TaskEditorForm({
                 <View style={styles.taskEditorPanelField}>
                   <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
                   <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border }]}>{tagsControl}</View>
-                </View>
-                <View style={styles.taskEditorPanelField}>
-                  <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
-                  <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border }]}>{listsControl}</View>
                 </View>
               </View> : null}
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
