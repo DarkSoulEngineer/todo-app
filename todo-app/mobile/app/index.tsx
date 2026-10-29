@@ -111,7 +111,7 @@ export default function BoardManagerScreen() {
   };
   const reopenBoard = (project: JanusProject) => {
     if (!reopenProject(project.id)) return;
-    router.push(`/board/${project.id}`);
+    // toast.success("Board reopened"); // optional, navigation handled elsewhere
   };
   const reorderBoard = (sourceId: string, targetId: string) => {
     if (!managerReady || !editMode) return;
@@ -126,7 +126,7 @@ export default function BoardManagerScreen() {
   const openProject = (id: string) => {
     const project = projects.find((entry) => entry.id === id);
     if (!project) return;
-    if (project.closedAt) { promptClosed(project); return; }
+    if (project.closedAt) { /* was automatically opening; now does nothing per request */ return; }
     switchProject(id);
     router.push(`/board/${id}`);
   };
@@ -170,7 +170,7 @@ export default function BoardManagerScreen() {
   };
   const duplicate = (project: JanusProject) => {
     const id = duplicateProject(project.id);
-    if (id) { toast.success("Board duplicated"); router.push(`/board/${id}`); }
+    if (id) { toast.success("Board duplicated"); }
   };
   const navigate = (tab: ReferenceMobileTab) => {
     if (tab === "top-tasks") router.replace("/top-tasks");
