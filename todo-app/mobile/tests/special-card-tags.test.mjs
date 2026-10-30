@@ -5,12 +5,14 @@ import test from "node:test";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url), cache = new Map();
+let viewportWidth = 1024;
 const mocks = {
   react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}], useRef: (current) => ({ current }), useCallback: (fn) => fn, useMemo: (fn) => fn(), useEffect() {} },
-  "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (styles) => styles } },
-  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { card: "#211C17", success: "#45BF82", successSoft: "#1D3A2C", destructive: "#F36164", destructiveSoft: "#431B1D", mutedForeground: "#B0A79C", secondary: "#29231D", border: "#342D25", borderStrong: "#4A4035" } } }) },
+  "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (styles) => styles, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: viewportWidth }) },
+  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { card: "#211C17", cardElevated: "#29231D", backgroundAlt: "#181512", primary: "#D9A441", primarySoft: "#3A2E19", success: "#45BF82", successSoft: "#1D3A2C", destructive: "#F36164", destructiveSoft: "#431B1D", mutedForeground: "#B0A79C", secondary: "#29231D", border: "#342D25", borderStrong: "#4A4035" } } }) },
   "@expo/vector-icons": { Ionicons: "Ionicons" },
   "@/components/ui/sheet": { Sheet: "Sheet" },
+  "@/components/ui/editor-window": { EditorWindow: "EditorWindow" },
   "./tactile": { tactileSurface: () => ({}) },
   "@/lib/domain/projects": {}, "@/lib/data/versions": {},
 };
@@ -110,18 +112,38 @@ test("direct Complete, Cancel and Restore actions synchronize the exclusive stat
   assert.deepEqual(api.snapshot().tasks[0].tags, ["Work", "Halloween"]);
 });
 
-test("moving between specially named holders never changes tags, status or design", () => {
+test("moving into status-named sections applies matching status tags without affecting ordinary sections", () => {
   const api = useTasks();
-  const task = createTask(draft({ tags: ["Halloween", "Done"] }));
+  const task = createTask(draft({ tags: ["Work", "Halloween"] }));
   const sections = ["Done", "Canceled", "Overdue", "Christmas"].map((title, index) => ({ id: String(index), title }));
   api.restore(workspace([task], sections));
-  for (const section of sections) {
-    api.assignTaskToSection(task.id, section.id);
-    const moved = api.snapshot().tasks[0];
-    assert.equal(moved.completed, true);
-    assert.deepEqual(moved.tags, ["Halloween", "Done"]);
-    assert.equal(themes.resolveCardDecoration(moved.tags, deriveStatus(moved, now))?.id, "halloween");
-  }
+  api.assignTaskToSection(task.id, "0");
+  let moved = api.snapshot().tasks[0];
+  assert.equal(moved.completed, true);
+  assert.deepEqual(moved.tags, ["Work", "Halloween", "Done"]);
+  const completedAt = moved.completedAt;
+  assert.equal(themes.resolveCardDecoration(moved.tags, deriveStatus(moved, now))?.id, "done");
+
+  api.assignTaskToSection(task.id, "0");
+  assert.equal(api.snapshot().tasks[0].completedAt, completedAt, "moving into the same completed section preserves completion time");
+
+  api.assignTaskToSection(task.id, "1");
+  moved = api.snapshot().tasks[0];
+  assert.equal(moved.completed, false);
+  assert.equal(moved.canceled, true);
+  assert.deepEqual(moved.tags, ["Work", "Halloween", "Canceled"]);
+
+  api.assignTaskToSection(task.id, "2");
+  moved = api.snapshot().tasks[0];
+  assert.equal(moved.completed, false);
+  assert.equal(moved.canceled, false);
+  assert.deepEqual(moved.tags, ["Work", "Halloween", "Overdue"]);
+
+  api.assignTaskToSection(task.id, "3");
+  moved = api.snapshot().tasks[0];
+  assert.equal(moved.completed, false);
+  assert.equal(moved.canceled, false);
+  assert.deepEqual(moved.tags, ["Work", "Halloween", "Overdue"], "ordinary and event tags are retained on ordinary section moves");
 });
 
 test("name-based event designs migrate once, and removing a migrated tag stays removed", () => {
@@ -277,7 +299,13 @@ test("Actions debug controls trigger each corresponding picker option and reset"
   const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
   const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
   let opened = false;
+  viewportWidth = 375;
+  const phoneTree = nodes(EventDebugButton({ onOpenChange: (open) => { opened = open; } }));
+  assert.ok(phoneTree.some((node) => node.type === "Sheet"), "phones use the bottom sheet");
+  assert.ok(!phoneTree.some((node) => node.type === "EditorWindow"), "phones do not use the desktop window");
+  viewportWidth = 1024;
   const controls = nodes(EventDebugButton({ onOpenChange: (open) => { opened = open; } }));
+  assert.ok(controls.some((node) => node.type === "EditorWindow"), "tablets and web use the centered editor window");
   controls.find((node) => node.props?.accessibilityLabel === "Debug events").props.onPress();
   assert.equal(opened, true);
   for (const entry of themes.SEASONAL_CARD_THEMES) {

@@ -19,7 +19,7 @@ const cardThemes = await load("../src/lib/features/card-themes.ts");
 const colors = { card: "#303030", primary: "#aabb22", primarySoft: "#aabb2222", border: "#444444", foreground: "#eeeecc", mutedForeground: "#aaaaaa", backgroundAlt: "#202020", success: "#66cc88", successSoft: "#66cc8822", destructive: "#ff9988", destructiveSoft: "#ff998822", secondary: "#404040" };
 let scheme = "dark", platform = "web";
 const { MobileColumnTaskCard, taskCardBorderRadius } = await load("../src/components/board/mobile-column-task-card.tsx", {
-  react: { useState: () => [false, () => {}] },
+  react: { useState: () => [false, () => {}], useRef: (current) => ({ current }) },
   "react-native": { Platform: { get OS() { return platform; } }, Pressable: "Pressable", View: "View", Text: "Text", StyleSheet: { create: (value) => value, hairlineWidth: 0.5 } },
   "@expo/vector-icons": { Ionicons: "Icon" },
   "@/providers/theme-provider": { useTheme: () => ({ theme: { colors, scheme } }) },
@@ -28,6 +28,7 @@ const { MobileColumnTaskCard, taskCardBorderRadius } = await load("../src/compon
   "@/lib/domain/boards": { boardColor: () => ({ dot: "#aa66ff" }) },
   "./mobile-board-colors": { useMobileBoardColors: () => colors },
   "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
+  "@/lib/features/task-completion-celebration": { registerTaskCompletionOrigin: () => () => {} },
   "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
   "@/hooks/use-active-events": { useActiveEvents: () => ({ override: null }) },
   "@/lib/features/card-themes": cardThemes,
@@ -228,7 +229,7 @@ test("real React Native Web renders a group with sibling buttons, never nested H
     "./halloween-card-artwork": halloweenArtwork,
   });
   const { MobileColumnTaskCard: WebCard } = await load("../src/components/board/mobile-column-task-card.tsx", {
-    react: React,
+    react: { ...React, useRef: (current) => ({ current }) },
     "react-native": native,
     "@expo/vector-icons": { Ionicons: () => null },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors, scheme: "dark" } }) },
@@ -237,6 +238,7 @@ test("real React Native Web renders a group with sibling buttons, never nested H
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#aa66ff" }) },
     "./mobile-board-colors": { useMobileBoardColors: () => colors },
     "@/components/ui/priority-stars": { PriorityStars: () => null },
+    "@/lib/features/task-completion-celebration": { registerTaskCompletionOrigin: () => () => {} },
     "@/components/ui/status-icon": { StatusIcon: () => null },
     "@/lib/features/card-themes": cardThemes,
     "@/hooks/use-active-events": { useActiveEvents: () => ({ override: null }) },

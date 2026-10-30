@@ -221,8 +221,17 @@ test("quick add recognizes only tags supplied by the user, not historical preset
   assert.equal(parseQuickAdd("Task #studio", new Date(), [{ id: "mine", label: "Studio" }]).category, "mine");
 });
 
-test("special holder names never change a card's tags, status, or deadline", () => {
-  for (const title of ["Done", "Completed", "Finished", "Canceled", "Cancelled", "Overdue", "Halloween", "Christmas"]) {
+test("moving into status-named sections applies status tags but ordinary and event sections do not", () => {
+  for (const [title, expectedTag, expectedCompleted, expectedCanceled] of [
+    ["Done", "Done", true, false],
+    ["Completed", "Done", true, false],
+    ["Finished", "Done", true, false],
+    ["Canceled", "Canceled", false, true],
+    ["Cancelled", "Canceled", false, true],
+    ["Overdue", "Overdue", false, false],
+    ["Halloween", null, false, false],
+    ["Christmas", null, false, false],
+  ]) {
     const api = useTasks();
     const task = { ...createSampleTasks()[0], id: "test", completed: false, canceled: false, completedAt: null, sectionId: null };
     api.restore(workspace([{ id: "special", title }], [task]));
@@ -230,10 +239,12 @@ test("special holder names never change a card's tags, status, or deadline", () 
     api.assignTaskToSection("test", "special");
     const result = api.snapshot().tasks[0];
     assert.equal(result.sectionId, "special");
-    assert.equal(result.completed, false, title);
-    assert.equal(result.canceled, false, title);
-    assert.equal(result.completedAt, null, title);
-    for (const key of ["dueAt", "category", "priority", "title", "description", "subtasks", "attachments", "tags"]) assert.deepEqual(result[key], task[key]);
+    assert.equal(result.completed, expectedCompleted, title);
+    assert.equal(result.canceled, expectedCanceled, title);
+    assert.equal(result.completedAt !== null, expectedCompleted, title);
+    assert.deepEqual(result.tags.filter((tag) => tag === "Done" || tag === "Canceled" || tag === "Overdue"), expectedTag ? [expectedTag] : [], title);
+    for (const key of ["dueAt", "category", "priority", "title", "description", "subtasks", "attachments"]) assert.deepEqual(result[key], task[key]);
+    if (!expectedTag) assert.deepEqual(result.tags, task.tags, title);
   }
 });
 
@@ -252,9 +263,9 @@ test("status tags follow the card across holders and undo restores their state",
   api.setTaskSectionId("test", "todo");
   assert.equal(api.snapshot().tasks[0].completed, true);
   api.setTaskSectionId("test", "cancel");
-  assert.equal(api.snapshot().tasks[0].completed, true);
-  api.patchTask("test", { tags: ["Halloween", "Canceled"] });
+  assert.equal(api.snapshot().tasks[0].completed, false);
   assert.equal(api.snapshot().tasks[0].canceled, true);
+  assert.deepEqual(api.snapshot().tasks[0].tags, ["Halloween", "Canceled"]);
   api.setTaskSectionId("test", null);
   assert.equal(api.snapshot().tasks[0].canceled, true, "unassigning is not a status change");
   api.restore(original);

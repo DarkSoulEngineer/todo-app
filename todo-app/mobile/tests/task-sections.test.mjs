@@ -132,5 +132,10 @@ test("status is a top-of-form property, never nested inside the Tags section", (
   assert.equal(statusSections[0].includes("CardStatusPicker"), false, "status picker is not part of Tags");
   const statusField = source.slice(source.indexOf('testID="task-editor-status-field"'), source.indexOf("</View>", source.indexOf('testID="task-editor-status-field"')));
   assert.match(statusField, /<CardStatusPicker/);
+  assert.match(statusField, /onChange=\{changeStatusTags\}/, "the Done status action uses the editor completion handler");
+  const completionHandler = source.slice(source.indexOf("const changeStatusTags"), source.indexOf("const cancelTask", source.indexOf("const changeStatusTags")));
+  assert.match(completionHandler, /markedDone/);
+  assert.match(completionHandler, /autoSave\(draft, sectionId\)/, "the latest editor draft is saved before dismissal");
+  assert.match(completionHandler, /onClose\(\)/, "marking a task Done closes its editor");
   assert.match(source, /<CollapsibleTaskSection title="Tags"[\s\S]*?<\/CollapsibleTaskSection>/);
 });

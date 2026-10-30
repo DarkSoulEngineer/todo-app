@@ -7,6 +7,7 @@ import { useTasksContext } from "@/providers/tasks-provider";
 import { makeId } from "@/lib/utils/id";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import type { Priority } from "@/lib/domain/types";
+import { deferTaskCompletionCelebration } from "@/lib/features/task-completion-celebration";
 
 type TaskOrigin = "reference-board" | "my-tasks" | "calendar" | "desktop";
 
@@ -81,8 +82,10 @@ export default function TaskInspectorRoute() {
           api.setTaskDueAt(task.id, value);
           appendActivity(value ? "Set a due date" : "Removed the due date");
         } else if (property === "status" && (value === "completed" || value === "canceled" || value === "open")) {
+          if (value === "completed" && !task.completed) deferTaskCompletionCelebration(task.id, 450);
           api.setTaskStatus(task.id, value);
           appendActivity(value === "open" ? "Reopened task" : value === "completed" ? "Completed task" : "Canceled task", "status");
+          if (value === "completed") returnToOrigin();
         }
       }}
       onAddAttachment={(attachment) => {

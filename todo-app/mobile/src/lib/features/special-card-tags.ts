@@ -82,6 +82,16 @@ export function setCardStatus(task: Task, status: "completed" | "canceled" | "op
   return { ...applyCardTags(task, label ? [...ordinaryAndEvent, label] : ordinaryAndEvent, stamp), ...statusFields(task, label === "Done" ? "done" : label === "Canceled" ? "canceled" : "open", stamp), updatedAt: stamp };
 }
 
+/** Moving into a status-named section applies its matching status tag. */
+export function applySectionCardStatus(task: Task, sectionTitle: string, stamp = new Date().toISOString()): Task {
+  const status = classifySpecialCardTag(sectionTitle);
+  if (status?.group !== "status") return task;
+  if (status.theme.id === "done") return setCardStatus(task, "completed", stamp);
+  if (status.theme.id === "canceled") return setCardStatus(task, "canceled", stamp);
+  const reopened = setCardStatus(task, "open", stamp);
+  return applyCardTags(reopened, [...reopened.tags, status.theme.label], stamp);
+}
+
 /** Convert a legacy single category if it names a special tag. */
 export function applyCategoryCardTag(task: Task, boards: readonly Board[]): Task {
   const board = boards.find((board) => board.id === task.category);

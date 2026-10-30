@@ -8,6 +8,7 @@ import { PreferencesProvider } from "@/providers/preferences-provider";
 import { TasksProvider } from "@/providers/tasks-provider";
 import { ThemeProvider, useTheme } from "@/providers/theme-provider";
 import { ToastProvider } from "@/providers/toast-provider";
+import { TaskCompletionCelebration } from "@/components/ui/task-completion-celebration";
 
 function RootLayoutInner() {
   const { theme } = useTheme();
@@ -34,6 +35,7 @@ function RootLayoutInner() {
         <Stack.Screen name="task/new" options={{ title: "Create" }} />
         <Stack.Screen name="task/[id]" options={{ title: "Task" }} />
       </Stack>
+      <TaskCompletionCelebration />
     </GestureHandlerRootView>
   );
 }

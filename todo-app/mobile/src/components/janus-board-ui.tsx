@@ -42,6 +42,7 @@ import { SpecialCardTagPicker } from "@/components/ui/special-card-tag-picker";
 import { useActiveEvents } from "@/hooks/use-active-events";
 import { CardStatusPicker } from "@/components/ui/card-status-picker";
 import { mergeCardTagDraft, normalizeCardTags, toggleCardTag } from "@/lib/features/special-card-tags";
+import { deferTaskCompletionCelebration } from "@/lib/features/task-completion-celebration";
 import {
   DEFAULT_FILTERS,
   hasActiveFilters,
@@ -303,6 +304,28 @@ function TaskEditorForm({
     flushAutoSave();
     onClose();
   };
+  const changeStatusTags = (nextTags: string[]) => {
+    setTags(nextTags);
+    const markedDone = nextTags.some((tag) => classifySpecialCardTag(tag)?.theme.id === "done");
+    if (!task || !markedDone) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    const draft = { ...buildDraft(), tags: nextTags };
+    const signature = JSON.stringify({ draft, sectionId });
+    const autoSave = autoSaveRef.current;
+    if (!task.completed) deferTaskCompletionCelebration(task.id, 450);
+    if (autoSave && signature !== savedSignatureRef.current) {
+      autoSave(draft, sectionId);
+      savedSignatureRef.current = signature;
+    } else if (!autoSave) {
+      onSave(draft, sectionId);
+      return;
+    }
+    onClose();
+  };
   const cancelTask = () => {
     flushAutoSave();
     onCancelTask?.();
@@ -410,7 +433,7 @@ function TaskEditorForm({
               </View>
               <View testID="task-editor-status-field">
                 <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>STATUS</Text>
-                <CardStatusPicker tags={tags} onChange={setTags} />
+                <CardStatusPicker tags={tags} onChange={changeStatusTags} />
               </View>
               <CollapsibleTaskSection title="List" summary={sections.find((section) => section.id === sectionId)?.title} style={styles.taskEditorSectionHeading}>
                 <View testID="task-editor-list-choices" style={[styles.wrapRow, { marginTop: 8 }]}>

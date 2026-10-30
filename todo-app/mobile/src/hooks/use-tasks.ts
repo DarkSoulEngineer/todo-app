@@ -1,5 +1,6 @@
 import { makeId } from "@/lib/utils/id";
-import { applyCategoryCardTag, migrateCardTags, setCardStatus } from "@/lib/features/special-card-tags";
+import { applyCategoryCardTag, applySectionCardStatus, migrateCardTags, setCardStatus } from "@/lib/features/special-card-tags";
+import { celebrateTaskCompletion } from "@/lib/features/task-completion-celebration";
 import {
   defaultBoards,
   type Board,
@@ -257,7 +258,12 @@ export function useTasks(): TasksApi {
   }, []);
 
   const updateById = useCallback((id: string, updater: (task: Task) => Task) => {
-    setLiveTasks((prev) => prev.map((task) => (task.id === id ? applyCategoryCardTag(updater(task), boardsRef.current) : task)));
+    setLiveTasks((prev) => prev.map((task) => {
+      if (task.id !== id) return task;
+      const next = applyCategoryCardTag(updater(task), boardsRef.current);
+      celebrateTaskCompletion(task, next, id);
+      return next;
+    }));
   }, [setLiveTasks]);
 
   /**
@@ -312,7 +318,10 @@ export function useTasks(): TasksApi {
       if (index === -1) return project;
       found = true;
       const nextTasks = project.workspace.tasks.slice();
-      nextTasks[index] = applyCategoryCardTag(updater(nextTasks[index]), project.workspace.boards);
+      const previous = nextTasks[index];
+      const nextTask = applyCategoryCardTag(updater(previous), project.workspace.boards);
+      celebrateTaskCompletion(previous, nextTask, id);
+      nextTasks[index] = nextTask;
       return { ...project, updatedAt: stamp, workspace: { ...project.workspace, tasks: nextTasks } };
     });
     if (!found) return;
@@ -499,16 +508,16 @@ export function useTasks(): TasksApi {
       if (!section) return;
       recordTask(id);
       const stamp = new Date().toISOString();
-      updateById(id, (task) => ({
+      updateById(id, (task) => applySectionCardStatus({
         ...task,
         sectionId,
         updatedAt: stamp,
-      }));
+      }, section.title, stamp));
     },
     [recordTask, updateById],
   );
 
-  /** Placement never applies rules based on a holder's name. */
+  /** Moving into an exact status-named section also applies its status tag. */
   const assignTaskToSection = useCallback(
     (taskId: string, sectionId: string) => {
       setTaskSectionId(taskId, sectionId);

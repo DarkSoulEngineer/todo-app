@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
-import { useState, type MouseEvent } from "react";
+import { useRef, useState, type ComponentRef, type MouseEvent } from "react";
 import { Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { PRIORITY_META } from "@/lib/domain/constants";
 import { boardColor, type Board } from "@/lib/domain/boards";
 import { PriorityStars } from "@/components/ui/priority-stars";
+import { registerTaskCompletionOrigin } from "@/lib/features/task-completion-celebration";
 import type { Task } from "@/lib/domain/types";
 import { classifySpecialCardTag, resolveCardDecoration } from "@/lib/features/card-themes";
 import { useActiveEvents } from "@/hooks/use-active-events";
@@ -34,6 +35,7 @@ interface Props {
 export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, hideMoveArrows, animateSeasonal = true, calendarLayout = false, onToggleSubtask }: Props) {
   const c = useMobileBoardColors();
   const [expanded, setExpanded] = useState(false);
+  const unregisterOrigin = useRef<(() => void) | null>(null);
   const due = describeDue(task.dueAt, now);
   const done = task.subtasks.filter((item) => item.done).length;
   const priority = PRIORITY_META[task.priority];
@@ -77,7 +79,12 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: (event: GestureResponderEvent) => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={(event) => { event.stopPropagation(); handler(event); }} {...contextMenu(handler)} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.5 : 1 }]}><Ionicons name={name} size={15} color={c.mutedForeground} /></Pressable>;
   const title = <Text numberOfLines={2} style={[styles.title, { fontSize: (compact ? 13 : 14) * zoom, lineHeight: (compact ? 18 : 19) * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{task.title}</Text>;
   const checklistSummary = <><Ionicons name="list-outline" size={12} color={c.mutedForeground} /><Text style={[styles.tagText, { color: c.mutedForeground, fontSize: 10 * zoom }]}>{done}/{task.subtasks.length}</Text></>;
-  return <Pressable testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, calendarLayout && styles.calendarCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : decoration?.border ?? c.border, borderLeftColor: statusColor ?? decoration?.accent ?? accent }]}>
+  return <Pressable ref={(node: ComponentRef<typeof Pressable> | null) => {
+    unregisterOrigin.current?.();
+    unregisterOrigin.current = node ? registerTaskCompletionOrigin(task.id, (callback) => {
+      node.measureInWindow((x, y, width, height) => callback({ x: x + width / 2, y: y + height / 2 }));
+    }) : null;
+  }} testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, calendarLayout && styles.calendarCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : decoration?.border ?? c.border, borderLeftColor: statusColor ?? decoration?.accent ?? accent }]}>
     {decoration ? <SeasonalCardDecoration theme={decoration} cardId={task.id} compact={compact} paused={!animateSeasonal || selectionMode || Boolean(hideMoveArrows) || Boolean(compact)} /> : null}
     <View style={[styles.topRow, calendarLayout && styles.calendarTopRow]}>
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={(event) => { event.stopPropagation(); onSelect(); }} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
