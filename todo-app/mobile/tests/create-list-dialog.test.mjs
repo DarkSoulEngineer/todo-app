@@ -19,6 +19,7 @@ function render(width, title = "", visible = true) {
     "@/components/ui/input": { Input: "Input" },
     "@/components/ui/editor-window": { EditorWindow: "EditorWindow" },
     "@/components/ui/sheet": { Sheet: "Sheet" },
+    "./special-list-identity": { SpecialListIdentity: "SpecialListIdentity" },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
   };
   const exports = {};

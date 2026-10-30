@@ -5,7 +5,7 @@ import type { BoardColorId } from "@/lib/domain/boards";
  *
  * The web build used Tailwind class strings; React Native needs concrete color
  * values, so each theme carries an accent color and its translucent variants.
- * Detection logic is unchanged: first theme in `CARD_THEMES` order wins.
+ * Seasonal titles take precedence; otherwise the first `CARD_THEMES` match wins.
  */
 export interface CardTheme {
   id: string;
@@ -27,6 +27,20 @@ function theme(id: string, keywords: string[], hex: string): CardTheme {
     wash: `${hex}0F`,
   };
 }
+
+export interface SeasonalCardTheme extends CardTheme {
+  label: string;
+  symbol: string;
+  decoration: string;
+}
+
+/** Seasonal easter eggs take priority over generic “gift”, “party”, etc. */
+export const SEASONAL_CARD_THEMES: SeasonalCardTheme[] = [
+  { ...theme("halloween", ["halloween", "haloween", "all hallows eve"], "#F59E0B"), label: "Halloween", symbol: "🎃", decoration: "✦" },
+  { ...theme("christmas", ["christmas", "christmass", "xmas", "noel", "craciun", "crăciun"], "#22C55E"), label: "Christmas", symbol: "🎄", decoration: "❄" },
+  { ...theme("easter", ["easter", "paște"], "#C084FC"), label: "Easter", symbol: "🥚", decoration: "✿" },
+  { ...theme("new-year", ["new year", "new-year", "new year's", "new year’s", "new years"], "#60A5FA"), label: "New Year", symbol: "🎉", decoration: "✧" },
+];
 
 /** The theme list, in detection-priority order. */
 export const CARD_THEMES: CardTheme[] = [
@@ -130,8 +144,18 @@ const THEME_MATCHERS = CARD_THEMES.map((entry) => ({
   matchers: entry.keywords.map(compileKeyword),
 }));
 
+const SEASONAL_MATCHERS = SEASONAL_CARD_THEMES.map((entry) => ({ theme: entry, matchers: entry.keywords.map(compileKeyword) }));
+
+/** Titles opt in; a passing mention in the description does not change design. */
+export function detectSeasonalCardTheme(title: string): SeasonalCardTheme | null {
+  const text = (title ?? "").toLowerCase();
+  return SEASONAL_MATCHERS.find((entry) => entry.matchers.some((matcher) => matcher.test(text)))?.theme ?? null;
+}
+
 /** Picks the first matching theme for a task's text, or null when nothing fits. */
 export function detectCardTheme(title: string, description: string): CardTheme | null {
+  const seasonal = detectSeasonalCardTheme(title);
+  if (seasonal) return seasonal;
   const haystack = `${title ?? ""} ${description ?? ""}`.toLowerCase();
   if (!haystack.trim()) return null;
   for (const { theme: entry, matchers } of THEME_MATCHERS) {

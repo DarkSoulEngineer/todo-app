@@ -15,6 +15,7 @@ async function load(path, mocks = {}) {
 }
 const status = await load("../src/lib/domain/status.ts");
 const constants = await load("../src/lib/domain/constants.ts");
+const cardThemes = await load("../src/lib/features/card-themes.ts");
 const colors = { card: "#303030", primary: "#aabb22", primarySoft: "#aabb2222", border: "#444444", foreground: "#eeeecc", mutedForeground: "#aaaaaa", backgroundAlt: "#202020", success: "#66cc88", successSoft: "#66cc8822", destructive: "#ff9988", destructiveSoft: "#ff998822", secondary: "#404040" };
 let scheme = "dark", platform = "web";
 const { MobileColumnTaskCard, taskCardBorderRadius } = await load("../src/components/board/mobile-column-task-card.tsx", {
@@ -28,6 +29,8 @@ const { MobileColumnTaskCard, taskCardBorderRadius } = await load("../src/compon
   "./mobile-board-colors": { useMobileBoardColors: () => colors },
   "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
   "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
+  "@/lib/features/card-themes": cardThemes,
+  "@/components/ui/seasonal-card-decoration": { SeasonalCardDecoration: "SeasonalCardDecoration" },
 });
 const now = new Date(2026, 9, 29, 12);
 const task = { id: "card", title: "Draft the design review notes", description: "Keep these details in the editor", priority: "medium", dueAt: new Date(2026, 9, 29, 18, 22).toISOString(), completed: false, canceled: false, subtasks: [] };
@@ -49,6 +52,25 @@ test("board cards match the simple tile hierarchy without descriptions or decora
   assert.equal(style(tree).borderLeftColor, constants.PRIORITY_META.medium.dot);
   assert.equal(style(tree).borderRadius, taskCardBorderRadius);
   assert.equal(style(tree).backgroundColor, colors.card);
+});
+
+test("holiday titles activate seasonal decoration while preserving status and selection cues", () => {
+  for (const [title, id] of [["Halloween party", "halloween"], ["Christmass gifts", "christmas"], ["Easter", "easter"], ["New Year", "new-year"]]) {
+    const tree = render({ title });
+    const decoration = nodes(tree).find((node) => node.type === "SeasonalCardDecoration");
+    assert.equal(decoration.props.theme.id, id);
+    assert.equal(decoration.props.paused, false);
+    assert.equal(style(render({ title, completed: true })).borderLeftColor, colors.success);
+    assert.equal(style(render({ title }, { selected: true })).borderColor, colors.primary);
+    for (const props of [{ compact: true }, { selectionMode: true }, { hideMoveArrows: true }, { animateSeasonal: false }]) {
+      assert.equal(nodes(render({ title }, props)).find((node) => node.type === "SeasonalCardDecoration").props.paused, true);
+    }
+  }
+  assert.equal(nodes(render()).find((node) => node.type === "SeasonalCardDecoration"), undefined);
+  const inherited = nodes(render({}, { listTitle: "Halloween" })).find((node) => node.type === "SeasonalCardDecoration");
+  assert.equal(inherited.props.theme.id, "halloween");
+  const overridden = nodes(render({ title: "Christmas" }, { listTitle: "Halloween" })).find((node) => node.type === "SeasonalCardDecoration");
+  assert.equal(overridden.props.theme.id, "christmas", "a card's own seasonal title overrides its list design");
 });
 
 test("due badges distinguish days, tolerate invalid dates, and status beats priority", () => {
@@ -129,6 +151,10 @@ test("real React Native Web renders a group with sibling buttons, never nested H
   const React = require("react");
   const { renderToStaticMarkup } = require("react-dom/server");
   const native = require("react-native-web");
+  const decorations = await load("../src/components/ui/seasonal-card-decoration.tsx", {
+    react: React, "react-native": native,
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
+  });
   const { MobileColumnTaskCard: WebCard } = await load("../src/components/board/mobile-column-task-card.tsx", {
     react: React,
     "react-native": native,
@@ -140,10 +166,12 @@ test("real React Native Web renders a group with sibling buttons, never nested H
     "./mobile-board-colors": { useMobileBoardColors: () => colors },
     "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
   "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
+    "@/lib/features/card-themes": cardThemes,
+    "@/components/ui/seasonal-card-decoration": decorations,
   });
-  for (const compact of [false, true]) for (const selectionMode of [false, true]) {
+  for (const title of [task.title, "Halloween party"]) for (const compact of [false, true]) for (const selectionMode of [false, true]) {
     const html = renderToStaticMarkup(React.createElement(WebCard, {
-      task: { ...task, subtasks: [{ id: "step", title: "Step", done: false }] },
+      task: { ...task, title, subtasks: [{ id: "step", title: "Step", done: false }] },
       now, compact, selectionMode, selected: selectionMode,
       onPress() {}, onMenu() {}, onSelect() {}, onToggleSubtask() {}, onMoveLeft() {}, onMoveRight() {},
     }));

@@ -8,11 +8,14 @@ import { boardColor, type Board } from "@/lib/domain/boards";
 import { PriorityStars } from "@/components/ui/priority-stars";
 import { StatusIcon } from "@/components/ui/status-icon";
 import type { Task } from "@/lib/domain/types";
+import { detectSeasonalCardTheme } from "@/lib/features/card-themes";
+import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
 import { useMobileBoardColors } from "./mobile-board-colors";
 
 interface Props {
   task: Task;
   board?: Board;
+  listTitle?: string;
   now: Date;
   compact?: boolean;
   zoom?: number;
@@ -24,10 +27,11 @@ interface Props {
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
   hideMoveArrows?: boolean;
+  animateSeasonal?: boolean;
   onToggleSubtask: (subtaskId: string) => void;
 }
 
-export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, hideMoveArrows, onToggleSubtask }: Props) {
+export function MobileColumnTaskCard({ task, board, listTitle, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, hideMoveArrows, animateSeasonal = true, onToggleSubtask }: Props) {
   const c = useMobileBoardColors();
   const [expanded, setExpanded] = useState(false);
   const due = describeDue(task.dueAt, now);
@@ -38,6 +42,7 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const accent = statusColor ?? priority.dot;
   const tagTone = board ? boardColor(board.color) : null;
   const settled = task.completed || task.canceled;
+  const seasonal = detectSeasonalCardTheme(task.title) ?? detectSeasonalCardTheme(listTitle ?? "");
   // A web button cannot contain the menu, move and checklist buttons. Keep the
   // card focusable as a group; Pressable already handles Enter for that group.
   const webCardProps = Platform.OS === "web" ? {
@@ -69,7 +74,8 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: (event: GestureResponderEvent) => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={(event) => { event.stopPropagation(); handler(event); }} {...contextMenu(handler)} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.5 : 1 }]}><Ionicons name={name} size={15} color={c.mutedForeground} /></Pressable>;
   const title = <Text numberOfLines={2} style={[styles.title, { fontSize: (compact ? 13 : 14) * zoom, lineHeight: (compact ? 18 : 19) * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{task.title}</Text>;
 
-  return <Pressable testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : c.border, borderLeftColor: accent }]}>
+  return <Pressable testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : seasonal?.border ?? c.border, borderLeftColor: statusColor ?? seasonal?.accent ?? accent }]}>
+    {seasonal ? <SeasonalCardDecoration theme={seasonal} compact={compact} paused={!animateSeasonal || selectionMode || Boolean(hideMoveArrows) || Boolean(compact)} /> : null}
     <View style={styles.topRow}>
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={(event) => { event.stopPropagation(); onSelect(); }} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <View style={styles.titleArea}>{compact ? title : <View accessible accessibilityLabel={due?.title ?? "No due date"} style={styles.timeBadge}><Text style={[styles.timeText, { color: c.foreground, fontSize: 11 * zoom }]}>{due && task.dueAt ? format(parseISO(task.dueAt), due.today ? "h:mm a" : "MMM d · h:mm a") : "Any time"}</Text></View>}</View>

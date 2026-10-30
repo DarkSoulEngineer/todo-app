@@ -18,6 +18,24 @@ npm run lint
 `npm start` then scan the QR code with Expo Go, or run a development build for
 the native date picker.
 
+## Special names
+
+Lists remain user-defined. Exact names (case-insensitive, optional emoji) opt into
+entry rules: **Done / Completed / Finished / Resolved / Delivered / Shipped**
+complete cards; **Canceled / Cancelled / Dropped / Abandoned** cancel them;
+**To do / Backlog / In progress / Doing / Active / Open / Pending** reopen them.
+The list header and creation dialog show the rule before use. Rules run when a
+card is placed in a list—not on load or rename. Ordinary lists and “No list”
+preserve status, and no entry rule changes a due date or creates another list.
+
+Card titles mentioning **Halloween**, **Christmas**, **Easter**, or **New Year**
+unlock seasonal designs (including Haloween, Christmass, and Xmas aliases).
+Cards have no added event-title labels: Christmas uses lights, snow and a tree;
+Easter uses patterned eggs and a meadow; New Year uses fireworks and confetti.
+Decorations respect reduced motion and pause in the background, compact mode,
+selection mode, and drag previews. Seasonal list names theme their cards in Board
+view without an extra list subtitle; a card's own seasonal title takes precedence.
+
 ## Architecture
 
 ```

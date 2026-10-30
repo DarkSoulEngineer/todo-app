@@ -1,4 +1,5 @@
 import { makeId } from "@/lib/utils/id";
+import { specialListTaskPatch } from "@/lib/features/special-lists";
 import {
   defaultBoards,
   type Board,
@@ -79,7 +80,7 @@ export interface TasksApi {
   setTaskStatus: (id: string, status: "completed" | "canceled" | "open") => void;
   /** Move a task to a due date (used by calendar actions), or clear it. */
   setTaskDueAt: (id: string, dueAt: string | null) => void;
-  /** Assign a task to a list without changing its status or due date. */
+  /** Assign a task to a list, applying a recognized name's explicit entry rule. */
   assignTaskToSection: (taskId: string, sectionId: string) => void;
   /** Point a task at a custom section (or null to release it). */
   setTaskSectionId: (taskId: string, sectionId: string | null) => void;
@@ -535,28 +536,26 @@ export function useTasks(): TasksApi {
 
   const setTaskSectionId = useCallback(
     (id: string, sectionId: string | null) => {
-      if (sectionId !== null && !sectionsRef.current.some((section) => section.id === sectionId)) return;
+      const section = sectionsRef.current.find((section) => section.id === sectionId);
+      if (sectionId !== null && !section) return;
       recordTask(id);
+      const stamp = new Date().toISOString();
       updateById(id, (task) => ({
         ...task,
+        ...(section ? specialListTaskPatch(task, section.title, stamp) : {}),
         sectionId,
-        updatedAt: new Date().toISOString(),
+        updatedAt: stamp,
       }));
     },
     [recordTask, updateById],
   );
 
-  /** Placement is independent of task status, due date, and list title. */
+  /** Every placement path shares the same special-name rules. */
   const assignTaskToSection = useCallback(
     (taskId: string, sectionId: string) => {
-      const section = sectionsRef.current.find((item) => item.id === sectionId);
-      if (!section) return;
-
-      recordTask(taskId);
-      const stamp = new Date().toISOString();
-      updateById(taskId, (task) => ({ ...task, sectionId: section.id, updatedAt: stamp }));
+      setTaskSectionId(taskId, sectionId);
     },
-    [recordTask, updateById],
+    [setTaskSectionId],
   );
 
   const addSection = useCallback((title: string): BoardSection => {

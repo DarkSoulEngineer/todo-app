@@ -34,7 +34,9 @@ import { boardColor } from "@/lib/domain/boards";
 import { getTaskSectionId } from "@/lib/domain/sections";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
 import { describeDue, deriveStatus } from "@/lib/domain/status";
-import { detectCardTheme } from "@/lib/features/card-themes";
+import { detectCardTheme, detectSeasonalCardTheme } from "@/lib/features/card-themes";
+import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
+import { SpecialListIdentity } from "@/components/board/special-list-identity";
 import {
   DEFAULT_FILTERS,
   hasActiveFilters,
@@ -122,6 +124,7 @@ export function TaskCard({
   const board = boards.find((item) => item.id === task.category);
   const boardTone = board ? boardColor(board.color) : undefined;
   const cardTheme = detectCardTheme(task.title, task.description);
+  const seasonal = detectSeasonalCardTheme(task.title);
   const doneSubtasks = task.subtasks.filter((item) => item.done).length;
   const status = deriveStatus(task, now);
   const overdueDuration = status === "overdue" && due ? due.label.replace(/\s+overdue$/i, "") : null;
@@ -130,6 +133,7 @@ export function TaskCard({
     <Pressable accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} // @ts-ignore
     onContextMenu={(event) => { event.preventDefault?.(); onLongPress?.(event.nativeEvent); }} delayLongPress={360} style={styles.taskPressable}>
       <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
+        {seasonal ? <SeasonalCardDecoration theme={seasonal} compact={compact} paused={compact} /> : null}
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
@@ -381,6 +385,7 @@ function TaskEditorForm({
                   <Chip label="No list" active={sectionId === null} onPress={() => setSectionId(null)} />
                   {sections.filter((section) => !section.hidden || section.id === sectionId).map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}
                 </View>
+                <SpecialListIdentity title={sections.find((section) => section.id === sectionId)?.title ?? ""} />
               </View>
               <View testID="task-editor-notes-field">
               <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>

@@ -4,6 +4,7 @@ import { EditorWindow } from "@/components/ui/editor-window";
 import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
 import { useTheme } from "@/providers/theme-provider";
+import { SpecialListIdentity } from "./special-list-identity";
 
 export function CreateListDialog({ visible, title, onChangeTitle, onClose, onCreate }: {
   visible: boolean;
@@ -23,6 +24,7 @@ export function CreateListDialog({ visible, title, onChangeTitle, onClose, onCre
     <Text style={[styles.copy, !windowed && styles.mobileCopy, { color: colors.mutedForeground }]}>Use lists to shape this board around your flow.</Text>
     <Text style={[styles.label, !windowed && styles.mobileLabel, { color: colors.mutedForeground }]}>LIST NAME</Text>
     <Input autoFocus value={title} onChangeText={onChangeTitle} placeholder="e.g. In progress" accessibilityLabel="List name" accessibilityHint="Required" returnKeyType="done" onSubmitEditing={submit} style={windowed ? styles.windowInput : styles.mobileInput} />
+    <View style={{ marginTop: 10 }}><SpecialListIdentity title={title} /></View>
   </>;
   const createButton = <Button label="Add list" disabled={!title.trim()} onPress={submit} style={windowed ? styles.primary : styles.mobileButton} />;
 

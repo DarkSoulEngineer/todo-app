@@ -35,6 +35,7 @@ const { MobileTaskColumns } = await load("../src/components/board/mobile-task-co
   },
   "./mobile-board-colors": { useMobileBoardColors: () => ({}) },
   "./mobile-column-task-card": { MobileColumnTaskCard: "Card" },
+  "./special-list-identity": { SpecialListIdentity: "SpecialListIdentity" },
   "./board-column-carousel": { BoardColumnCarousel: "Carousel" },
   "./janus-drag-cell": { JanusDragCell: "DragCell" },
   "./board-drop-zone": { BoardDropZone: "DropZone" },

@@ -75,7 +75,7 @@ test("real Board drop action moves and orders filtered cards without losing othe
   assert.deepEqual(h.sorts, ["manual", "priority"]);
 });
 
-test("same-list reordering and moves to empty or migrated lists preserve task status", () => {
+test("same-list reordering and empty lists preserve status; Done applies its entry rule", () => {
   for (const [target, beforeId, expectedOrder] of [["a", null, ["two", "invisible", "one", "three"]], ["empty", null, ["one", "invisible", "two", "three"]], ["done", null, ["one", "invisible", "two", "three"]]]) {
     const h = harness();
     h.dropTask("one", target, beforeId);
@@ -83,7 +83,7 @@ test("same-list reordering and moves to empty or migrated lists preserve task st
     assert.deepEqual(workspace.tasks.map((task) => task.id), expectedOrder);
     const moved = workspace.tasks.find((task) => task.id === "one");
     assert.equal(getTaskSectionId(moved, workspace.sections, new Date()), target);
-    assert.equal(moved.completed, false);
+    assert.equal(moved.completed, target === "done");
     assert.equal(moved.canceled, false);
     // Restoring the serialized workspace follows the same hydration path as reopening it.
     const reloaded = useTasks();
@@ -99,6 +99,17 @@ test("dropping into No list clears placement without changing status and support
   assert.equal(task.sectionId, null);
   assert.equal(task.completed, false);
   assert.equal(h.api.snapshot().sections.length, h.before.sections.length);
+  h.messages[0].options.action.onPress();
+  assert.deepEqual(h.api.snapshot(), h.before);
+});
+
+test("dropping into Done completes the card and Undo restores both placement and status", () => {
+  const h = harness();
+  h.dropTask("one", "done", null);
+  const moved = h.api.snapshot().tasks.find((task) => task.id === "one");
+  assert.equal(moved.completed, true);
+  assert.ok(moved.completedAt);
+  assert.equal(moved.sectionId, "done");
   h.messages[0].options.action.onPress();
   assert.deepEqual(h.api.snapshot(), h.before);
 });

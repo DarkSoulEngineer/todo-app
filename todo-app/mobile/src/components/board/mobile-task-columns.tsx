@@ -16,6 +16,7 @@ import { useNativeDragPreview } from "./use-native-drag-preview";
 import { useJanusDrag } from "@/hooks/use-janus-drag";
 import { useNativeJanusAutoScroll } from "@/hooks/use-native-janus-auto-scroll";
 import { sectionDragId, taskDragId } from "@/lib/features/janus-drag";
+import { SpecialListIdentity } from "./special-list-identity";
 
 export interface MobileTaskColumnsProps {
   tasks: Task[];
@@ -120,7 +121,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   const cards = (section: { id: string; title: string }, index: number) => <>
     {(grouped.get(section.id) ?? []).map((task) => <JanusDragCell key={task.id} id={taskDragId(task.id)} name={task.title} width="100%" borderRadius={taskCardBorderRadius} enabled={enabled} active={drag.drag?.id === taskDragId(task.id)} target={false} floating previewLayer={previewLayer} onRegister={drag.register} onStart={dragStart} onMove={dragMove} onDrop={drag.drop} onCancel={drag.cancel}>
       {drag.drag?.target?.kind === "task" && drag.drag.target.beforeTaskId === task.id ? <View testID={`janus-insert-before-${task.id}`} pointerEvents="none" style={[styles.insertLine, { backgroundColor: c.primary }]} /> : null}
-      <MobileColumnTaskCard task={task} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} hideMoveArrows={Boolean(drag.drag)} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={(event)=>props.selectionMode?props.onToggleSelect(task.id):props.onLongPress(task,event)} onSelect={() => props.onToggleSelect(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />
+      <MobileColumnTaskCard task={task} listTitle={section.title} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={props.selectionMode} hideMoveArrows={Boolean(drag.drag)} onPress={() => props.selectionMode ? props.onToggleSelect(task.id) : props.onTask(task)} onMenu={(event)=>props.selectionMode?props.onToggleSelect(task.id):props.onLongPress(task,event)} onSelect={() => props.onToggleSelect(task.id)} onMoveLeft={props.showMoveArrows && !props.selectionMode && index > 0 ? () => move(task, index - 1) : undefined} onMoveRight={props.showMoveArrows && !props.selectionMode && index < columns.length - 1 ? () => move(task, index + 1) : undefined} onToggleSubtask={(subtaskId) => props.onToggleSubtask(task.id, subtaskId)} />
     </JanusDragCell>)}
     {!(grouped.get(section.id)?.length) ? <Text style={[styles.empty, { color: c.mutedForeground, borderColor: c.border }]}>No cards here yet</Text> : null}
   </>;
@@ -160,6 +161,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
       <Pressable testID={`janus-add-card-header-${section.id}`} accessibilityRole="button" accessibilityLabel={`Add card to ${section.title}`} onPress={() => props.onAddTask(section.id)} style={styles.icon}><Ionicons name="add" size={18} color={c.mutedForeground} /></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${section.title}`} onPress={(event) => openSectionMenu(section, event)} style={styles.icon}><Ionicons name="ellipsis-horizontal" size={16} color={c.mutedForeground} /></Pressable>
     </View>
+    <SpecialListIdentity title={section.title} />
     <View style={{ height: 2, backgroundColor: c.borderStrong, borderRadius: 1 }} />
   </View></View>;
   // Build a visual-only native copy. Reusing the live section subtree would
@@ -169,7 +171,7 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
     <ScrollView scrollEnabled={false} contentOffset={{ x: 0, y: autoScroll.listOffset(section.id) }} style={styles.cardScroll} contentContainerStyle={holderContentStyle}>
     <View style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: c.border }]}>
     <View style={cardContentStyle}>
-      {(grouped.get(section.id) ?? []).map((task) => <MobileColumnTaskCard key={task.id} task={task} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={false} onPress={() => {}} onMenu={() => {}} onSelect={() => {}} onToggleSubtask={() => {}} onMoveLeft={props.showMoveArrows && index > 0 ? () => {} : undefined} onMoveRight={props.showMoveArrows && index < columns.length - 1 ? () => {} : undefined} />)}
+      {(grouped.get(section.id) ?? []).map((task) => <MobileColumnTaskCard key={task.id} task={task} listTitle={section.title} board={task.category ? boardsById.get(task.category) : undefined} now={props.now} compact={props.compact} zoom={zoom} selected={props.selectedTaskIds.has(task.id)} selectionMode={false} animateSeasonal={false} onPress={() => {}} onMenu={() => {}} onSelect={() => {}} onToggleSubtask={() => {}} onMoveLeft={props.showMoveArrows && index > 0 ? () => {} : undefined} onMoveRight={props.showMoveArrows && index < columns.length - 1 ? () => {} : undefined} />)}
       {!(grouped.get(section.id)?.length) ? <Text style={[styles.empty, { color: c.mutedForeground, borderColor: c.border }]}>No cards here yet</Text> : null}
     </View>
     </View>{addCard(section)}

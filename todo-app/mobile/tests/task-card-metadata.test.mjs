@@ -15,7 +15,7 @@ const declaration = ast.statements.find((node) => ts.isFunctionDeclaration(node)
 const colors = new Proxy({}, { get: () => "#888888" });
 const exports = {};
 vm.runInNewContext(compile(declaration.getText(ast)), {
-  exports, require, ...status, useTheme: () => ({ theme: { colors } }), detectCardTheme: () => null,
+  exports, require, ...status, useTheme: () => ({ theme: { colors } }), detectCardTheme: () => null, detectSeasonalCardTheme: () => null,
   styles: new Proxy({}, { get: () => ({}) }), StyleSheet: { absoluteFill: {} },
   Card: "Card", View: "View", Text: "Text", Pressable: "Pressable", Ionicons: "Ionicons", Chip: "Chip",
   PRIORITY_META: { high: { label: "High" } },
