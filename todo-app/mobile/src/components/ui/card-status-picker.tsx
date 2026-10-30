@@ -25,10 +25,10 @@ export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange:
         accessibilityHint={selected ? "Tap again to remove this status tag." : `Add the ${option.label} status tag.`}
         accessibilityState={{ checked: selected, selected }}
         onPress={() => onChange(toggleCardTag(tags, option.label))}
-        style={styles.segment}
+        style={[styles.segment, { borderColor: c.border }]}
       >
         {({ pressed }) => <>
-          <View style={[styles.statusDot, { backgroundColor: option.color, opacity: pressed ? 1 : 0.7 }]} />
+          <View style={[styles.statusDot, { backgroundColor: option.color, opacity: selected || pressed ? 1 : 0.7 }]} />
           <Text numberOfLines={1} style={[styles.label, { color: selected ? option.color : c.mutedForeground }]}>{option.label}</Text>
         </>}
       </Pressable>;
@@ -38,7 +38,7 @@ export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange:
 
 const styles = StyleSheet.create({
   track: { flexDirection: "row", gap: 8 },
-  segment: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: "row", gap: 7, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderRadius: 999 },
+  segment: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: "row", gap: 7, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderWidth: 1, borderRadius: 999, boxShadow: "0 1px 3px rgba(0,0,0,0.16)", elevation: 1 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   label: { fontSize: 12, letterSpacing: 0.1, fontWeight: "600" },
 });

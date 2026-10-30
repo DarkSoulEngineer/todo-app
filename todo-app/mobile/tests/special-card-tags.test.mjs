@@ -209,14 +209,16 @@ test("the neutral status has no tag and explicit status buttons toggle independe
       assert.equal(button.props.accessibilityRole, "radio");
       const style = Object.assign({}, ...[button.props.style].flat());
       assert.equal(style.minHeight, 44);
-      assert.equal(style.borderWidth, undefined);
+      assert.equal(style.borderWidth, 1);
       assert.equal(style.borderRadius, 999);
       assert.equal(style.backgroundColor, undefined);
+      assert.equal(style.boxShadow, "0 1px 3px rgba(0,0,0,0.16)");
+      assert.equal(style.elevation, 1);
       const unpressed = nodes(button.props.children({ pressed: false }));
       const pressed = nodes(button.props.children({ pressed: true }));
       const unpressedDot = unpressed.find((node) => Object.assign({}, ...[node.props?.style ?? []].flat()).width === 7);
       const pressedDot = pressed.find((node) => Object.assign({}, ...[node.props?.style ?? []].flat()).width === 7);
-      assert.equal(Object.assign({}, ...[unpressedDot.props.style].flat()).opacity, 0.7);
+      assert.equal(Object.assign({}, ...[unpressedDot.props.style].flat()).opacity, selected.includes(entry.label) ? 1 : 0.7);
       assert.equal(Object.assign({}, ...[pressedDot.props.style].flat()).opacity, 1);
       const labelStyle = Object.assign({}, ...[unpressed.find((node) => node.type === "Text").props.style].flat());
       const pressedLabelStyle = Object.assign({}, ...[pressed.find((node) => node.type === "Text").props.style].flat());
