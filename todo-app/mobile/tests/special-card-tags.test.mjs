@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url), cache = new Map();
 const mocks = {
   react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}], useRef: (current) => ({ current }), useCallback: (fn) => fn, useMemo: (fn) => fn(), useEffect() {} },
   "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (styles) => styles } },
-  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { success: "#45BF82", successSoft: "#1D3A2C", destructive: "#F36164", destructiveSoft: "#431B1D", mutedForeground: "#B0A79C", secondary: "#29231D", border: "#342D25", borderStrong: "#4A4035" } } }) },
+  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { card: "#211C17", success: "#45BF82", successSoft: "#1D3A2C", destructive: "#F36164", destructiveSoft: "#431B1D", mutedForeground: "#B0A79C", secondary: "#29231D", border: "#342D25", borderStrong: "#4A4035" } } }) },
   "@expo/vector-icons": { Ionicons: "Ionicons" },
   "@/components/ui/sheet": { Sheet: "Sheet" },
   "./tactile": { tactileSurface: () => ({}) },
@@ -196,7 +196,7 @@ test("the tag picker enforces independent selections on the actual controls", ()
 
 test("the neutral status has no tag and explicit status buttons toggle independently", () => {
   const { CardStatusPicker } = load("components/ui/card-status-picker");
-  const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
+  const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(typeof node.props?.children === "function" ? node.props.children({ pressed: false }) : node.props?.children)];
   for (const selected of [[], ["Done"], ["Canceled"], ["Overdue"]]) {
     const tree = nodes(CardStatusPicker({ tags: selected, onChange() {} }));
     const buttons = tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Status tag "));
@@ -207,10 +207,21 @@ test("the neutral status has no tag and explicit status buttons toggle independe
       assert.deepEqual(nodes(button).filter((node) => node.type === "Text").map((node) => node.props.children), [entry.label]);
       assert.equal(button.props.accessibilityState.selected, selected.includes(entry.label));
       assert.equal(button.props.accessibilityRole, "radio");
-      const style = Object.assign({}, ...[button.props.style({ pressed: false })].flat());
+      const style = Object.assign({}, ...[button.props.style].flat());
       assert.equal(style.minHeight, 44);
-      assert.equal(style.borderWidth, 1);
-      assert.equal(style.borderColor, selected.includes(entry.label) ? entry.id === "done" ? "#45BF82" : entry.id === "overdue" ? "#F36164" : "#B0A79C" : "#4A4035");
+      assert.equal(style.borderWidth, undefined);
+      assert.equal(style.borderRadius, 999);
+      assert.equal(style.backgroundColor, undefined);
+      const unpressed = nodes(button.props.children({ pressed: false }));
+      const pressed = nodes(button.props.children({ pressed: true }));
+      const unpressedDot = unpressed.find((node) => Object.assign({}, ...[node.props?.style ?? []].flat()).width === 7);
+      const pressedDot = pressed.find((node) => Object.assign({}, ...[node.props?.style ?? []].flat()).width === 7);
+      assert.equal(Object.assign({}, ...[unpressedDot.props.style].flat()).opacity, 0.7);
+      assert.equal(Object.assign({}, ...[pressedDot.props.style].flat()).opacity, 1);
+      const labelStyle = Object.assign({}, ...[unpressed.find((node) => node.type === "Text").props.style].flat());
+      const pressedLabelStyle = Object.assign({}, ...[pressed.find((node) => node.type === "Text").props.style].flat());
+      assert.deepEqual(pressedLabelStyle, labelStyle);
+      assert.equal(labelStyle.fontWeight, "600");
     }
   }
   let updated;

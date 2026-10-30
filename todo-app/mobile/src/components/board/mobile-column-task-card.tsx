@@ -43,8 +43,6 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const accent = statusColor ?? priority.dot;
   const tagTone = board ? boardColor(board.color) : null;
   const settled = task.completed || task.canceled;
-  const checklistComplete = task.subtasks.length > 0 && done === task.subtasks.length;
-  const checklistIndicatorColor = checklistComplete ? c.success : c.primary;
   const { override } = useActiveEvents();
   const decoration = resolveCardDecoration(task.tags, status, override);
   const cardTags = (task.tags ?? []).filter((tag) => classifySpecialCardTag(tag)?.group !== "status").sort((a, b) => Number(Boolean(classifySpecialCardTag(b))) - Number(Boolean(classifySpecialCardTag(a))));
@@ -79,14 +77,12 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: (event: GestureResponderEvent) => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={(event) => { event.stopPropagation(); handler(event); }} {...contextMenu(handler)} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.5 : 1 }]}><Ionicons name={name} size={15} color={c.mutedForeground} /></Pressable>;
   const title = <Text numberOfLines={2} style={[styles.title, { fontSize: (compact ? 13 : 14) * zoom, lineHeight: (compact ? 18 : 19) * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{task.title}</Text>;
   const checklistSummary = <><Ionicons name="list-outline" size={12} color={c.mutedForeground} /><Text style={[styles.tagText, { color: c.mutedForeground, fontSize: 10 * zoom }]}>{done}/{task.subtasks.length}</Text></>;
-
   return <Pressable testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, calendarLayout && styles.calendarCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : decoration?.border ?? c.border, borderLeftColor: statusColor ?? decoration?.accent ?? accent }]}>
     {decoration ? <SeasonalCardDecoration theme={decoration} cardId={task.id} compact={compact} paused={!animateSeasonal || selectionMode || Boolean(hideMoveArrows) || Boolean(compact)} /> : null}
     <View style={[styles.topRow, calendarLayout && styles.calendarTopRow]}>
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={(event) => { event.stopPropagation(); onSelect(); }} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <View style={styles.titleArea}>{compact ? title : <View accessible accessibilityLabel={due?.title ?? "No due date"} style={styles.timeBadge}><Text style={[styles.timeText, { color: c.foreground, fontSize: 11 * zoom }]}>{due && task.dueAt ? format(parseISO(task.dueAt), due.today ? "h:mm a" : "MMM d · h:mm a") : "Any time"}</Text></View>}</View>
       <View style={styles.actions}>
-        {task.subtasks.length > 0 ? <View testID={`janus-card-checklist-indicator-${task.id}`} accessible={false} importantForAccessibility="no" style={[styles.checklistIndicator, task.subtasks.length === 1 ? styles.singleChecklistIndicator : styles.multipleChecklistIndicator, { borderColor: checklistComplete ? c.success : c.borderStrong, backgroundColor: checklistComplete ? c.successSoft : c.backgroundAlt }]}><Ionicons name={task.subtasks.length === 1 ? checklistComplete ? "checkbox" : "square-outline" : checklistComplete ? "checkmark-done" : "list"} size={14} color={checklistIndicatorColor} />{task.subtasks.length > 1 ? <Text style={[styles.checklistIndicatorText, { color: checklistIndicatorColor }]}>{done}/{task.subtasks.length}</Text> : null}</View> : null}
         {onMoveLeft || onMoveRight ? <View pointerEvents={hideMoveArrows ? "none" : "auto"} accessibilityElementsHidden={hideMoveArrows} importantForAccessibility={hideMoveArrows ? "no-hide-descendants" : "auto"} style={{ flexDirection: "row", opacity: hideMoveArrows ? 0 : 1 }}>
           {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}
           {onMoveRight ? action("arrow-forward", `Move ${task.title} to next column`, onMoveRight) : null}
@@ -116,14 +112,11 @@ const styles = StyleSheet.create({
   calendarCard: { flexGrow: 1, minHeight: 108, paddingLeft: 13, borderWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
   calendarTopRow: { marginTop: 0, marginBottom: 0 },
   checklistSummary: { flexDirection: "row", alignItems: "center", gap: 4 },
-  checklistIndicator: { height: 28, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderWidth: 1, marginTop: 8 },
-  singleChecklistIndicator: { width: 28, borderRadius: 14 },
-  multipleChecklistIndicator: { minWidth: 48, paddingHorizontal: 7, borderRadius: 10 },
-  checklistIndicatorText: { fontSize: 10, lineHeight: 14, fontWeight: "800", fontVariant: ["tabular-nums"] },
   topRow: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: -6, marginBottom: -2 }, titleArea: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center", alignItems: "flex-start" }, checkbox: { width: 36, height: 44, alignItems: "center", justifyContent: "center", flexShrink: 0 }, title: { fontWeight: "600", letterSpacing: -0.2 },
   actions: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", flexShrink: 0, gap: 2 }, action: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 7 },
   timeBadge: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" }, timeText: { flexShrink: 1, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }, tagDot: { width: 6, height: 6, borderRadius: 3 }, tag: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%", flexShrink: 1 }, tagText: { flexShrink: 1, fontWeight: "600" }, checklistToggle: { minHeight: 28, flexDirection: "row", alignItems: "center", gap: 4 },
+  meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }, tagDot: { width: 6, height: 6, borderRadius: 3 }, tag: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%", flexShrink: 1 }, tagText: { flexShrink: 1, fontWeight: "600" },
+  checklistToggle: { minHeight: 28, flexDirection: "row", alignItems: "center", gap: 4 },
   progressTrack: { height: 3, borderRadius: 2, overflow: "hidden" }, progressFill: { height: "100%", borderRadius: 2 },
   checklist: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 2 }, subtask: { flexDirection: "row", alignItems: "center", minHeight: 44, gap: 7 },
 });

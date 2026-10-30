@@ -14,10 +14,8 @@ export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange:
   const options = STATUS_CARD_THEMES.map((entry) => ({
     ...entry,
     color: entry.id === "done" ? c.success : entry.id === "overdue" ? c.destructive : c.mutedForeground,
-    soft: entry.id === "done" ? c.successSoft : entry.id === "overdue" ? c.destructiveSoft : c.secondary,
   }));
-  return <View testID="card-status-picker">
-    <View accessibilityRole="radiogroup" accessibilityLabel="Card status tags" style={[styles.track, { backgroundColor: c.secondary, borderColor: c.border }]}>
+  return <View testID="card-status-picker" accessibilityRole="radiogroup" accessibilityLabel="Card status tags" style={styles.track}>
     {options.map((option) => {
       const selected = current?.id === option.id;
       return <Pressable
@@ -27,19 +25,22 @@ export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange:
         accessibilityHint={selected ? "Tap again to remove this status tag." : `Add the ${option.label} status tag.`}
         accessibilityState={{ checked: selected, selected }}
         onPress={() => onChange(toggleCardTag(tags, option.label))}
-        style={({ pressed }) => [styles.segment, { backgroundColor: selected ? option.soft : "transparent", borderColor: selected ? option.color : c.borderStrong }, { opacity: pressed ? 0.7 : 1 }]}
+        style={styles.segment}
       >
-        <Text numberOfLines={1} style={[styles.label, { color: selected ? option.color : c.mutedForeground, fontWeight: selected ? "800" : "600" }]}>{option.label}</Text>
+        {({ pressed }) => <>
+          <View style={[styles.statusDot, { backgroundColor: option.color, opacity: pressed ? 1 : 0.7 }]} />
+          <Text numberOfLines={1} style={[styles.label, { color: selected ? option.color : c.mutedForeground }]}>{option.label}</Text>
+        </>}
       </Pressable>;
     })}
-    </View>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", gap: 4, padding: 4, borderWidth: StyleSheet.hairlineWidth, borderRadius: 13 },
-  segment: { flex: 1, minWidth: 0, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 6, borderWidth: 1, borderRadius: 10 },
-  label: { fontSize: 12, letterSpacing: 0.1 },
+  track: { flexDirection: "row", gap: 8 },
+  segment: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: "row", gap: 7, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderRadius: 999 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  label: { fontSize: 12, letterSpacing: 0.1, fontWeight: "600" },
 });
 
 export { CardStatusPicker as StatusPicker };

@@ -150,34 +150,18 @@ test("checklist count and slim progress bar reflect zero, partial and full compl
   assert.ok(!nodes(render()).some((node) => node.props?.accessibilityRole === "progressbar"));
 });
 
-test("checklist card badge distinguishes one item, multiple items, and fully completed checklists", () => {
+test("checklist counts stay in metadata and no separate badge appears on task cards", () => {
   const indicator = (subtasks) => nodes(render({ subtasks })).find((node) => node.props?.testID === "janus-card-checklist-indicator-card");
 
-  const singleOpen = indicator([{ id: "one", title: "Step", done: false }]);
-  assert.equal(style(singleOpen).width, 28);
-  assert.equal(nodes(singleOpen).find((node) => node.type === "Icon").props.name, "square-outline");
-  assert.equal(nodes(singleOpen).some((node) => node.type === "Text"), false);
-
-  const singleDone = indicator([{ id: "one", title: "Step", done: true }]);
-  assert.equal(nodes(singleDone).find((node) => node.type === "Icon").props.name, "checkbox");
-  assert.equal(style(singleDone).borderColor, colors.success);
-
-  const multiplePartial = indicator([
+  assert.equal(indicator([{ id: "one", title: "Step", done: false }]), undefined);
+  assert.equal(indicator([{ id: "one", title: "Step", done: true }]), undefined);
+  assert.equal(indicator([
     { id: "one", title: "First", done: true },
     { id: "two", title: "Second", done: false },
-    { id: "three", title: "Third", done: false },
-  ]);
-  assert.equal(style(multiplePartial).minWidth, 48);
-  assert.equal(nodes(multiplePartial).find((node) => node.type === "Icon").props.name, "list");
-  assert.equal(text(multiplePartial), "1/3");
-
-  const multipleDone = indicator([
-    { id: "one", title: "First", done: true },
-    { id: "two", title: "Second", done: true },
-  ]);
-  assert.equal(nodes(multipleDone).find((node) => node.type === "Icon").props.name, "checkmark-done");
-  assert.equal(style(multipleDone).borderColor, colors.success);
-  assert.equal(indicator([]), undefined, "cards without checklist items keep their original design");
+  ]), undefined);
+  const tree = render({ subtasks: [{ id: "one", title: "Step", done: true }] });
+  assert.ok(text(tree).includes("1/1"));
+  assert.ok(nodes(tree).some((node) => node.props?.accessibilityRole === "progressbar"));
 });
 
 test("compact mode, zoom, theme contrast and selected state remain available", () => {
