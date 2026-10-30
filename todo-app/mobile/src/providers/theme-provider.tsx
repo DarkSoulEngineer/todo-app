@@ -10,10 +10,9 @@ import {
 } from "react";
 import { useColorScheme } from "react-native";
 import { getThemeById, themes, type Theme, type ThemePreference } from "@/theme/tokens";
+import { getFontFamily } from "@/theme/fonts";
 
 const THEME_KEY = "janus.theme.v2";
-
-import { getFontFamily } from "@/theme/fonts";
 
 const FONT_KEY = "janus.font.v1";
 
@@ -92,7 +91,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const resolvedScheme = preference === "system" ? (system === "dark" ? "dark" : "light") : undefined;
   const baseResolved = preference === "system" ? (resolvedScheme === "light" ? themes.light : themes.dark) : getThemeById(preference);
-  const resolved = { ...baseResolved, fontFamily: getFontFamily(font) };
+  const resolved = useMemo(() => ({ ...baseResolved, fontFamily: getFontFamily(font) }), [baseResolved, font]);
 
   const toggle = useCallback(() => {
     setPreference(preference === "system" ? "dark" : preference === "dark" ? "light" : "system");

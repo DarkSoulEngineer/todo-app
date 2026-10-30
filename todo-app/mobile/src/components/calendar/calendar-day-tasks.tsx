@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
+import { useState, type MouseEvent } from "react";
+import { Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { boardColor, type Board } from "@/lib/domain/boards";
 import { PRIORITY_META } from "@/lib/domain/constants";
 import { deriveStatus } from "@/lib/domain/status";
@@ -122,7 +122,7 @@ function CalendarDayTaskTile({
       accessibilityHint="Opens the task editor. Long press for task actions."
       onPress={onPress}
       onLongPress={(event) => { onLongPress(event); }}
-      onContextMenu={(event) => { event.preventDefault?.(); onLongPress(event.nativeEvent as unknown as GestureResponderEvent); }}
+      {...(Platform.OS === "web" ? { onContextMenu: (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); onLongPress(event as unknown as GestureResponderEvent); } } : {})}
       delayLongPress={360}
       style={({ pressed }) => [
         styles.tile,
@@ -141,7 +141,7 @@ function CalendarDayTaskTile({
             {task.dueAt && sameDay ? format(parseISO(task.dueAt), "h:mm a") : "Any time"}
           </Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); onActionPress?.(event) ?? onLongPress(event); }} style={({ pressed }) => [styles.actionPill, { opacity: pressed ? 0.7 : 1 }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} onPress={(event) => { event.stopPropagation(); (onActionPress ?? onLongPress)(event); }} style={({ pressed }) => [styles.actionPill, { opacity: pressed ? 0.7 : 1 }]}>
           <Ionicons name="ellipsis-horizontal" size={14} color={theme.colors.mutedForeground} />
         </Pressable>
       </View>
@@ -223,6 +223,7 @@ function createStyles(colors: ThemeColors) {
     },
     tileTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
     timePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6, paddingVertical: 3, borderWidth: StyleSheet.hairlineWidth, borderRadius: 6 },
+    actionPill: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: 6 },
     timeText: { fontSize: 11, lineHeight: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
     tileTitle: { fontSize: 14, lineHeight: 19, fontWeight: "600" },
     tileMeta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },

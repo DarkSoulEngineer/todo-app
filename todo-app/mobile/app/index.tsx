@@ -125,9 +125,6 @@ export default function BoardManagerScreen() {
     setLayout(next);
     void saveManagerLayout(next);
   };
-  const promptClosed = (project: JanusProject) => {
-    setClosedPromptProject(project);
-  };
   const openProject = (id: string) => {
     const project = projects.find((entry) => entry.id === id);
     if (!project) return;

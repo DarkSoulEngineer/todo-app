@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import {
   Modal,
   Platform,
@@ -128,7 +128,7 @@ export function AnchoredMenu({
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Close menu"
-          onContextMenu={(e) => { e.preventDefault?.(); onClose(); }}
+          {...(Platform.OS === "web" ? { onContextMenu: (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); onClose(); } } : {})}
         />
         <View
           testID="anchored-menu-surface"
@@ -146,7 +146,7 @@ export function AnchoredMenu({
               shadowColor: theme.colors.shadow,
             },
           ]}
-          onContextMenu={(e) => { e.preventDefault?.(); /* keep open */ }}
+          {...(Platform.OS === "web" ? { onContextMenu: (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); } } : {})}
         >
           <View style={[styles.titleRow, { borderBottomColor: theme.colors.border }]}>
             <Text numberOfLines={1} style={[styles.title, { color: theme.colors.mutedForeground }]}>{title}</Text>
@@ -158,7 +158,7 @@ export function AnchoredMenu({
                 accessibilityRole="menuitem"
                 accessibilityLabel={option.label}
                 onPress={() => { option.onPress(); onClose(); }}
-                style={({ pressed, hovered }) => [styles.option, { backgroundColor: (pressed || hovered) ? theme.colors.secondary : "transparent" }]}
+                style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.option, { backgroundColor: (pressed || hovered) ? theme.colors.secondary : "transparent" }]}
               >
                 <Ionicons
                   name={option.icon ?? "chevron-forward-outline"}

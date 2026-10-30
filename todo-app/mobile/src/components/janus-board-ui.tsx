@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, isValid, parseISO } from "date-fns";
-import { useCallback, createElement, useEffect, useRef, useState } from "react";
+import { useCallback, createElement, useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   Platform,
   Pressable,
@@ -67,7 +67,7 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={(event) => { event.stopPropagation(); onPress(event); }}
-      onContextMenu={(event) => { event.preventDefault?.(); event.stopPropagation(); onPress(event.nativeEvent as unknown as GestureResponderEvent); }}
+      {...(Platform.OS === "web" ? { onContextMenu: (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); onPress(event as unknown as GestureResponderEvent); } } : {})}
       style={({ pressed }) => [styles.iconButton, { width: size, height: size, opacity: pressed ? 0.65 : 1 }]}
     >
       <Ionicons name={icon} size={20} color={color} />
@@ -480,7 +480,7 @@ export function OptionSheet({ visible, title, options, onClose, anchor }: { visi
   // eslint-disable-next-line react-hooks/refs
   const shown = visible ? { title, options, anchor } : lastVisible.current;
   if (anchoredMenus && shown.anchor) return <AnchoredMenu visible={visible} title={shown.title} options={shown.options} onClose={onClose} anchor={shown.anchor} />;
-  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{shown.title}</Text>{shown.options.map((option) => <Pressable key={option.label} accessibilityRole="button" onPress={() => { option.onPress(); onClose(); }} style={({ pressed, hovered }) => [styles.option, { borderBottomColor: theme.colors.border, backgroundColor: (pressed || hovered) ? theme.colors.secondary : "transparent", opacity: pressed ? 0.85 : 1 }]}><Ionicons name={option.icon ?? "chevron-forward-outline"} size={20} color={option.destructive ? theme.colors.destructive : theme.colors.primary} /><Text style={{ color: option.destructive ? theme.colors.destructive : theme.colors.foreground, fontSize: 15, fontWeight: "600" }}>{option.label}</Text></Pressable>)}</Sheet>;
+  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{shown.title}</Text>{shown.options.map((option) => <Pressable key={option.label} accessibilityRole="button" onPress={() => { option.onPress(); onClose(); }} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.option, { borderBottomColor: theme.colors.border, backgroundColor: (pressed || hovered) ? theme.colors.secondary : "transparent", opacity: pressed ? 0.85 : 1 }]}><Ionicons name={option.icon ?? "chevron-forward-outline"} size={20} color={option.destructive ? theme.colors.destructive : theme.colors.primary} /><Text style={{ color: option.destructive ? theme.colors.destructive : theme.colors.foreground, fontSize: 15, fontWeight: "600" }}>{option.label}</Text></Pressable>)}</Sheet>;
 }
 
 export function TextEntrySheet({ visible, title, description, placeholder, initialValue = "", actionLabel = "Save", onClose, onSubmit }: { visible: boolean; title: string; description?: string; placeholder?: string; initialValue?: string; actionLabel?: string; onClose: () => void; onSubmit: (value: string) => void }) {
