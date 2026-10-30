@@ -6,7 +6,6 @@ import { useTheme } from "@/providers/theme-provider";
 import { usePreferences } from "@/providers/preferences-provider";
 import { applyScheduleTime, readScheduleDate, scheduleCalendarDays, selectScheduleDay, validScheduleTime } from "@/lib/utils/task-schedule";
 import { Input } from "./input";
-import { SelectionLed } from "./selection-led";
 
 export function TaskSchedulePicker({ value, onChange, dateLocked = false, now = new Date() }: {
   value: string | null;
@@ -33,11 +32,11 @@ export function TaskSchedulePicker({ value, onChange, dateLocked = false, now = 
     {!timeOnly ? <View testID="schedule-calendar" style={styles.calendar}>
       <View style={styles.monthHeading}>
         <View style={styles.monthCopy}><Text accessibilityRole="header" accessibilityLiveRegion="polite" style={[styles.monthTitle, { color: c.foreground }]}>{format(month, "MMMM yyyy")}</Text><Text style={[styles.hint, { color: c.mutedForeground }]}>Choose a deadline</Text></View>
-        <View style={styles.monthNavigation}>{[{ delta: -1, label: "Previous picker month", glyph: "‹" }, { delta: 1, label: "Next picker month", glyph: "›" }].map(({ delta, label, glyph }) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={() => setMonth(addMonths(month, delta))} style={({ pressed }) => [styles.monthArrow, { opacity: pressed ? 0.5 : 1 }]}><View pointerEvents="none" style={[styles.arrowFace, { borderColor: c.border }]}><Text style={[styles.arrow, { color: c.foreground }]}>{glyph}</Text></View></Pressable>)}{due ? <Pressable accessibilityRole="button" accessibilityLabel="Remove due date" onPress={() => onChange(null)} style={({ pressed }) => [styles.clearDateButton, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name="close" size={17} color={c.mutedForeground} /></Pressable> : null}</View>
+        <View style={styles.monthNavigation}>{[{ delta: -1, label: "Previous picker month", glyph: "‹" }, { delta: 1, label: "Next picker month", glyph: "›" }].map(({ delta, label, glyph }) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={() => setMonth(addMonths(month, delta))} style={({ pressed }) => [styles.monthArrow, { opacity: pressed ? 0.5 : 1 }]}><View pointerEvents="none" style={[styles.arrowFace, { borderColor: c.border }]}><Text style={[styles.arrow, { color: c.foreground }]}>{glyph}</Text></View></Pressable>)}{due ? <Pressable accessibilityRole="button" accessibilityLabel="Remove due date" accessibilityHint="Deletes the scheduled date and time" onPress={() => onChange(null)} style={({ pressed }) => [styles.clearDateButton, { borderColor: c.border, backgroundColor: c.secondary, opacity: pressed ? 0.55 : 1 }]}><Ionicons name="close" size={14} color={c.mutedForeground} /><Text style={[styles.clearDateText, { color: c.mutedForeground }]}>Clear date</Text></Pressable> : null}</View>
       </View>
       <View style={styles.dateShortcuts}>{shortcuts.map(({ label, day }) => {
         const selected = Boolean(due && isSameDay(day, due));
-        return <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} aria-pressed={selected} onPress={() => chooseDay(day)} style={({ pressed }) => [styles.dateShortcut, { backgroundColor: selected ? c.cardElevated : c.secondary, borderColor: c.border }]}><Text style={[styles.dateShortcutText, { color: c.foreground }]}>{label}</Text><SelectionLed selected={selected} /></Pressable>;
+        return <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} aria-pressed={selected} onPress={() => chooseDay(day)} style={({ pressed }) => [styles.dateShortcut, { backgroundColor: selected ? c.cardElevated : c.secondary, borderColor: c.border }]}><Text style={[styles.dateShortcutText, { color: c.foreground }]}>{label}</Text></Pressable>;
       })}</View>
       <View style={styles.weekdays}>{weekdays.map((label, index) => <Text key={index} style={[styles.weekday, { color: c.mutedForeground }]}>{label}</Text>)}</View>
       <View style={styles.grid}>{days.map((day) => {
@@ -45,7 +44,6 @@ export function TaskSchedulePicker({ value, onChange, dateLocked = false, now = 
         const today = isSameDay(day, now);
         return <Pressable key={day.toISOString()} accessibilityRole="button" accessibilityLabel={`Choose ${format(day, "EEEE, MMMM d, yyyy")}`} accessibilityHint={today ? "Today" : undefined} accessibilityState={{ selected }} aria-pressed={selected} onPress={() => chooseDay(day)} style={({ pressed }) => [styles.day, { opacity: isSameMonth(day, month) ? 1 : 0.38, backgroundColor: selected ? c.secondary : pressed ? c.cardElevated : "transparent", borderColor: selected ? c.borderStrong : "transparent" }]}>
           <Text style={[styles.dayText, { color: today && !selected ? c.success : c.foreground }]}>{format(day, "d")}</Text>
-          {selected ? <SelectionLed selected /> : null}
         </Pressable>;
       })}</View>
     </View> : null}
@@ -75,7 +73,7 @@ function ScheduleTimePanel({ date, onApply, onClear, showTitle = true }: { date:
   return <View testID="schedule-time-panel" style={[styles.panel, { borderColor: c.border, backgroundColor: c.input }]}>
     {showTitle || onClear ? <View style={styles.panelHeading}>
       {showTitle ? <Text accessibilityRole="header" style={[styles.monthTitle, styles.panelTitle, { color: c.foreground }]}>Time</Text> : <View style={styles.flex} />}
-      {onClear ? <Pressable accessibilityRole="button" accessibilityLabel="Remove due date" onPress={onClear} style={({ pressed }) => [styles.clearDateButton, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name="close" size={17} color={c.mutedForeground} /></Pressable> : null}
+      {onClear ? <Pressable accessibilityRole="button" accessibilityLabel="Remove due date" accessibilityHint="Deletes the scheduled date and time" onPress={onClear} style={({ pressed }) => [styles.clearDateButton, { borderColor: c.border, backgroundColor: c.secondary, opacity: pressed ? 0.55 : 1 }]}><Ionicons name="close" size={14} color={c.mutedForeground} /><Text style={[styles.clearDateText, { color: c.mutedForeground }]}>Clear date</Text></Pressable> : null}
     </View> : null}
     <View style={styles.timeFields}>
       <View style={styles.timeField}><Text style={[styles.caption, { color: c.mutedForeground }]}>HOUR</Text><Input accessibilityLabel="Due hour" accessibilityHint="0 to 23" editable={Boolean(date)} placeholder="—" inputMode="numeric" maxLength={2} value={hour} onChangeText={(text) => { const value = text.replace(/\D/g, ""); setHour(value); tryApply(value, minute); }} selectTextOnFocus style={styles.timeInput} /></View>
@@ -102,7 +100,8 @@ const styles = StyleSheet.create({
   hint: { fontSize: 11, lineHeight: 16 },
   monthNavigation: { flexDirection: "row", alignItems: "center", gap: 2 },
   monthArrow: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  clearDateButton: { width: 36, height: 36, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  clearDateButton: { minHeight: 32, paddingHorizontal: 8, borderRadius: 9, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 4 },
+  clearDateText: { fontSize: 11, fontWeight: "600" },
   arrowFace: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   arrow: { fontSize: 22, lineHeight: 24, fontWeight: "400" },
   dateShortcuts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, paddingBottom: 4 },

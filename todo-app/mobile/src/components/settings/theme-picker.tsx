@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Input } from "@/components/ui/input";
-import { SelectionLed } from "@/components/ui/selection-led";
 import { useReferenceTheme } from "@/components/reference/reference-theme";
 import { useTheme } from "@/providers/theme-provider";
 import { themes as catalog } from "@/theme/palettes";
@@ -52,7 +51,6 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
           onPress={() => selectMode(option.value)}
           style={({ pressed }) => [styles.modeButton, { backgroundColor: active ? colors.primaryFixed : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
           <Text style={[type.bodyStrong, { color: active ? colors.onSecondaryContainer : colors.muted, fontSize: 13 }]}>{option.label}</Text>
-          <SelectionLed selected={active} />
         </Pressable>;
       })}
     </View>
@@ -84,7 +82,6 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
               style={({ pressed }) => [styles.option, { backgroundColor: active ? colors.secondaryContainer : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
               <Swatches colors={preview.colors} />
               <Text numberOfLines={1} style={[type.body, styles.copy, { fontWeight: "600" }]}>{entry.id === "system" ? "System (follow device)" : entry.name}</Text>
-              <SelectionLed selected={active} />
             </Pressable>;
           })}
           {!options.length ? <Text accessibilityLiveRegion="polite" style={[type.caption, styles.empty, { color: colors.muted }]}>No themes match your search.</Text> : null}

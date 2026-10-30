@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
-import { SelectionLed } from "@/components/ui/selection-led";
 
 export interface SegmentedOption {
   key: string;
@@ -43,7 +42,6 @@ export function SegmentedControl({ options, value, onChange }: { options: Segmen
             >
               {option.label}
             </Text>
-            <SelectionLed selected={active} />
           </Pressable>
         );
       })}

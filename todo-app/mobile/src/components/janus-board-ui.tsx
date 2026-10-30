@@ -25,7 +25,6 @@ import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
 import { CollapsibleTaskSection } from "@/components/ui/collapsible-task-section";
-import { SelectionLed } from "@/components/ui/selection-led";
 import { TaskSchedulePicker } from "@/components/ui/task-schedule-picker";
 import { Card } from "@/components/ui/card";
 import { InsightsDashboard } from "@/components/insights/insights-dashboard";
@@ -104,7 +103,6 @@ function Chip({ label, active, onPress, color, icon }: { label: string; active?:
       {icon ? <Ionicons name={icon} size={14} color={theme.colors.secondaryForeground} /> : null}
       {color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
       <Text style={{ color: theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>{label}</Text>
-      <SelectionLed selected={Boolean(active)} />
     </Pressable>
   );
 }
@@ -230,6 +228,7 @@ function TaskEditorForm({
 }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { events: availableEvents } = useActiveEvents();
   const { width } = useWindowDimensions();
   const windowed = presentation === "sheet" && width >= 768;
   const wideForm = presentation === "panel" || windowed;
@@ -238,7 +237,6 @@ function TaskEditorForm({
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [category, setCategory] = useState<string | null>(() => task?.category ?? null);
   const [tags, setTags] = useState<string[]>(() => normalizeCardTags(task?.tags));
-  const [tagInput, setTagInput] = useState("");
   const sourceTags = task?.tags;
   const lastSourceTags = useRef(normalizeCardTags(sourceTags));
   useEffect(() => {
@@ -248,9 +246,8 @@ function TaskEditorForm({
     lastSourceTags.current = incoming;
     setTags((current) => mergeCardTagDraft(current, previous, incoming));
   }, [sourceTags]);
-  const [sectionId, setSectionId] = useState<string | null>(() => {
+  const [sectionId] = useState<string | null>(() => {
     const requested = task ? getTaskSectionId(task, sections, new Date()) : initialSectionId;
-    if (task) return requested ?? null;
     return sections.find((section) => section.id === requested)?.id ?? sections.find((section) => !section.hidden)?.id ?? null;
   });
   const hasList = sections.some((section) => section.id === sectionId);
@@ -392,22 +389,18 @@ function TaskEditorForm({
           <Text style={{ color: theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>
             {PRIORITY_META[item].label}
           </Text>
-          <SelectionLed selected={priority === item} color={item === "critical" || item === "high" ? theme.colors.destructive : theme.colors.success} />
         </Pressable>
       ))}
     </View>
   );
   const tagChips = boards.filter((item) => !classifySpecialCardTag(item.label)).map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
 
-  const addTag = () => { if (!tagInput.trim()) return; setTags((current) => normalizeCardTags([...current, tagInput])); setTagInput(""); };
   const tagsControl = <View style={{ gap: 10 }}>
     {tagChips.length ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : null}
-    <SpecialCardTagPicker tags={tags} onChange={setTags} />
     <View style={styles.wrapRow}>{tags.filter((tag) => {
       const special = classifySpecialCardTag(tag);
       return !special || special.group === "easter-egg";
     }).map((tag) => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Remove tag ${tag}`} onPress={() => setTags((current) => toggleCardTag(current, tag))} style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary }]}><Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{tag} ×</Text></Pressable>)}</View>
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Input accessibilityLabel="New card tag" placeholder="Add a tag" value={tagInput} onChangeText={setTagInput} onSubmitEditing={addTag} returnKeyType="done" style={{ flex: 1, minWidth: 0, borderRadius: 12 }} /><Button variant="secondary" label="Add" onPress={addTag} disabled={!tagInput.trim()} /></View>
   </View>;
 
   const content = <>
@@ -434,25 +427,6 @@ function TaskEditorForm({
               />
               {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
               </View>
-              <View testID="task-editor-status-field">
-                <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>STATUS</Text>
-                <CardStatusPicker tags={tags} onChange={changeStatusTags} />
-              </View>
-              <CollapsibleTaskSection title="List" summary={sections.find((section) => section.id === sectionId)?.title} style={styles.taskEditorSectionHeading}>
-                <View testID="task-editor-list-choices" style={[styles.wrapRow, { marginTop: 8 }]}>
-                  {sections.filter((section) => !section.hidden || section.id === sectionId).map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}
-                </View>
-              </CollapsibleTaskSection>
-              <View testID="task-editor-priority-field">
-              <CollapsibleTaskSection title="Priority" summary={PRIORITY_META[priority].label}>
-                {priorityControl}
-              </CollapsibleTaskSection>
-              </View>
-              <View testID="task-editor-schedule-field">
-              <CollapsibleTaskSection title={calendarDateFixed ? "Time" : "Schedule"} summary={dueAt && isValid(parseISO(dueAt)) ? format(parseISO(dueAt), "MMM d · HH:mm") : "Optional"} defaultExpanded={false}>
-              <TaskSchedulePicker value={dueAt} onChange={setDueAt} dateLocked={calendarDateFixed} />
-              </CollapsibleTaskSection>
-              </View>
               <CollapsibleTaskSection title="Notes">
               <View testID="task-editor-notes-field">
               <Input
@@ -466,15 +440,34 @@ function TaskEditorForm({
               />
               </View>
               </CollapsibleTaskSection>
+              <View testID="task-editor-status-field">
+                <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>STATUS</Text>
+                <CardStatusPicker tags={tags} onChange={changeStatusTags} />
+              </View>
+              <View testID="task-editor-priority-field">
+              <CollapsibleTaskSection title="Priority" summary={PRIORITY_META[priority].label}>
+                {priorityControl}
+              </CollapsibleTaskSection>
+              </View>
+              <View testID="task-editor-schedule-field">
+              <CollapsibleTaskSection title={calendarDateFixed ? "Time" : "Schedule"} summary={dueAt && isValid(parseISO(dueAt)) ? format(parseISO(dueAt), "MMM d · HH:mm") : "Optional"} defaultExpanded={false}>
+              <TaskSchedulePicker value={dueAt} onChange={setDueAt} dateLocked={calendarDateFixed} />
+              </CollapsibleTaskSection>
+              </View>
               <CollapsibleTaskSection title="Checklist" summary={`${subtasks.filter((item) => item.done).length}/${subtasks.length} done`}>
                 {subtasks.length ? <View style={[styles.taskEditorChecklist, { borderColor: theme.colors.border, backgroundColor: theme.colors.input, marginTop: 0 }]}>{subtasks.map((subtask, index) => <View key={subtask.id} style={[styles.taskEditorSubtaskRow, index > 0 ? { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.taskEditorSubtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><TextInput value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} placeholderTextColor={theme.colors.mutedForeground} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.taskEditorSubtaskInput, { color: theme.colors.foreground, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} style={({ pressed }) => [styles.taskEditorSubtaskDelete, { opacity: pressed ? 0.6 : 1 }]}><Ionicons name="trash-outline" size={17} color={theme.colors.mutedForeground} /></Pressable></View>)}</View> : null}
                 <View style={styles.taskEditorAddSubtask}><Input value={subtaskTitle} accessibilityLabel="New checklist step" onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a step" returnKeyType="done" style={styles.taskEditorAddSubtaskInput} /><Button label="Add" variant="secondary" accessibilityLabel="Add subtask" onPress={addSubtaskLocal} disabled={!subtaskTitle.trim()} /></View>
               </CollapsibleTaskSection>
               <View testID="task-editor-tags-list-row">
-                <CollapsibleTaskSection title="Tags" summary={`${tags.filter((tag) => classifySpecialCardTag(tag)?.group !== "status").length + (category ? 1 : 0)} selected`}>
+                <CollapsibleTaskSection title="Tags" summary={`${tags.filter((tag) => { const group = classifySpecialCardTag(tag)?.group; return group !== "status" && group !== "event"; }).length + (category ? 1 : 0)} selected`}>
                 {tagsControl}
                 </CollapsibleTaskSection>
               </View>
+              {availableEvents.length ? <View testID="task-editor-event-tag-row">
+                <CollapsibleTaskSection title="Event" summary={tags.find((tag) => classifySpecialCardTag(tag)?.group === "event")}>
+                <SpecialCardTagPicker tags={tags} onChange={setTags} showLabel={false} />
+                </CollapsibleTaskSection>
+              </View> : null}
               {presentation === "panel" ? <View style={{ marginTop: 16 }}>{footer}</View> : null}
             </ScrollView>
             {presentation === "sheet" ? footer : null}
@@ -744,7 +737,6 @@ const styles = StyleSheet.create({
   taskEditorLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.2, marginTop: 16, marginBottom: 7 },
   taskEditorTitleInput: { height: 56, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 0, fontSize: 19, lineHeight: 25, fontWeight: "700", textAlignVertical: "center" },
   taskEditorNotes: { minHeight: 88, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, fontSize: 14, lineHeight: 20, textAlignVertical: "top" },
-  taskEditorSectionHeading: { marginTop: 20, marginBottom: 8 },
   taskEditorSection: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
   taskEditorSectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: "700", letterSpacing: -0.1 },
   taskEditorSectionMeta: { fontSize: 9, fontWeight: "800", letterSpacing: 1 },

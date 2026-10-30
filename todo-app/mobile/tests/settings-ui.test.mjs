@@ -27,7 +27,6 @@ async function load(path, mocks) {
   const exports = {};
   vm.runInNewContext(outputText, { exports, require: (id) => {
     if (id === "react/jsx-runtime") return require(id);
-    if (id === "@/components/ui/selection-led") return { SelectionLed: "SelectionLed" };
     if (id === "@/components/ui/tactile") return tactile;
     assert.ok(id in mocks, `Unexpected import ${id}`);
     return mocks[id];

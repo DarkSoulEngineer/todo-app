@@ -31,7 +31,6 @@ function setup({ initialSectionId = null, initialDueAt = null, task = null, widt
     react,
     "@expo/vector-icons": { Ionicons: "Ionicons" },
     "./tactile": { tactileSurface: () => ({}) },
-    "@/components/ui/selection-led": { SelectionLed: "SelectionLed" },
     "react-native": { ...fallback, Platform: { OS: "web" }, View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", TextInput: "TextInput", StyleSheet: { create: (value) => value }, useWindowDimensions: () => ({ width }) },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
@@ -92,56 +91,37 @@ test("calendar creation keeps its selected date and replaces Schedule with time-
 });
 
 test("Task/Create/Edit use the same logical section order on phones, windows and side panels", () => {
+  activeEvents.setEventOverride("all");
   for (const width of [390, 1200]) for (const presentation of ["sheet", "panel"]) for (const task of [null, { id: "existing", title: "Task", priority: "medium", sectionId: "mine", subtasks: [] }]) {
     const tree = setup({ width, presentation, task }).render();
     const all = nodes(tree);
     const sections = all.filter((node) => node.type === "CollapsibleTaskSection");
-    assert.deepEqual(sections.map((node) => node.props.title), ["List", "Priority", "Schedule", "Notes", "Checklist", "Tags"]);
+    assert.deepEqual(sections.map((node) => node.props.title), ["Notes", "Priority", "Schedule", "Checklist", "Tags", "Event"]);
     const titleIndex = all.findIndex((node) => node.props?.accessibilityLabel === "Task title");
     assert.ok(titleIndex >= 0 && titleIndex < all.indexOf(sections[0]));
     const actionIndex = all.findIndex((node) => node.props?.label === (task ? "Cancel task" : "Add task"));
     assert.ok(actionIndex > all.indexOf(sections.at(-1)), "main actions stay after the form");
   }
+  activeEvents.setEventOverride(null);
 });
 
-test("task editor selects a real list and never offers No list on phone and desktop", () => {
+test("editor saves one event and one status tag on mobile and desktop", () => {
   for (const width of [390, 1200]) {
     const app = setup({ width });
-    let tree = app.render();
-    const choices = () => nodes(tree).find((node) => node.props?.testID === "task-editor-list-choices");
-    const chip = (label) => nodes(choices()).find((node) => node.props?.label === label);
-    assert.equal(chip("No list"), undefined);
-    assert.equal(chip("My workflow").props.active, true);
-    assert.equal(chip("Hidden"), undefined);
-    chip("My workflow").props.onPress();
-    tree = app.render();
-    assert.equal(chip("My workflow").props.active, true);
-    assert.ok(nodes(tree).some((node) => node.props?.accessibilityLabel === "New card tag"));
-  }
-});
-
-test("editor saves one event and one status plus unlimited ordinary tags on mobile and desktop", () => {
-  for (const width of [390, 1200]) {
-    const app = setup({ width });
+    activeEvents.setEventOverride("all");
     let tree = app.render();
     const pressSpecial = (label) => {
-      if (label.startsWith("Event tag ")) activeEvents.setEventOverride("all");
       const component = label.startsWith("Status tag ") ? "CardStatusPicker" : "SpecialCardTagPicker";
       const picker = nodes(tree).find((node) => node.type?.name === component);
       nodes(picker.type(picker.props)).find((node) => node.props?.accessibilityLabel === label).props.onPress();
       tree = app.render();
     };
     pressSpecial("Event tag Halloween"); pressSpecial("Status tag Done"); pressSpecial("Status tag Canceled"); pressSpecial("Event tag Christmas");
-    for (const label of ["Work", "Study"]) {
-      nodes(tree).find((node) => node.props?.accessibilityLabel === "New card tag").props.onChangeText(label);
-      tree = app.render();
-      nodes(tree).find((node) => node.props?.label === "Add" && node.props.accessibilityLabel !== "Add subtask").props.onPress();
-      tree = app.render();
-    }
+    assert.equal(nodes(tree).some((node) => node.props?.accessibilityLabel === "New card tag"), false, "the editor has no free-text tag field");
     nodes(tree).find((node) => node.props?.accessibilityLabel === "Task title").props.onChangeText("Tagged task");
     tree = app.render();
     nodes(tree).find((node) => node.props?.label === "Add task").props.onPress();
-    assert.deepEqual(app.saves[0].draft.tags, ["Canceled", "Christmas", "Work", "Study"]);
+    assert.deepEqual(app.saves[0].draft.tags, ["Canceled", "Christmas"]);
     assert.equal(app.saves[0].sectionId, "mine");
     activeEvents.setEventOverride(null);
   }
@@ -150,7 +130,6 @@ test("editor saves one event and one status plus unlimited ordinary tags on mobi
 test("adding from a list preserves that list on save", () => {
   const app = setup({ initialSectionId: "other", sections: [{ id: "mine", title: "My workflow" }, { id: "other", title: "Other" }] });
   let tree = app.render();
-  assert.equal(nodes(tree).find((node) => node.props?.label === "Other").props.active, true);
   nodes(tree).find((node) => node.props?.accessibilityLabel === "Task title").props.onChangeText("New task");
   tree = app.render();
   const save = nodes(tree).find((node) => node.props?.label === "Create task" || node.props?.label === "Add task");
@@ -171,12 +150,18 @@ test("an empty board cannot save a card or invent a list", () => {
   assert.equal(nodes(tree).some((node) => node.props?.label === "No list"), false);
 });
 
-test("legacy unassigned cards require an explicit list choice without helper text", () => {
+test("the editor has no list picker and new cards fall back to the first visible list", () => {
   const app = setup({ task: { id: "legacy", title: "Existing card", sectionId: null, subtasks: [] } });
   let tree = app.render();
-  assert.equal(nodes(tree).find((node) => node.props?.label === "My workflow").props.active, false);
-  assert.ok(!nodes(tree).some((node) => node.props?.children === "Choose a list to save this card."));
-  nodes(tree).find((node) => node.props?.label === "My workflow").props.onPress();
-  tree = app.render();
-  assert.equal(nodes(tree).find((node) => node.props?.label === "My workflow").props.active, true);
+  assert.equal(nodes(tree).some((node) => node.props?.testID === "task-editor-list-choices"), false);
+  assert.equal(nodes(tree).some((node) => node.props?.children === "Choose a list to save this card."), false);
+  assert.ok(nodes(tree).find((node) => node.props?.accessibilityLabel === "Task title"));
+
+  const fresh = setup();
+  tree = fresh.render();
+  assert.equal(nodes(tree).some((node) => node.props?.testID === "task-editor-list-choices"), false);
+  nodes(tree).find((node) => node.props?.accessibilityLabel === "Task title").props.onChangeText("New task");
+  tree = fresh.render();
+  nodes(tree).find((node) => node.props?.label === "Add task").props.onPress();
+  assert.equal(fresh.saves[0].sectionId, "mine");
 });

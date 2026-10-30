@@ -14,7 +14,6 @@ import { useTheme } from "@/providers/theme-provider";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { SelectionLed } from "@/components/ui/selection-led";
 import { JanusLogo } from "@/components/ui/janus-logo";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
@@ -138,7 +137,6 @@ export default function SettingsRoute() {
           {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
             style={({ pressed }) => [styles.sectionTab, { backgroundColor: section === label ? colors.primaryFixed : colors.card, borderColor: section === label ? colors.primary : colors.outlineVariant }]}>
             <Text style={[type.bodyStrong, { color: section === label ? colors.text : colors.muted }]}>{label}</Text>
-            <SelectionLed selected={section === label} />
           </Pressable>)}
         </ScrollView>
         {section === "Appearance" ? <View style={styles.sectionBlock}>
@@ -168,7 +166,6 @@ export default function SettingsRoute() {
                 return (
                   <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
-                    <SelectionLed selected={selected} />
                   </Pressable>
                 );
               })}
@@ -180,7 +177,6 @@ export default function SettingsRoute() {
                 return (
                   <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
-                    <SelectionLed selected={selected} />
                   </Pressable>
                 );
               })}
@@ -238,7 +234,6 @@ export default function SettingsRoute() {
           {BACKUP_OPTIONS.map((option) => (
             <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, scope === option.value && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>{option.label}</Text><Text style={[type.caption, { color: colors.muted }]}>{option.description}</Text></View>
-              <SelectionLed selected={scope === option.value} />
             </Pressable>
           ))}
         </View>

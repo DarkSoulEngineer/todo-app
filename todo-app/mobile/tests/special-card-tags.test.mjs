@@ -9,7 +9,7 @@ let viewportWidth = 1024;
 const mocks = {
   react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}], useRef: (current) => ({ current }), useCallback: (fn) => fn, useMemo: (fn) => fn(), useEffect() {} },
   "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (styles) => styles, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: viewportWidth }) },
-  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { card: "#211C17", cardElevated: "#29231D", backgroundAlt: "#181512", primary: "#D9A441", primarySoft: "#3A2E19", success: "#45BF82", successSoft: "#1D3A2C", destructive: "#F36164", destructiveSoft: "#431B1D", mutedForeground: "#B0A79C", secondary: "#29231D", border: "#342D25", borderStrong: "#4A4035" } } }) },
+  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { card: "#211C17", cardElevated: "#29231D", backgroundAlt: "#181512", primary: "#D9A441", primarySoft: "#3A2E19", success: "#45BF82", successSoft: "#1D3A2C", destructive: "#F36164", destructiveSoft: "#431B1D", mutedForeground: "#B0A79C", secondary: "#29231D", secondaryForeground: "#E8E1D6", border: "#342D25", borderStrong: "#4A4035" } } }) },
   "@expo/vector-icons": { Ionicons: "Ionicons" },
   "@/components/ui/sheet": { Sheet: "Sheet" },
   "@/components/ui/editor-window": { EditorWindow: "EditorWindow" },
@@ -253,26 +253,27 @@ test("the neutral status has no tag and explicit status buttons toggle independe
     assert.equal(tree.some((node) => node.props?.children === "No status tag selected"), false);
     for (const entry of themes.STATUS_CARD_THEMES) {
       const button = tree.find((node) => node.props?.accessibilityLabel === `Status tag ${entry.label}`);
-      assert.deepEqual(nodes(button).filter((node) => node.type === "Text").map((node) => node.props.children), [entry.label]);
-      assert.equal(button.props.accessibilityState.selected, selected.includes(entry.label));
+      const active = selected.includes(entry.label);
+      const content = nodes(button);
+      assert.deepEqual(content.filter((node) => node.type === "Text").map((node) => node.props.children), [entry.label]);
+      assert.equal(button.props.accessibilityState.selected, active);
       assert.equal(button.props.accessibilityRole, "radio");
-      const style = Object.assign({}, ...[button.props.style].flat());
+      const style = Object.assign({}, ...[button.props.style({ pressed: false })].flat());
       assert.equal(style.minHeight, 44);
-      assert.equal(style.borderWidth, 1);
-      assert.equal(style.borderRadius, 999);
-      assert.equal(style.backgroundColor, undefined);
-      assert.equal(style.boxShadow, "0 1px 3px rgba(0,0,0,0.16)");
-      assert.equal(style.elevation, 1);
-      const unpressed = nodes(button.props.children({ pressed: false }));
-      const pressed = nodes(button.props.children({ pressed: true }));
-      const unpressedDot = unpressed.find((node) => Object.assign({}, ...[node.props?.style ?? []].flat()).width === 7);
-      const pressedDot = pressed.find((node) => Object.assign({}, ...[node.props?.style ?? []].flat()).width === 7);
-      assert.equal(Object.assign({}, ...[unpressedDot.props.style].flat()).opacity, selected.includes(entry.label) ? 1 : 0.7);
-      assert.equal(Object.assign({}, ...[pressedDot.props.style].flat()).opacity, 1);
-      const labelStyle = Object.assign({}, ...[unpressed.find((node) => node.type === "Text").props.style].flat());
-      const pressedLabelStyle = Object.assign({}, ...[pressed.find((node) => node.type === "Text").props.style].flat());
-      assert.deepEqual(pressedLabelStyle, labelStyle);
+      assert.equal(style.borderWidth, 0.5);
+      assert.equal(style.borderRadius, 13);
+      assert.equal(style.backgroundColor, "#29231D", "status pills share the chip surface");
+      assert.equal(style.borderColor, active ? "#4A4035" : "#342D25");
+      assert.equal(style.boxShadow, undefined, "status pills are flat like the other editor chips");
+      assert.equal(style.elevation, undefined);
+      assert.equal(Object.assign({}, ...[button.props.style({ pressed: true })].flat()).opacity, 0.75);
+      const dot = content.find((node) => Object.assign({}, ...[node.props?.style ?? []].flat()).width === 7);
+      const dotStyle = Object.assign({}, ...[dot.props.style].flat());
+      assert.equal(dotStyle.opacity, active ? 1 : 0.7);
+      assert.equal(dotStyle.backgroundColor, entry.id === "done" ? "#45BF82" : entry.id === "overdue" ? "#F36164" : "#B0A79C");
+      const labelStyle = Object.assign({}, ...[content.find((node) => node.type === "Text").props.style].flat());
       assert.equal(labelStyle.fontWeight, "600");
+      assert.equal(labelStyle.color, "#E8E1D6");
     }
   }
   let updated;
