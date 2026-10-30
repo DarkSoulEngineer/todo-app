@@ -54,6 +54,12 @@ export const SEASONAL_CARD_THEMES: SeasonalCardTheme[] = [
   { ...theme("valentines", ["valentine", "valentines", "valentine's", "valentine’s"], "#FB7185"), label: "Valentine's Day", symbol: "♥", decoration: "" },
 ];
 
+/** Hand-crafted, always-available easter eggs with dedicated card artwork. */
+export const EASTER_EGG_CARD_THEMES: DecorativeCardTheme[] = [
+  { ...theme("darksoulengineer", ["darksoulengineer", "dark soul engineer", "dark-soul-engineer", "dse"], "#63E6D1"), label: "DarkSoulEngineer", symbol: "⌘", decoration: "◈" },
+  { ...theme("janus", ["janus", "two-faced", "two faces"], "#E8BD70"), label: "Janus", symbol: "◑", decoration: "◒" },
+];
+
 /** The theme list, in detection-priority order. */
 export const CARD_THEMES: CardTheme[] = [
   theme(
@@ -181,6 +187,8 @@ export function resolveCardDecoration(tags: readonly string[] = [], status: Task
     // No active event: suppress event decoration
     // fall through to status/regular theming below
   }
+  const easterEgg = special.findLast((entry) => entry.group === "easter-egg");
+  if (easterEgg) return easterEgg.theme;
   const stateId = status === "completed" ? "done" : status;
   const actual = STATUS_CARD_THEMES.find((entry) => entry.id === stateId);
   if (actual) return actual;
@@ -189,13 +197,13 @@ export function resolveCardDecoration(tags: readonly string[] = [], status: Task
   return null;
 }
 
-export interface SpecialCardTag { group: "status" | "event"; theme: DecorativeCardTheme }
+export interface SpecialCardTag { group: "status" | "event" | "easter-egg"; theme: DecorativeCardTheme }
 
 /** A special tag must be a complete name/alias, not a passing word in a sentence. */
 export function classifySpecialCardTag(label: string): SpecialCardTag | null {
   const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/’/g, "'").replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
   const name = normalize(label);
-  for (const [group, entries] of [["status", STATUS_CARD_THEMES], ["event", SEASONAL_CARD_THEMES]] as const) {
+  for (const [group, entries] of [["status", STATUS_CARD_THEMES], ["event", SEASONAL_CARD_THEMES], ["easter-egg", EASTER_EGG_CARD_THEMES]] as const) {
     const entry = entries.find((entry) => [entry.label, ...entry.keywords].some((alias) => normalize(alias) === name));
     if (entry) return { group, theme: entry };
   }

@@ -177,7 +177,6 @@ export function MobileTaskColumns(props: MobileTaskColumnsProps) {
   </View>;
 
   return <View ref={previewHost} collapsable={false} style={styles.root}>
-    {props.tasks.some((task) => !getTaskSectionId(task, props.sections, props.now)) ? <Text style={{ color: c.mutedForeground, fontSize: 12, padding: 10 }}>Some existing cards need a list. Open Activity to choose a list in their editor.</Text> : null}
     {focused && active ? <>
       <ScrollView ref={tabs} horizontal onContentSizeChange={scrollToNewColumn} showsHorizontalScrollIndicator={false} style={styles.tabsRail} contentContainerStyle={styles.tabs}>{columns.map((section, index) => <Pressable key={section.id} accessibilityRole="tab" accessibilityLabel={`${section.title}, ${grouped.get(section.id)?.length ?? 0} cards`} aria-selected={index === activeIndex} onPress={() => selectColumn(index)} style={[styles.tab, { backgroundColor: c.backgroundAlt, borderColor: index === activeIndex ? c.primary : c.border }]}><Text style={{ color: index === activeIndex ? c.primary : c.mutedForeground, fontSize: 12, fontWeight: index === activeIndex ? "600" : "400" }}>{section.title}</Text></Pressable>)}</ScrollView>
       <View {...sectionContextMenu(active)} style={[styles.columnStack, styles.focusColumn, { marginBottom: 12 + insets.bottom }]}>{heading(active)}<ScrollView testID="janus-focused-scroll" style={styles.cardScroll} contentContainerStyle={holderContentStyle} keyboardShouldPersistTaps="handled"><View style={[styles.column, { backgroundColor: c.backgroundAlt, borderColor: c.border }]}><View style={cardContentStyle}>{cards(active, activeIndex)}</View></View>{addCard(active)}</ScrollView></View>
@@ -210,5 +209,4 @@ const styles = StyleSheet.create({
   addSection: { alignSelf: "flex-start", borderWidth: 1, borderStyle: "dashed", borderRadius: 12, minHeight: 110, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   tabsRail: { flexGrow: 0, flexShrink: 0, height: 60 }, tabs: { gap: 5, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" }, tab: { minHeight: 44, justifyContent: "center", borderWidth: 1, borderRadius: 7, paddingHorizontal: 10 }, focusColumn: { marginHorizontal: 10, marginBottom: 10 },
 });
-
 

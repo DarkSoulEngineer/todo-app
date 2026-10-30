@@ -2,7 +2,7 @@ import type { Board } from "@/lib/domain/boards";
 import type { Task } from "@/lib/domain/types";
 import { classifySpecialCardTag, detectSeasonalCardTheme } from "@/lib/features/card-themes";
 
-/** Last selection wins within each special group. Ordinary tags are unlimited. */
+/** Status and event groups are exclusive; custom easter eggs and ordinary tags coexist. */
 export function normalizeCardTags(input: readonly unknown[] | undefined): string[] {
   const result: string[] = [];
   for (const item of input ?? []) {
@@ -11,7 +11,7 @@ export function normalizeCardTags(input: readonly unknown[] | undefined): string
     const label = special?.theme.label ?? item.trim();
     for (let index = result.length - 1; index >= 0; index--) {
       const existing = classifySpecialCardTag(result[index]);
-      if ((special && existing?.group === special.group) || result[index].toLowerCase() === label.toLowerCase()) result.splice(index, 1);
+      if ((special && special.group !== "easter-egg" && existing?.group === special.group) || result[index].toLowerCase() === label.toLowerCase()) result.splice(index, 1);
     }
     result.push(label);
   }
@@ -52,10 +52,14 @@ export function mergeCardTagDraft(local: string[], previous: readonly string[], 
     }
   }
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-  for (const tag of before.filter((tag) => !classifySpecialCardTag(tag))) {
+  const isMergeableTag = (tag: string) => {
+    const special = classifySpecialCardTag(tag);
+    return !special || special.group === "easter-egg";
+  };
+  for (const tag of before.filter(isMergeableTag)) {
     if (!next.some((value) => same(tag, value))) merged = merged.filter((value) => !same(tag, value));
   }
-  for (const tag of next.filter((tag) => !classifySpecialCardTag(tag))) {
+  for (const tag of next.filter(isMergeableTag)) {
     if (!before.some((value) => same(tag, value)) && !merged.some((value) => same(tag, value))) merged.push(tag);
   }
   const result = normalizeCardTags(merged);
@@ -102,7 +106,7 @@ export function applyCategoryCardTag(task: Task, boards: readonly Board[]): Task
 /** One-time compatibility conversion. Never re-infer tags after the version mark. */
 export function migrateCardTags(task: Task, listTitle = "", boards: readonly Board[] = []): Task {
   let tags = normalizeCardTags(task.tags);
-  if (task.specialTagsVersion !== 1 && !tags.some((tag) => classifySpecialCardTag(tag)?.group === "event")) {
+  if (task.specialTagsVersion !== 1 && !tags.some((tag) => ["event", "easter-egg"].includes(classifySpecialCardTag(tag)?.group ?? ""))) {
     const event = detectSeasonalCardTheme(task.title) ?? detectSeasonalCardTheme(listTitle);
     if (event) tags = normalizeCardTags([...tags, event.label]);
   }

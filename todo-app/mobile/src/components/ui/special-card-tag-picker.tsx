@@ -7,7 +7,7 @@ import { SelectionLed } from "@/components/ui/selection-led";
 
 /** Event tags stay in the Tags section; status now lives at the top of the editor. */
 export function SpecialCardTagPicker({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
-  const { theme: { colors: c, scheme } } = useTheme();
+  const { theme: { colors: c } } = useTheme();
   const { events } = useActiveEvents();
   if (!events.length) return null;
   return <View testID="special-card-tag-picker" style={styles.group}>

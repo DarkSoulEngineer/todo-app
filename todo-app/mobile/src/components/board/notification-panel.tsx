@@ -18,7 +18,7 @@ export function NotificationPanel({ visible, onClose }: { visible: boolean; onCl
   }, [markNotificationsRead, visible]);
 
   return <Modal visible={visible} transparent animationType="fade" presentationStyle="overFullScreen" statusBarTranslucent onRequestClose={onClose}>
-    <View style={[styles.overlay, { paddingRight: insets.right + 12 }]}>
+    <View style={[styles.overlay, { paddingRight: insets.right }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Close notifications" onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
       <View accessibilityViewIsModal testID="board-notification-panel" style={[styles.panel, { width: panelWidth, height, backgroundColor: c.card, borderColor: c.border, shadowColor: c.shadow }]}>
         <View style={[styles.header, { paddingTop: insets.top, borderBottomColor: c.border }]}>

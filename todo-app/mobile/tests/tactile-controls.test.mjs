@@ -86,7 +86,7 @@ test("event chips keep their selection and toggle behavior with a tactile select
     "react-native": native,
     "@/providers/theme-provider": { useTheme: () => ({ theme: { scheme: "dark", colors: { border: "#444444", borderStrong: "#777777", secondary: "#333333", cardElevated: "#222222" } } }) },
     "./tactile": { tactileSurface },
-    "@/lib/features/card-themes": { STATUS_CARD_THEMES: [entry], classifySpecialCardTag: (tag) => tag === entry.label ? { theme: entry } : null },
+    "@/lib/features/card-themes": { STATUS_CARD_THEMES: [entry], EASTER_EGG_CARD_THEMES: [], classifySpecialCardTag: (tag) => tag === entry.label ? { theme: entry } : null },
     "@/hooks/use-active-events": { useActiveEvents: () => ({ events: [{ id: entry.id, label: entry.label }] }) },
     "@/lib/features/special-card-tags": { toggleCardTag: (tags, tag) => tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag] },
   });

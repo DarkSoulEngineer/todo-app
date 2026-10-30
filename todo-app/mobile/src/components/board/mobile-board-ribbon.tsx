@@ -201,7 +201,7 @@ export function MobileBoardRibbon(props: Props) {
       <Text style={[styles.moreHint, { color: c.mutedForeground }]}>Choose a tab. Swipe tool rows or use their arrows for more options.</Text>
       {visibleTabs.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Show ${item.label} ribbon tab`} accessibilityState={{ selected: shownTab === item.value }} onPress={() => { openTab(item.value); setMoreOpen(false); }} style={[styles.moreOption, { backgroundColor: shownTab === item.value ? c.primarySoft : "transparent" }]}>
         <Ionicons name={item.icon} size={20} color={c.foreground} />
-        <Text style={{ flex: 1, color: c.foreground, fontSize: 15 }}>{item.label}{item.value === "hidden" ? ` (${hiddenSections.length})` : item.value === "filters" && props.filtersActive ? " · Active" : item.value === "notifications" && unreadNotifications ? ` · ${unreadNotifications} unread` : ""}</Text>
+        <Text style={{ flex: 1, color: c.foreground, fontSize: 15 }}>{item.label}{item.value === "hidden" ? ` (${hiddenSections.length})` : item.value === "filters" && props.filtersActive ? " · Active" : ""}</Text>
         {shownTab === item.value ? <Ionicons name="checkmark" size={20} color={c.primary} /> : null}
       </Pressable>)}
     </Sheet>

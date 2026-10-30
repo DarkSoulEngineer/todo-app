@@ -13,12 +13,14 @@ function load(path, mocks = {}) {
   return exports;
 }
 const themes = load("lib/features/card-themes.ts");
-const allDecorations = [...themes.SEASONAL_CARD_THEMES, ...themes.STATUS_CARD_THEMES];
+const allDecorations = [...themes.SEASONAL_CARD_THEMES, ...themes.EASTER_EGG_CARD_THEMES, ...themes.STATUS_CARD_THEMES];
 const halloweenVariants = load("lib/features/halloween-variants.ts");
 
 test("special tags match complete aliases without inferring rules from holder names", () => {
   for (const name of ["Done", "COMPLETED", " Finished ", "Resolved", "Delivered"]) assert.equal(themes.classifySpecialCardTag(name)?.theme.id, "done");
   for (const name of ["Cancelled", "CANCELED", "Abandoned"]) assert.equal(themes.classifySpecialCardTag(name)?.theme.id, "canceled");
+  for (const name of ["DarkSoulEngineer", "dark soul engineer", "DSE"]) assert.equal(themes.classifySpecialCardTag(name)?.theme.id, "darksoulengineer");
+  for (const name of ["Janus", "two-faced", "two faces"]) assert.equal(themes.classifySpecialCardTag(name)?.theme.id, "janus");
   for (const name of ["Not done", "Unfinished", "Completed research", "Almost finished", "Don't cancel", "My backlog", "D", ""]) assert.equal(themes.classifySpecialCardTag(name), null, name);
 });
 
@@ -58,6 +60,10 @@ test("tags combine one event design with status, and ordinary task state stays v
   assert.equal(themes.resolveCardDecoration(["Done"], "canceled")?.id, "canceled");
   assert.equal(themes.resolveCardDecoration(["Halloween", "Done"], "completed")?.id, "halloween");
   assert.equal(themes.resolveCardDecoration(["Christmas", "Overdue"], "overdue")?.id, "christmas");
+  assert.equal(themes.resolveCardDecoration(["DarkSoulEngineer"], "completed")?.id, "darksoulengineer");
+  assert.equal(themes.resolveCardDecoration(["Janus"])?.id, "janus");
+  assert.equal(themes.resolveCardDecoration(["Janus", "Halloween"], "completed")?.id, "janus");
+  assert.equal(themes.resolveCardDecoration(["Janus", "Halloween"], "completed", "halloween")?.id, "halloween");
   assert.equal(themes.resolveCardDecoration([], "upcoming"), null);
 });
 
@@ -85,6 +91,11 @@ function decorationHarness({ paused = false, compact = false, active = true, id 
     "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", Ellipse: "Ellipse", G: "G", Path: "Path", Rect: "Rect" },
     "@/lib/features/halloween-variants": halloweenVariants,
   });
+  const customArtwork = load("components/ui/custom-card-artwork.tsx", {
+    "react-native": { View: "View", Animated: { View: "AnimatedView" }, StyleSheet: { create: (value) => value, absoluteFillObject: {} } },
+    "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", Defs: "Defs", Ellipse: "Ellipse", G: "G", LinearGradient: "LinearGradient", Path: "Path", Polygon: "Polygon", Rect: "Rect", Stop: "Stop" },
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { primary: "#63E6D1", accent: "#A78BFA", mutedForeground: "#94A3B8", backgroundAlt: "#1E293B", card: "#0F172A" } } }) },
+  });
   const { SeasonalCardDecoration } = load("components/ui/seasonal-card-decoration.tsx", {
     react: { useState: (initial) => [initial(), () => {}], useEffect: (effect) => { cleanup = effect(); } },
     "react-native": {
@@ -97,6 +108,7 @@ function decorationHarness({ paused = false, compact = false, active = true, id 
     "./seasonal-card-artwork": artwork,
     "./status-card-artwork": statusArtwork,
     "./halloween-card-artwork": halloweenArtwork,
+    "./custom-card-artwork": customArtwork,
   });
   const tree = SeasonalCardDecoration({ theme: allDecorations.find((theme) => theme.id === id), cardId, paused, compact });
   return { tree, callbacks, configs, cleanup: () => cleanup(), resolvePreference: (value) => resolvePreference(value), get starts() { return starts; }, get stops() { return stops; }, get removals() { return removals; } };
@@ -122,6 +134,8 @@ test("holiday cards use distinct event-specific artwork without event title labe
     "new-year": ["new-year-confetti", "new-year-fireworks"],
     birthday: ["birthday-bunting", "birthday-balloons", "birthday-cake"],
     valentines: ["valentines-petals", "valentines-hearts", "valentines-envelope"],
+    darksoulengineer: ["custom-artwork-darksoulengineer"],
+    janus: ["custom-artwork-janus"],
     done: ["done-seal"],
     canceled: ["canceled-ticket"],
     overdue: ["overdue-clock"],

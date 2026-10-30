@@ -4,6 +4,7 @@ import type { DecorativeCardTheme } from "@/lib/features/card-themes";
 import { SeasonalCardArtwork } from "./seasonal-card-artwork";
 import { StatusCardArtwork } from "./status-card-artwork";
 import { HalloweenCardArtwork } from "./halloween-card-artwork";
+import { CustomCardArtwork } from "./custom-card-artwork";
 
 /** A small, non-interactive seasonal layer. Ordinary cards never mount it. */
 export function SeasonalCardDecoration({ theme, cardId = "", paused = false, compact = false }: { theme: DecorativeCardTheme; cardId?: string; paused?: boolean; compact?: boolean }) {
@@ -43,6 +44,6 @@ export function SeasonalCardDecoration({ theme, cardId = "", paused = false, com
   }, [compact, paused, phase, staticDesign]);
 
   return <View testID={`seasonal-decoration-${theme.id}`} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: theme.wash, borderRadius: 12, overflow: "hidden" }]}>
-    {theme.id === "halloween" ? <HalloweenCardArtwork cardId={cardId} phase={phase} compact={compact} /> : staticDesign ? <StatusCardArtwork id={theme.id} color={theme.accent} compact={compact} /> : <SeasonalCardArtwork id={theme.id} phase={phase} compact={compact} />}
+    {theme.id === "halloween" ? <HalloweenCardArtwork cardId={cardId} phase={phase} compact={compact} /> : theme.id === "darksoulengineer" || theme.id === "janus" ? <CustomCardArtwork id={theme.id} phase={phase} compact={compact} /> : staticDesign ? <StatusCardArtwork id={theme.id} color={theme.accent} compact={compact} /> : <SeasonalCardArtwork id={theme.id} phase={phase} compact={compact} />}
   </View>;
 }

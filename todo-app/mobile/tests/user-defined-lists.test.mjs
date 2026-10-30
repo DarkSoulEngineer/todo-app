@@ -171,11 +171,11 @@ test("an empty board cannot save a card or invent a list", () => {
   assert.equal(nodes(tree).some((node) => node.props?.label === "No list"), false);
 });
 
-test("legacy unassigned cards require an explicit list choice", () => {
+test("legacy unassigned cards require an explicit list choice without helper text", () => {
   const app = setup({ task: { id: "legacy", title: "Existing card", sectionId: null, subtasks: [] } });
   let tree = app.render();
   assert.equal(nodes(tree).find((node) => node.props?.label === "My workflow").props.active, false);
-  assert.ok(nodes(tree).some((node) => node.props?.children === "Choose a list to save this card."));
+  assert.ok(!nodes(tree).some((node) => node.props?.children === "Choose a list to save this card."));
   nodes(tree).find((node) => node.props?.label === "My workflow").props.onPress();
   tree = app.render();
   assert.equal(nodes(tree).find((node) => node.props?.label === "My workflow").props.active, true);

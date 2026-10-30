@@ -107,6 +107,17 @@ test("theme catalog has unique ids, names and visual palettes; System is a mode,
   }
 });
 
+test("light appearance includes the refreshed default and distinct color themes", () => {
+  const lightThemes = palettes.themes.filter((theme) => theme.scheme === "light" && theme.id !== "system");
+  assert.ok(lightThemes.length >= 8);
+  for (const id of ["light", "rose-light", "mint-light", "lavender-light", "peach-light"]) {
+    assert.equal(palettes.themesById[id].scheme, "light");
+  }
+  assert.equal(palettes.themesById.light.colors.background, "#F7F8FC");
+  assert.equal(palettes.themesById.light.colors.primary, "#4F46E5");
+  assert.equal(new Set(lightThemes.map(({ colors }) => colors.primary)).size, lightThemes.length);
+});
+
 test("all catalog colors are valid and containers are distinct from their base", () => {
   for (const [id, { colors: c }] of Object.entries(tokens.themes)) {
     for (const [key, value] of Object.entries(c)) {
@@ -171,7 +182,7 @@ test("navigation glass uses each palette rather than fixed light/dark colors", a
 test("board tag labels use readable foregrounds on dark cards", async () => {
   const { MobileColumnTaskCard } = await load("../src/components/board/mobile-column-task-card.tsx", {
     "react/jsx-runtime": createRequire(import.meta.url)("react/jsx-runtime"),
-    react: { useState: (value) => [value, () => {}] },
+    react: { useState: (value) => [value, () => {}], useRef: () => ({ current: null }) },
     "@expo/vector-icons": { Ionicons: "Icon" },
     "date-fns": createRequire(import.meta.url)("date-fns"),
     "@/lib/domain/constants": await load("../src/lib/domain/constants.ts"),
@@ -180,8 +191,13 @@ test("board tag labels use readable foregrounds on dark cards", async () => {
     "./mobile-board-colors": { useMobileBoardColors: () => active.colors },
     "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
     "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
-    "@/lib/domain/status": { describeDue: () => null },
-    "@/lib/domain/boards": { boardColor: () => ({ dot: "#8B5CF6", ink: "#6D28D9", tint: "rgba(139,92,246,0.16)", ring: "#8B5CF6" }) },  });
+    "@/components/ui/seasonal-card-decoration": { SeasonalCardDecoration: "SeasonalCardDecoration" },
+    "@/lib/domain/status": { describeDue: () => null, deriveStatus: () => "upcoming" },
+    "@/lib/domain/boards": { boardColor: () => ({ dot: "#8B5CF6", ink: "#6D28D9", tint: "rgba(139,92,246,0.16)", ring: "#8B5CF6" }) },
+    "@/lib/features/task-completion-celebration": { registerTaskCompletionOrigin: () => () => {} },
+    "@/lib/features/card-themes": { classifySpecialCardTag: () => ({ group: "none" }), resolveCardDecoration: () => null },
+    "@/hooks/use-active-events": { useActiveEvents: () => ({ override: null }) },
+  });
   function nodes(node) {
     if (!node || typeof node !== "object") return [];
     if (Array.isArray(node)) return node.flatMap(nodes);

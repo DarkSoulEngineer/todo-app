@@ -57,6 +57,14 @@ test("selecting another special tag replaces only its own group and supports rem
   assert.deepEqual(selected, ["Work", "Birthday"]);
 });
 
+test("custom easter-egg designs coexist and survive independent editor merges", () => {
+  const selected = tags.normalizeCardTags(["Dark Soul Engineer", "Janus", "DSE", "Work"]);
+  assert.deepEqual(selected, ["Janus", "DarkSoulEngineer", "Work"]);
+  const merged = tags.mergeCardTagDraft(["DarkSoulEngineer", "Janus"], ["DarkSoulEngineer"], ["DarkSoulEngineer", "Janus"]);
+  assert.deepEqual(merged, ["DarkSoulEngineer", "Janus"]);
+  assert.deepEqual(tags.toggleCardTag(selected, "Janus"), ["DarkSoulEngineer", "Work"]);
+});
+
 test("an open editor merges external status changes without losing local event and ordinary tags", () => {
   const merged = tags.mergeCardTagDraft(["Work", "Study", "Halloween"], ["Work"], ["Work", "Done"]);
   assert.deepEqual(merged, ["Work", "Study", "Halloween", "Done"]);
@@ -230,6 +238,9 @@ test("the tag picker enforces independent selections on the actual controls", ()
   events.setEventOverride("christmas");
   press(SpecialCardTagPicker, "Event tag Christmas");
   assert.deepEqual(selected, ["Work", "Canceled", "Christmas"]);
+  const picker = nodes(SpecialCardTagPicker({ tags: selected, onChange: () => assert.fail("Rendering must not edit tags") }));
+  assert.equal(picker.some((node) => node.props?.accessibilityLabel?.startsWith("Easter egg tag ")), false);
+  assert.deepEqual(tags.normalizeCardTags([...selected, "DarkSoulEngineer", "Janus"]), ["Work", "Canceled", "Christmas", "DarkSoulEngineer", "Janus"], "typing custom names in the add-tag field enables their designs");
   events.setEventOverride(null);
 });
 

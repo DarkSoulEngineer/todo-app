@@ -437,7 +437,6 @@ function TaskEditorForm({
               </View>
               <CollapsibleTaskSection title="List" summary={sections.find((section) => section.id === sectionId)?.title} style={styles.taskEditorSectionHeading}>
                 <View testID="task-editor-list-choices" style={[styles.wrapRow, { marginTop: 8 }]}>
-                  {!hasList ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{sections.some((section) => !section.hidden) ? "Choose a list to save this card." : "Create a list on the board before adding a card."}</Text> : null}
                   {sections.filter((section) => !section.hidden || section.id === sectionId).map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}
                 </View>
               </CollapsibleTaskSection>
@@ -469,7 +468,7 @@ function TaskEditorForm({
                 <View style={styles.taskEditorAddSubtask}><Input value={subtaskTitle} accessibilityLabel="New checklist step" onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a step" returnKeyType="done" style={styles.taskEditorAddSubtaskInput} /><Button label="Add" variant="secondary" accessibilityLabel="Add subtask" onPress={addSubtaskLocal} disabled={!subtaskTitle.trim()} /></View>
               </CollapsibleTaskSection>
               <View testID="task-editor-tags-list-row">
-                <CollapsibleTaskSection title="Tags" summary={`${tags.filter((tag) => !classifySpecialCardTag(tag)).length + (category ? 1 : 0)} selected`}>
+                <CollapsibleTaskSection title="Tags" summary={`${tags.filter((tag) => classifySpecialCardTag(tag)?.group !== "status").length + (category ? 1 : 0)} selected`}>
                 {tagsControl}
                 </CollapsibleTaskSection>
               </View>
