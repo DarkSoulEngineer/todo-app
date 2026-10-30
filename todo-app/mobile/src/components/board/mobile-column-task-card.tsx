@@ -105,7 +105,7 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
 export const taskCardBorderRadius = 12;
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: taskCardBorderRadius, overflow: "hidden", padding: 12, gap: 8, boxShadow: "0 2px 5px rgba(0,0,0,0.16)" },
+  card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: taskCardBorderRadius, overflow: "hidden", padding: 12, gap: 8, boxShadow: "0 1px 2px rgba(0,0,0,0.1)" },
   compactCard: { padding: 9, gap: 0 },
   calendarCard: { flexGrow: 1, minHeight: 108, paddingLeft: 13, borderWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
   calendarTopRow: { marginTop: 0, marginBottom: 0 },

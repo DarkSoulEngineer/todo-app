@@ -27,7 +27,7 @@ export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange:
       return <Pressable
         key={option.id}
         accessibilityRole="radio"
-        accessibilityLabel={`Card status ${option.label}`}
+        accessibilityLabel={`Status tag ${option.label}`}
         accessibilityState={{ checked: selected, selected }}
         onPress={() => option.id === "open" ? clearStatus() : onChange(toggleCardTag(tags, option.label))}
         style={({ pressed }) => [styles.segment, { backgroundColor: selected ? option.soft : "transparent", borderColor: selected ? option.color : "transparent" }, { opacity: pressed ? 0.7 : 1 }]}
@@ -39,7 +39,10 @@ export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange:
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", gap: 3, padding: 3, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12 },
+  track: { flexDirection: "row", gap: 3, padding: 3, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.10)" },
   segment: { flex: 1, minHeight: 34, alignItems: "center", justifyContent: "center", paddingHorizontal: 4, borderWidth: 1, borderRadius: 9 },
   label: { fontSize: 12, letterSpacing: 0.1 },
 });
+
+export { CardStatusPicker as StatusPicker };
+export { CardStatusPicker as default };

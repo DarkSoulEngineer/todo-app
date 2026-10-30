@@ -14,7 +14,6 @@ import { useTheme } from "@/providers/theme-provider";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { tactileSurface } from "@/components/ui/tactile";
 import { SelectionLed } from "@/components/ui/selection-led";
 import { JanusLogo } from "@/components/ui/janus-logo";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
@@ -47,7 +46,7 @@ export default function SettingsRoute() {
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { preference, savePreference, setPreference } = useTheme();
   const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart, savePreferences } = usePreferences();
-  const { colors, type, scheme } = useReferenceTheme();
+  const { colors, type } = useReferenceTheme();
   const insets = useSafeAreaInsets();
   const styles = createStyles(colors);
   const [busy, setBusy] = useState(false);
@@ -137,7 +136,7 @@ export default function SettingsRoute() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
         <ScrollView horizontal accessibilityRole="tablist" accessibilityLabel="Settings sections" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionTabs}>
           {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
-            style={({ pressed }) => [styles.sectionTab, { backgroundColor: section === label ? colors.primaryFixed : colors.card, borderColor: section === label ? colors.primary : colors.outlineVariant }, tactileSurface({ pressed, selected: section === label, accent: colors.primary, dark: scheme === "dark" })]}>
+            style={({ pressed }) => [styles.sectionTab, { backgroundColor: section === label ? colors.primaryFixed : colors.card, borderColor: section === label ? colors.primary : colors.outlineVariant }]}>
             <Text style={[type.bodyStrong, { color: section === label ? colors.text : colors.muted }]}>{label}</Text>
             <SelectionLed selected={section === label} />
           </Pressable>)}
@@ -152,7 +151,7 @@ export default function SettingsRoute() {
         {section === "Commands" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Commands" subtitle="Search and run any action without leaving this screen." />
           <View style={styles.sectionCard}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Open commands" onPress={() => setPaletteMode("commands")} style={({ pressed }) => [styles.actionRow, tactileSurface({ pressed, dark: scheme === "dark" })]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open commands" onPress={() => setPaletteMode("commands")} style={({ pressed }) => [styles.actionRow]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>Open commands</Text><Text style={[type.caption, { color: colors.muted }]}>Find boards, tasks, views, themes and settings</Text></View>
               <Text style={[type.caption, { color: colors.primary }]}>Open</Text>
             </Pressable>
@@ -167,7 +166,7 @@ export default function SettingsRoute() {
               {CALENDAR_VIEW_OPTIONS.map((option) => {
                 const selected = calendarDefaultView === option.value;
                 return (
-                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, tactileSurface({ pressed, selected, disabled: busy, accent: colors.primary, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
+                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
                     <SelectionLed selected={selected} />
                   </Pressable>
@@ -179,7 +178,7 @@ export default function SettingsRoute() {
               {WEEK_START_OPTIONS.map((option) => {
                 const selected = calendarWeekStart === option.value;
                 return (
-                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, tactileSurface({ pressed, selected, disabled: busy, accent: colors.primary, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
+                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
                     <SelectionLed selected={selected} />
                   </Pressable>
@@ -192,11 +191,11 @@ export default function SettingsRoute() {
         {section === "Data & backups" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Data & backups" subtitle="Changes save automatically on this device. Choose what to include when saving a backup file." />
           <View style={styles.sectionCard}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Save backup" disabled={busy} onPress={() => { setStatus(null); setSaveOpen(true); }} style={({ pressed }) => [styles.actionRow, tactileSurface({ pressed, disabled: busy, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Save backup" disabled={busy} onPress={() => { setStatus(null); setSaveOpen(true); }} style={({ pressed }) => [styles.actionRow, { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>Export backup</Text><Text style={[type.caption, { color: colors.muted }]}>Choose preferences, boards or everything</Text></View>
               <Text style={[type.caption, { color: colors.primary }]}>Export</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Import backup" disabled={busy} onPress={() => void handleImport()} style={({ pressed }) => [styles.actionRow, tactileSurface({ pressed, disabled: busy, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Import backup" disabled={busy} onPress={() => void handleImport()} style={({ pressed }) => [styles.actionRow, { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>Import backup</Text><Text style={[type.caption, { color: colors.muted }]}>Adds boards and replaces included preferences</Text></View>
               <Text style={[type.caption, { color: colors.primary }]}>Import</Text>
             </Pressable>
@@ -237,7 +236,7 @@ export default function SettingsRoute() {
         <Text style={[type.caption, { color: colors.muted, marginBottom: 12 }]}>What would you like to download or save?</Text>
         <View accessibilityRole="radiogroup">
           {BACKUP_OPTIONS.map((option) => (
-            <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, scope === option.value && styles.segmentSelected, tactileSurface({ pressed, selected: scope === option.value, disabled: busy, accent: colors.primary, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
+            <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, scope === option.value && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>{option.label}</Text><Text style={[type.caption, { color: colors.muted }]}>{option.description}</Text></View>
               <SelectionLed selected={scope === option.value} />
             </Pressable>

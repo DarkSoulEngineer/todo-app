@@ -110,11 +110,11 @@ export function BoardManagerContent(props: Props) {
         subtitle={`${props.totalBoards} active`}
         style={styles.firstSectionHeading}
         right={<View style={styles.headingActions}>{props.onSelecting ? <Button variant="outline" label={props.selecting ? "Done" : "Select"} accessibilityLabel={props.selecting ? "Finish selecting boards" : "Select boards"} onPress={() => props.onSelecting?.(!props.selecting)} disabled={!props.ready || props.editing} style={[styles.arrange, styles.selectButton]}>
-          <Ionicons name={props.selecting ? "checkmark" : "checkbox-outline"} size={18} color={c.mutedForeground} />
-          <Text style={{ color: c.secondaryForeground, fontSize: 12 }}>{props.selecting ? "Done" : "Select"}</Text>
+          <Ionicons name={props.selecting ? "checkmark" : "checkbox-outline"} size={15} color={c.mutedForeground} />
+          <Text style={{ color: c.secondaryForeground, fontSize: 11 }}>{props.selecting ? "Done" : "Select"}</Text>
         </Button> : null}<Button variant="outline" label={props.editing ? "Done" : "Rearrange"} onPress={() => props.onEdit(!props.editing)} disabled={props.selecting || !props.ready || (!props.editing && props.totalBoards < 2)} style={styles.arrange}>
-          <Ionicons name={props.editing ? "checkmark" : "reorder-three-outline"} size={18} color={c.mutedForeground} />
-          <Text style={{ color: c.secondaryForeground, fontSize: 12 }}>{props.editing ? "Done" : "Rearrange"}</Text>
+          <Ionicons name={props.editing ? "checkmark" : "reorder-three-outline"} size={15} color={c.mutedForeground} />
+          <Text style={{ color: c.secondaryForeground, fontSize: 11 }}>{props.editing ? "Done" : "Rearrange"}</Text>
         </Button></View>}
       />
       {props.selecting ? <View testID="home-board-selection" style={[styles.selectionToolbar, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -192,7 +192,7 @@ function ManagerCard({ project, accent, metrics, pinned, editing, hideMoveArrows
       <View style={[styles.track, { backgroundColor: c.secondary }]}><View style={{ height: "100%", width: `${metrics.completionPercent}%`, backgroundColor: accent, borderRadius: 5 }} /></View>
     </View>
     <View pointerEvents="none" style={styles.signals}><View style={styles.inline}><Ionicons name="warning-outline" size={14} color={c.destructive} /><Text style={{ color: c.destructive, fontSize: 12 }}>{metrics.overdue} overdue</Text></View><View style={styles.inline}><Ionicons name="time-outline" size={14} color={c.info} /><Text style={{ color: c.info, fontSize: 12 }}>{metrics.dueSoon} due soon</Text></View></View>
-    {!selecting ? <View pointerEvents="box-none" style={[styles.cardFooter, { borderColor: c.border }]}>{closed ? <><CardAction icon="refresh-outline" label="Reopen" onPress={onReopen} /><View pointerEvents="none" style={{ flex: 1 }} /><CardAction label="Remove" onPress={onRemove} destructive disabled={!ready} /><IconButton icon="ellipsis-horizontal" label={`Actions for ${project.name}`} onPress={onMenu} size={44} /></> : <><CardAction icon="download-outline" label="Save" onPress={onSave} /><CardAction icon="copy-outline" label="Duplicate" onPress={onDuplicate} /><View pointerEvents="none" style={{ flex: 1 }} /><CardAction label="Remove" onPress={onRemove} destructive disabled={!ready} /><IconButton icon="ellipsis-horizontal" label={`Actions for ${project.name}`} onPress={onMenu} size={44} /></>}</View> : null}
+    {!selecting ? <View pointerEvents="box-none" style={[styles.cardFooter, { borderColor: c.border }]}>{closed ? <><CardAction icon="refresh-outline" label="Reopen" onPress={onReopen} /><View pointerEvents="none" style={{ flex: 1 }} /><CardAction label="delete" onPress={onRemove} destructive disabled={!ready} /><IconButton icon="ellipsis-horizontal" label={`Actions for ${project.name}`} onPress={onMenu} size={44} /></> : <><CardAction icon="download-outline" label="Save" onPress={onSave} /><CardAction icon="copy-outline" label="Duplicate" onPress={onDuplicate} /><View pointerEvents="none" style={{ flex: 1 }} /><CardAction label="delete" onPress={onRemove} destructive disabled={!ready} /><IconButton icon="ellipsis-horizontal" label={`Actions for ${project.name}`} onPress={onMenu} size={44} /></>}</View> : null}
   </View>;
 }
 
@@ -287,7 +287,7 @@ function WorkspaceOverview({ metrics, boards, projects = [], now, wide = false, 
 
 const styles = StyleSheet.create({
   headingActions: { flexDirection: "row", gap: 6 },
-  selectButton: { width: 88 },
+  selectButton: { width: 72 },
   selectionToolbar: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingVertical: 4, marginBottom: 12 },
   newBoardButton: { width: 44, height: 44, borderRadius: 7, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   themeSwitch: { flexDirection: "row", borderWidth: 1, borderRadius: 10, padding: 2 }, themeButton: { width: 44, height: 44, borderRadius: 7, alignItems: "center", justifyContent: "center" },
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
    overviewCardSidebar: { paddingHorizontal: 0, paddingVertical: 8, gap: 28 },
   legendSidebar: { marginTop: 24, paddingTop: 24, gap: 20 },
   statsBoardCount: { fontSize: 13, textAlign: "center", marginBottom: 8 },
-  arrange: { paddingHorizontal: 10, borderRadius: 13 },
+  arrange: { paddingHorizontal: 8, borderRadius: 11 },
   sectionHeading: { marginTop: 24, marginBottom: 10 }, firstSectionHeading: { marginBottom: 10 }, editHint: { fontSize: 12, marginBottom: 12 }, boards: { gap: 16 },
   board: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 17, paddingTop: 14, shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 }, cardHeader: { flexDirection: "row", alignItems: "flex-start" }, cardTitleArea: { flex: 1, paddingVertical: 4, minHeight: 44 }, boardTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.4 }, closedBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5, height: 20, paddingHorizontal: 6, borderWidth: 1, borderRadius: 7 }, created: { fontSize: 12, marginTop: 4 }, pin: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -10, marginTop: -5 },
   headerActions: { flexDirection: "row", alignItems: "center", marginTop: -5, marginRight: -10 },

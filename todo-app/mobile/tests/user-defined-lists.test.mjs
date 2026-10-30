@@ -49,7 +49,7 @@ function setup({ initialSectionId = null, initialDueAt = null, task = null, widt
       cardThemes.STATUS_CARD_THEMES.map((entry) => react.createElement("Pressable", {
         key: entry.id,
         accessibilityRole: "radio",
-        accessibilityLabel: `Card status ${entry.label}`,
+        accessibilityLabel: `Status tag ${entry.label}`,
         onPress: () => onChange(cardTags.toggleCardTag(tags, entry.label)),
       })),
     ),
@@ -126,12 +126,12 @@ test("editor saves one event and one status plus unlimited ordinary tags on mobi
     let tree = app.render();
     const pressSpecial = (label) => {
       if (label.startsWith("Event tag ")) activeEvents.setEventOverride(cardThemes.classifySpecialCardTag(label.slice(10)).theme.id);
-      const component = label.startsWith("Card status ") ? "CardStatusPicker" : "SpecialCardTagPicker";
+      const component = label.startsWith("Status tag ") ? "CardStatusPicker" : "SpecialCardTagPicker";
       const picker = nodes(tree).find((node) => node.type?.name === component);
       nodes(picker.type(picker.props)).find((node) => node.props?.accessibilityLabel === label).props.onPress();
       tree = app.render();
     };
-    pressSpecial("Event tag Halloween"); pressSpecial("Card status Done"); pressSpecial("Card status Canceled"); pressSpecial("Event tag Christmas");
+    pressSpecial("Event tag Halloween"); pressSpecial("Status tag Done"); pressSpecial("Status tag Canceled"); pressSpecial("Event tag Christmas");
     for (const label of ["Work", "Study"]) {
       nodes(tree).find((node) => node.props?.accessibilityLabel === "New card tag").props.onChangeText(label);
       tree = app.render();

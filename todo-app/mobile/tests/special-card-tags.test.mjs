@@ -184,9 +184,9 @@ test("the tag picker enforces independent selections on the actual controls", ()
     nodes(tree).find((node) => node.props?.accessibilityLabel === label).props.onPress();
   };
   events.setEventOverride("halloween");
-  press(SpecialCardTagPicker, "Event tag Halloween"); press(CardStatusPicker, "Card status Done");
+  press(SpecialCardTagPicker, "Event tag Halloween"); press(CardStatusPicker, "Status tag Done");
   assert.deepEqual(selected, ["Work", "Halloween", "Done"]);
-  press(CardStatusPicker, "Card status Canceled");
+  press(CardStatusPicker, "Status tag Canceled");
   assert.deepEqual(selected, ["Work", "Halloween", "Canceled"]);
   events.setEventOverride("christmas");
   press(SpecialCardTagPicker, "Event tag Christmas");
@@ -200,7 +200,7 @@ test("status tag buttons stay text-only whether selected or unselected", () => {
   for (const selected of [[], ["Done"], ["Canceled"], ["Overdue"]]) {
     const tree = nodes(CardStatusPicker({ tags: selected, onChange() {} }));
     for (const entry of [...themes.STATUS_CARD_THEMES, { id: "open", label: "Open" }]) {
-      const button = tree.find((node) => node.props?.accessibilityLabel === `Card status ${entry.label}`);
+      const button = tree.find((node) => node.props?.accessibilityLabel === `Status tag ${entry.label}`);
       assert.deepEqual(nodes(button).filter((node) => node.type === "Text").map((node) => node.props.children), [entry.label]);
       assert.equal(button.props.accessibilityState.selected, entry.id === "open" ? selected.length === 0 : selected.includes(entry.label));
       assert.equal(button.props.accessibilityRole, "radio");
@@ -243,7 +243,7 @@ test("picker hides the empty Event group and inactive saved events without dropp
   assert.equal(tree.some((node) => node.props?.children === "EVENT"), false);
   assert.equal(tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Event tag ")).length, 0);
   const statuses = nodes(CardStatusPicker({ tags: selected, onChange: () => assert.fail("Rendering must not edit tags") }));
-  assert.equal(statuses.filter((node) => node.props?.accessibilityLabel?.startsWith("Card status ")).length, 4);
+  assert.equal(statuses.filter((node) => node.props?.accessibilityLabel?.startsWith("Status tag ")).length, 4);
   assert.deepEqual(selected, ["Work", "Halloween"]);
   events.setEventOverride(null);
 });

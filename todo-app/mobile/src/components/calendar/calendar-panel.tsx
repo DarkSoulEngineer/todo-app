@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { addDays, addMonths, addWeeks, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from "date-fns";
-import { useMemo, type MouseEvent } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
+import { useMemo } from "react";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
-import { deriveStatus } from "@/lib/domain/status";
 import type { Task } from "@/lib/domain/types";
 import type { ThemeColors } from "@/theme/tokens";
 import { SelectionLed } from "@/components/ui/selection-led";
@@ -102,14 +101,7 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
                   {selected ? <SelectionLed selected /> : null}
                 </View>
                 {dayTasks.length > (mode === "week" ? 5 : 2) ? <Text style={styles.moreLabel}>+{dayTasks.length - (mode === "week" ? 5 : 2)}</Text> : null}
-              </View>
-              {dayTasks.slice(0, mode === "week" ? 5 : 2).map((task) => {
-                const color = taskColor(task, colors, now);
-                const contextMenu = Platform.OS === "web" && !daySelectionOnly && onTaskLongPress ? { onContextMenu: (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); onTaskLongPress(task, event as unknown as GestureResponderEvent); } } : {};
-                return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={daySelectionOnly ? `View tasks for ${format(day, "EEEE, MMMM d")}` : `Open ${task.title}`} onPress={(event) => { event.stopPropagation(); if (daySelectionOnly) onSelectDay(day); else onTaskPress(task); }} onLongPress={!daySelectionOnly && onTaskLongPress ? (event) => { event.stopPropagation(); onTaskLongPress(task, event); } : undefined} {...contextMenu} style={({ pressed }) => [styles.taskChip, { opacity: pressed ? 0.6 : 1 }]}>
-                  <Text style={[styles.taskText, { color }, task.completed && styles.taskTextDone]} numberOfLines={1}>{task.title || "Untitled task"}</Text>
-                </Pressable>;
-              })}
+            </View>
             </View>
           );
         })}
@@ -127,16 +119,6 @@ function NavButton({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyph
 
 function tasksForDay(tasks: Task[], day: Date): Task[] {
   return tasks.filter((task) => task.dueAt && isSameDay(parseISO(task.dueAt), day)).sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? ""));
-}
-
-function taskColor(task: Task, colors: ThemeColors, now: Date): string {
-  const status = deriveStatus(task, now);
-  if (status === "canceled") return colors.mutedForeground;
-  if (status === "completed") return colors.success;
-  if (status === "overdue") return colors.destructive;
-  if (task.priority === "critical") return colors.destructive;
-  if (task.priority === "high") return colors.warning;
-  return colors.primary;
 }
 
 function createStyles(colors: ThemeColors) {
@@ -177,9 +159,6 @@ function createStyles(colors: ThemeColors) {
     dayBadgeSelected: { backgroundColor: colors.secondary, borderColor: colors.borderStrong },
     dayNumber: { color: colors.foreground, fontSize: 12, lineHeight: 16, fontWeight: "600" },
     dayNumberToday: { color: colors.success },
-    moreLabel: { position: "absolute", right: 2, bottom: 1, color: colors.mutedForeground, fontSize: 9, lineHeight: 12, fontWeight: "600" },
-    taskChip: { minWidth: 0, paddingVertical: 3, marginTop: 3 },
-    taskText: { flex: 1, color: colors.foreground, fontSize: 10, lineHeight: 13, fontWeight: "700" },
-    taskTextDone: { textDecorationLine: "line-through", color: colors.mutedForeground },
+    moreLabel: { position: "absolute", right: 4, top: 2, color: colors.mutedForeground, fontSize: 10, lineHeight: 13, fontWeight: "700" },
   });
 }

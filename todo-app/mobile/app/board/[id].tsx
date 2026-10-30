@@ -266,7 +266,7 @@ export default function WorkspaceScreen() {
   const addNewTask = (due?: string | null, sectionId?: string | null) => {
     const target = sections.find((section) => section.id === sectionId && !section.hidden) ?? sections.find((section) => !section.hidden);
     if (!target) { setAddSectionOpen(true); toast.show("Create a list before adding a card"); return; }
-    const selectedDate = due === undefined && mode === "calendar" && selectedCalendarDay ? new Date(selectedCalendarDay) : null;
+    const selectedDate = due === undefined && mode === "calendar" ? new Date(selectedCalendarDay ?? Date.now()) : null;
     selectedDate?.setHours(9, 0, 0, 0);
     setEditorProjectId(currentProjectId); setEditorTask(null); setInitialDueAt(due ?? selectedDate?.toISOString() ?? null); setInitialSectionId(target.id); setEditorVisible(true);
   };

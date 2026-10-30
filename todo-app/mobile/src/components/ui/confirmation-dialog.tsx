@@ -16,7 +16,7 @@ export function ConfirmationDialog({ visible, title, description, confirmLabel, 
   const { theme: { colors } } = useTheme();
   const { width } = useWindowDimensions();
   const windowed = width >= 768;
-  const copy = <Text style={[styles.copy, { color: colors.destructive, fontWeight: "700" }]}>{description}</Text>;
+  const copy = <Text style={[styles.copy, { color: colors.destructive, fontWeight: "400" }]}>{description}</Text>;
   const actions = <View style={[styles.actions, windowed && styles.windowActions, windowed && { backgroundColor: colors.backgroundAlt, borderTopColor: colors.border }]}>
     <Button variant="outline" label={cancelLabel} onPress={onClose} style={windowed ? styles.windowButton : styles.mobileButton} />
     <Button variant="danger" label={confirmLabel} onPress={onConfirm} style={windowed ? styles.windowButton : styles.mobileButton} />

@@ -110,7 +110,7 @@ export default function TopTasksRoute() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { ...mobileContentStyle, gap: 16 },
-  limitSwitch: { flexDirection: "row", padding: 4, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, gap: 4 },
+  limitSwitch: { flexDirection: "row", padding: 4, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, gap: 4, boxShadow: "0 1px 4px rgba(0,0,0,0.10)" },
   limitOption: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 10 },
   taskHeading: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 6 },
   rank: { fontSize: 12, fontWeight: "700", fontVariant: ["tabular-nums"] },
