@@ -4,6 +4,8 @@ import { BUILT_IN_BOARDS, type Board } from "@/lib/domain/boards";
 import type { BoardSection, Task, TaskDraft } from "@/lib/domain/types";
 import { createTask } from "@/lib/domain/task-factory";
 import { isCustomSection } from "@/lib/domain/sections";
+import { getEventOverride } from "@/lib/features/active-events";
+import { SEASONAL_CARD_THEMES } from "@/lib/features/card-themes";
 
 /** Sample boards: the six built-ins plus four custom boards, so loading the
  * example tasks demonstrates custom categories too. */
@@ -286,7 +288,7 @@ export function createSampleTasks(now: Date = new Date()): Task[] {
   // Evenly distribute tasks across every sample category (shuffled too).
   const categoryPool = SAMPLE_BOARDS.map((board) => board.id).sort(() => Math.random() - 0.5);
 
-  return shuffledSeeds.map((seed, index) => {
+  const tasks = shuffledSeeds.map((seed, index) => {
     const { offsetHours, subtasks, ...draft } = seed;
     // Spread statuses evenly: completed, canceled, overdue, upcoming.
     const bucket = index % 4;
@@ -321,4 +323,26 @@ export function createSampleTasks(now: Date = new Date()): Task[] {
       completedAt: isCompleted ? addDays(createdAt, 1).toISOString() : null,
     };
   });
+
+  // When a debug event is active, sprinkle a few extra sample cards carrying
+  // that event's tag so the seasonal styling shows up on the demo board.
+  const overrideId = typeof getEventOverride === "function" ? getEventOverride() : null;
+  const eventTheme = overrideId
+    ? SEASONAL_CARD_THEMES.find((entry) => entry.id === overrideId) ?? null
+    : null;
+  if (eventTheme) {
+    const extraCount = 1 + Math.floor(Math.random() * 3);
+    const chosen = new Set<number>();
+    while (chosen.size < Math.min(extraCount, tasks.length)) {
+      chosen.add(Math.floor(Math.random() * tasks.length));
+    }
+    for (const index of chosen) {
+      tasks[index] = {
+        ...tasks[index],
+        tags: [...(tasks[index].tags ?? []), eventTheme.label],
+      };
+    }
+  }
+
+  return tasks;
 }
