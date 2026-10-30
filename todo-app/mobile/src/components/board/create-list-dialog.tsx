@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   content: { padding: 20 },
   windowInput: { borderRadius: 6 },
   footer: { flexDirection: "row", justifyContent: "flex-end", gap: 10, padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  primary: { minWidth: 120, borderRadius: 6 },
+  primary: { minWidth: 120, borderRadius: 12 },
   mobileSheet: { paddingHorizontal: 12, paddingTop: 2, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   mobileTitle: { fontSize: 20, lineHeight: 26, marginBottom: 4 },
   mobileCopy: { fontSize: 12, lineHeight: 18 },

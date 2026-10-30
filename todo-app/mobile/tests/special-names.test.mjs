@@ -14,6 +14,7 @@ function load(path, mocks = {}) {
 }
 const themes = load("lib/features/card-themes.ts");
 const allDecorations = [...themes.SEASONAL_CARD_THEMES, ...themes.STATUS_CARD_THEMES];
+const halloweenVariants = load("lib/features/halloween-variants.ts");
 
 test("special tags match complete aliases without inferring rules from holder names", () => {
   for (const name of ["Done", "COMPLETED", " Finished ", "Resolved", "Delivered"]) assert.equal(themes.classifySpecialCardTag(name)?.theme.id, "done");
@@ -67,7 +68,7 @@ test("holders and list editors no longer offer special-name behavior", () => {
   }
 });
 
-function decorationHarness({ paused = false, compact = false, active = true, id = "halloween" } = {}) {
+function decorationHarness({ paused = false, compact = false, active = true, id = "halloween", cardId = "" } = {}) {
   let cleanup, resolvePreference, starts = 0, stops = 0, removals = 0;
   const callbacks = {}, configs = [];
   class Value { setValue() {} interpolate(value) { return value; } }
@@ -78,6 +79,11 @@ function decorationHarness({ paused = false, compact = false, active = true, id 
   const statusArtwork = load("components/ui/status-card-artwork.tsx", {
     "react-native": { View: "View", Animated: { View: "AnimatedView" }, StyleSheet: { create: (value) => value } },
     "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", G: "G", Line: "Line", Path: "Path", Rect: "Rect" },
+  });
+  const halloweenArtwork = load("components/ui/halloween-card-artwork.tsx", {
+    "react-native": { View: "View", Animated: { View: "AnimatedView" }, StyleSheet: { create: (value) => value } },
+    "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", Ellipse: "Ellipse", G: "G", Path: "Path", Rect: "Rect" },
+    "@/lib/features/halloween-variants": halloweenVariants,
   });
   const { SeasonalCardDecoration } = load("components/ui/seasonal-card-decoration.tsx", {
     react: { useState: (initial) => [initial(), () => {}], useEffect: (effect) => { cleanup = effect(); } },
@@ -90,8 +96,9 @@ function decorationHarness({ paused = false, compact = false, active = true, id 
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { foreground: "ink" } } }) },
     "./seasonal-card-artwork": artwork,
     "./status-card-artwork": statusArtwork,
+    "./halloween-card-artwork": halloweenArtwork,
   });
-  const tree = SeasonalCardDecoration({ theme: allDecorations.find((theme) => theme.id === id), paused, compact });
+  const tree = SeasonalCardDecoration({ theme: allDecorations.find((theme) => theme.id === id), cardId, paused, compact });
   return { tree, callbacks, configs, cleanup: () => cleanup(), resolvePreference: (value) => resolvePreference(value), get starts() { return starts; }, get stops() { return stops; }, get removals() { return removals; } };
 }
 
@@ -109,7 +116,7 @@ function nodes(node) {
 
 test("holiday cards use distinct event-specific artwork without event title labels or added layout rows", () => {
   const compositions = {
-    halloween: ["halloween-orbit"],
+    halloween: ["halloween-cobweb", "halloween-bats"],
     christmas: ["christmas-lights", "christmas-snow", "christmas-tree"],
     easter: ["easter-meadow", "easter-eggs"],
     "new-year": ["new-year-confetti", "new-year-fireworks"],
@@ -145,6 +152,34 @@ test("snowfall, Easter eggs and fireworks have different motion styles", () => {
     const style = Object.assign({}, ...node.props.style.filter(Boolean));
     assert.ok(style.transform.some((item) => transform in item));
     h.cleanup();
+  }
+});
+
+test("Halloween costumes are stable, distributed, and distinct in normal and compact cards", () => {
+  const seen = new Map();
+  for (let index = 0; index < 600; index++) {
+    const cardId = `task-${index}`;
+    const variant = halloweenVariants.halloweenVariantForCard(cardId);
+    assert.equal(halloweenVariants.halloweenVariantForCard(cardId), variant);
+    seen.set(variant, cardId);
+  }
+  assert.deepEqual([...seen.keys()].sort(), [...halloweenVariants.HALLOWEEN_VARIANTS].sort());
+  const drawings = new Set();
+  for (const [variant, cardId] of seen) {
+    for (const compact of [false, true]) {
+      const h = decorationHarness({ cardId, compact });
+      const tree = nodes(expand(h.tree));
+      const character = tree.find((node) => node.props?.testID === `halloween-character-${variant}`);
+      assert.ok(character, `${variant} is rendered, including in compact mode`);
+      assert.equal(tree.some((node) => node.props?.testID === "halloween-bats"), !compact);
+      assert.equal(h.tree.props.accessibilityElementsHidden, true);
+      if (!compact) drawings.add(JSON.stringify(nodes(character).filter((node) => node.props?.d).map((node) => node.props.d)));
+      h.cleanup();
+    }
+  }
+  assert.equal(drawings.size, 6, "every costume has its own vector drawing");
+  for (const path of ["components/board/mobile-column-task-card.tsx", "components/janus-board-ui.tsx"]) {
+    assert.match(readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8"), /<SeasonalCardDecoration[^>]*cardId=\{task.id\}/);
   }
 });
 

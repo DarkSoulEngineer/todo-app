@@ -172,14 +172,17 @@ test("real React Native Web renders a group with sibling buttons, never nested H
   const React = require("react");
   const { renderToStaticMarkup } = require("react-dom/server");
   const native = require("react-native-web");
-  const artworkMocks = { "react-native": native, "react-native-svg": { __esModule: true, default: "svg", Circle: "circle", G: "g", Line: "line", Path: "path", Rect: "rect" } };
+  const artworkMocks = { "react-native": native, "react-native-svg": { __esModule: true, default: "svg", Circle: "circle", Ellipse: "ellipse", G: "g", Line: "line", Path: "path", Rect: "rect" } };
   const eventArtwork = await load("../src/components/ui/seasonal-card-artwork.tsx", artworkMocks);
   const statusArtwork = await load("../src/components/ui/status-card-artwork.tsx", artworkMocks);
+  const halloweenVariants = await load("../src/lib/features/halloween-variants.ts", {});
+  const halloweenArtwork = await load("../src/components/ui/halloween-card-artwork.tsx", { ...artworkMocks, "@/lib/features/halloween-variants": halloweenVariants });
   const decorations = await load("../src/components/ui/seasonal-card-decoration.tsx", {
     react: React, "react-native": native,
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
     "./seasonal-card-artwork": eventArtwork,
     "./status-card-artwork": statusArtwork,
+    "./halloween-card-artwork": halloweenArtwork,
   });
   const { MobileColumnTaskCard: WebCard } = await load("../src/components/board/mobile-column-task-card.tsx", {
     react: React,

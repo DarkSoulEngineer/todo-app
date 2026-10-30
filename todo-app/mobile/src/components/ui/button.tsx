@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
+import { tactileSurface } from "./tactile";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "soft";
 type Size = "sm" | "md" | "lg" | "icon" | "icon-sm";
@@ -18,7 +19,7 @@ export function Button({ variant = "primary", size = "md", label, children, styl
   const variantStyle = (() => {
     switch (variant) {
       case "primary":
-        return { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary, shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 };
+        return { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary };
       case "secondary":
         return { backgroundColor: theme.colors.secondary, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border };
       case "outline":
@@ -26,7 +27,7 @@ export function Button({ variant = "primary", size = "md", label, children, styl
       case "ghost":
         return { backgroundColor: "transparent" };
       case "danger":
-        return { backgroundColor: theme.colors.destructive, shadowColor: theme.colors.destructive, shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 };
+        return { backgroundColor: theme.colors.destructive, borderColor: theme.colors.destructive };
       case "soft":
         return { backgroundColor: theme.colors.primarySoft, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.primarySoft };
       default:
@@ -79,15 +80,17 @@ export function Button({ variant = "primary", size = "md", label, children, styl
         styles.base,
         variantStyle,
         sizeStyle,
-        { opacity: disabled ? 0.5 : pressed ? 0.9 : 1 },
         style,
+        variant !== "ghost" ? tactileSurface({ pressed, disabled: Boolean(disabled), dark: theme.scheme === "dark" }) : null,
+        { opacity: disabled ? 0.45 : pressed ? 0.9 : 1 },
       ]}
       {...props}
+      accessibilityState={{ ...props.accessibilityState, disabled: Boolean(disabled) }}
     >
       {children ? (
         <View style={styles.row}>{children}</View>
       ) : label ? (
-        <Text style={[styles.text, { color: textColor, fontSize: size === "sm" ? 13 : 14, fontWeight: "600" }]} numberOfLines={1}>
+        <Text style={[styles.text, { color: textColor, fontSize: size === "sm" ? 13 : 14, fontWeight: "700", fontFamily: theme.fontFamily || undefined }]} numberOfLines={1}>
           {label}
         </Text>
       ) : null}

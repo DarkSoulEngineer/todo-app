@@ -16,7 +16,10 @@ export function ConfirmationDialog({ visible, title, description, confirmLabel, 
   const { theme: { colors } } = useTheme();
   const { width } = useWindowDimensions();
   const windowed = width >= 768;
-  const copy = <Text style={[styles.copy, { color: colors.mutedForeground }]}>{description}</Text>;
+  const copy = <View style={[styles.notice, { backgroundColor: colors.destructiveSoft, borderColor: colors.destructive }]}>
+    <View accessible={false} style={[styles.noticeIcon, { backgroundColor: colors.card, borderColor: colors.destructive }]}><Text style={{ color: colors.destructive, fontSize: 22, fontWeight: "800" }}>!</Text></View>
+    <Text style={[styles.copy, { color: colors.foreground, flex: 1 }]}>{description}</Text>
+  </View>;
   const actions = <View style={[styles.actions, windowed && styles.windowActions, windowed && { backgroundColor: colors.backgroundAlt, borderTopColor: colors.border }]}>
     <Button variant="outline" label={cancelLabel} onPress={onClose} style={windowed ? styles.windowButton : styles.mobileButton} />
     <Button variant="danger" label={confirmLabel} onPress={onConfirm} style={windowed ? styles.windowButton : styles.mobileButton} />
@@ -37,10 +40,12 @@ export function ConfirmationDialog({ visible, title, description, confirmLabel, 
 const styles = StyleSheet.create({
   title: { fontSize: 23, fontWeight: "700", marginBottom: 6 },
   copy: { fontSize: 14, lineHeight: 21 },
+  notice: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14 },
+  noticeIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   scroll: { flex: 1, minHeight: 0 },
   content: { padding: 20 },
   actions: { flexDirection: "row", gap: 10, marginTop: 18 },
   windowActions: { marginTop: 0, justifyContent: "flex-end", padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  windowButton: { minWidth: 120, borderRadius: 6 },
+  windowButton: { minWidth: 120, borderRadius: 12 },
   mobileButton: { flex: 1 },
 });

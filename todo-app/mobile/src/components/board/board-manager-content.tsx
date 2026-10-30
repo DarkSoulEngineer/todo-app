@@ -280,7 +280,6 @@ function WorkspaceOverview({ metrics, boards, projects = [], now, wide = false, 
           </View>;
         }) : <Text style={[styles.comparisonEmpty, { color: c.mutedForeground }]}>Create a board to start tracking progress.</Text>}
         </View>
-        <Text style={[styles.comparisonNote, { color: c.mutedForeground }]}>Task status colors match the chart above.</Text>
       </View>
     </View>
   </View>;

@@ -29,6 +29,7 @@ import { BulkSelectionToolbar } from "@/components/board/bulk-selection-toolbar"
 import { MobileBoardBottomNav } from "@/components/board/mobile-board-bottom-nav";
 import { MobileTaskColumns } from "@/components/board/mobile-task-columns";
 import { MobileBoardRibbon, type RibbonControls } from "@/components/board/mobile-board-ribbon";
+import { EventDebugButton } from "@/components/ui/event-debug-button";
 import { CreateListDialog } from "@/components/board/create-list-dialog";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, SORT_OPTIONS } from "@/lib/domain/constants";
@@ -545,6 +546,7 @@ export default function WorkspaceScreen() {
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="share-outline" label="Export JSON" onPress={() => { if (activeProject) void exportWorkspace(liveWorkspace, activeProject.name); }} /><OptionTool icon="document-text-outline" label="Export CSV" onPress={() => { if (activeProject) void exportWorkspaceCsv(liveWorkspace, activeProject.name); }} /><OptionTool icon="download-outline" label="Import board" onPress={importBoard} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DATA</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="bookmark-outline" label="Save version" onPress={() => { api.createVersion(); toast.success("Version saved"); }} />{api.versions.length ? <OptionTool icon="return-down-back-outline" label={`Restore ${api.versions[0].label}`} onPress={() => { api.restoreVersion(api.versions[0].id); toast.success("Version restored"); }} /> : null}{api.versions.length ? <OptionTool icon="trash-outline" label={`Delete ${api.versions[0].label}`} tone="danger" onPress={() => { api.deleteVersion(api.versions[0].id); toast.success("Version deleted"); }} /> : null}</View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>VERSIONS</Text></View>
     <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><OptionTool icon="checkmark-done-outline" label="Clear done" onPress={clearCompleted} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>TIDY UP</Text></View>
+    <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionToolButtons}><EventDebugButton onOpenChange={setInsightsOverlayOpen} /></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>DEBUG</Text></View>
   </RibbonScrollView>;
   const activeFilterBoard = boards.find((board) => board.id === boardFilter);
   const activeSortLabel = SORT_OPTIONS.find((option) => option.value === sort)?.label ?? "Sort";

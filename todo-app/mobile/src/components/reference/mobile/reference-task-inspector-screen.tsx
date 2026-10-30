@@ -11,6 +11,7 @@ import { useNow } from "@/hooks/use-now";
 import { IconButton, Pill, ReferenceActivity, ReferenceTaskInput, resolveReferenceTask, SurfaceCard } from "./reference-primitives";
 import { useReferenceTheme, type ReferenceColors, type ReferenceType, referenceRadii, referenceSpacing } from "../reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
+import { Button } from "@/components/ui/button";
 
 export interface ReferenceTaskInspectorScreenProps {
   task: ReferenceTaskInput;
@@ -119,7 +120,7 @@ export function ReferenceTaskInspectorScreen({ task: taskInput, onBack, onSave, 
 
          <SurfaceCard style={styles.sectionCard}><View style={styles.sectionHeader}><View style={styles.sectionTitle}><Ionicons name="chatbox-ellipses-outline" size={18} color={colors.secondary} /><Text style={type.section}>Activity</Text></View><Text style={[type.caption, { color: colors.muted }]}>{activity.length} event{activity.length === 1 ? "" : "s"}</Text></View>{activity.length ? <View style={styles.timeline}>{activity.map((event, index) => <View key={`${event.time}-${index}`} style={styles.activityRow}><View style={styles.timelineMarker}><View style={[styles.timelineDot, { backgroundColor: colors.primary }]} />{index < activity.length - 1 ? <View style={styles.timelineLine} /> : null}</View><View style={styles.activityBody}><View style={styles.activityHeader}><Text style={[type.caption, { color: colors.outline }]}>{event.time}</Text></View><Text style={[type.body, { color: colors.muted, marginTop: 4 }]}>{event.message}</Text></View></View>)}</View> : <Text style={[type.body, { color: colors.muted }]}>Changes you save will appear here.</Text>}</SurfaceCard>
       </ScrollView>
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}><Pressable accessibilityRole="button" onPress={onDiscard} style={[styles.bottomButton, { backgroundColor: colors.surfaceHigh }]}><Text style={type.bodyStrong}>Close</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Save changes" onPress={save} style={[styles.bottomButton, styles.saveButton]}><Ionicons name="checkmark" size={18} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Save changes</Text></Pressable></View>
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}><Button variant="secondary" label="Close" onPress={onDiscard} style={styles.bottomButton} /><Button accessibilityLabel="Save changes" onPress={save} style={[styles.bottomButton, styles.saveButton]}><Ionicons name="checkmark" size={18} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Save changes</Text></Button></View>
      </KeyboardAvoidingView>
   );
 }
@@ -183,6 +184,6 @@ function createStyles(colors: ReferenceColors, type: ReferenceType) { return Sty
   activityHeader: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   bottomBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: referenceSpacing.md, paddingTop: 10, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant, flexDirection: "row", gap: referenceSpacing.sm, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: -3 }, elevation: 8 },
   bottomButton: { minHeight: 44, flex: 1, borderRadius: referenceRadii.lg, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
-  saveButton: { flex: 2, backgroundColor: colors.primary },
+  saveButton: { flex: 2 },
 });
 } 

@@ -9,6 +9,9 @@ const mocks = {
   react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}], useRef: (current) => ({ current }), useCallback: (fn) => fn, useMemo: (fn) => fn(), useEffect() {} },
   "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (styles) => styles } },
   "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
+  "@expo/vector-icons": { Ionicons: "Ionicons" },
+  "@/components/ui/sheet": { Sheet: "Sheet" },
+  "./tactile": { tactileSurface: () => ({}) },
   "@/lib/domain/projects": {}, "@/lib/data/versions": {},
 };
 function load(path) {
@@ -23,6 +26,7 @@ function load(path) {
 }
 const tags = load("lib/features/special-card-tags");
 const themes = load("lib/features/card-themes");
+const events = load("lib/features/active-events");
 const { createTask, applyDraft, applyTaskPatch } = load("lib/domain/task-factory");
 const { deriveStatus } = load("lib/domain/status");
 const { buildWorkspace } = load("lib/data/workspace");
@@ -176,10 +180,84 @@ test("the tag picker enforces independent selections on the actual controls", ()
     const tree = SpecialCardTagPicker({ tags: selected, onChange: (next) => { selected = next; } });
     nodes(tree).find((node) => node.props?.accessibilityLabel === label).props.onPress();
   };
+  events.setEventOverride("halloween");
   press("Event tag Halloween"); press("Status tag Done");
   assert.deepEqual(selected, ["Work", "Halloween", "Done"]);
   press("Status tag Canceled");
   assert.deepEqual(selected, ["Work", "Halloween", "Canceled"]);
+  events.setEventOverride("christmas");
   press("Event tag Christmas");
   assert.deepEqual(selected, ["Work", "Canceled", "Christmas"]);
+  events.setEventOverride(null);
+});
+
+test("status tag buttons stay text-only whether selected or unselected", () => {
+  const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
+  const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
+  for (const selected of [[], ["Done"], ["Canceled"], ["Overdue"]]) {
+    const tree = nodes(SpecialCardTagPicker({ tags: selected, onChange() {} }));
+    for (const entry of themes.STATUS_CARD_THEMES) {
+      const button = tree.find((node) => node.props?.accessibilityLabel === `Status tag ${entry.label}`);
+      assert.deepEqual(nodes(button).filter((node) => node.type === "Text").map((node) => node.props.children), [entry.label]);
+      assert.equal(button.props.accessibilityState.selected, selected.includes(entry.label));
+    }
+  }
+});
+
+test("event availability follows local holiday dates and excludes unrelated events", () => {
+  const cases = [[2026, 10, 31, "halloween"], [2026, 12, 25, "christmas"], [2027, 1, 1, "new-year"], [2026, 2, 14, "valentines"], [2026, 4, 5, "easter"], [2027, 3, 28, "easter"]];
+  for (const [year, month, day, id] of cases) {
+    assert.deepEqual(events.getActiveEventThemes(new Date(year, month - 1, day, 0, 1)).map((entry) => entry.id), [id]);
+    assert.deepEqual(events.getActiveEventThemes(new Date(year, month - 1, day, 23, 59)).map((entry) => entry.id), [id]);
+  }
+  for (const date of [new Date(2026, 9, 30), new Date(2026, 10, 1), new Date(2026, 11, 24), new Date(2026, 3, 6)]) assert.deepEqual(events.getActiveEventThemes(date), []);
+});
+
+test("debug triggers exactly one event, notifies subscribers and resets without modifying tags", () => {
+  let changes = 0;
+  const unsubscribe = events.subscribeToEvents(() => changes++);
+  const ordinaryDay = new Date(2026, 6, 10);
+  for (const entry of themes.SEASONAL_CARD_THEMES) {
+    events.setEventOverride(entry.id);
+    assert.deepEqual(events.getActiveEventThemes(ordinaryDay, events.getEventOverride()).map((item) => item.id), [entry.id]);
+  }
+  events.setEventOverride(null);
+  assert.deepEqual(events.getActiveEventThemes(ordinaryDay, events.getEventOverride()), []);
+  assert.equal(changes, 7);
+  unsubscribe();
+  assert.equal(themes.resolveCardDecoration(["Halloween"])?.id, "halloween");
+});
+
+test("picker hides the empty Event group and inactive saved events without dropping tags", () => {
+  const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
+  const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
+  // An invalid preview deterministically represents a day with no active events.
+  events.setEventOverride("none");
+  const selected = ["Work", "Halloween"];
+  const tree = nodes(SpecialCardTagPicker({ tags: selected, onChange: () => assert.fail("Rendering must not edit tags") }));
+  assert.equal(tree.some((node) => node.props?.children === "EVENT"), false);
+  assert.equal(tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Event tag ")).length, 0);
+  assert.equal(tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Status tag ")).length, 3);
+  assert.deepEqual(selected, ["Work", "Halloween"]);
+  events.setEventOverride(null);
+});
+
+test("Actions debug controls trigger each corresponding picker option and reset", () => {
+  const { EventDebugButton } = load("components/ui/event-debug-button");
+  const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
+  const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
+  let opened = false;
+  const controls = nodes(EventDebugButton({ onOpenChange: (open) => { opened = open; } }));
+  controls.find((node) => node.props?.accessibilityLabel === "Debug events").props.onPress();
+  assert.equal(opened, true);
+  for (const entry of themes.SEASONAL_CARD_THEMES) {
+    controls.find((node) => node.props?.accessibilityLabel === `Trigger ${entry.label} event`).props.onPress();
+    const picker = nodes(SpecialCardTagPicker({ tags: [], onChange() {} }));
+    const choices = picker.filter((node) => node.props?.accessibilityLabel?.startsWith("Event tag "));
+    assert.deepEqual(choices.map((node) => node.props.accessibilityLabel), [`Event tag ${entry.label}`]);
+  }
+  controls.find((node) => node.props?.accessibilityLabel === "Reset events to automatic dates").props.onPress();
+  assert.equal(events.getEventOverride(), null);
+  const route = readFileSync(new URL("../app/board/[id].tsx", import.meta.url), "utf8");
+  assert.match(route.slice(route.indexOf("const actionsContent"), route.indexOf("const activeFilterBoard")), /<EventDebugButton/);
 });

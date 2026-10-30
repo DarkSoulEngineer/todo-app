@@ -518,7 +518,7 @@ const ayuDark: ThemeColors = {
   skeleton: "#232834",
 };
 
-const githubDark: ThemeColors = {
+const slateDark: ThemeColors = {
   background: "#0D1117",
   backgroundAlt: "#161B22",
   card: "#161B22",
@@ -550,7 +550,7 @@ const githubDark: ThemeColors = {
   skeleton: "#21262D",
 };
 
-const githubLight: ThemeColors = {
+const slateLight: ThemeColors = {
   background: "#FFFFFF",
   backgroundAlt: "#F6F8FA",
   card: "#FFFFFF",
@@ -582,7 +582,7 @@ const githubLight: ThemeColors = {
   skeleton: "#D0D7DE",
 };
 
-const microsoftLight: ThemeColors = {
+const cobaltLight: ThemeColors = {
   background: "#F5F7FA",
   backgroundAlt: "#EDF1F5",
   card: "#FFFFFF",
@@ -614,7 +614,7 @@ const microsoftLight: ThemeColors = {
   skeleton: "#EDEBE9",
 };
 
-const microsoftDark: ThemeColors = {
+const cobaltDark: ThemeColors = {
   background: "#17191C",
   backgroundAlt: "#1C1F24",
   card: "#22262B",
@@ -842,10 +842,10 @@ export const themes: ThemeDefinition[] = [
   { id: "system", name: "System", category: "system", scheme: "light", colors: light },
   { id: "light", name: "Light", category: "light", scheme: "light", colors: light },
   { id: "dark", name: "Dark", category: "dark", scheme: "dark", colors: dark },
-  { id: "github-light", name: "GitHub Light", category: "light", scheme: "light", colors: githubLight },
-  { id: "github-dark", name: "GitHub Dark", category: "dark", scheme: "dark", colors: githubDark },
-  { id: "microsoft-light", name: "Microsoft Fluent Light", category: "light", scheme: "light", colors: microsoftLight },
-  { id: "microsoft-dark", name: "Microsoft Fluent Dark", category: "dark", scheme: "dark", colors: microsoftDark },
+  { id: "slate-light", name: "Slate Light", category: "light", scheme: "light", colors: slateLight },
+  { id: "slate-dark", name: "Slate Dark", category: "dark", scheme: "dark", colors: slateDark },
+  { id: "cobalt-light", name: "Cobalt Light", category: "light", scheme: "light", colors: cobaltLight },
+  { id: "cobalt-dark", name: "Cobalt Dark", category: "dark", scheme: "dark", colors: cobaltDark },
   { id: "vscode-dark", name: "VS Code Dark", category: "dark", scheme: "dark", colors: vscodeDark },
   { id: "dracula", name: "Dracula", category: "dark", scheme: "dark", colors: dracula },
   { id: "monokai", name: "Monokai", category: "dark", scheme: "dark", colors: monokai },

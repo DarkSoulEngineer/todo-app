@@ -181,8 +181,7 @@ test("board tag labels use readable foregrounds on dark cards", async () => {
     "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
     "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
     "@/lib/domain/status": { describeDue: () => null },
-    "@/lib/domain/boards": { boardColor: () => ({ dot: "#8B5CF6", ink: "#6D28D9", tint: "rgba(139,92,246,0.16)", ring: "#8B5CF6" }) },
-  });
+    "@/lib/domain/boards": { boardColor: () => ({ dot: "#8B5CF6", ink: "#6D28D9", tint: "rgba(139,92,246,0.16)", ring: "#8B5CF6" }) },  });
   function nodes(node) {
     if (!node || typeof node !== "object") return [];
     if (Array.isArray(node)) return node.flatMap(nodes);

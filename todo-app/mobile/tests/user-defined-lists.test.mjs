@@ -15,6 +15,7 @@ function loadHelper(path, mocks = {}) {
   return exports;
 }
 const cardThemes = loadHelper("lib/features/card-themes.ts");
+const activeEvents = loadHelper("lib/features/active-events.ts", { "@/lib/features/card-themes": cardThemes });
 const cardTags = loadHelper("lib/features/special-card-tags.ts", { "@/lib/features/card-themes": cardThemes });
 
 function setup({ initialSectionId = null, task = null, width = 1200 } = {}) {
@@ -28,10 +29,13 @@ function setup({ initialSectionId = null, task = null, width = 1200 } = {}) {
   const fallback = new Proxy({}, { get: (_, key) => key });
   const mocks = {
     react,
+    "@expo/vector-icons": { Ionicons: "Ionicons" },
+    "./tactile": { tactileSurface: () => ({}) },
     "react-native": { ...fallback, Platform: { OS: "web" }, View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", TextInput: "TextInput", StyleSheet: { create: (value) => value }, useWindowDimensions: () => ({ width }) },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
     "@/hooks/use-open-session": { useOpenSession: () => 1 },
+    "@/hooks/use-active-events": { useActiveEvents: () => ({ events: activeEvents.getActiveEventThemes(new Date(), activeEvents.getEventOverride()) }) },
     "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId ?? undefined },
     "@/lib/domain/constants": { PRIORITY_ORDER: ["medium"], PRIORITY_META: { medium: { label: "Medium" } } },
     "@/lib/features/card-themes": cardThemes,
@@ -75,6 +79,7 @@ test("editor saves one event and one status plus unlimited ordinary tags on mobi
     const app = setup({ width });
     let tree = app.render();
     const pressSpecial = (label) => {
+      if (label.startsWith("Event tag ")) activeEvents.setEventOverride(cardThemes.classifySpecialCardTag(label.slice(10)).theme.id);
       const picker = nodes(tree).find((node) => node.type?.name === "SpecialCardTagPicker");
       nodes(picker.type(picker.props)).find((node) => node.props?.accessibilityLabel === label).props.onPress();
       tree = app.render();
@@ -91,6 +96,7 @@ test("editor saves one event and one status plus unlimited ordinary tags on mobi
     nodes(tree).find((node) => node.props?.label === "Add task").props.onPress();
     assert.deepEqual(app.saves[0].draft.tags, ["Canceled", "Christmas", "Work", "Study"]);
     assert.equal(app.saves[0].sectionId, null);
+    activeEvents.setEventOverride(null);
   }
 });
 

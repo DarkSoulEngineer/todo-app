@@ -13,6 +13,7 @@ import { IconButton, Pill, SurfaceCard } from "./reference-primitives";
 import { useReferenceTheme, type ReferenceColors, referenceRadii, referenceSpacing } from "../reference-theme";
 import { ThemeAtmosphere } from "@/components/ui/atmosphere";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { Button } from "@/components/ui/button";
 
 type ReferencePriority = Priority;
 
@@ -144,7 +145,7 @@ export function ReferenceNewTaskScreen({ initialDraft, boardLabel = "Current boa
            {attachments.length ? <View style={styles.attachmentList}>{attachments.map((attachment) => <View key={attachment.id} style={styles.attachmentRow}><Ionicons name="document-outline" size={22} color={colors.primary} /><View style={styles.attachmentCopy}><Text style={type.bodyStrong} numberOfLines={1}>{attachment.name}</Text><Text style={[type.caption, { color: colors.muted }]}>{attachment.mimeType ?? "File"}{attachment.size ? ` · ${Math.ceil(attachment.size / 1024)} KB` : ""}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${attachment.name}`} onPress={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))} style={styles.removeAttachment}><Ionicons name="close-circle-outline" size={20} color={colors.muted} /></Pressable></View>)}</View> : null}<Pressable accessibilityRole="button" accessibilityLabel="Choose a file to attach" onPress={() => void pickAttachment()} style={styles.upload}><View style={styles.uploadIcons}><Ionicons name="attach-outline" size={23} color={colors.primary} /><Ionicons name="document-outline" size={23} color={colors.primary} /></View><Text style={type.bodyStrong}>Choose a file</Text><Text style={[type.caption, { color: colors.muted, textAlign: "center" }]}>Saves file details, not file contents.</Text></Pressable></SurfaceCard>
          </View>
       </ScrollView>
-       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}><Pressable accessibilityRole="button" accessibilityLabel="Add task" onPress={submit} style={styles.submit}><Ionicons name="add-circle-outline" size={20} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Add task</Text></Pressable></View>
+        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10) }]}><Button size="lg" accessibilityLabel="Add task" onPress={submit}><Ionicons name="add-circle-outline" size={20} color={colors.onPrimary} /><Text style={[type.bodyStrong, { color: colors.onPrimary }]}>Add task</Text></Button></View>
     </KeyboardAvoidingView>
   );
 }
@@ -190,6 +191,5 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   upload: { minHeight: 104, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, alignItems: "center", justifyContent: "center", gap: 4 },
   uploadIcons: { flexDirection: "row", gap: 6 },
   bottomBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: referenceSpacing.md, paddingTop: 9, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
-  submit: { minHeight: 48, borderRadius: referenceRadii.lg, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7, shadowColor: colors.primary, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
 });
 } 

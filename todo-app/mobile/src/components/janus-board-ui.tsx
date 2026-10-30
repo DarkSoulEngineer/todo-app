@@ -24,6 +24,7 @@ import { ribbonLabel } from "@/lib/utils/ribbon-label";
 import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
+import { tactileSurface } from "@/components/ui/tactile";
 import { Card } from "@/components/ui/card";
 import { InsightsDashboard } from "@/components/insights/insights-dashboard";
 import { Input } from "@/components/ui/input";
@@ -94,11 +95,13 @@ function Chip({ label, active, onPress, color, icon }: { label: string; active?:
       style={({ pressed }) => [
         styles.chip,
         { backgroundColor: active ? theme.colors.primarySoft : theme.colors.secondary, borderColor: active ? theme.colors.primary : theme.colors.border, opacity: pressed ? 0.75 : 1 },
+        tactileSurface({ pressed, selected: active, accent: theme.colors.primary, dark: theme.scheme === "dark" }),
       ]}
     >
       {icon ? <Ionicons name={icon} size={14} color={active ? theme.colors.accentForeground : theme.colors.secondaryForeground} /> : null}
       {color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
       <Text style={{ color: active ? theme.colors.accentForeground : theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>{label}</Text>
+      {active ? <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} /> : null}
     </Pressable>
   );
 }
@@ -135,7 +138,7 @@ export function TaskCard({
     <Pressable accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} // @ts-ignore
     onContextMenu={(event) => { event.preventDefault?.(); onLongPress?.(event.nativeEvent); }} delayLongPress={360} style={styles.taskPressable}>
       <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : status === "completed" ? theme.colors.success : status === "overdue" ? theme.colors.destructive : decoration?.accent ?? cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
-        {decoration ? <SeasonalCardDecoration theme={decoration} compact={compact} paused={compact} /> : null}
+        {decoration ? <SeasonalCardDecoration theme={decoration} cardId={task.id} compact={compact} paused={compact} /> : null}
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
@@ -334,9 +337,9 @@ function TaskEditorForm({
   const footer = <View style={[styles.taskEditorFooter, windowed && styles.taskEditorWindowFooter, { borderTopColor: theme.colors.border, paddingBottom: wideForm ? 12 : Math.max(insets.bottom, 12), backgroundColor: windowed ? theme.colors.backgroundAlt : undefined }]}>
     {task ? <View style={[styles.taskEditorFooterActions, wideForm && styles.taskEditorPanelActions]}>
       <Button variant="secondary" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} style={wideForm ? styles.taskEditorPanelPrimary : styles.taskEditorFooterPrimary} />
-      <Button variant="ghost" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={styles.taskEditorDeleteButton}>
+      <Button variant="outline" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={[styles.taskEditorDeleteButton, { borderColor: theme.colors.destructive }]}>
         <Ionicons name="trash-outline" size={17} color={theme.colors.destructive} />
-        <Text style={{ color: theme.colors.destructive, fontSize: 14, fontWeight: "600" }}>Delete</Text>
+        <Text style={{ color: theme.colors.destructive, fontSize: 14, fontWeight: "700" }}>Delete</Text>
       </Button>
     </View> : <Button label="Add task" onPress={save} style={windowed ? styles.taskEditorWindowPrimary : undefined} />}
   </View>;
@@ -356,12 +359,14 @@ function TaskEditorForm({
               opacity: pressed ? 0.75 : 1,
               gap: 6,
             },
+            tactileSurface({ pressed, selected: priority === item, accent: theme.colors.primary, dark: theme.scheme === "dark" }),
           ]}
         >
           <PriorityStars priority={item} size={13} zoom={1} />
           <Text style={{ color: priority === item ? theme.colors.accentForeground : theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>
             {PRIORITY_META[item].label}
           </Text>
+          {priority === item ? <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} /> : null}
         </Pressable>
       ))}
     </View>
@@ -437,13 +442,15 @@ function TaskEditorForm({
               </View>
               <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border, marginTop: 6 }]}>
                 <View style={styles.taskEditorDateRow}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due ${format(dateValue, "MMMM d, yyyy")}` : "Set due date"} onPress={() => setPicker("date")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due ${format(dateValue, "MMMM d, yyyy")}` : "Set due date"} onPress={() => setPicker("date")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border }, tactileSurface({ pressed, selected: picker === "date", dark: theme.scheme === "dark" })]}>
                     <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
                     <Text style={[styles.taskEditorDateText, { color: theme.colors.foreground }]} numberOfLines={1}>{dueAt ? format(dateValue, "MMM d") : "Pick a date"}</Text>
+                    <Ionicons name="chevron-down" size={13} color={theme.colors.mutedForeground} />
                   </Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due at ${format(dateValue, "h:mm a")}` : "Set due time"} onPress={() => setPicker("time")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due at ${format(dateValue, "h:mm a")}` : "Set due time"} onPress={() => setPicker("time")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border }, tactileSurface({ pressed, selected: picker === "time", dark: theme.scheme === "dark" })]}>
                     <Ionicons name="time-outline" size={16} color={theme.colors.primary} />
                     <Text style={[styles.taskEditorDateText, { color: theme.colors.foreground }]} numberOfLines={1}>{dueAt ? format(dateValue, "h:mm a") : "Set time"}</Text>
+                    <Ionicons name="chevron-down" size={13} color={theme.colors.mutedForeground} />
                   </Pressable>
                   {dueAt ? <Pressable accessibilityRole="button" accessibilityLabel="Clear due date" onPress={() => setDueAt(null)} style={({ pressed }) => [styles.taskEditorClearDue, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}><Ionicons name="close" size={18} color={theme.colors.mutedForeground} /></Pressable> : null}
                 </View>
@@ -544,8 +551,8 @@ function TextEntrySheetForm({ visible, title, description, placeholder, initialV
       <Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} accessibilityLabel={placeholder ?? title} accessibilityHint="Required" returnKeyType="done" onSubmitEditing={submit} style={{ borderRadius: 6 }} />
     </ScrollView>
     <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border, backgroundColor: theme.colors.backgroundAlt }}>
-      <Button label="Cancel" variant="secondary" onPress={onClose} style={{ borderRadius: 6 }} />
-      <Button label={actionLabel} disabled={!value.trim()} onPress={submit} style={{ minWidth: 120, borderRadius: 6 }} />
+      <Button label="Cancel" variant="secondary" onPress={onClose} style={{ borderRadius: 12 }} />
+      <Button label={actionLabel} disabled={!value.trim()} onPress={submit} style={{ minWidth: 120, borderRadius: 12 }} />
     </View>
   </EditorWindow>;
   return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{description ? <Text style={[styles.sheetDescription, { color: theme.colors.mutedForeground }]}>{description}</Text> : null}<Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} onSubmitEditing={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 12 }} /><Button label={actionLabel} disabled={!value.trim()} onPress={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 14 }} /></Sheet>;
@@ -754,8 +761,8 @@ const styles = StyleSheet.create({
   boardCardNewRemoveText: { fontSize: 12, fontWeight: "500" },
   taskEditorSheet: { paddingTop: 10, borderTopLeftRadius: 28, borderTopRightRadius: 28, shadowRadius: 22, shadowOffset: { width: 0, height: -8 }, elevation: 16 },
   taskEditorWindowFooter: { flexShrink: 0, alignItems: "flex-end" },
-  taskEditorWindowPrimary: { minWidth: 140, borderRadius: 6 },
-  taskEditorWindowInput: { borderRadius: 6, fontSize: 15 },
+  taskEditorWindowPrimary: { minWidth: 160, borderRadius: 12 },
+  taskEditorWindowInput: { borderRadius: 12, fontSize: 15 },
   taskEditorHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 18, paddingBottom: 4 },
   taskEditorHeaderCopy: { flex: 1, minWidth: 0 },
   taskEditorTitle: { fontSize: 24, lineHeight: 30, fontWeight: "700", letterSpacing: -0.3 },
@@ -793,7 +800,7 @@ const styles = StyleSheet.create({
   taskEditorPanelActions: { justifyContent: "flex-end", flexWrap: "wrap" },
   taskEditorPanelPrimary: { minWidth: 140 },
   taskEditorDeleteButton: { height: 44, paddingHorizontal: 14, borderRadius: 16 },
-  chip: { minHeight: 44, paddingHorizontal: 12, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" },
+  chip: { minHeight: 44, paddingHorizontal: 13, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" },
   dot: { width: 7, height: 7, borderRadius: 4 },
   taskPressable: { marginBottom: 10 }, taskCard: { borderRadius: 16, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 2 }, taskTopline: { flexDirection: "row", alignItems: "flex-start", gap: 10 }, check: { width: 23, height: 23, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center", marginTop: 1 }, taskTitle: { flex: 1, fontSize: 15, lineHeight: 21, fontWeight: "700" }, taskAction: { width: 44, height: 44, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center", marginTop: -10, marginRight: -6 }, taskDescription: { fontSize: 13, lineHeight: 18, marginTop: 8, marginLeft: 33 }, metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 11, marginLeft: 33 }, metaItem: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "75%" }, modalBackdrop: { flex: 1, justifyContent: "flex-end" }, modalKeyboard: { maxHeight: "94%" }, editor: { borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingTop: 16, maxHeight: "100%" }, editorHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }, editorEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 1.3 }, editorTitle: { fontSize: 23, lineHeight: 28, fontWeight: "700", marginTop: 2 }, fieldLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 16, marginBottom: 7 }, textArea: { minHeight: 78, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, textAlignVertical: "top", fontSize: 14 }, wrapRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, dateRow: { flexDirection: "row", alignItems: "center", gap: 4 }, subtaskRow: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 44 }, subtaskCheck: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center" }, subtaskText: { flex: 1, fontSize: 14, lineHeight: 19 }, addSubtask: { flexDirection: "row", alignItems: "center", gap: 8 }, subtaskInput: { flex: 1, height: 42, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 }, editorActions: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 }, sheetTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 }, sheetDescription: { fontSize: 14, lineHeight: 20 }, option: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 14, borderBottomWidth: StyleSheet.hairlineWidth }, boardCard: { borderRadius: 20, padding: 14, minHeight: 150 }, boardCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 }, boardCardBody: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minHeight: 44 }, boardGlyph: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" }, boardCardCopy: { flex: 1 }, boardName: { fontSize: 16, fontWeight: "700" }, boardMeta: { fontSize: 12, marginTop: 4 }, boardCreated: { fontSize: 10, marginTop: 2 }, boardSignals: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 12 }, boardSignal: { fontSize: 11, fontWeight: "700", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 }, progressTrack: { height: 5, borderRadius: 3, marginTop: 14, overflow: "hidden" }, progressFill: { height: "100%", borderRadius: 3 }, progressLabel: { fontSize: 11, fontWeight: "600", marginTop: 6 }, insightSwitch: { flexDirection: "row", gap: 8 }, statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 }, stat: { width: "48%", minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: 17, padding: 13, overflow: "hidden" }, statAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 }, statValue: { fontSize: 24, fontWeight: "800" }, statLabel: { fontSize: 12, marginTop: 4, fontWeight: "600" }, insightCard: { borderRadius: 19, padding: 16 }, insightTitle: { fontSize: 16, fontWeight: "700", marginBottom: 14 }, chart: { height: 105, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 3 }, chartPoint: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 5 }, chartBar: { width: "42%", minWidth: 4, borderRadius: 4 }, chartLabel: { fontSize: 9 }, weekBars: { height: 84, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 7 }, weekBarItem: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 6 }, weekBar: { width: "58%", minWidth: 5, borderRadius: 5 }, barRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 11 }, barLabel: { width: 66, fontSize: 12, fontWeight: "600" }, barTrack: { flex: 1, height: 9, borderRadius: 6, overflow: "hidden" }, barFill: { height: "100%", borderRadius: 6 },
   overviewHeader: { flexDirection: "row", alignItems: "center", gap: 12 }, completionRing: { width: 62, height: 62, alignItems: "center", justifyContent: "center" }, completionRingLabel: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" }, completionRingValue: { fontSize: 13, fontWeight: "800" }, overviewCopy: { marginTop: 10 }, overviewMain: { fontSize: 20, fontWeight: "800" }, overviewTrack: { height: 8, borderRadius: 8, overflow: "hidden", marginTop: 12 }, overviewFill: { height: "100%", borderRadius: 8 }, overviewFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 7 }, trendMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: -8, marginBottom: 12 }, legend: { flexDirection: "row", alignItems: "center", gap: 4 }, legendDot: { width: 7, height: 7, borderRadius: 4 }, legendDash: { width: 16, borderTopWidth: 2, borderStyle: "dashed" }, chartValuePair: { minHeight: 18, alignItems: "center", justifyContent: "flex-end", gap: 1 }, chartBars: { width: "100%", flexDirection: "row", alignItems: "flex-end", justifyContent: "center", height: 76 }, chartBarButton: { width: "42%", alignItems: "center", justifyContent: "flex-end" }, chartPreviousOverlay: { position: "absolute", bottom: 0, left: "29%", width: "42%", borderTopWidth: 2, borderStyle: "dashed", opacity: 0.62 }, trendDetail: { minHeight: 34, borderRadius: 10, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }, comparisonCallout: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(127,127,127,0.22)" }, comparisonValue: { flexDirection: "row", alignItems: "center", gap: 3 }, productivityHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }, productivityTabs: { gap: 7, paddingVertical: 12 }, productivityBody: { minHeight: 88 }, emptyChartText: { color: "#8a8f9d", textAlign: "center", paddingVertical: 18, fontSize: 13 }, chartHint: { color: "#8a8f9d", fontSize: 12, lineHeight: 17 }, miniTrend: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 18 }, miniTrendValue: { fontSize: 28, fontWeight: "800" }, miniTrendDivider: { width: 1, height: 34, backgroundColor: "#d2d6df", marginHorizontal: 6 },
