@@ -1,5 +1,5 @@
 import { makeId } from "@/lib/utils/id";
-import { specialListTaskPatch } from "@/lib/features/special-lists";
+import { applyCategoryCardTag, migrateCardTags, setCardStatus } from "@/lib/features/special-card-tags";
 import {
   defaultBoards,
   type Board,
@@ -60,8 +60,8 @@ export interface TasksApi {
   updateTask: (id: string, draft: TaskDraft) => void;
   /**
    * Merges only the provided fields into a task and bumps `updatedAt`. Unlike
-   * `updateTask`, it never re-runs keyword/status derivation and never touches
-   * `completed`/`canceled`/`completedAt`.
+   * `updateTask`, it never re-runs title keyword derivation. Explicit status-tag
+   * edits synchronize `completed`/`canceled`/`completedAt`.
    */
   patchTask: (id: string, patch: TaskPatch) => void;
   /** Appends one timeline event; activity is intentionally not patchable. */
@@ -80,7 +80,7 @@ export interface TasksApi {
   setTaskStatus: (id: string, status: "completed" | "canceled" | "open") => void;
   /** Move a task to a due date (used by calendar actions), or clear it. */
   setTaskDueAt: (id: string, dueAt: string | null) => void;
-  /** Assign a task to a list, applying a recognized name's explicit entry rule. */
+  /** Assign a task to a list without changing tags, state, or appearance. */
   assignTaskToSection: (taskId: string, sectionId: string) => void;
   /** Point a task at a custom section (or null to release it). */
   setTaskSectionId: (taskId: string, sectionId: string | null) => void;
@@ -258,7 +258,7 @@ export function useTasks(): TasksApi {
   }, []);
 
   const updateById = useCallback((id: string, updater: (task: Task) => Task) => {
-    setLiveTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
+    setLiveTasks((prev) => prev.map((task) => (task.id === id ? applyCategoryCardTag(updater(task), boardsRef.current) : task)));
   }, [setLiveTasks]);
 
   /**
@@ -313,7 +313,7 @@ export function useTasks(): TasksApi {
       if (index === -1) return project;
       found = true;
       const nextTasks = project.workspace.tasks.slice();
-      nextTasks[index] = updater(nextTasks[index]);
+      nextTasks[index] = applyCategoryCardTag(updater(nextTasks[index]), project.workspace.boards);
       return { ...project, updatedAt: stamp, workspace: { ...project.workspace, tasks: nextTasks } };
     });
     if (!found) return;
@@ -345,7 +345,7 @@ export function useTasks(): TasksApi {
   const clearTaskHistory = useCallback(() => setTaskHistory({}), []);
 
   const addTask = useCallback((draft: TaskDraft): Task => {
-    const task = createTask(draft);
+    const task = applyCategoryCardTag(createTask(draft), boardsRef.current);
     setLiveTasks((prev) => [...prev, task]);
     return task;
   }, [setLiveTasks]);
@@ -418,16 +418,7 @@ export function useTasks(): TasksApi {
 
   const toggleComplete = useCallback(
     (id: string) => {
-      updateTaskAnywhere(id, (task) => {
-        const completed = !task.completed;
-        return {
-          ...task,
-          completed,
-          canceled: completed ? false : task.canceled,
-          completedAt: completed ? new Date().toISOString() : null,
-          updatedAt: new Date().toISOString(),
-        };
-      });
+      updateTaskAnywhere(id, (task) => setCardStatus(task, task.completed ? "open" : "completed"));
     },
     [updateTaskAnywhere],
   );
@@ -437,16 +428,7 @@ export function useTasks(): TasksApi {
       const current = tasksRef.current.find((task) => task.id === id);
       if (!current) return;
       recordTask(id);
-      const canceling = !current.canceled;
-      updateById(id, (task) => {
-        return {
-          ...task,
-          canceled: canceling,
-          completed: canceling ? false : task.completed,
-          completedAt: canceling ? null : task.completedAt,
-          updatedAt: new Date().toISOString(),
-        };
-      });
+      updateById(id, (task) => setCardStatus(task, task.canceled ? "open" : "canceled"));
     },
     [recordTask, updateById],
   );
@@ -495,34 +477,7 @@ export function useTasks(): TasksApi {
     (id: string, status: "completed" | "canceled" | "open") => {
       if (!tasksRef.current.some((task) => task.id === id)) return;
       recordTask(id);
-      updateById(id, (task) => {
-        const stamp = new Date().toISOString();
-        if (status === "completed") {
-          return {
-            ...task,
-            completed: true,
-            canceled: false,
-            completedAt: stamp,
-            updatedAt: stamp,
-          };
-        }
-        if (status === "canceled") {
-          return {
-            ...task,
-            completed: false,
-            canceled: true,
-            completedAt: null,
-            updatedAt: stamp,
-          };
-        }
-        return {
-          ...task,
-          completed: false,
-          canceled: false,
-          completedAt: null,
-          updatedAt: stamp,
-        };
-      });
+      updateById(id, (task) => setCardStatus(task, status));
     },
     [updateById, recordTask],
   );
@@ -542,7 +497,6 @@ export function useTasks(): TasksApi {
       const stamp = new Date().toISOString();
       updateById(id, (task) => ({
         ...task,
-        ...(section ? specialListTaskPatch(task, section.title, stamp) : {}),
         sectionId,
         updatedAt: stamp,
       }));
@@ -550,7 +504,7 @@ export function useTasks(): TasksApi {
     [recordTask, updateById],
   );
 
-  /** Every placement path shares the same special-name rules. */
+  /** Placement never applies rules based on a holder's name. */
   const assignTaskToSection = useCallback(
     (taskId: string, sectionId: string) => {
       setTaskSectionId(taskId, sectionId);
@@ -657,10 +611,14 @@ export function useTasks(): TasksApi {
   const renameBoard = useCallback((id: string, label: string) => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    setLiveBoards((prev) =>
-      prev.map((board) => (board.id === id ? { ...board, label: trimmed } : board)),
-    );
-  }, [setLiveBoards]);
+    const nextBoards = boardsRef.current.map((board) => board.id === id ? { ...board, label: trimmed } : board);
+    setLiveBoards(() => nextBoards);
+    setLiveTasks((prev) => prev.map((task) => {
+      if (task.category !== id) return task;
+      const next = applyCategoryCardTag(task, nextBoards);
+      return next === task ? task : { ...next, updatedAt: new Date().toISOString() };
+    }));
+  }, [setLiveBoards, setLiveTasks]);
 
   const recolorBoard = useCallback((id: string, color: BoardColorId) => {
     setLiveBoards((prev) => prev.map((board) => (board.id === id ? { ...board, color } : board)));
@@ -696,10 +654,10 @@ export function useTasks(): TasksApi {
   const restore = useCallback((workspace: Workspace) => {
     // Do not retain references supplied by an undo/version/import caller. A
     // later edit must not mutate the saved workspace behind that caller's back.
-    const nextTasks = workspace.tasks.map(cloneTask);
     const nextSections = workspace.sections.map((section) => ({ ...section }));
-    reconcileSectionIds(nextTasks, nextSections);
     const nextBoards = workspace.boards.map((board) => ({ ...board }));
+    const nextTasks = workspace.tasks.map((task) => migrateCardTags(cloneTask(task), nextSections.find((section) => section.id === task.sectionId)?.title, nextBoards));
+    reconcileSectionIds(nextTasks, nextSections);
     tasksRef.current = nextTasks;
     sectionsRef.current = nextSections;
     boardsRef.current = nextBoards;
@@ -709,7 +667,7 @@ export function useTasks(): TasksApi {
   }, []);
 
   const loadSample = useCallback(() => {
-    const samples = createSampleTasks();
+    const samples = createSampleTasks().map((task) => migrateCardTags(task));
     const sampleBoards = SAMPLE_BOARDS.map((board) => ({ ...board }));
     boardsRef.current = sampleBoards;
     setBoards(sampleBoards);

@@ -1,4 +1,5 @@
 import type { BoardColorId } from "@/lib/domain/boards";
+import type { TaskStatus } from "@/lib/domain/types";
 
 /**
  * Card accent themes: keyword-driven visual identities for task cards.
@@ -28,11 +29,20 @@ function theme(id: string, keywords: string[], hex: string): CardTheme {
   };
 }
 
-export interface SeasonalCardTheme extends CardTheme {
+export interface DecorativeCardTheme extends CardTheme {
   label: string;
   symbol: string;
   decoration: string;
 }
+
+export type SeasonalCardTheme = DecorativeCardTheme;
+
+/** Exact status names avoid false positives such as “Not done” or “Late night”. */
+export const STATUS_CARD_THEMES: DecorativeCardTheme[] = [
+  { ...theme("done", ["done", "complete", "completed", "finished", "resolved", "delivered", "shipped"], "#34D399"), label: "Done", symbol: "✓", decoration: "" },
+  { ...theme("canceled", ["canceled", "cancelled", "cancel", "dropped", "abandoned"], "#94A3B8"), label: "Canceled", symbol: "×", decoration: "" },
+  { ...theme("overdue", ["overdue", "late", "past due", "expired", "missed deadline"], "#FB7185"), label: "Overdue", symbol: "!", decoration: "" },
+];
 
 /** Seasonal easter eggs take priority over generic “gift”, “party”, etc. */
 export const SEASONAL_CARD_THEMES: SeasonalCardTheme[] = [
@@ -40,6 +50,8 @@ export const SEASONAL_CARD_THEMES: SeasonalCardTheme[] = [
   { ...theme("christmas", ["christmas", "christmass", "xmas", "noel", "craciun", "crăciun"], "#22C55E"), label: "Christmas", symbol: "🎄", decoration: "❄" },
   { ...theme("easter", ["easter", "paște"], "#C084FC"), label: "Easter", symbol: "🥚", decoration: "✿" },
   { ...theme("new-year", ["new year", "new-year", "new year's", "new year’s", "new years"], "#60A5FA"), label: "New Year", symbol: "🎉", decoration: "✧" },
+  { ...theme("birthday", ["birthday", "bday", "b-day"], "#F472B6"), label: "Birthday", symbol: "🎂", decoration: "" },
+  { ...theme("valentines", ["valentine", "valentines", "valentine's", "valentine’s"], "#FB7185"), label: "Valentine's Day", symbol: "♥", decoration: "" },
 ];
 
 /** The theme list, in detection-priority order. */
@@ -152,10 +164,39 @@ export function detectSeasonalCardTheme(title: string): SeasonalCardTheme | null
   return SEASONAL_MATCHERS.find((entry) => entry.matchers.some((matcher) => matcher.test(text)))?.theme ?? null;
 }
 
+export function detectStatusCardTheme(title: string): DecorativeCardTheme | null {
+  const name = (title ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  return STATUS_CARD_THEMES.find((entry) => entry.keywords.includes(name)) ?? null;
+}
+
+/** Explicit event designs stay intact; ordinary cards reflect their actual state. */
+export function resolveCardDecoration(tags: readonly string[] = [], status: TaskStatus | null = null): DecorativeCardTheme | null {
+  const special = tags.map(classifySpecialCardTag).filter((entry) => entry !== null);
+  const event = special.findLast((entry) => entry.group === "event");
+  if (event) return event.theme;
+  const stateId = status === "completed" ? "done" : status;
+  const actual = STATUS_CARD_THEMES.find((entry) => entry.id === stateId);
+  if (actual) return actual;
+  const taggedStatus = special.findLast((entry) => entry.group === "status");
+  if (taggedStatus) return taggedStatus.theme;
+  return null;
+}
+
+export interface SpecialCardTag { group: "status" | "event"; theme: DecorativeCardTheme }
+
+/** A special tag must be a complete name/alias, not a passing word in a sentence. */
+export function classifySpecialCardTag(label: string): SpecialCardTag | null {
+  const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/’/g, "'").replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+  const name = normalize(label);
+  for (const [group, entries] of [["status", STATUS_CARD_THEMES], ["event", SEASONAL_CARD_THEMES]] as const) {
+    const entry = entries.find((entry) => [entry.label, ...entry.keywords].some((alias) => normalize(alias) === name));
+    if (entry) return { group, theme: entry };
+  }
+  return null;
+}
+
 /** Picks the first matching theme for a task's text, or null when nothing fits. */
 export function detectCardTheme(title: string, description: string): CardTheme | null {
-  const seasonal = detectSeasonalCardTheme(title);
-  if (seasonal) return seasonal;
   const haystack = `${title ?? ""} ${description ?? ""}`.toLowerCase();
   if (!haystack.trim()) return null;
   for (const { theme: entry, matchers } of THEME_MATCHERS) {

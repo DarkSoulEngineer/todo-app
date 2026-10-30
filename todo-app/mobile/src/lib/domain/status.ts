@@ -19,6 +19,7 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
 export function deriveStatus(task: Task, now: Date): TaskStatus {
   if (task.completed) return "completed";
   if (task.canceled) return "canceled";
+  if (task.tags?.some((tag) => tag.trim().toLowerCase() === "overdue")) return "overdue";
 
   if (task.dueAt) {
     const due = parseISO(task.dueAt);

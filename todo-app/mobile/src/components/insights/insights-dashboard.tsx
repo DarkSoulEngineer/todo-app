@@ -25,7 +25,7 @@ export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTER
   const showCategories = filters.boardId === "all";
   const showPriorities = filters.priority === "all";
   const [selection, setSelection] = useState<{ key: string; period: string } | null>(null);
-  const filtered = useMemo(() => filterTasksByFilters(tasks, filters, now), [tasks, filters, now]);
+  const filtered = useMemo(() => filterTasksByFilters(tasks, filters, now, boards), [tasks, filters, now, boards]);
   const start = windowStartFromPreset(now, filters.dateRange, filters.customStart);
   const end = windowEndFromPreset(now, filters.dateRange, filters.customEnd);
   const period = useMemo(() => computeInsightsForWindow(filtered, start, end, { trendTasks: [...filtered], metricsTasks: filtered, now }), [filtered, start, end, now]);

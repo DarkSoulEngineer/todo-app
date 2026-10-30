@@ -34,9 +34,10 @@ import { boardColor } from "@/lib/domain/boards";
 import { getTaskSectionId } from "@/lib/domain/sections";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
 import { describeDue, deriveStatus } from "@/lib/domain/status";
-import { detectCardTheme, detectSeasonalCardTheme } from "@/lib/features/card-themes";
+import { classifySpecialCardTag, detectCardTheme, resolveCardDecoration } from "@/lib/features/card-themes";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
-import { SpecialListIdentity } from "@/components/board/special-list-identity";
+import { SpecialCardTagPicker } from "@/components/ui/special-card-tag-picker";
+import { mergeCardTagDraft, normalizeCardTags, toggleCardTag } from "@/lib/features/special-card-tags";
 import {
   DEFAULT_FILTERS,
   hasActiveFilters,
@@ -124,16 +125,17 @@ export function TaskCard({
   const board = boards.find((item) => item.id === task.category);
   const boardTone = board ? boardColor(board.color) : undefined;
   const cardTheme = detectCardTheme(task.title, task.description);
-  const seasonal = detectSeasonalCardTheme(task.title);
   const doneSubtasks = task.subtasks.filter((item) => item.done).length;
   const status = deriveStatus(task, now);
+  const decoration = resolveCardDecoration(task.tags, status);
+  const cardTags = (task.tags ?? []).filter((tag) => classifySpecialCardTag(tag)?.group !== "status").sort((a, b) => Number(Boolean(classifySpecialCardTag(b))) - Number(Boolean(classifySpecialCardTag(a))));
   const overdueDuration = status === "overdue" && due ? due.label.replace(/\s+overdue$/i, "") : null;
   const taskAction = onLongPress ?? onPress;
   return (
     <Pressable accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} // @ts-ignore
     onContextMenu={(event) => { event.preventDefault?.(); onLongPress?.(event.nativeEvent); }} delayLongPress={360} style={styles.taskPressable}>
-      <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
-        {seasonal ? <SeasonalCardDecoration theme={seasonal} compact={compact} paused={compact} /> : null}
+      <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : status === "completed" ? theme.colors.success : status === "overdue" ? theme.colors.destructive : decoration?.accent ?? cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
+        {decoration ? <SeasonalCardDecoration theme={decoration} compact={compact} paused={compact} /> : null}
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
@@ -146,8 +148,9 @@ export function TaskCard({
            {status !== "upcoming" ? <StatusIcon status={status} detail={overdueDuration ? `Overdue by ${overdueDuration}` : undefined} /> : null}
            <PriorityStars priority={task.priority} size={14} />
            {due && !task.canceled && status !== "overdue" ? <View accessible accessibilityLabel={`Due ${due.title}`} style={styles.metaItem}><Ionicons name="time-outline" size={14} color={due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground} /><Text style={{ color: due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{due.label}</Text></View> : null}
-            {board && boardTone ? <Chip label={board.label} color={boardTone.dot} /> : null}
-            {(task.tags ?? []).slice(0, 2).map((tag) => <Chip key={tag} label={tag} color={theme.colors.primary} />)}
+             {board && boardTone && classifySpecialCardTag(board.label)?.group !== "status" ? <Chip label={board.label} color={boardTone.dot} /> : null}
+             {cardTags.slice(0, 4).map((tag) => <Chip key={tag} label={tag} color={classifySpecialCardTag(tag)?.theme.accent ?? theme.colors.primary} />)}
+             {cardTags.length > 4 ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>+{cardTags.length - 4}</Text> : null}
             {task.subtasks.length > 0 ? <View style={styles.metaItem}><Ionicons name="list-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{doneSubtasks}/{task.subtasks.length}</Text></View> : null}
          </View>
          {task.subtasks.length > 0 ? <View accessible accessibilityLabel={`Checklist: ${doneSubtasks} of ${task.subtasks.length} complete`} style={[{ borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginTop: 10, gap: 6 }, { borderTopColor: theme.colors.border }]}>
@@ -229,6 +232,17 @@ function TaskEditorForm({
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [category, setCategory] = useState<string | null>(() => task?.category ?? null);
+  const [tags, setTags] = useState<string[]>(() => normalizeCardTags(task?.tags));
+  const [tagInput, setTagInput] = useState("");
+  const sourceTags = task?.tags;
+  const lastSourceTags = useRef(normalizeCardTags(sourceTags));
+  useEffect(() => {
+    if (!sourceTags) return;
+    const previous = lastSourceTags.current;
+    const incoming = normalizeCardTags(sourceTags);
+    lastSourceTags.current = incoming;
+    setTags((current) => mergeCardTagDraft(current, previous, incoming));
+  }, [sourceTags]);
   const [sectionId, setSectionId] = useState<string | null>(() => task ? getTaskSectionId(task, sections, new Date()) ?? null : initialSectionId ?? null);
   const [dueAt, setDueAt] = useState<string | null>(() => task?.dueAt ?? initialDueAt ?? null);
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => task?.subtasks.map((item) => ({ ...item })) ?? []);
@@ -253,8 +267,9 @@ function TaskEditorForm({
     dueAt,
     priority,
     category,
+    tags,
     subtasks: subtasks.map((item) => ({ ...item, title: item.title.trim() })).filter((item) => item.title.length > 0),
-  }), [category, description, dueAt, priority, subtasks, title]);
+  }), [category, description, dueAt, priority, subtasks, tags, title]);
   const save = () => {
     if (!title.trim()) {
       setTitleError("Give your task a title.");
@@ -351,9 +366,15 @@ function TaskEditorForm({
       ))}
     </View>
   );
-  const tagChips = boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
+  const tagChips = boards.filter((item) => !classifySpecialCardTag(item.label)).map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
 
-  const tagsControl = !boards.length ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>Create your own tags using Actions → Add filter/tag.</Text> : wideForm ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
+  const addTag = () => { if (!tagInput.trim()) return; setTags((current) => normalizeCardTags([...current, tagInput])); setTagInput(""); };
+  const tagsControl = <View style={{ gap: 10 }}>
+    {tagChips.length ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : null}
+    <SpecialCardTagPicker tags={tags} onChange={setTags} />
+    <View style={styles.wrapRow}>{tags.filter((tag) => !classifySpecialCardTag(tag)).map((tag) => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Remove tag ${tag}`} onPress={() => setTags((current) => toggleCardTag(current, tag))} style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary }]}><Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{tag} ×</Text></Pressable>)}</View>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><TextInput accessibilityLabel="New card tag" placeholder="Add a tag" placeholderTextColor={theme.colors.mutedForeground} value={tagInput} onChangeText={setTagInput} onSubmitEditing={addTag} returnKeyType="done" style={{ flex: 1, minWidth: 0, minHeight: 44, color: theme.colors.foreground, paddingHorizontal: 10, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8 }} /><Button label="Add" size="sm" onPress={addTag} disabled={!tagInput.trim()} /></View>
+  </View>;
 
   const content = <>
             {!windowed ? <View style={styles.taskEditorHeader}>
@@ -385,7 +406,6 @@ function TaskEditorForm({
                   <Chip label="No list" active={sectionId === null} onPress={() => setSectionId(null)} />
                   {sections.filter((section) => !section.hidden || section.id === sectionId).map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}
                 </View>
-                <SpecialListIdentity title={sections.find((section) => section.id === sectionId)?.title ?? ""} />
               </View>
               <View testID="task-editor-notes-field">
               <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>

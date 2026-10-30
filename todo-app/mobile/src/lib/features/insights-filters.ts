@@ -1,6 +1,8 @@
 import { differenceInCalendarDays, format, isSameDay, parseISO, startOfDay, subDays, isValid } from "date-fns";
 import type { Task, Workspace } from "@/lib/domain/types";
 import type { Board } from "@/lib/domain/boards";
+import { deriveStatus } from "@/lib/domain/status";
+import { matchesBoardTag } from "@/lib/features/special-card-tags";
 
 /** Date range preset options. */
 export type DateRangePreset = "7d" | "30d" | "90d" | "custom";
@@ -87,22 +89,16 @@ export function windowEndFromPreset(now: Date, preset: DateRangePreset, customEn
 }
 
 /** Applies the board, status and priority filters (no date-range window). */
-export function filterTasksByFilters(tasks: Task[], filters: InsightsFilters, now: Date): Task[] {
+export function filterTasksByFilters(tasks: Task[], filters: InsightsFilters, now: Date, boards: readonly Board[] = []): Task[] {
   const filtered = tasks.filter((task) => {
     // Board filter
-    if (filters.boardId !== "all" && task.category !== filters.boardId) {
+    if (filters.boardId !== "all" && !matchesBoardTag(task, filters.boardId, boards)) {
       return false;
     }
 
     // Status filter
     if (filters.status !== "all") {
-      const isCompleted = task.completed;
-      const isCanceled = task.canceled;
-      const isOverdue = !isCompleted && !isCanceled && task.dueAt && Date.parse(task.dueAt) < now.getTime();
-
-      if (filters.status === "completed" && !isCompleted) return false;
-      if (filters.status === "canceled" && !isCanceled) return false;
-      if (filters.status === "overdue" && !isOverdue) return false;
+      if (deriveStatus(task, now) !== filters.status) return false;
     }
 
     // Priority filter
@@ -274,13 +270,7 @@ export function exportProjectsToCSV(projects: { name: string; workspace: Workspa
 }
 
 function csvStatus(task: Task): string {
-  return task.completed
-    ? "completed"
-    : task.canceled
-      ? "canceled"
-      : task.dueAt && Date.parse(task.dueAt) < Date.now()
-        ? "overdue"
-        : "upcoming";
+  return deriveStatus(task, new Date());
 }
 
 /** Check if any filter is non-default. */

@@ -198,9 +198,8 @@ test("quick add recognizes only tags supplied by the user, not historical preset
   assert.equal(parseQuickAdd("Task #studio", new Date(), [{ id: "mine", label: "Studio" }]).category, "mine");
 });
 
-test("special list synonyms apply only when placing a card and preserve unrelated task fields", () => {
-  const { SPECIAL_LIST_RULES } = load("lib/features/special-lists");
-  for (const rule of SPECIAL_LIST_RULES) for (const title of rule.names) {
+test("special holder names never change a card's tags, status, or deadline", () => {
+  for (const title of ["Done", "Completed", "Finished", "Canceled", "Cancelled", "Overdue", "Halloween", "Christmas"]) {
     const api = useTasks();
     const task = { ...createSampleTasks()[0], id: "test", completed: false, canceled: false, completedAt: null, sectionId: null };
     api.restore(workspace([{ id: "special", title }], [task]));
@@ -208,18 +207,19 @@ test("special list synonyms apply only when placing a card and preserve unrelate
     api.assignTaskToSection("test", "special");
     const result = api.snapshot().tasks[0];
     assert.equal(result.sectionId, "special");
-    assert.equal(result.completed, rule.id === "completed", title);
-    assert.equal(result.canceled, rule.id === "canceled", title);
-    assert.equal(Boolean(result.completedAt), rule.id === "completed", title);
+    assert.equal(result.completed, false, title);
+    assert.equal(result.canceled, false, title);
+    assert.equal(result.completedAt, null, title);
     for (const key of ["dueAt", "category", "priority", "title", "description", "subtasks", "attachments", "tags"]) assert.deepEqual(result[key], task[key]);
   }
 });
 
-test("Done → To do → Cancelled transitions work through the shared assignment action and undo", () => {
+test("status tags follow the card across holders and undo restores their state", () => {
   const api = useTasks();
   const task = { ...createSampleTasks()[0], id: "test", completed: false, canceled: false, completedAt: null, sectionId: null };
   api.restore(workspace([{ id: "done", title: "Finished" }, { id: "todo", title: "To do" }, { id: "cancel", title: "Cancelled" }, { id: "plain", title: "My work" }], [task]));
   const original = api.snapshot();
+  api.patchTask("test", { tags: ["Halloween", "Done"] });
   api.setTaskSectionId("test", "done");
   const completedAt = api.snapshot().tasks[0].completedAt;
   api.setTaskSectionId("test", "done");
@@ -227,8 +227,10 @@ test("Done → To do → Cancelled transitions work through the shared assignmen
   api.setTaskSectionId("test", "plain");
   assert.equal(api.snapshot().tasks[0].completed, true, "ordinary lists do not reopen tasks");
   api.setTaskSectionId("test", "todo");
-  assert.equal(api.snapshot().tasks[0].completed, false);
+  assert.equal(api.snapshot().tasks[0].completed, true);
   api.setTaskSectionId("test", "cancel");
+  assert.equal(api.snapshot().tasks[0].completed, true);
+  api.patchTask("test", { tags: ["Halloween", "Canceled"] });
   assert.equal(api.snapshot().tasks[0].canceled, true);
   api.setTaskSectionId("test", null);
   assert.equal(api.snapshot().tasks[0].canceled, true, "unassigning is not a status change");

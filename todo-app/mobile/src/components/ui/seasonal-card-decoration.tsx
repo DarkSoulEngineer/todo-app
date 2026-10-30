@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, Animated, AppState, Platform, StyleSheet, Text, View } from "react-native";
-import type { SeasonalCardTheme } from "@/lib/features/card-themes";
+import type { DecorativeCardTheme } from "@/lib/features/card-themes";
 import { SeasonalCardArtwork } from "./seasonal-card-artwork";
+import { StatusCardArtwork } from "./status-card-artwork";
 
 /** A small, non-interactive seasonal layer. Ordinary cards never mount it. */
-export function SeasonalCardDecoration({ theme, paused = false, compact = false }: { theme: SeasonalCardTheme; paused?: boolean; compact?: boolean }) {
+export function SeasonalCardDecoration({ theme, paused = false, compact = false }: { theme: DecorativeCardTheme; paused?: boolean; compact?: boolean }) {
   const [phase] = useState(() => new Animated.Value(0));
+  const staticDesign = theme.id === "done" || theme.id === "canceled" || theme.id === "overdue";
 
   useEffect(() => {
     let disposed = false, reduced = true, preferenceChanged = false;
@@ -16,7 +18,7 @@ export function SeasonalCardDecoration({ theme, paused = false, compact = false 
       animation?.stop();
       animation = null;
       phase.setValue(0);
-      if (reduced || !active || paused || compact) return;
+      if (reduced || !active || paused || compact || staticDesign) return;
       const config = { duration: 2400, useNativeDriver: Platform.OS !== "web", isInteraction: false };
       animation = Animated.loop(Animated.sequence([
         Animated.timing(phase, { ...config, toValue: 1 }),
@@ -37,13 +39,13 @@ export function SeasonalCardDecoration({ theme, paused = false, compact = false 
       refresh();
     }).catch(() => { /* Prefer a static design if the setting is unavailable. */ });
     return () => { disposed = true; animation?.stop(); motion.remove(); app.remove(); };
-  }, [compact, paused, phase]);
+  }, [compact, paused, phase, staticDesign]);
 
   return <View testID={`seasonal-decoration-${theme.id}`} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: theme.wash, borderRadius: 12, overflow: "hidden" }]}>
     {theme.id === "halloween" ? <>
       <View testID="halloween-orbit" style={[styles.orbit, { borderColor: theme.border }]} />
       {!compact ? <Animated.View style={[styles.motif, { opacity: phase.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.22] }), transform: [{ translateY: phase.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }, { rotate: phase.interpolate({ inputRange: [0, 1], outputRange: ["-5deg", "5deg"] }) }] }]}><Text style={{ color: theme.accent, fontSize: 50 }}>{theme.decoration}</Text></Animated.View> : null}
-    </> : <SeasonalCardArtwork id={theme.id} phase={phase} compact={compact} />}
+    </> : staticDesign ? <StatusCardArtwork id={theme.id} color={theme.accent} compact={compact} /> : <SeasonalCardArtwork id={theme.id} phase={phase} compact={compact} />}
   </View>;
 }
 

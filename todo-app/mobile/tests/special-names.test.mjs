@@ -12,37 +12,59 @@ function load(path, mocks = {}) {
   new Function("require", "exports", compiled)((id) => id === "react/jsx-runtime" ? require(id) : mocks[id], exports);
   return exports;
 }
-const rules = load("lib/features/special-lists.ts");
 const themes = load("lib/features/card-themes.ts");
+const allDecorations = [...themes.SEASONAL_CARD_THEMES, ...themes.STATUS_CARD_THEMES];
 
-test("special list names match synonyms, case, spaces and emoji, not partial or negated phrases", () => {
-  for (const name of ["Done", "COMPLETED", " Finished ", "✅ Done", "Resolved", "Delivered"]) assert.equal(rules.getSpecialListRule(name)?.id, "completed");
-  for (const name of ["Cancelled", "CANCELED", "Abandoned"]) assert.equal(rules.getSpecialListRule(name)?.id, "canceled");
-  for (const name of ["TO DO", "To-do", "  In   progress  ", "Backlog"]) assert.equal(rules.getSpecialListRule(name)?.id, "open");
-  for (const name of ["Not done", "Unfinished", "Completed research", "Almost finished", "Don't cancel", "My backlog", "Halloween", ""]) assert.equal(rules.getSpecialListRule(name), null, name);
+test("special tags match complete aliases without inferring rules from holder names", () => {
+  for (const name of ["Done", "COMPLETED", " Finished ", "Resolved", "Delivered"]) assert.equal(themes.classifySpecialCardTag(name)?.theme.id, "done");
+  for (const name of ["Cancelled", "CANCELED", "Abandoned"]) assert.equal(themes.classifySpecialCardTag(name)?.theme.id, "canceled");
+  for (const name of ["Not done", "Unfinished", "Completed research", "Almost finished", "Don't cancel", "My backlog", "D", ""]) assert.equal(themes.classifySpecialCardTag(name), null, name);
 });
 
 test("seasonal titles handle aliases and take precedence over generic themes", () => {
   for (const [title, id] of [["Haloween", "halloween"], ["HALLOWEEN party", "halloween"], ["Urgent Christmass shopping", "christmas"], ["Xmas gifts", "christmas"], ["Easter eggs", "easter"], ["New Year's party", "new-year"], ["New year’s plans", "new-year"]]) {
     assert.equal(themes.detectSeasonalCardTheme(title)?.id, id, title);
-    assert.equal(themes.detectCardTheme(title, "")?.id, id, title);
   }
   for (const title of ["Eastern timezone", "Paste code", "Halloweenish", "Routine task"]) assert.equal(themes.detectSeasonalCardTheme(title), null, title);
   assert.equal(themes.detectSeasonalCardTheme("Meeting"), null);
   assert.notEqual(themes.detectCardTheme("Meeting", "Discuss Christmas")?.id, "christmas", "description mentions are not easter eggs");
 });
 
-test("special list appearance tells users what happens before moving a card", () => {
-  const { SpecialListIdentity } = load("components/board/special-list-identity.tsx", {
-    "react-native": { View: "View", Text: "Text", StyleSheet: { create: (value) => value } },
-    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { success: "green", destructive: "red", info: "blue", foreground: "ink" } } }) },
-    "@/lib/features/special-lists": rules,
-    "@/lib/features/card-themes": themes,
-  });
-  const text = (node) => typeof node === "string" ? node : Array.isArray(node) ? node.map(text).join("") : node && typeof node === "object" ? text(node.props?.children) : "";
-  for (const [name, expected] of [["Done", "Mark complete"], ["Cancelled", "Cancel task"], ["To do", "Reopen task"]]) assert.ok(text(SpecialListIdentity({ title: name })).includes(expected));
-  for (const title of ["Halloween", "Christmas", "Easter", "New Year"]) assert.equal(SpecialListIdentity({ title }), null, "seasonal designs stay on cards, without a list subtitle");
-  assert.equal(SpecialListIdentity({ title: "My workflow" }), null);
+test("status card names and synonyms match full names in every capitalization, never just initials", () => {
+  for (const entry of themes.STATUS_CARD_THEMES) for (const name of entry.keywords) {
+    for (const variant of [name, name.toUpperCase(), name[0].toUpperCase() + name.slice(1), name.split("").map((char, index) => index % 2 ? char.toUpperCase() : char).join("")]) {
+      assert.equal(themes.detectStatusCardTheme(variant)?.id, entry.id, variant);
+      assert.equal(themes.resolveCardDecoration([variant])?.id, entry.id, variant);
+    }
+  }
+  for (const name of ["D", "C", "O", "B", "V", "Not done", "Unfinished", "Late night walk", "Completed research", "Overdue-ish", "cancellation"]) {
+    assert.equal(themes.detectStatusCardTheme(name), null, name);
+    assert.equal(themes.resolveCardDecoration([name]), null, name);
+  }
+});
+
+test("Birthday and Valentine's designs match full words and aliases, case-insensitively", () => {
+  for (const name of ["Birthday", "BIRTHDAY", "bIrThDaY party", "bday", "B-DAY"]) assert.equal(themes.detectSeasonalCardTheme(name)?.id, "birthday");
+  for (const name of ["Valentine", "VALENTINES DAY", "valentine's day", "Valentine’s Day", "vAlEnTiNeS"]) assert.equal(themes.detectSeasonalCardTheme(name)?.id, "valentines");
+  for (const name of ["b", "V", "Birthdaysuit", "Valentinesque"]) assert.equal(themes.detectSeasonalCardTheme(name), null);
+});
+
+test("tags combine one event design with status, and ordinary task state stays visible", () => {
+  for (const [status, id] of [["completed", "done"], ["canceled", "canceled"], ["overdue", "overdue"]]) assert.equal(themes.resolveCardDecoration([], status)?.id, id);
+  assert.equal(themes.resolveCardDecoration(["FINISHED"])?.id, "done");
+  assert.equal(themes.resolveCardDecoration(["CANCELLED"])?.id, "canceled");
+  assert.equal(themes.resolveCardDecoration(["OVERDUE"])?.id, "overdue");
+  assert.equal(themes.resolveCardDecoration(["Done"], "canceled")?.id, "canceled");
+  assert.equal(themes.resolveCardDecoration(["Halloween", "Done"], "completed")?.id, "halloween");
+  assert.equal(themes.resolveCardDecoration(["Christmas", "Overdue"], "overdue")?.id, "christmas");
+  assert.equal(themes.resolveCardDecoration([], "upcoming"), null);
+});
+
+test("holders and list editors no longer offer special-name behavior", () => {
+  for (const path of ["components/board/mobile-task-columns.tsx", "components/board/create-list-dialog.tsx"]) {
+    const source = readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
+    assert.doesNotMatch(source, /SpecialListIdentity|listTitle=/);
+  }
 });
 
 function decorationHarness({ paused = false, compact = false, active = true, id = "halloween" } = {}) {
@@ -51,7 +73,11 @@ function decorationHarness({ paused = false, compact = false, active = true, id 
   class Value { setValue() {} interpolate(value) { return value; } }
   const artwork = load("components/ui/seasonal-card-artwork.tsx", {
     "react-native": { View: "View", Animated: { View: "AnimatedView" }, StyleSheet: { create: (value) => value, absoluteFill: {} } },
-    "react-native-svg": { default: "Svg", Circle: "Circle", G: "G", Line: "Line", Path: "Path", Rect: "Rect" },
+    "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", G: "G", Line: "Line", Path: "Path", Rect: "Rect" },
+  });
+  const statusArtwork = load("components/ui/status-card-artwork.tsx", {
+    "react-native": { View: "View", Animated: { View: "AnimatedView" }, StyleSheet: { create: (value) => value } },
+    "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", G: "G", Line: "Line", Path: "Path", Rect: "Rect" },
   });
   const { SeasonalCardDecoration } = load("components/ui/seasonal-card-decoration.tsx", {
     react: { useState: (initial) => [initial(), () => {}], useEffect: (effect) => { cleanup = effect(); } },
@@ -63,8 +89,9 @@ function decorationHarness({ paused = false, compact = false, active = true, id 
     },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { foreground: "ink" } } }) },
     "./seasonal-card-artwork": artwork,
+    "./status-card-artwork": statusArtwork,
   });
-  const tree = SeasonalCardDecoration({ theme: themes.SEASONAL_CARD_THEMES.find((theme) => theme.id === id), paused, compact });
+  const tree = SeasonalCardDecoration({ theme: allDecorations.find((theme) => theme.id === id), paused, compact });
   return { tree, callbacks, configs, cleanup: () => cleanup(), resolvePreference: (value) => resolvePreference(value), get starts() { return starts; }, get stops() { return stops; }, get removals() { return removals; } };
 }
 
@@ -86,6 +113,11 @@ test("holiday cards use distinct event-specific artwork without event title labe
     christmas: ["christmas-lights", "christmas-snow", "christmas-tree"],
     easter: ["easter-meadow", "easter-eggs"],
     "new-year": ["new-year-confetti", "new-year-fireworks"],
+    birthday: ["birthday-bunting", "birthday-balloons", "birthday-cake"],
+    valentines: ["valentines-petals", "valentines-hearts", "valentines-envelope"],
+    done: ["done-seal"],
+    canceled: ["canceled-ticket"],
+    overdue: ["overdue-clock"],
   };
   for (const [id, expected] of Object.entries(compositions)) {
     const h = decorationHarness({ id });
@@ -93,10 +125,11 @@ test("holiday cards use distinct event-specific artwork without event title labe
     assert.equal(tree.type, "View", "decoration is only one absolute overlay, not an in-flow label");
     assert.equal(tree.props.pointerEvents, "none");
     const ids = nodes(tree).map((node) => node.props?.testID).filter(Boolean);
+    if (["done", "canceled", "overdue"].includes(id)) assert.ok(!nodes(tree).some((node) => node.type === "AnimatedView"), "basic status artwork is a static image, not an animated view");
     for (const motif of expected) assert.ok(ids.includes(motif), `${id} has ${motif}`);
     for (const [other, motifs] of Object.entries(compositions)) if (other !== id) for (const motif of motifs) assert.ok(!ids.includes(motif), `${id} does not reuse ${motif}`);
     const texts = nodes(tree).filter((node) => node.type === "Text").map((node) => node.props.children);
-    for (const theme of themes.SEASONAL_CARD_THEMES) assert.ok(!texts.some((text) => String(text).toLowerCase().includes(theme.label.toLowerCase())), "no added holiday title");
+    for (const theme of allDecorations) assert.ok(!texts.some((text) => String(text).toLowerCase().includes(theme.label.toLowerCase())), "no added event or status title");
     for (const node of nodes(tree)) {
       if (node.props?.d) assert.doesNotMatch(node.props.d, /NaN|Infinity/);
       if (node.props?.x1 !== undefined) assert.ok(Number.isFinite(node.props.x1));
@@ -136,9 +169,9 @@ test("seasonal motion is opt-in after accessibility is known, stops in backgroun
 });
 
 test("reduced motion, paused previews and background apps keep seasonal designs static", async () => {
-  for (const options of [{}, { paused: true }, { compact: true }, { active: false }]) {
+  for (const options of [{}, { paused: true }, { compact: true }, { active: false }, { id: "done" }, { id: "canceled" }, { id: "overdue" }]) {
     const h = decorationHarness(options);
-    h.resolvePreference(!options.paused && !options.compact && options.active !== false);
+    h.resolvePreference(!options.paused && !options.compact && options.active !== false && !["done", "canceled", "overdue"].includes(options.id));
     await Promise.resolve();
     assert.equal(h.starts, 0);
     h.cleanup();

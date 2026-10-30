@@ -55,22 +55,43 @@ test("board cards match the simple tile hierarchy without descriptions or decora
 });
 
 test("holiday titles activate seasonal decoration while preserving status and selection cues", () => {
-  for (const [title, id] of [["Halloween party", "halloween"], ["Christmass gifts", "christmas"], ["Easter", "easter"], ["New Year", "new-year"]]) {
-    const tree = render({ title });
+  for (const [title, id] of [["Halloween party", "halloween"], ["Christmass gifts", "christmas"], ["Easter", "easter"], ["New Year", "new-year"], ["BIRTHDAY", "birthday"], ["Valentine's day", "valentines"]]) {
+    const tags = [cardThemes.SEASONAL_CARD_THEMES.find((entry) => entry.id === id).label];
+    const tree = render({ title, tags });
     const decoration = nodes(tree).find((node) => node.type === "SeasonalCardDecoration");
     assert.equal(decoration.props.theme.id, id);
     assert.equal(decoration.props.paused, false);
-    assert.equal(style(render({ title, completed: true })).borderLeftColor, colors.success);
-    assert.equal(style(render({ title }, { selected: true })).borderColor, colors.primary);
+    assert.equal(style(render({ title, tags, completed: true })).borderLeftColor, colors.success);
+    assert.equal(style(render({ title, tags }, { selected: true })).borderColor, colors.primary);
     for (const props of [{ compact: true }, { selectionMode: true }, { hideMoveArrows: true }, { animateSeasonal: false }]) {
-      assert.equal(nodes(render({ title }, props)).find((node) => node.type === "SeasonalCardDecoration").props.paused, true);
+      assert.equal(nodes(render({ title, tags }, props)).find((node) => node.type === "SeasonalCardDecoration").props.paused, true);
     }
   }
   assert.equal(nodes(render()).find((node) => node.type === "SeasonalCardDecoration"), undefined);
-  const inherited = nodes(render({}, { listTitle: "Halloween" })).find((node) => node.type === "SeasonalCardDecoration");
-  assert.equal(inherited.props.theme.id, "halloween");
-  const overridden = nodes(render({ title: "Christmas" }, { listTitle: "Halloween" })).find((node) => node.type === "SeasonalCardDecoration");
-  assert.equal(overridden.props.theme.id, "christmas", "a card's own seasonal title overrides its list design");
+  assert.equal(nodes(render({ title: "Halloween" }, { listTitle: "Halloween" })).find((node) => node.type === "SeasonalCardDecoration"), undefined, "holder and card names no longer choose a design");
+  const combined = nodes(render({ tags: ["Halloween", "Done"], completed: true })).find((node) => node.type === "SeasonalCardDecoration");
+  assert.equal(combined.props.theme.id, "halloween");
+});
+
+test("status designs follow task state and complete case-insensitive names without changing controls", () => {
+  for (const [changes, id] of [[{ completed: true }, "done"], [{ canceled: true }, "canceled"], [{ dueAt: new Date(2026, 9, 28).toISOString() }, "overdue"], [{ tags: ["dOnE"] }, "done"], [{ tags: ["CANCELLED"] }, "canceled"], [{ tags: ["OVERDUE"] }, "overdue"]]) {
+    const tree = render(changes);
+    const decoration = nodes(tree).find((node) => node.type === "SeasonalCardDecoration");
+    assert.equal(decoration.props.theme.id, id);
+    assert.ok(nodes(tree).some((node) => node.props?.accessibilityLabel === `Actions for ${changes.title ?? task.title}`));
+    assert.equal(tree.props.accessibilityLabel, changes.title ?? task.title);
+  }
+  for (const title of ["D", "C", "O", "B", "V"]) assert.equal(nodes(render({ title })).find((node) => node.type === "SeasonalCardDecoration"), undefined);
+});
+
+test("basic status tags are icon-only; event and ordinary custom tags keep text labels", () => {
+  for (const [tag, changes, expected] of [["Done", { completed: true }, "completed"], ["Canceled", { canceled: true }, "canceled"], ["Overdue", {}, "overdue"]]) {
+    const tree = render({ tags: ["Work custom", "Halloween", tag], ...changes });
+    assert.ok(text(tree).includes("Halloween"));
+    assert.ok(text(tree).includes("Work custom"));
+    assert.ok(!text(tree).includes(tag), `${tag} is not duplicated as text`);
+    assert.equal(nodes(tree).find((node) => node.type === "StatusIcon").props.status, expected);
+  }
 });
 
 test("due badges distinguish days, tolerate invalid dates, and status beats priority", () => {
@@ -151,9 +172,14 @@ test("real React Native Web renders a group with sibling buttons, never nested H
   const React = require("react");
   const { renderToStaticMarkup } = require("react-dom/server");
   const native = require("react-native-web");
+  const artworkMocks = { "react-native": native, "react-native-svg": { __esModule: true, default: "svg", Circle: "circle", G: "g", Line: "line", Path: "path", Rect: "rect" } };
+  const eventArtwork = await load("../src/components/ui/seasonal-card-artwork.tsx", artworkMocks);
+  const statusArtwork = await load("../src/components/ui/status-card-artwork.tsx", artworkMocks);
   const decorations = await load("../src/components/ui/seasonal-card-decoration.tsx", {
     react: React, "react-native": native,
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
+    "./seasonal-card-artwork": eventArtwork,
+    "./status-card-artwork": statusArtwork,
   });
   const { MobileColumnTaskCard: WebCard } = await load("../src/components/board/mobile-column-task-card.tsx", {
     react: React,
@@ -164,14 +190,14 @@ test("real React Native Web renders a group with sibling buttons, never nested H
     "@/lib/domain/constants": constants,
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#aa66ff" }) },
     "./mobile-board-colors": { useMobileBoardColors: () => colors },
-    "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
-  "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
+    "@/components/ui/priority-stars": { PriorityStars: () => null },
+    "@/components/ui/status-icon": { StatusIcon: () => null },
     "@/lib/features/card-themes": cardThemes,
     "@/components/ui/seasonal-card-decoration": decorations,
   });
-  for (const title of [task.title, "Halloween party"]) for (const compact of [false, true]) for (const selectionMode of [false, true]) {
+  for (const title of [task.title, "Halloween party", "Birthday", "Valentine's Day", "DONE", "cAnCeLeD", "OVERDUE"]) for (const compact of [false, true]) for (const selectionMode of [false, true]) {
     const html = renderToStaticMarkup(React.createElement(WebCard, {
-      task: { ...task, title, subtasks: [{ id: "step", title: "Step", done: false }] },
+      task: { ...task, title, tags: title === "Halloween party" ? ["Halloween"] : [title], subtasks: [{ id: "step", title: "Step", done: false }] },
       now, compact, selectionMode, selected: selectionMode,
       onPress() {}, onMenu() {}, onSelect() {}, onToggleSubtask() {}, onMoveLeft() {}, onMoveRight() {},
     }));

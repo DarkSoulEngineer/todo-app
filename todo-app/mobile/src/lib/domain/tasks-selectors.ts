@@ -50,6 +50,7 @@ export function matchesQuery(task: Task, needle: string): boolean {
   if (!needle) return true;
   if (task.title.toLowerCase().includes(needle)) return true;
   if (task.description.toLowerCase().includes(needle)) return true;
+  if (task.tags?.some((tag) => tag.toLowerCase().includes(needle))) return true;
   return task.subtasks.some((subtask) => subtask.title.toLowerCase().includes(needle));
 }
 

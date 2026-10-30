@@ -1,20 +1,10 @@
 import { makeId } from "@/lib/utils/id";
 import { isValid, parseISO } from "date-fns";
 import type { ActivityEvent, Attachment, Subtask, Task, TaskDraft } from "@/lib/domain/types";
-import { detectStatusFromText } from "@/lib/domain/status-keywords";
+import { applyCardTags, normalizeCardTags } from "@/lib/features/special-card-tags";
 
 export function normalizeTags(tags: readonly unknown[] | undefined): string[] {
-  if (!tags) return [];
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const tag of tags) {
-    if (typeof tag !== "string") continue;
-    const value = tag.trim();
-    if (!value || seen.has(value)) continue;
-    seen.add(value);
-    result.push(value);
-  }
-  return result;
+  return normalizeCardTags(tags);
 }
 
 export function normalizeAttachment(value: unknown): Attachment | null {
@@ -106,51 +96,48 @@ export function applyTaskPatch(task: Task, patch: unknown): Task {
         done: subtask.done as boolean,
       }));
   }
-  if (Array.isArray(record.tags)) next.tags = normalizeTags(record.tags);
-  return next;
+  return Array.isArray(record.tags) ? applyCardTags(next, record.tags) : next;
 }
 
-/** Builds a fresh task from a draft, trimming text and stamping timestamps.
- * Auto-detects status from title/description keywords if present. */
+/** Builds a fresh task; only explicit status tags change its initial state. */
 export function createTask(draft: TaskDraft): Task {
   const now = new Date().toISOString();
   
-  // Auto-detect status from title/description keywords
-  const detectedStatus = detectStatusFromText(draft.title, draft.description);
-  
-  return {
+  const task: Task = {
     id: makeId(10),
     title: draft.title.trim(),
     description: draft.description.trim(),
     dueAt: draft.dueAt,
     priority: draft.priority,
     category: draft.category,
-    completed: detectedStatus === "completed",
-    canceled: detectedStatus === "canceled",
+    completed: false,
+    canceled: false,
     sectionId: null,
     subtasks: draft.subtasks.map((subtask) => ({
       id: subtask.id || makeId(8),
       title: subtask.title.trim(),
       done: subtask.done,
     })),
-    tags: normalizeTags(draft.tags),
+    tags: [],
+    specialTagsVersion: 1,
     attachments: [],
     activity: [],
     createdAt: now,
     updatedAt: now,
-    completedAt: detectedStatus === "completed" ? now : null,
+    completedAt: null,
   };
+  return applyCardTags(task, draft.tags ?? [], now);
 }
 
 /** Applies editable fields from a draft onto an existing task.
  *
  * Status is NOT re-derived from keywords here: editing any field (title,
  * description, due date, …) must never silently set or clear `completed`,
- * `canceled` or `completedAt`. Those only change through explicit user
- * actions elsewhere. Keyword auto-detection remains a create-time feature.
+ * `canceled` or `completedAt`. Explicit status-tag edits are the exception;
+ * titles and holder names never drive state.
  */
 export function applyDraft(task: Task, draft: TaskDraft): Task {
-  return {
+  const next = {
     ...cloneTask(task),
     title: draft.title.trim(),
     description: draft.description.trim(),
@@ -162,7 +149,7 @@ export function applyDraft(task: Task, draft: TaskDraft): Task {
       title: subtask.title.trim(),
       done: subtask.done,
     })),
-    tags: draft.tags === undefined ? [...task.tags] : normalizeTags(draft.tags),
     updatedAt: new Date().toISOString(),
   };
+  return draft.tags === undefined ? next : applyCardTags(next, draft.tags, next.updatedAt);
 }

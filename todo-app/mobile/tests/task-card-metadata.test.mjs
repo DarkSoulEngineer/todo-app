@@ -9,13 +9,17 @@ const require = createRequire(import.meta.url);
 const compile = (source) => ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const status = {};
 vm.runInNewContext(compile(await readFile(new URL("../src/lib/domain/status.ts", import.meta.url), "utf8")), { exports: status, require });
+const cardThemes = {};
+vm.runInNewContext(compile(await readFile(new URL("../src/lib/features/card-themes.ts", import.meta.url), "utf8")), { exports: cardThemes, require });
 const source = await readFile(new URL("../src/components/janus-board-ui.tsx", import.meta.url), "utf8");
 const ast = ts.createSourceFile("card.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const declaration = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "TaskCard");
 const colors = new Proxy({}, { get: () => "#888888" });
 const exports = {};
 vm.runInNewContext(compile(declaration.getText(ast)), {
-  exports, require, ...status, useTheme: () => ({ theme: { colors } }), detectCardTheme: () => null, detectSeasonalCardTheme: () => null,
+  exports, require, ...status, useTheme: () => ({ theme: { colors } }), detectCardTheme: () => null, resolveCardDecoration: cardThemes.resolveCardDecoration,
+  SeasonalCardDecoration: "SeasonalCardDecoration",
+  classifySpecialCardTag: cardThemes.classifySpecialCardTag,
   styles: new Proxy({}, { get: () => ({}) }), StyleSheet: { absoluteFill: {} },
   Card: "Card", View: "View", Text: "Text", Pressable: "Pressable", Ionicons: "Ionicons", Chip: "Chip",
   PRIORITY_META: { high: { label: "High" } },
@@ -35,6 +39,15 @@ function text(node) {
   if (Array.isArray(node)) return node.map(text).join("");
   return node && typeof node === "object" ? text(node.props?.children) : "";
 }
+
+test("feed cards keep status tags icon-only and show event/custom tags as text chips", () => {
+  for (const [tag, extra, expected] of [["Done", { completed: true }, "completed"], ["Canceled", { canceled: true }, "canceled"], ["Overdue", {}, "overdue"]]) {
+    const tree = render(null, { tags: [tag, "Christmas", "Custom label"], ...extra });
+    const labels = find(tree, (node) => node.type === "Chip").map((node) => node.props.label);
+    assert.deepEqual(labels, ["Christmas", "Custom label"]);
+    assert.equal(find(tree, (node) => node.type === "StatusIcon")[0].props.status, expected);
+  }
+});
 
 test("overdue metadata is one icon-only status badge, not duplicated text or clock", () => {
   for (const [minutes, duration] of [[6 * 24 * 60, "6d"], [3 * 60, "3h"], [45, "45m"]]) {

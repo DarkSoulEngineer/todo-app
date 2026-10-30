@@ -46,6 +46,8 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   tags: string[];
+  /** One-time migration marker: list/title names no longer assign special tags. */
+  specialTagsVersion?: 1;
   attachments: Attachment[];
   activity: ActivityEvent[];
 }

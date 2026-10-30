@@ -34,6 +34,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, SORT_OPTIONS } from "@/lib/domain/constants";
 import { deriveStatus, STATUS_LABELS } from "@/lib/domain/status";
 import { getTaskSectionId, isCustomSection } from "@/lib/domain/sections";
+import { matchesBoardTag } from "@/lib/features/special-card-tags";
 import { exportWorkspace, exportWorkspaceCsv, pickWorkspaceFile } from "@/lib/data/transfer";
 import { matchesQuery, sortTasks } from "@/lib/domain/tasks-selectors";
 import { rescheduleToDay } from "@/lib/utils/datetime";
@@ -129,8 +130,8 @@ export default function WorkspaceScreen() {
   }, [activityUnavailable, isLoading]);
   const visibleTasks = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return sortTasks(tasks.filter((task) => (boardFilter === "all" || task.category === boardFilter) && matchesQuery(task, needle)), sort);
-  }, [boardFilter, query, sort, tasks]);
+    return sortTasks(tasks.filter((task) => (boardFilter === "all" || matchesBoardTag(task, boardFilter, boards)) && matchesQuery(task, needle)), sort);
+  }, [boardFilter, boards, query, sort, tasks]);
   // Split Calendar always has a selected date; opening it starts with today,
   // not the old undated create form or a task from another day.
   const selectedCalendarDay = calendarDay ?? (splitView && mode === "calendar" ? now : null);

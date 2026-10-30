@@ -3,6 +3,7 @@ import { defaultBoards, normalizeBoards } from "@/lib/domain/boards";
 import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/domain/sections";
 import type { ActivityEvent, Attachment, Priority, Subtask, Task, Workspace } from "@/lib/domain/types";
 import { makeId } from "@/lib/utils/id";
+import { migrateCardTags, normalizeCardTags } from "@/lib/features/special-card-tags";
 
 const PRIORITIES: Priority[] = ["critical", "high", "medium", "low"];
 
@@ -69,17 +70,7 @@ function normalizeActivityEvent(value: unknown): ActivityEvent | null {
 }
 
 function normalizeTags(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const tags: string[] = [];
-  for (const item of value) {
-    if (typeof item !== "string") continue;
-    const tag = item.trim();
-    if (!tag || seen.has(tag)) continue;
-    seen.add(tag);
-    tags.push(tag);
-  }
-  return tags;
+  return normalizeCardTags(Array.isArray(value) ? value : []);
 }
 
 /** Turns unknown persisted data into a safe, fully-populated Task. */
@@ -124,6 +115,7 @@ function normalizeTask(value: unknown): Task | null {
     updatedAt: normalizeDate(record.updatedAt) ?? createdAt,
     completedAt: completed ? normalizeDate(record.completedAt) : null,
     tags: normalizeTags(record.tags),
+    specialTagsVersion: record.specialTagsVersion === 1 ? 1 : undefined,
     attachments,
     activity,
   };
@@ -218,7 +210,7 @@ export function buildWorkspace(parsed: unknown): Workspace | null {
   reconcileSectionIds(tasks, sections);
   // Preserve explicitly saved tags; do not invent presets on load/import.
   const boards = normalizeBoards(rawBoards);
-  return { tasks, sections, boards };
+  return { tasks: tasks.map((task) => migrateCardTags(task, sections.find((section) => section.id === task.sectionId)?.title, boards)), sections, boards };
 }
 
 /**

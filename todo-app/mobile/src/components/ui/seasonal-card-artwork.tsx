@@ -6,6 +6,8 @@ export function SeasonalCardArtwork({ id, phase, compact }: { id: string; phase:
   if (id === "christmas") return <ChristmasArtwork phase={phase} compact={compact} />;
   if (id === "easter") return <EasterArtwork phase={phase} compact={compact} />;
   if (id === "new-year") return <NewYearArtwork phase={phase} compact={compact} />;
+  if (id === "birthday") return <BirthdayArtwork phase={phase} compact={compact} />;
+  if (id === "valentines") return <ValentinesArtwork phase={phase} compact={compact} />;
   return null;
 }
 
@@ -85,6 +87,68 @@ function NewYearArtwork({ phase, compact }: { phase: Animated.Value; compact: bo
         <Path d="M73 69 q-3 15 -9 23 M30 91 l-3 7" stroke="#91C5FF" strokeWidth={1} opacity={0.35} fill="none" />
       </Svg>
     </Animated.View> : null}
+  </>;
+}
+
+function BirthdayArtwork({ phase, compact }: { phase: Animated.Value; compact: boolean }) {
+  return <>
+    <View testID="birthday-bunting" style={styles.lights}>
+      <Svg width="100%" height={17} viewBox="0 0 320 17" preserveAspectRatio="none">
+        <Path d="M-3 1 Q160 14 323 1" stroke="#F4C8D8" opacity={0.35} fill="none" strokeWidth={0.8} />
+        {[19, 55, 91, 127, 163, 199, 235, 271, 307].map((x, index) => <Path key={x} d={`M${x - 5} 5 l10 1 -6 9Z`} fill={["#F4B4CF", "#9DD9E6", "#F5D27C"][index % 3]} opacity={0.4} />)}
+      </Svg>
+    </View>
+    {!compact ? <>
+      <Animated.View testID="birthday-balloons" style={[styles.corner, { bottom: 28, opacity: 0.38, transform: [{ translateY: phase.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }] }]}>
+        <Svg width={91} height={100} viewBox="0 0 91 100">
+          <Path d="M27 43 Q18 65 45 93 M65 35 Q72 63 45 93" stroke="#F4C8D8" strokeWidth={0.8} fill="none" />
+          <Path d="M27 5 C7 5 7 39 27 43 C47 39 47 5 27 5Z" fill="#9DD9E6" />
+          <Path d="M65 0 C46 0 46 30 65 35 C84 30 84 0 65 0Z" fill="#F4B4CF" />
+          <Path d="M27 43 l-3 5 h6Z M65 35 l-3 5 h6Z" fill="#F5D27C" />
+          <Path d="M19 14 q-5 8 0 14 M57 8 q-5 7 -1 12" stroke="#FFFFFF" strokeWidth={1.5} opacity={0.65} fill="none" strokeLinecap="round" />
+        </Svg>
+      </Animated.View>
+      <View testID="birthday-cake" style={[styles.corner, { opacity: 0.5 }]}>
+        <Svg width={94} height={72} viewBox="0 0 94 72">
+          <Rect x={22} y={37} width={59} height={28} rx={4} fill="#F4B4CF" />
+          <Path d="M22 39 Q22 33 29 33 H74 Q81 33 81 39 V45 Q75 51 71 44 Q66 51 61 44 Q56 51 51 44 Q46 51 41 44 Q35 51 31 44 Q27 49 22 45Z" fill="#FFF0D0" />
+          {[37, 51, 65].map((x) => <G key={x}><Rect x={x} y={19} width={3} height={15} rx={1} fill="#9DD9E6" /><Path d={`M${x + 1.5} 9 q-6 9 0 9 q6 0 0 -9Z`} fill="#F5D27C" /></G>)}
+          <Path d="M17 66 H86" stroke="#FFF0D0" strokeWidth={2} strokeLinecap="round" />
+          <Path d="M30 55 H73" stroke="#FFF0D0" strokeWidth={2} opacity={0.6} />
+        </Svg>
+      </View>
+    </> : null}
+  </>;
+}
+
+function Heart({ x, y, size, color }: { x: number; y: number; size: number; color: string }) {
+  return <G transform={`translate(${x} ${y}) scale(${size / 24})`}><Path d="M12 22 C8 18 0 13 0 7 C0 -1 10 -2 12 5 C14 -2 24 -1 24 7 C24 13 16 18 12 22Z" fill={color} /></G>;
+}
+
+function ValentinesArtwork({ phase, compact }: { phase: Animated.Value; compact: boolean }) {
+  return <>
+    <View testID="valentines-petals" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox="0 0 320 140" preserveAspectRatio="none">
+        <G opacity={0.18}><Heart x={15} y={9} size={8} color="#F6A3B7" /><Heart x={136} y={3} size={5} color="#F8C8D2" /><Heart x={302} y={46} size={7} color="#F6A3B7" /><Path d="M5 127 Q72 147 127 135" stroke="#F6A3B7" strokeWidth={1} fill="none" /></G>
+      </Svg>
+    </View>
+    {!compact ? <>
+      <Animated.View testID="valentines-hearts" style={[styles.corner, { bottom: 25, opacity: 0.4, transform: [{ translateY: phase.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }] }]}>
+        <Svg width={98} height={84} viewBox="0 0 98 84">
+          <Heart x={63} y={4} size={19} color="#F6A3B7" /><Heart x={28} y={24} size={12} color="#F8C8D2" /><Heart x={75} y={46} size={9} color="#ED718D" />
+          <Path d="M50 57 q-5 -12 1 -19" fill="none" stroke="#F6A3B7" strokeWidth={1} strokeDasharray="2 4" />
+        </Svg>
+      </Animated.View>
+      <View testID="valentines-envelope" style={[styles.corner, { opacity: 0.45 }]}>
+        <Svg width={111} height={69} viewBox="0 0 111 69">
+          <G transform="rotate(-9 62 40)">
+            <Rect x={22} y={17} width={77} height={45} rx={4} fill="#F8C8D2" />
+            <Path d="M24 59 L60 32 L97 59 M24 19 L60 45 L97 19" fill="none" stroke="#D8738A" strokeWidth={1.3} />
+            <Heart x={52} y={32} size={17} color="#ED718D" />
+          </G>
+        </Svg>
+      </View>
+    </> : null}
   </>;
 }
 

@@ -18,23 +18,26 @@ npm run lint
 `npm start` then scan the QR code with Expo Go, or run a development build for
 the native date picker.
 
-## Special names
+## Special card tags
 
-Lists remain user-defined. Exact names (case-insensitive, optional emoji) opt into
-entry rules: **Done / Completed / Finished / Resolved / Delivered / Shipped**
-complete cards; **Canceled / Cancelled / Dropped / Abandoned** cancel them;
-**To do / Backlog / In progress / Doing / Active / Open / Pending** reopen them.
-The list header and creation dialog show the rule before use. Rules run when a
-card is placed in a list—not on load or rename. Ordinary lists and “No list”
-preserve status, and no entry rule changes a due date or creates another list.
+Special behavior belongs to card tags, never to holder or card titles. In the task
+editor, choose at most **one status** (Done, Canceled, Overdue) and **one event**
+(Halloween, Christmas, Easter, New Year, Birthday, Valentine's Day). Selecting a
+different special tag replaces only the tag in that group. Ordinary tags are
+unlimited. Full names and aliases ignore capitalization; initials do not match.
 
-Card titles mentioning **Halloween**, **Christmas**, **Easter**, or **New Year**
-unlock seasonal designs (including Haloween, Christmass, and Xmas aliases).
-Cards have no added event-title labels: Christmas uses lights, snow and a tree;
-Easter uses patterned eggs and a meadow; New Year uses fireworks and confetti.
-Decorations respect reduced motion and pause in the background, compact mode,
-selection mode, and drag previews. Seasonal list names theme their cards in Board
-view without an extra list subtitle; a card's own seasonal title takes precedence.
+Halloween + Done is valid: the card keeps its Halloween artwork and completed
+state as it moves between holders. Basic status tags appear on cards only as
+status icons (checkmark, canceled circle, warning), not duplicate text chips.
+Custom tags and event tags keep their text labels. Status actions also update the
+status tag; removing one reopens the card, while a genuinely past deadline can
+still make it overdue. The Overdue tag can mark a task without changing its date.
+
+Existing name-based event designs migrate once to explicit tags. Afterward,
+removing a tag stays removed, and renaming or moving a holder has no effect.
+Done's completion seal, Canceled's ticket and Overdue's clock are static artwork.
+Event scenes retain their distinct designs and gentle animations, respecting
+reduced motion and pausing in the background, compact/selection mode and previews.
 
 ## Architecture
 
