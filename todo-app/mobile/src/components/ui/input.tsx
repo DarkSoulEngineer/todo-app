@@ -21,11 +21,14 @@ export function Input({ style, onFocus, onBlur, ...props }: TextInputProps) {
           borderColor: theme.colors.border,
           borderRadius: theme.radius.lg,
           fontSize: 14,
+          fontFamily: theme.fontFamily || undefined,
           paddingHorizontal: 12,
+          boxShadow: "inset 0 2px 3px rgba(0,0,0,0.10)",
         },
         style,
         Platform.OS === "web" && { outlineWidth: 0 },
-        focused && { borderColor: theme.colors.primary },
+        focused && { borderColor: theme.colors.primary, boxShadow: `inset 0 1px 2px rgba(0,0,0,0.06), 0 0 0 1px ${theme.colors.primary}` },
+        props.editable === false && { opacity: 0.55 },
       ]}
       {...props}
     />

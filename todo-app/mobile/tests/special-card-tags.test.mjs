@@ -100,6 +100,7 @@ test("ordinary edits do not reset completion dates or drop event/custom tags", (
 
 test("direct Complete, Cancel and Restore actions synchronize the exclusive status tag", () => {
   const api = useTasks();
+  api.addSection("Tasks");
   const task = api.addTask(draft({ tags: ["Work", "Halloween"] }));
   api.toggleComplete(task.id);
   assert.deepEqual(api.snapshot().tasks[0].tags, ["Work", "Halloween", "Done"]);
@@ -146,6 +147,7 @@ test("imports sanitize conflicting special tags and round-trip canonical state",
 
 test("legacy category tags cannot bypass the special-tag limits", () => {
   const api = useTasks();
+  api.addSection("Tasks");
   const special = api.createBoard({ label: "Cancelled", color: "slate" });
   const task = api.addTask(draft({ category: special.id, tags: ["Halloween", "Done"] }));
   assert.equal(task.category, null);
@@ -174,32 +176,34 @@ test("special tags work with board filters, Insights status filters and text sea
 
 test("the tag picker enforces independent selections on the actual controls", () => {
   const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
+  const { CardStatusPicker } = load("components/ui/card-status-picker");
   let selected = ["Work"];
   const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
-  const press = (label) => {
-    const tree = SpecialCardTagPicker({ tags: selected, onChange: (next) => { selected = next; } });
+  const press = (component, label) => {
+    const tree = component({ tags: selected, onChange: (next) => { selected = next; } });
     nodes(tree).find((node) => node.props?.accessibilityLabel === label).props.onPress();
   };
   events.setEventOverride("halloween");
-  press("Event tag Halloween"); press("Status tag Done");
+  press(SpecialCardTagPicker, "Event tag Halloween"); press(CardStatusPicker, "Card status Done");
   assert.deepEqual(selected, ["Work", "Halloween", "Done"]);
-  press("Status tag Canceled");
+  press(CardStatusPicker, "Card status Canceled");
   assert.deepEqual(selected, ["Work", "Halloween", "Canceled"]);
   events.setEventOverride("christmas");
-  press("Event tag Christmas");
+  press(SpecialCardTagPicker, "Event tag Christmas");
   assert.deepEqual(selected, ["Work", "Canceled", "Christmas"]);
   events.setEventOverride(null);
 });
 
 test("status tag buttons stay text-only whether selected or unselected", () => {
-  const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
+  const { CardStatusPicker } = load("components/ui/card-status-picker");
   const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
   for (const selected of [[], ["Done"], ["Canceled"], ["Overdue"]]) {
-    const tree = nodes(SpecialCardTagPicker({ tags: selected, onChange() {} }));
-    for (const entry of themes.STATUS_CARD_THEMES) {
-      const button = tree.find((node) => node.props?.accessibilityLabel === `Status tag ${entry.label}`);
+    const tree = nodes(CardStatusPicker({ tags: selected, onChange() {} }));
+    for (const entry of [...themes.STATUS_CARD_THEMES, { id: "open", label: "Open" }]) {
+      const button = tree.find((node) => node.props?.accessibilityLabel === `Card status ${entry.label}`);
       assert.deepEqual(nodes(button).filter((node) => node.type === "Text").map((node) => node.props.children), [entry.label]);
-      assert.equal(button.props.accessibilityState.selected, selected.includes(entry.label));
+      assert.equal(button.props.accessibilityState.selected, entry.id === "open" ? selected.length === 0 : selected.includes(entry.label));
+      assert.equal(button.props.accessibilityRole, "radio");
     }
   }
 });
@@ -230,6 +234,7 @@ test("debug triggers exactly one event, notifies subscribers and resets without 
 
 test("picker hides the empty Event group and inactive saved events without dropping tags", () => {
   const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
+  const { CardStatusPicker } = load("components/ui/card-status-picker");
   const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
   // An invalid preview deterministically represents a day with no active events.
   events.setEventOverride("none");
@@ -237,7 +242,8 @@ test("picker hides the empty Event group and inactive saved events without dropp
   const tree = nodes(SpecialCardTagPicker({ tags: selected, onChange: () => assert.fail("Rendering must not edit tags") }));
   assert.equal(tree.some((node) => node.props?.children === "EVENT"), false);
   assert.equal(tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Event tag ")).length, 0);
-  assert.equal(tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Status tag ")).length, 3);
+  const statuses = nodes(CardStatusPicker({ tags: selected, onChange: () => assert.fail("Rendering must not edit tags") }));
+  assert.equal(statuses.filter((node) => node.props?.accessibilityLabel?.startsWith("Card status ")).length, 4);
   assert.deepEqual(selected, ["Work", "Halloween"]);
   events.setEventOverride(null);
 });

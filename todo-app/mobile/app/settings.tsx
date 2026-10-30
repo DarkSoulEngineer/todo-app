@@ -14,6 +14,8 @@ import { useTheme } from "@/providers/theme-provider";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { tactileSurface } from "@/components/ui/tactile";
+import { SelectionLed } from "@/components/ui/selection-led";
 import { JanusLogo } from "@/components/ui/janus-logo";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
@@ -45,7 +47,7 @@ export default function SettingsRoute() {
   const blurTarget = useRef<ComponentRef<typeof BlurTargetView> | null>(null);
   const { preference, savePreference, setPreference } = useTheme();
   const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart, savePreferences } = usePreferences();
-  const { colors, type } = useReferenceTheme();
+  const { colors, type, scheme } = useReferenceTheme();
   const insets = useSafeAreaInsets();
   const styles = createStyles(colors);
   const [busy, setBusy] = useState(false);
@@ -135,8 +137,9 @@ export default function SettingsRoute() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + mobileBottomNavClearance }]}>
         <ScrollView horizontal accessibilityRole="tablist" accessibilityLabel="Settings sections" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionTabs}>
           {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
-            style={[styles.sectionTab, { borderBottomColor: section === label ? colors.primary : "transparent" }]}>
+            style={({ pressed }) => [styles.sectionTab, { backgroundColor: section === label ? colors.primaryFixed : colors.card, borderColor: section === label ? colors.primary : colors.outlineVariant }, tactileSurface({ pressed, selected: section === label, accent: colors.primary, dark: scheme === "dark" })]}>
             <Text style={[type.bodyStrong, { color: section === label ? colors.text : colors.muted }]}>{label}</Text>
+            <SelectionLed selected={section === label} />
           </Pressable>)}
         </ScrollView>
         {section === "Appearance" ? <View style={styles.sectionBlock}>
@@ -149,7 +152,7 @@ export default function SettingsRoute() {
         {section === "Commands" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Commands" subtitle="Search and run any action without leaving this screen." />
           <View style={styles.sectionCard}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Open commands" onPress={() => setPaletteMode("commands")} style={({ pressed }) => [styles.actionRow, styles.firstRow, { opacity: pressed ? 0.7 : 1 }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open commands" onPress={() => setPaletteMode("commands")} style={({ pressed }) => [styles.actionRow, tactileSurface({ pressed, dark: scheme === "dark" })]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>Open commands</Text><Text style={[type.caption, { color: colors.muted }]}>Find boards, tasks, views, themes and settings</Text></View>
               <Text style={[type.caption, { color: colors.primary }]}>Open</Text>
             </Pressable>
@@ -164,8 +167,9 @@ export default function SettingsRoute() {
               {CALENDAR_VIEW_OPTIONS.map((option) => {
                 const selected = calendarDefaultView === option.value;
                 return (
-                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={[styles.segment, selected && styles.segmentSelected]}>
+                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, tactileSurface({ pressed, selected, disabled: busy, accent: colors.primary, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
+                    <SelectionLed selected={selected} />
                   </Pressable>
                 );
               })}
@@ -175,8 +179,9 @@ export default function SettingsRoute() {
               {WEEK_START_OPTIONS.map((option) => {
                 const selected = calendarWeekStart === option.value;
                 return (
-                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={[styles.segment, selected && styles.segmentSelected]}>
+                  <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, tactileSurface({ pressed, selected, disabled: busy, accent: colors.primary, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
+                    <SelectionLed selected={selected} />
                   </Pressable>
                 );
               })}
@@ -187,11 +192,11 @@ export default function SettingsRoute() {
         {section === "Data & backups" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Data & backups" subtitle="Changes save automatically on this device. Choose what to include when saving a backup file." />
           <View style={styles.sectionCard}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Save backup" disabled={busy} onPress={() => { setStatus(null); setSaveOpen(true); }} style={({ pressed }) => [styles.actionRow, styles.firstRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Save backup" disabled={busy} onPress={() => { setStatus(null); setSaveOpen(true); }} style={({ pressed }) => [styles.actionRow, tactileSurface({ pressed, disabled: busy, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>Export backup</Text><Text style={[type.caption, { color: colors.muted }]}>Choose preferences, boards or everything</Text></View>
               <Text style={[type.caption, { color: colors.primary }]}>Export</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Import backup" disabled={busy} onPress={() => void handleImport()} style={({ pressed }) => [styles.actionRow, { opacity: busy ? 0.55 : pressed ? 0.7 : 1 }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Import backup" disabled={busy} onPress={() => void handleImport()} style={({ pressed }) => [styles.actionRow, tactileSurface({ pressed, disabled: busy, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>Import backup</Text><Text style={[type.caption, { color: colors.muted }]}>Adds boards and replaces included preferences</Text></View>
               <Text style={[type.caption, { color: colors.primary }]}>Import</Text>
             </Pressable>
@@ -231,10 +236,10 @@ export default function SettingsRoute() {
         <Text accessibilityRole="header" style={type.title}>Save backup</Text>
         <Text style={[type.caption, { color: colors.muted, marginBottom: 12 }]}>What would you like to download or save?</Text>
         <View accessibilityRole="radiogroup">
-          {BACKUP_OPTIONS.map((option, index) => (
-            <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, index === 0 && styles.firstRow, { opacity: pressed ? 0.7 : 1 }]}>
+          {BACKUP_OPTIONS.map((option) => (
+            <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, scope === option.value && styles.segmentSelected, tactileSurface({ pressed, selected: scope === option.value, disabled: busy, accent: colors.primary, dark: scheme === "dark" }), { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>{option.label}</Text><Text style={[type.caption, { color: colors.muted }]}>{option.description}</Text></View>
-              <Text style={[type.caption, { color: colors.primary }]}>{scope === option.value ? "Selected" : ""}</Text>
+              <SelectionLed selected={scope === option.value} />
             </Pressable>
           ))}
         </View>
@@ -251,15 +256,15 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   content: { ...mobileContentStyle, gap: referenceSpacing.lg },
   sectionBlock: { gap: 12 },
   sectionCard: { padding: referenceSpacing.md, borderRadius: referenceRadii.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.outlineVariant, backgroundColor: colors.card },
-  sectionTabs: { flexDirection: "row", gap: 18, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant },
-  sectionTab: { minHeight: 44, justifyContent: "center", borderBottomWidth: 2, paddingHorizontal: 2 },
+  sectionTabs: { flexDirection: "row", gap: 8, paddingBottom: 7, paddingHorizontal: 2 },
+  sectionTab: { minHeight: 44, justifyContent: "center", borderRadius: 12, paddingHorizontal: 14 },
   firstRow: { borderTopWidth: 0 },
   settingLabel: { marginTop: referenceSpacing.md, marginBottom: 6, color: colors.muted },
   settingLabelFirst: { marginBottom: 10, color: colors.muted },
-  segmented: { padding: 4, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 3 },
-  segment: { flex: 1, minHeight: 44, paddingHorizontal: 6, borderRadius: referenceRadii.md, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
-  segmentSelected: { backgroundColor: colors.card },
-  actionRow: { minHeight: 60, paddingHorizontal: 4, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },
+  segmented: { padding: 5, paddingBottom: 7, borderWidth: 1, borderColor: colors.outlineVariant, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 8 },
+  segment: { flex: 1, minHeight: 44, paddingHorizontal: 8, borderWidth: 1, borderColor: colors.outlineVariant, backgroundColor: colors.card, borderRadius: referenceRadii.md, alignItems: "center", justifyContent: "center" },
+  segmentSelected: { backgroundColor: colors.primaryFixed, borderColor: colors.primary },
+  actionRow: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 12, marginBottom: 10, borderRadius: 12, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: colors.outlineVariant, backgroundColor: colors.surfaceHigh },
   infoRow: { minHeight: 60, paddingHorizontal: 4, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth },
   actionCopy: { flex: 1, minWidth: 0, gap: 5 },
   storageNote: { marginTop: 8, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.outlineVariant },

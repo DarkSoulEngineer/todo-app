@@ -6,7 +6,6 @@ import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { PRIORITY_META } from "@/lib/domain/constants";
 import { boardColor, type Board } from "@/lib/domain/boards";
 import { PriorityStars } from "@/components/ui/priority-stars";
-import { StatusIcon } from "@/components/ui/status-icon";
 import type { Task } from "@/lib/domain/types";
 import { classifySpecialCardTag, resolveCardDecoration } from "@/lib/features/card-themes";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
@@ -27,10 +26,11 @@ interface Props {
   onMoveRight?: () => void;
   hideMoveArrows?: boolean;
   animateSeasonal?: boolean;
-  onToggleSubtask: (subtaskId: string) => void;
+  calendarLayout?: boolean;
+  onToggleSubtask?: (subtaskId: string) => void;
 }
 
-export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, hideMoveArrows, animateSeasonal = true, onToggleSubtask }: Props) {
+export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, selected, selectionMode, onPress, onMenu, onSelect, onMoveLeft, onMoveRight, hideMoveArrows, animateSeasonal = true, calendarLayout = false, onToggleSubtask }: Props) {
   const c = useMobileBoardColors();
   const [expanded, setExpanded] = useState(false);
   const due = describeDue(task.dueAt, now);
@@ -74,10 +74,11 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   } } : {};
   const action = (name: keyof typeof Ionicons.glyphMap, label: string, handler: (event: GestureResponderEvent) => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={(event) => { event.stopPropagation(); handler(event); }} {...contextMenu(handler)} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.5 : 1 }]}><Ionicons name={name} size={15} color={c.mutedForeground} /></Pressable>;
   const title = <Text numberOfLines={2} style={[styles.title, { fontSize: (compact ? 13 : 14) * zoom, lineHeight: (compact ? 18 : 19) * zoom, color: settled ? c.mutedForeground : c.foreground, textDecorationLine: settled ? "line-through" : "none" }]}>{task.title}</Text>;
+  const checklistSummary = <><Ionicons name="list-outline" size={12} color={c.mutedForeground} /><Text style={[styles.tagText, { color: c.mutedForeground, fontSize: 10 * zoom }]}>{done}/{task.subtasks.length}</Text></>;
 
-  return <Pressable testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : decoration?.border ?? c.border, borderLeftColor: statusColor ?? decoration?.accent ?? accent }]}>
+  return <Pressable testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, calendarLayout && styles.calendarCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : decoration?.border ?? c.border, borderLeftColor: statusColor ?? decoration?.accent ?? accent }]}>
     {decoration ? <SeasonalCardDecoration theme={decoration} cardId={task.id} compact={compact} paused={!animateSeasonal || selectionMode || Boolean(hideMoveArrows) || Boolean(compact)} /> : null}
-    <View style={styles.topRow}>
+    <View style={[styles.topRow, calendarLayout && styles.calendarTopRow]}>
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={(event) => { event.stopPropagation(); onSelect(); }} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <View style={styles.titleArea}>{compact ? title : <View accessible accessibilityLabel={due?.title ?? "No due date"} style={styles.timeBadge}><Text style={[styles.timeText, { color: c.foreground, fontSize: 11 * zoom }]}>{due && task.dueAt ? format(parseISO(task.dueAt), due.today ? "h:mm a" : "MMM d · h:mm a") : "Any time"}</Text></View>}</View>
       <View style={styles.actions}>
@@ -91,22 +92,24 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
     {!compact ? title : null}
     {!compact ? <View style={styles.meta}>
       <PriorityStars priority={task.priority} zoom={zoom} />
-      {status ? <StatusIcon status={status} zoom={zoom} /> : null}
       {board && tagTone && classifySpecialCardTag(board.label)?.group !== "status" ? <View style={styles.tag}><View style={[styles.tagDot, { backgroundColor: tagTone.dot }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.foreground, fontSize: 10 * zoom }]}>{board.label}</Text></View> : null}
       {cardTags.slice(0, 4).map((tag) => <View key={tag} style={styles.tag}><View style={[styles.tagDot, { backgroundColor: classifySpecialCardTag(tag)?.theme.accent ?? c.mutedForeground }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.foreground, fontSize: 10 * zoom }]}>{tag}</Text></View>)}
       {cardTags.length > 4 ? <Text style={{ color: c.mutedForeground, fontSize: 10 }}>+{cardTags.length - 4}</Text> : null}
-      {task.subtasks.length ? <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel={`Checklist for ${task.title}`} accessibilityHint={`${done} of ${task.subtasks.length} completed. Show or hide checklist.`} aria-expanded={expanded} onPress={(event) => { event.stopPropagation(); setExpanded(!expanded); }} style={styles.checklistToggle}><Ionicons name="list-outline" size={12} color={c.mutedForeground} /><Text style={[styles.tagText, { color: c.mutedForeground, fontSize: 10 * zoom }]}>{done}/{task.subtasks.length}</Text></Pressable> : null}
+      {task.subtasks.length ? onToggleSubtask ? <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel={`Checklist for ${task.title}`} accessibilityHint={`${done} of ${task.subtasks.length} completed. Show or hide checklist.`} aria-expanded={expanded} onPress={(event) => { event.stopPropagation(); setExpanded(!expanded); }} style={styles.checklistToggle}>{checklistSummary}</Pressable> : <View style={styles.checklistSummary}>{checklistSummary}</View> : null}
     </View> : null}
     {!compact && task.subtasks.length ? <View testID={`janus-card-progress-${task.id}`} accessibilityRole="progressbar" accessibilityLabel="Checklist progress" accessibilityValue={{ min: 0, max: task.subtasks.length, now: done, text: `${done} of ${task.subtasks.length} completed` }} style={[styles.progressTrack, { backgroundColor: c.backgroundAlt }]}><View style={[styles.progressFill, { width: `${Math.round(done / task.subtasks.length * 100)}%`, backgroundColor: done === task.subtasks.length ? c.success : c.primary }]} /></View> : null}
-    {expanded && !compact ? <View style={[styles.checklist, { borderColor: c.border }]}>{task.subtasks.map((subtask) => <Pressable key={subtask.id} accessibilityRole="checkbox" accessibilityLabel={subtask.title} aria-checked={subtask.done} disabled={selectionMode} onPress={(event) => { event.stopPropagation(); onToggleSubtask(subtask.id); }} style={styles.subtask}><Ionicons name={subtask.done ? "checkbox" : "square-outline"} size={16} color={subtask.done ? c.success : c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 12, flex: 1, textDecorationLine: subtask.done ? "line-through" : "none" }}>{subtask.title}</Text></Pressable>)}</View> : null}
+    {expanded && !compact && onToggleSubtask ? <View style={[styles.checklist, { borderColor: c.border }]}>{task.subtasks.map((subtask) => <Pressable key={subtask.id} accessibilityRole="checkbox" accessibilityLabel={subtask.title} aria-checked={subtask.done} disabled={selectionMode} onPress={(event) => { event.stopPropagation(); onToggleSubtask(subtask.id); }} style={styles.subtask}><Ionicons name={subtask.done ? "checkbox" : "square-outline"} size={16} color={subtask.done ? c.success : c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 12, flex: 1, textDecorationLine: subtask.done ? "line-through" : "none" }}>{subtask.title}</Text></Pressable>)}</View> : null}
   </Pressable>;
 }
 
 export const taskCardBorderRadius = 12;
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: taskCardBorderRadius, overflow: "hidden", padding: 12, gap: 8 },
+  card: { borderWidth: 1, borderLeftWidth: 3, borderRadius: taskCardBorderRadius, overflow: "hidden", padding: 12, gap: 8, boxShadow: "0 2px 5px rgba(0,0,0,0.16)" },
   compactCard: { padding: 9, gap: 0 },
+  calendarCard: { flexGrow: 1, minHeight: 108, paddingLeft: 13, borderWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
+  calendarTopRow: { marginTop: 0, marginBottom: 0 },
+  checklistSummary: { flexDirection: "row", alignItems: "center", gap: 4 },
   topRow: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: -6, marginBottom: -2 }, titleArea: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center", alignItems: "flex-start" }, checkbox: { width: 36, height: 44, alignItems: "center", justifyContent: "center", flexShrink: 0 }, title: { fontWeight: "600", letterSpacing: -0.2 },
   actions: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", flexShrink: 0, gap: 2 }, action: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 7 },
   timeBadge: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" }, timeText: { flexShrink: 1, fontWeight: "700", fontVariant: ["tabular-nums"] },

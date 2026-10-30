@@ -7,6 +7,8 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 const dates = require("date-fns");
+const tactile = {};
+vm.runInNewContext(ts.transpileModule(await readFile(new URL("../src/components/ui/tactile.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: tactile });
 
 const source = await readFile(new URL("../src/components/calendar/calendar-day-tasks.tsx", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
@@ -25,7 +27,7 @@ function makeTask(id, overrides = {}) {
   return { id, title: `Task ${id}`, priority: "medium", completed: false, canceled: false, subtasks: [], dueAt: new Date(2026, 9, 28, 9).toISOString(), createdAt: now.toISOString(), updatedAt: now.toISOString(), ...overrides };
 }
 
-function render({ tasks = [makeTask("a")], boards = [], width = 0 } = {}) {
+function render({ tasks = [makeTask("a")], boards = [], width = 0, scheme = "dark" } = {}) {
   const calls = { edited: [], actions: [], added: 0 };
   let measuredWidth = width;
   const mocks = {
@@ -33,13 +35,15 @@ function render({ tasks = [makeTask("a")], boards = [], width = 0 } = {}) {
       useState: (initial) => [measuredWidth || initial, (next) => { measuredWidth = typeof next === "function" ? next(measuredWidth) : next; }],
     },
     "react-native": {
+      Platform: { OS: "web" },
       View: "View", Text: "Text", Pressable: "Pressable",
       StyleSheet: { create: (value) => value, hairlineWidth: 0.5 },
     },
     "@expo/vector-icons": { Ionicons: "Icon" },
     "date-fns": dates,
     "@/components/ui/button": { Button: "Button" },
-    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { colors, scheme } }) },
+    "@/components/ui/tactile": tactile,
     "@/lib/domain/boards": { boardColor: () => ({ dot: "#123456", tint: "#12345620" }) },
     "@/lib/domain/constants": {
       PRIORITY_META: {
@@ -54,6 +58,7 @@ function render({ tasks = [makeTask("a")], boards = [], width = 0 } = {}) {
     },
     "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
     "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
+    "@/components/board/mobile-column-task-card": { MobileColumnTaskCard: "MobileColumnTaskCard" },
   };
   const exports = {};
   vm.runInNewContext(outputText, {
@@ -83,6 +88,17 @@ test("selected-day tasks render as a two-column grid that grows to three on wide
   assert.equal(cellWidth(wide), `${100 / 3}%`);
 });
 
+test("selected-day cards reuse the board card with the calendar layout in both themes", () => {
+  for (const scheme of ["dark", "light"]) {
+    const { tree } = render({ scheme });
+    const cards = nodes(tree).filter((node) => node.type === "MobileColumnTaskCard");
+    assert.equal(cards.length, 1);
+    assert.equal(cards[0].props.calendarLayout, true);
+    assert.equal(cards[0].props.selected, false);
+    assert.equal(cards[0].props.selectionMode, false);
+  }
+});
+
 test("tiles keep task editing, long-press actions and checklist progress", () => {
   const tasks = [
     makeTask("done", { completed: true, subtasks: [{ id: "s1", title: "Step", done: true }] }),
@@ -90,20 +106,14 @@ test("tiles keep task editing, long-press actions and checklist progress", () =>
   ];
   const boards = [{ id: "board-1", label: "Product", color: "slate" }];
   const { tree, calls } = render({ tasks: tasks.map((task) => ({ ...task, category: "board-1" })), boards });
-  const tileElements = nodes(tree).filter((node) => typeof node.type === "function" && node.type.name === "CalendarDayTaskTile");
-  assert.equal(tileElements.length, 2);
-  const renderedTiles = tileElements.map((element) => element.type(element.props));
-  const tiles = renderedTiles.filter((tile) => tile.type === "Pressable");
-  assert.equal(tiles.length, 2);
-  tiles[0].props.onPress();
-  tiles[1].props.onLongPress();
+  const cards = nodes(tree).filter((node) => node.type === "MobileColumnTaskCard");
+  assert.equal(cards.length, 2);
+  cards[0].props.onPress();
+  cards[1].props.onMenu();
   assert.deepEqual(calls.edited.map((task) => task.id), ["done"]);
   assert.deepEqual(calls.actions.map((task) => task.id), ["late"]);
-  const labels = renderedTiles.flatMap((tile) => nodes(tile).map((node) => node.props?.children).flat().filter((child) => typeof child === "string"));
-  assert.ok(labels.includes("Product"));
-  const statusIcons = renderedTiles.flatMap((tile) => nodes(tile).filter((node) => node.type === "StatusIcon"));
-  assert.ok(statusIcons.some((node) => node.props.status === "overdue"));
-  assert.ok(renderedTiles.some((tile) => nodes(tile).some((node) => node.type === "Text" && Array.isArray(node.props?.children) && node.props.children.join("") === "1/1")));
+  assert.equal(cards[0].props.board.label, "Product");
+  assert.equal(cards[0].props.task.subtasks.length, 1);
 });
 
 test("a date without tasks keeps the add card in the grid", () => {

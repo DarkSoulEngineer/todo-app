@@ -27,11 +27,14 @@ async function load(path, mocks) {
   const exports = {};
   vm.runInNewContext(outputText, { exports, require: (id) => {
     if (id === "react/jsx-runtime") return require(id);
+    if (id === "@/components/ui/selection-led") return { SelectionLed: "SelectionLed" };
+    if (id === "@/components/ui/tactile") return tactile;
     assert.ok(id in mocks, `Unexpected import ${id}`);
     return mocks[id];
   } });
   return exports;
 }
+const tactile = await load("../src/components/ui/tactile.ts", {});
 function nodes(node) {
   if (!node || typeof node !== "object") return [];
   if (Array.isArray(node)) return node.flatMap(nodes);
@@ -40,7 +43,7 @@ function nodes(node) {
 const byLabel = (tree, label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
 const byText = (tree, text) => nodes(tree).find((node) => node.type === "Text" && node.props.children === text);
 
-test("theme picker shows a sun/moon switch and only the palettes for that mode", async () => {
+test("theme picker uses icon-free fixed-size mode buttons and only the palettes for that mode", async () => {
   const state = hooks();
   const choices = [];
   let preference = "matrix";
@@ -66,7 +69,16 @@ test("theme picker shows a sun/moon switch and only the palettes for that mode",
   // Dark is the active mode, so its palettes are shown and light-only ones are hidden.
   assert.equal(byLabel(tree, "Use dark appearance").props.accessibilityState.checked, true);
   assert.equal(byLabel(tree, "Use light appearance").props.accessibilityState.checked, false);
-  assert.equal(nodes(tree).filter((node) => node.type === "Ionicons").length, 2, "the switch shows sun and moon icons");
+  assert.equal(nodes(tree).filter((node) => node.type === "Ionicons").length, 0);
+  for (const label of ["Use light appearance", "Use dark appearance"]) {
+    const button = byLabel(tree, label);
+    const normal = Object.assign({}, ...button.props.style({ pressed: false }).filter(Boolean));
+    const pressed = Object.assign({}, ...button.props.style({ pressed: true }).filter(Boolean));
+    assert.equal(normal.flex, 1);
+    assert.equal(normal.minHeight, 44);
+    assert.equal(pressed.minHeight, normal.minHeight);
+    assert.equal(pressed.transform[0].translateY, 2);
+  }
   assert.equal(byLabel(tree, "Choose interface theme").props.accessibilityState.expanded, false);
   byLabel(tree, "Choose interface theme").props.onPress();
   tree = state.render(ThemePicker, {});

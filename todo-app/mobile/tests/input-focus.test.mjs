@@ -24,21 +24,25 @@ test("input focus uses the active theme, preserves dimensions and forwards callb
     const render = () => exports.Input({ style: { borderRadius: 6, height: 56 }, autoFocus: true, onFocus: (event) => events.push(["focus", event]), onBlur: (event) => events.push(["blur", event]) });
     let tree = render();
     const original = flatten(tree.props.style);
+    assert.match(original.boxShadow, /inset/);
     assert.equal(tree.props.autoFocus, true);
     assert.equal(original.outlineWidth, platform === "web" ? 0 : undefined);
     const event = {};
     tree.props.onFocus(event);
     tree = render();
     assert.equal(flatten(tree.props.style).borderColor, primary);
+    assert.match(flatten(tree.props.style).boxShadow, /0 0 0 1px #86b840/);
     for (const key of ["height", "borderWidth", "borderRadius"]) assert.equal(flatten(tree.props.style)[key], original[key]);
     primary = "#6589e8";
     tree = render();
     assert.equal(flatten(tree.props.style).borderColor, primary, "focused input responds to theme changes");
+    assert.match(flatten(tree.props.style).boxShadow, /0 0 0 1px #6589e8/);
     assert.equal(tree.props.selectionColor, primary);
     assert.equal(tree.props.cursorColor, primary);
     assert.equal(tree.props.underlineColorAndroid, "transparent");
     tree.props.onBlur(event);
     assert.equal(flatten(render().props.style).borderColor, "#555555");
+    assert.equal(flatten(render().props.style).boxShadow, original.boxShadow);
     assert.deepEqual(events, [["focus", event], ["blur", event]]);
   }
 });

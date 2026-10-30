@@ -28,9 +28,8 @@ const { MobileTaskColumns } = await load("../src/components/board/mobile-task-co
   "@/theme/layout": { mobileBottomNavClearance: 112 },
   "@/components/ui/anchored-menu": { anchorFromEvent: (event) => ({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) },
   "@/lib/domain/sections": {
-    UNASSIGNED_SECTION_ID: "__janus_unassigned__",
     getTaskSectionId: (task, sections) => sections.some((section) => section.id === task.sectionId) ? task.sectionId : undefined,
-    getDisplaySections: (tasks, sections) => tasks.some((task) => !sections.some((section) => section.id === task.sectionId)) ? [{ id: "__janus_unassigned__", title: "No list" }, ...sections.filter((section) => !section.hidden)] : sections.filter((section) => !section.hidden),
+    getDisplaySections: (tasks, sections) => sections.filter((section) => !section.hidden),
     isCustomSection: (section) => section.status === undefined,
   },
   "./mobile-board-colors": { useMobileBoardColors: () => ({}) },
@@ -48,22 +47,13 @@ function renderColumns(overrides = {}) {
   return MobileTaskColumns({ tasks: [{ id: "one", title: "One", sectionId: "a" }], sections: [{ id: "a", title: "First" }], boards: [], now: new Date(), selectionMode: false, selectedTaskIds: new Set(), focused: false, compact: false, zoom: 1, showMoveArrows: false, ...overrides });
 }
 
-test("unassigned cards remain visible in normal and focused views without creating an editable list", () => {
+test("legacy unassigned cards never create an automatic list and show recovery guidance", () => {
   for (const focused of [false, true]) {
-    const added = [], moved = [];
-    const tree = renderColumns({ focused, tasks: [{ id: "one", title: "One", sectionId: null }], showMoveArrows: true, onAddTask: (id) => added.push(id), onMove: (task, id) => moved.push(id) });
-    assert.ok(nodes(tree).find((node) => node.props?.testID === "janus-unassigned-header"));
+    const tree = renderColumns({ focused, tasks: [{ id: "one", title: "One", sectionId: null }], showMoveArrows: true });
+    assert.equal(nodes(tree).find((node) => node.props?.testID === "janus-unassigned-header"), undefined);
     assert.equal(nodes(tree).find((node) => node.props?.testID === "janus-column-name-__janus_unassigned__"), undefined);
-    const card = nodes(tree).find((node) => node.type === "Card");
-    assert.ok(card);
-    nodes(tree).find((node) => node.props?.accessibilityLabel === "Add unassigned card").props.onPress();
-    assert.deepEqual(added, [null]);
-    if (!focused) {
-      const group = nodes(tree).find((node) => node.type === "DragCell" && node.props.id === "section:__janus_unassigned__");
-      assert.equal(group.props.enabled, false);
-      card.props.onMoveRight();
-      assert.deepEqual(moved, ["a"]);
-    }
+    assert.equal(nodes(tree).find((node) => node.type === "Card"), undefined);
+    assert.ok(nodes(tree).some((node) => node.type === "Text" && String(node.props.children).includes("Open Activity")));
   }
 });
 

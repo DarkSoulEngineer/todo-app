@@ -25,12 +25,14 @@ import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
 import { tactileSurface } from "@/components/ui/tactile";
+import { CollapsibleTaskSection } from "@/components/ui/collapsible-task-section";
+import { SelectionLed } from "@/components/ui/selection-led";
+import { TaskSchedulePicker } from "@/components/ui/task-schedule-picker";
 import { Card } from "@/components/ui/card";
 import { InsightsDashboard } from "@/components/insights/insights-dashboard";
 import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
 import { PriorityStars } from "@/components/ui/priority-stars";
-import { StatusIcon } from "@/components/ui/status-icon";
 import { boardColor } from "@/lib/domain/boards";
 import { getTaskSectionId } from "@/lib/domain/sections";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
@@ -38,6 +40,7 @@ import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { classifySpecialCardTag, detectCardTheme, resolveCardDecoration } from "@/lib/features/card-themes";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
 import { SpecialCardTagPicker } from "@/components/ui/special-card-tag-picker";
+import { CardStatusPicker } from "@/components/ui/card-status-picker";
 import { mergeCardTagDraft, normalizeCardTags, toggleCardTag } from "@/lib/features/special-card-tags";
 import {
   DEFAULT_FILTERS,
@@ -94,14 +97,14 @@ function Chip({ label, active, onPress, color, icon }: { label: string; active?:
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
-        { backgroundColor: active ? theme.colors.primarySoft : theme.colors.secondary, borderColor: active ? theme.colors.primary : theme.colors.border, opacity: pressed ? 0.75 : 1 },
-        tactileSurface({ pressed, selected: active, accent: theme.colors.primary, dark: theme.scheme === "dark" }),
+        { backgroundColor: active ? theme.colors.cardElevated : theme.colors.secondary, borderColor: active ? theme.colors.borderStrong : theme.colors.border, opacity: pressed ? 0.75 : 1 },
+        tactileSurface({ pressed, selected: active, dark: theme.scheme === "dark" }),
       ]}
     >
-      {icon ? <Ionicons name={icon} size={14} color={active ? theme.colors.accentForeground : theme.colors.secondaryForeground} /> : null}
+      {icon ? <Ionicons name={icon} size={14} color={theme.colors.secondaryForeground} /> : null}
       {color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
-      <Text style={{ color: active ? theme.colors.accentForeground : theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>{label}</Text>
-      {active ? <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} /> : null}
+      <Text style={{ color: theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>{label}</Text>
+      <SelectionLed selected={Boolean(active)} />
     </Pressable>
   );
 }
@@ -132,7 +135,6 @@ export function TaskCard({
   const status = deriveStatus(task, now);
   const decoration = resolveCardDecoration(task.tags, status);
   const cardTags = (task.tags ?? []).filter((tag) => classifySpecialCardTag(tag)?.group !== "status").sort((a, b) => Number(Boolean(classifySpecialCardTag(b))) - Number(Boolean(classifySpecialCardTag(a))));
-  const overdueDuration = status === "overdue" && due ? due.label.replace(/\s+overdue$/i, "") : null;
   const taskAction = onLongPress ?? onPress;
   return (
     <Pressable accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} // @ts-ignore
@@ -148,7 +150,6 @@ export function TaskCard({
         </View>
         {!compact && task.description ? <Text style={[styles.taskDescription, { color: theme.colors.mutedForeground, marginLeft: 0 }]} numberOfLines={2}>{task.description}</Text> : null}
         <View pointerEvents="none" style={[styles.metaRow, { marginLeft: 0 }]}>
-           {status !== "upcoming" ? <StatusIcon status={status} detail={overdueDuration ? `Overdue by ${overdueDuration}` : undefined} /> : null}
            <PriorityStars priority={task.priority} size={14} />
            {due && !task.canceled && status !== "overdue" ? <View accessible accessibilityLabel={`Due ${due.title}`} style={styles.metaItem}><Ionicons name="time-outline" size={14} color={due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground} /><Text style={{ color: due.overdue ? theme.colors.destructive : due.today ? theme.colors.warning : theme.colors.mutedForeground, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>{due.label}</Text></View> : null}
              {board && boardTone && classifySpecialCardTag(board.label)?.group !== "status" ? <Chip label={board.label} color={boardTone.dot} /> : null}
@@ -246,12 +247,17 @@ function TaskEditorForm({
     lastSourceTags.current = incoming;
     setTags((current) => mergeCardTagDraft(current, previous, incoming));
   }, [sourceTags]);
-  const [sectionId, setSectionId] = useState<string | null>(() => task ? getTaskSectionId(task, sections, new Date()) ?? null : initialSectionId ?? null);
+  const [sectionId, setSectionId] = useState<string | null>(() => {
+    const requested = task ? getTaskSectionId(task, sections, new Date()) : initialSectionId;
+    if (task) return requested ?? null;
+    return sections.find((section) => section.id === requested)?.id ?? sections.find((section) => !section.hidden)?.id ?? null;
+  });
+  const hasList = sections.some((section) => section.id === sectionId);
   const [dueAt, setDueAt] = useState<string | null>(() => task?.dueAt ?? initialDueAt ?? null);
+  const calendarDateFixed = !task && Boolean(initialDueAt && isValid(parseISO(initialDueAt)));
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => task?.subtasks.map((item) => ({ ...item })) ?? []);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
-  const [picker, setPicker] = useState<"date" | "time" | null>(null);
 
   const autoSaveRef = useRef(onAutoSave);
   useEffect(() => {
@@ -263,7 +269,6 @@ function TaskEditorForm({
   // Switching Activity cards replaces the keyed form. Save its last draft with
   // the old task's callback, never the newly selected task's callback.
   useEffect(() => () => pendingSaveRef.current?.(), []);
-  const dateValue = dueAt && isValid(parseISO(dueAt)) ? parseISO(dueAt) : new Date();
   const buildDraft = useCallback((): TaskDraft => ({
     title: title.trim(),
     description: description.trim(),
@@ -274,6 +279,7 @@ function TaskEditorForm({
     subtasks: subtasks.map((item) => ({ ...item, title: item.title.trim() })).filter((item) => item.title.length > 0),
   }), [category, description, dueAt, priority, subtasks, tags, title]);
   const save = () => {
+    if (!hasList) return;
     if (!title.trim()) {
       setTitleError("Give your task a title.");
       return;
@@ -286,7 +292,7 @@ function TaskEditorForm({
       autoSaveTimerRef.current = null;
     }
     const autoSave = autoSaveRef.current;
-    if (!task || !autoSave || !title.trim()) return;
+    if (!task || !autoSave || !title.trim() || !hasList) return;
     const draft = buildDraft();
     const signature = JSON.stringify({ draft, sectionId });
     if (signature === savedSignatureRef.current) return;
@@ -303,7 +309,7 @@ function TaskEditorForm({
   };
   useEffect(() => {
     const autoSave = autoSaveRef.current;
-    if (!task || !autoSave || !title.trim()) return;
+    if (!task || !autoSave || !title.trim() || !hasList) { pendingSaveRef.current = null; return; }
     const draft = buildDraft();
     const signature = JSON.stringify({ draft, sectionId });
     pendingSaveRef.current = () => {
@@ -327,8 +333,7 @@ function TaskEditorForm({
       clearTimeout(timer);
       if (autoSaveTimerRef.current === timer) autoSaveTimerRef.current = null;
     };
-  }, [buildDraft, sectionId, task, title]);
-  const updateDate = (date: Date) => setDueAt(date.toISOString());
+  }, [buildDraft, hasList, sectionId, task, title]);
   const addSubtaskLocal = () => {
     if (!subtaskTitle.trim()) return;
     setSubtasks((current) => [...current, { id: `local-${Date.now()}`, title: subtaskTitle.trim(), done: false }]);
@@ -337,11 +342,10 @@ function TaskEditorForm({
   const footer = <View style={[styles.taskEditorFooter, windowed && styles.taskEditorWindowFooter, { borderTopColor: theme.colors.border, paddingBottom: wideForm ? 12 : Math.max(insets.bottom, 12), backgroundColor: windowed ? theme.colors.backgroundAlt : undefined }]}>
     {task ? <View style={[styles.taskEditorFooterActions, wideForm && styles.taskEditorPanelActions]}>
       <Button variant="secondary" label={task.canceled ? "Restore task" : "Cancel task"} onPress={cancelTask} style={wideForm ? styles.taskEditorPanelPrimary : styles.taskEditorFooterPrimary} />
-      <Button variant="outline" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={[styles.taskEditorDeleteButton, { borderColor: theme.colors.destructive }]}>
-        <Ionicons name="trash-outline" size={17} color={theme.colors.destructive} />
+      <Button variant="outline" onPress={onDelete ?? (() => undefined)} accessibilityLabel="Delete task" style={styles.taskEditorDeleteButton}>
         <Text style={{ color: theme.colors.destructive, fontSize: 14, fontWeight: "700" }}>Delete</Text>
       </Button>
-    </View> : <Button label="Add task" onPress={save} style={windowed ? styles.taskEditorWindowPrimary : undefined} />}
+    </View> : <Button variant="secondary" label="Add task" onPress={save} disabled={!hasList} style={windowed ? styles.taskEditorWindowPrimary : undefined} />}
   </View>;
   const priorityControl = (
     <View style={styles.wrapRow}>
@@ -354,19 +358,19 @@ function TaskEditorForm({
           style={({ pressed }) => [
             styles.chip,
             {
-              backgroundColor: priority === item ? theme.colors.primarySoft : theme.colors.secondary,
-              borderColor: priority === item ? theme.colors.primary : theme.colors.border,
+              backgroundColor: priority === item ? theme.colors.cardElevated : theme.colors.secondary,
+              borderColor: priority === item ? theme.colors.borderStrong : theme.colors.border,
               opacity: pressed ? 0.75 : 1,
               gap: 6,
             },
-            tactileSurface({ pressed, selected: priority === item, accent: theme.colors.primary, dark: theme.scheme === "dark" }),
+            tactileSurface({ pressed, selected: priority === item, dark: theme.scheme === "dark" }),
           ]}
         >
           <PriorityStars priority={item} size={13} zoom={1} />
-          <Text style={{ color: priority === item ? theme.colors.accentForeground : theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>
+          <Text style={{ color: theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>
             {PRIORITY_META[item].label}
           </Text>
-          {priority === item ? <Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} /> : null}
+          <SelectionLed selected={priority === item} color={item === "critical" || item === "high" ? theme.colors.destructive : theme.colors.success} />
         </Pressable>
       ))}
     </View>
@@ -378,7 +382,7 @@ function TaskEditorForm({
     {tagChips.length ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : null}
     <SpecialCardTagPicker tags={tags} onChange={setTags} />
     <View style={styles.wrapRow}>{tags.filter((tag) => !classifySpecialCardTag(tag)).map((tag) => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Remove tag ${tag}`} onPress={() => setTags((current) => toggleCardTag(current, tag))} style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary }]}><Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{tag} ×</Text></Pressable>)}</View>
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><TextInput accessibilityLabel="New card tag" placeholder="Add a tag" placeholderTextColor={theme.colors.mutedForeground} value={tagInput} onChangeText={setTagInput} onSubmitEditing={addTag} returnKeyType="done" style={{ flex: 1, minWidth: 0, minHeight: 44, color: theme.colors.foreground, paddingHorizontal: 10, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8 }} /><Button label="Add" size="sm" onPress={addTag} disabled={!tagInput.trim()} /></View>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Input accessibilityLabel="New card tag" placeholder="Add a tag" value={tagInput} onChangeText={setTagInput} onSubmitEditing={addTag} returnKeyType="done" style={{ flex: 1, minWidth: 0, borderRadius: 12 }} /><Button variant="secondary" label="Add" onPress={addTag} disabled={!tagInput.trim()} /></View>
   </View>;
 
   const content = <>
@@ -392,7 +396,7 @@ function TaskEditorForm({
             <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={wideForm} style={[styles.taskEditorScroll, wideForm ? { flex: 1 } : null]} contentContainerStyle={[styles.taskEditorContent, presentation === "panel" ? { paddingBottom: mobileBottomNavClearance + insets.bottom } : null]}>
               <View testID="task-editor-title-field">
               <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>TITLE</Text>
-              <TextInput
+              <Input
                 autoFocus={!task}
                 value={title}
                 onChangeText={(value) => { setTitle(value); if (titleError) setTitleError(null); }}
@@ -405,17 +409,33 @@ function TaskEditorForm({
               />
               {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
               </View>
-              <View style={styles.taskEditorSectionHeading}>
-                <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
+              <View testID="task-editor-status-field">
+                <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>STATUS</Text>
+                <CardStatusPicker tags={tags} onChange={setTags} />
+              </View>
+              <CollapsibleTaskSection title="List" summary={sections.find((section) => section.id === sectionId)?.title} style={styles.taskEditorSectionHeading}>
                 <View testID="task-editor-list-choices" style={[styles.wrapRow, { marginTop: 8 }]}>
-                  <Chip label="No list" active={sectionId === null} onPress={() => setSectionId(null)} />
+                  {!hasList ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>{sections.some((section) => !section.hidden) ? "Choose a list to save this card." : "Create a list on the board before adding a card."}</Text> : null}
                   {sections.filter((section) => !section.hidden || section.id === sectionId).map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}
                 </View>
+              </CollapsibleTaskSection>
+              <View testID="task-editor-priority-field">
+              <CollapsibleTaskSection title="Priority" summary={PRIORITY_META[priority].label}>
+                <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border, marginTop: 6 }]}>
+                {priorityControl}
               </View>
+              </CollapsibleTaskSection>
+              </View>
+              <View testID="task-editor-schedule-field">
+              <CollapsibleTaskSection title={calendarDateFixed ? "Time" : "Schedule"} summary={dueAt && isValid(parseISO(dueAt)) ? format(parseISO(dueAt), "MMM d · HH:mm") : "Optional"}>
+              <TaskSchedulePicker value={dueAt} onChange={setDueAt} dateLocked={calendarDateFixed} />
+              </CollapsibleTaskSection>
+              </View>
+              <CollapsibleTaskSection title="Notes">
               <View testID="task-editor-notes-field">
-              <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>
-              <TextInput
+              <Input
                 value={description}
+                accessibilityLabel="Task notes"
                 onChangeText={setDescription}
                 placeholder="Add a little context"
                 placeholderTextColor={theme.colors.mutedForeground}
@@ -423,85 +443,17 @@ function TaskEditorForm({
                 style={[styles.taskEditorNotes, wideForm && styles.taskEditorPanelNotes, windowed && styles.taskEditorWindowInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
               />
               </View>
-              <View testID="task-editor-priority-schedule-row" style={wideForm ? styles.taskEditorPanelRow : undefined}>
-              <View testID="task-editor-priority-field" style={wideForm ? styles.taskEditorPanelField : undefined}>
-              <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground, marginTop: 18 }]}>{wideForm ? "PRIORITY" : "ORGANIZE"}</Text>
-                <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border, marginTop: 6 }]}>
-                {!wideForm ? <Text style={[styles.taskEditorInlineLabel, styles.taskEditorInlineLabelFirst, { color: theme.colors.mutedForeground }]}>PRIORITY</Text> : null}
-                {priorityControl}
-                {!wideForm ? <>
-                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
-                {tagsControl}
-                </> : null}
-              </View>
-              </View>
-              <View testID="task-editor-schedule-field" style={wideForm ? styles.taskEditorPanelField : undefined}>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
-                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>SCHEDULE</Text>
-                <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>OPTIONAL</Text>
-              </View>
-              <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border, marginTop: 6 }]}>
-                <View style={styles.taskEditorDateRow}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due ${format(dateValue, "MMMM d, yyyy")}` : "Set due date"} onPress={() => setPicker("date")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border }, tactileSurface({ pressed, selected: picker === "date", dark: theme.scheme === "dark" })]}>
-                    <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
-                    <Text style={[styles.taskEditorDateText, { color: theme.colors.foreground }]} numberOfLines={1}>{dueAt ? format(dateValue, "MMM d") : "Pick a date"}</Text>
-                    <Ionicons name="chevron-down" size={13} color={theme.colors.mutedForeground} />
-                  </Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel={dueAt ? `Due at ${format(dateValue, "h:mm a")}` : "Set due time"} onPress={() => setPicker("time")} style={({ pressed }) => [styles.taskEditorDateField, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border }, tactileSurface({ pressed, selected: picker === "time", dark: theme.scheme === "dark" })]}>
-                    <Ionicons name="time-outline" size={16} color={theme.colors.primary} />
-                    <Text style={[styles.taskEditorDateText, { color: theme.colors.foreground }]} numberOfLines={1}>{dueAt ? format(dateValue, "h:mm a") : "Set time"}</Text>
-                    <Ionicons name="chevron-down" size={13} color={theme.colors.mutedForeground} />
-                  </Pressable>
-                  {dueAt ? <Pressable accessibilityRole="button" accessibilityLabel="Clear due date" onPress={() => setDueAt(null)} style={({ pressed }) => [styles.taskEditorClearDue, { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 }]}><Ionicons name="close" size={18} color={theme.colors.mutedForeground} /></Pressable> : null}
-                </View>
-                {picker ? (Platform.OS === "web" ? <View style={styles.taskEditorPicker}>
-                  {picker === "date" ? createElement("input", {
-                    type: "date",
-                    value: format(dateValue, "yyyy-MM-dd"),
-                    onChange: (event: any) => {
-                      const value = event?.target?.value;
-                      if (value) {
-                        const selected = new Date(`${value}T00:00:00`);
-                        if (!Number.isNaN(selected.getTime())) {
-                          selected.setHours(dateValue.getHours(), dateValue.getMinutes(), 0, 0);
-                          updateDate(selected);
-                        }
-                      }
-                      setPicker(null);
-                    },
-                    style: { width: "100%", minHeight: 40, paddingHorizontal: 10, borderRadius: 8, border: "1px solid", borderColor: theme.colors.border, backgroundColor: theme.colors.input, color: theme.colors.foreground },
-                  }) : createElement("input", {
-                    type: "time",
-                    value: format(dateValue, "HH:mm"),
-                    onChange: (event: any) => {
-                      const value = event?.target?.value;
-                      if (value) {
-                        const [hours, minutes] = value.split(":").map((part: string) => Number(part));
-                        const selected = new Date(dateValue);
-                        selected.setHours(Number.isNaN(hours) ? 0 : hours, Number.isNaN(minutes) ? 0 : minutes, 0, 0);
-                        updateDate(selected);
-                      }
-                      setPicker(null);
-                    },
-                    style: { width: "100%", minHeight: 40, paddingHorizontal: 10, borderRadius: 8, border: "1px solid", borderColor: theme.colors.border, backgroundColor: theme.colors.input, color: theme.colors.foreground },
-                  })}
-                </View> : <View style={styles.taskEditorPicker}><DateTimePicker value={dateValue} mode={picker} display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selected) => { setPicker(null); if (selected) updateDate(selected); }} /></View>) : null}
-              </View>
-              </View>
-              </View>
-              {wideForm ? <View testID="task-editor-tags-list-row" style={styles.taskEditorPanelRow}>
-                <View style={styles.taskEditorPanelField}>
-                  <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>TAGS</Text>
-                  <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border }]}>{tagsControl}</View>
-                </View>
-              </View> : null}
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
-                <Text style={[styles.taskEditorInlineLabel, { color: theme.colors.mutedForeground, marginTop: 0, marginBottom: 0 }]}>CHECKLIST</Text>
-                {subtasks.length ? <Text style={[styles.taskEditorSectionMeta, { color: theme.colors.mutedForeground }]}>{subtasks.filter((item) => item.done).length}/{subtasks.length} DONE</Text> : null}
-              </View>
+              </CollapsibleTaskSection>
+              <CollapsibleTaskSection title="Checklist" summary={`${subtasks.filter((item) => item.done).length}/${subtasks.length} done`}>
               <View style={[styles.taskEditorSection, { borderColor: theme.colors.border, marginTop: 6 }]}>
                 {subtasks.length ? <View style={[styles.taskEditorChecklist, { borderColor: theme.colors.border, backgroundColor: theme.colors.input, marginTop: 0 }]}>{subtasks.map((subtask, index) => <View key={subtask.id} style={[styles.taskEditorSubtaskRow, index > 0 ? { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}><Pressable accessibilityRole="checkbox" accessibilityLabel={`${subtask.done ? "Mark incomplete" : "Mark complete"} ${subtask.title}`} accessibilityState={{ checked: subtask.done }} onPress={() => setSubtasks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, done: !item.done } : item))} style={[styles.taskEditorSubtaskCheck, { borderColor: subtask.done ? theme.colors.success : theme.colors.borderStrong, backgroundColor: subtask.done ? theme.colors.success : theme.colors.card }]}>{subtask.done ? <Ionicons name="checkmark" size={13} color={theme.colors.successForeground} /> : null}</Pressable><TextInput value={subtask.title} onChangeText={(value) => setSubtasks((current) => current.map((item) => item.id === subtask.id ? { ...item, title: value } : item))} placeholder={`Checklist item ${index + 1}`} placeholderTextColor={theme.colors.mutedForeground} accessibilityLabel={`Subtask ${index + 1}`} style={[styles.taskEditorSubtaskInput, { color: theme.colors.foreground, textDecorationLine: subtask.done ? "line-through" : "none" }]} /><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${subtask.title || `subtask ${index + 1}`}`} onPress={() => setSubtasks((current) => current.filter((item) => item.id !== subtask.id))} style={({ pressed }) => [styles.taskEditorSubtaskDelete, { opacity: pressed ? 0.6 : 1 }]}><Ionicons name="trash-outline" size={17} color={theme.colors.mutedForeground} /></Pressable></View>)}</View> : null}
-                <View style={styles.taskEditorAddSubtask}><TextInput value={subtaskTitle} onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a step" placeholderTextColor={theme.colors.mutedForeground} returnKeyType="done" style={[styles.taskEditorAddSubtaskInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]} /><Button size="icon-sm" variant="soft" accessibilityLabel="Add subtask" onPress={addSubtaskLocal}><Ionicons name="add" size={19} color={theme.colors.primary} /></Button></View>
+                <View style={styles.taskEditorAddSubtask}><Input value={subtaskTitle} accessibilityLabel="New checklist step" onChangeText={setSubtaskTitle} onSubmitEditing={addSubtaskLocal} placeholder="Add a step" returnKeyType="done" style={styles.taskEditorAddSubtaskInput} /><Button label="Add" variant="secondary" accessibilityLabel="Add subtask" onPress={addSubtaskLocal} disabled={!subtaskTitle.trim()} /></View>
+              </View>
+              </CollapsibleTaskSection>
+              <View testID="task-editor-tags-list-row">
+                <CollapsibleTaskSection title="Tags" summary={`${tags.filter((tag) => !classifySpecialCardTag(tag)).length + (category ? 1 : 0)} selected`}>
+                <View style={[styles.taskEditorSection, windowed && styles.taskEditorWindowInput, { borderColor: theme.colors.border }]}>{tagsControl}</View>
+                </CollapsibleTaskSection>
               </View>
               {presentation === "panel" ? <View style={{ marginTop: 16 }}>{footer}</View> : null}
             </ScrollView>
@@ -552,10 +504,10 @@ function TextEntrySheetForm({ visible, title, description, placeholder, initialV
     </ScrollView>
     <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border, backgroundColor: theme.colors.backgroundAlt }}>
       <Button label="Cancel" variant="secondary" onPress={onClose} style={{ borderRadius: 12 }} />
-      <Button label={actionLabel} disabled={!value.trim()} onPress={submit} style={{ minWidth: 120, borderRadius: 12 }} />
+      <Button variant="secondary" label={actionLabel} disabled={!value.trim()} onPress={submit} style={{ minWidth: 120, borderRadius: 12 }} />
     </View>
   </EditorWindow>;
-  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{description ? <Text style={[styles.sheetDescription, { color: theme.colors.mutedForeground }]}>{description}</Text> : null}<Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} onSubmitEditing={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 12 }} /><Button label={actionLabel} disabled={!value.trim()} onPress={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 14 }} /></Sheet>;
+  return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{description ? <Text style={[styles.sheetDescription, { color: theme.colors.mutedForeground }]}>{description}</Text> : null}<Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} onSubmitEditing={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 12 }} /><Button variant="secondary" label={actionLabel} disabled={!value.trim()} onPress={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 14 }} /></Sheet>;
 }
 
 export function BoardCard({ label, count, completed, createdAt, overdue = 0, dueSoon = 0, color, onPress, onMenu }: { label: string; count: number; completed: number; createdAt?: string; overdue?: number; dueSoon?: number; color: string; onPress: () => void; onMenu: () => void }) {
@@ -770,8 +722,8 @@ const styles = StyleSheet.create({
   taskEditorScroll: { flexShrink: 1, minHeight: 0 },
   taskEditorContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 20 },
   taskEditorLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.2, marginTop: 16, marginBottom: 7 },
-  taskEditorTitleInput: { height: 56, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 0, fontSize: 19, lineHeight: 25, fontWeight: "700", textAlignVertical: "center" },
-  taskEditorNotes: { minHeight: 88, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, fontSize: 14, lineHeight: 20, textAlignVertical: "top" },
+  taskEditorTitleInput: { height: 56, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 0, fontSize: 19, lineHeight: 25, fontWeight: "700", textAlignVertical: "center" },
+  taskEditorNotes: { minHeight: 88, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, fontSize: 14, lineHeight: 20, textAlignVertical: "top" },
   taskEditorSectionHeading: { marginTop: 20, marginBottom: 8 },
   taskEditorSection: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
   taskEditorSectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: "700", letterSpacing: -0.1 },
@@ -779,18 +731,13 @@ const styles = StyleSheet.create({
   taskEditorInlineLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.1, marginTop: 14, marginBottom: 7 },
   taskEditorInlineLabelFirst: { marginTop: 0 },
   taskEditorChipRow: { flexDirection: "row", gap: 8, paddingRight: 4, paddingBottom: 2 },
-  taskEditorDateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  taskEditorDateField: { flex: 1, minHeight: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
-  taskEditorDateText: { flex: 1, fontSize: 13, fontWeight: "600" },
-  taskEditorClearDue: { width: 44, height: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  taskEditorPicker: { marginTop: 10 },
   taskEditorChecklist: { marginTop: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, overflow: "hidden" },
   taskEditorSubtaskRow: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 48, paddingLeft: 12, paddingRight: 4 },
   taskEditorSubtaskCheck: { width: 21, height: 21, borderRadius: 7, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   taskEditorSubtaskInput: { flex: 1, fontSize: 14, lineHeight: 19, paddingVertical: 8, paddingHorizontal: 0 },
   taskEditorSubtaskDelete: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   taskEditorAddSubtask: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
-  taskEditorAddSubtaskInput: { flex: 1, height: 42, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 },
+  taskEditorAddSubtaskInput: { flex: 1, minWidth: 0, height: 44, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 },
   taskEditorFooter: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingTop: 12 },
   taskEditorFooterActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   taskEditorFooterPrimary: { flex: 1 },

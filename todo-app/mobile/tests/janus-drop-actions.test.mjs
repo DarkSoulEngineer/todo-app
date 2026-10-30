@@ -92,15 +92,11 @@ test("same-list reordering and every holder name preserve status", () => {
   }
 });
 
-test("dropping into No list clears placement without changing status and supports Undo", () => {
+test("dropping without a real list cannot clear placement or write state", () => {
   const h = harness();
   h.dropTask("one", null, null);
-  const task = h.api.snapshot().tasks.find((task) => task.id === "one");
-  assert.equal(task.sectionId, null);
-  assert.equal(task.completed, false);
-  assert.equal(h.api.snapshot().sections.length, h.before.sections.length);
-  h.messages[0].options.action.onPress();
   assert.deepEqual(h.api.snapshot(), h.before);
+  assert.equal(h.messages.length, 0);
 });
 
 test("dropping into Done preserves the card's state and Undo restores placement", () => {

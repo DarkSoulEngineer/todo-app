@@ -84,13 +84,26 @@ test("status designs follow task state and complete case-insensitive names witho
   for (const title of ["D", "C", "O", "B", "V"]) assert.equal(nodes(render({ title })).find((node) => node.type === "SeasonalCardDecoration"), undefined);
 });
 
-test("basic status tags are icon-only; event and ordinary custom tags keep text labels", () => {
-  for (const [tag, changes, expected] of [["Done", { completed: true }, "completed"], ["Canceled", { canceled: true }, "canceled"], ["Overdue", {}, "overdue"]]) {
+test("board cards have a subtle shadow in normal, compact, selected and calendar layouts", () => {
+  for (const props of [{}, { compact: true }, { selected: true }, { calendarLayout: true }]) {
+    const card = style(render({}, props));
+    assert.equal(card.boxShadow, "0 2px 5px rgba(0,0,0,0.16)");
+    assert.equal(card.borderRadius, taskCardBorderRadius);
+    assert.equal(card.borderLeftWidth, 3);
+  }
+  const calendar = style(render({}, { calendarLayout: true }));
+  assert.equal(calendar.minHeight, 108);
+  assert.equal(calendar.paddingLeft, 13);
+  assert.equal(calendar.borderWidth, 0.5);
+});
+
+test("basic status tags have no glyphs; event and ordinary custom tags keep text labels", () => {
+  for (const [tag, changes] of [["Done", { completed: true }], ["Canceled", { canceled: true }], ["Overdue", {}]]) {
     const tree = render({ tags: ["Work custom", "Halloween", tag], ...changes });
     assert.ok(text(tree).includes("Halloween"));
     assert.ok(text(tree).includes("Work custom"));
     assert.ok(!text(tree).includes(tag), `${tag} is not duplicated as text`);
-    assert.equal(nodes(tree).find((node) => node.type === "StatusIcon").props.status, expected);
+    assert.equal(nodes(tree).find((node) => node.type === "StatusIcon"), undefined);
   }
 });
 
@@ -99,10 +112,10 @@ test("due badges distinguish days, tolerate invalid dates, and status beats prio
   for (const dueAt of [null, "invalid"]) assert.ok(text(render({ dueAt })).includes("Any time"));
   const overdue = { dueAt: new Date(2026, 9, 28, 12).toISOString() };
   assert.equal(style(render(overdue)).borderLeftColor, colors.destructive);
-  assert.equal(nodes(render(overdue)).find((node) => node.type === "StatusIcon")?.props.status, "overdue");
-  for (const [changes, status, accent] of [[{ completed: true }, "completed", colors.success], [{ canceled: true }, "canceled", colors.mutedForeground]]) {
+  assert.equal(nodes(render(overdue)).find((node) => node.type === "StatusIcon"), undefined);
+  for (const [changes, accent] of [[{ completed: true }, colors.success], [{ canceled: true }, colors.mutedForeground]]) {
     const tree = render({ ...overdue, ...changes });
-    assert.equal(nodes(tree).find((node) => node.type === "StatusIcon")?.props.status, status);
+    assert.equal(nodes(tree).find((node) => node.type === "StatusIcon"), undefined);
     assert.equal(style(tree).borderLeftColor, accent);
   }
 });

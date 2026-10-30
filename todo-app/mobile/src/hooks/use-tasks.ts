@@ -10,10 +10,9 @@ import {
   createSampleTasks,
   distributeSampleTasks,
   SAMPLE_BOARDS,
-  SAMPLE_SECTIONS,
+  createSampleSections,
 } from "@/lib/data/sample";
 import {
-  getTaskSectionId,
   reconcileSectionIds,
   isCustomSection,
 } from "@/lib/domain/sections";
@@ -56,7 +55,7 @@ export interface TasksApi {
   boards: Board[];
   isLoading: boolean;
   isEmpty: boolean;
-  addTask: (draft: TaskDraft) => Task;
+  addTask: (draft: TaskDraft, sectionId?: string) => Task;
   updateTask: (id: string, draft: TaskDraft) => void;
   /**
    * Merges only the provided fields into a task and bumps `updatedAt`. Unlike
@@ -82,11 +81,11 @@ export interface TasksApi {
   setTaskDueAt: (id: string, dueAt: string | null) => void;
   /** Assign a task to a list without changing tags, state, or appearance. */
   assignTaskToSection: (taskId: string, sectionId: string) => void;
-  /** Point a task at a custom section (or null to release it). */
+  /** Point a task at an existing list. Null/invalid targets are ignored. */
   setTaskSectionId: (taskId: string, sectionId: string | null) => void;
   addSection: (title: string) => BoardSection;
   renameSection: (id: string, title: string) => void;
-  /** Removes a list; its tasks remain unassigned until the user places them. */
+  /** Removes an empty list only; move or delete its cards first. */
   deleteSection: (id: string) => void;
   toggleSectionHidden: (id: string) => void;
   reorderSections: (orderedIds: string[]) => void;
@@ -344,8 +343,12 @@ export function useTasks(): TasksApi {
 
   const clearTaskHistory = useCallback(() => setTaskHistory({}), []);
 
-  const addTask = useCallback((draft: TaskDraft): Task => {
-    const task = applyCategoryCardTag(createTask(draft), boardsRef.current);
+  const addTask = useCallback((draft: TaskDraft, sectionId?: string): Task => {
+    const section = sectionId === undefined
+      ? sectionsRef.current.find((section) => !section.hidden)
+      : sectionsRef.current.find((section) => section.id === sectionId && !section.hidden);
+    if (!section) throw new Error("Create or choose a visible list before adding a card.");
+    const task = { ...applyCategoryCardTag(createTask(draft), boardsRef.current), sectionId: section.id };
     setLiveTasks((prev) => [...prev, task]);
     return task;
   }, [setLiveTasks]);
@@ -361,6 +364,7 @@ export function useTasks(): TasksApi {
   const patchTask = useCallback(
     (id: string, patch: TaskPatch) => {
       if (typeof patch !== "object" || patch === null) return;
+      if ("sectionId" in patch && !sectionsRef.current.some((section) => section.id === patch.sectionId)) return;
       recordTask(id);
       updateById(id, (task) => ({ ...applyTaskPatch(task, patch), updatedAt: new Date().toISOString() }));
     },
@@ -492,7 +496,7 @@ export function useTasks(): TasksApi {
   const setTaskSectionId = useCallback(
     (id: string, sectionId: string | null) => {
       const section = sectionsRef.current.find((section) => section.id === sectionId);
-      if (sectionId !== null && !section) return;
+      if (!section) return;
       recordTask(id);
       const stamp = new Date().toISOString();
       updateById(id, (task) => ({
@@ -532,14 +536,10 @@ export function useTasks(): TasksApi {
   const deleteSection = useCallback((id: string) => {
     const target = sectionsRef.current.find((section) => section.id === id);
     if (!target || !isCustomSection(target)) return;
+    if (tasksRef.current.some((task) => task.sectionId === id)) return;
     const nextSections = sectionsRef.current.filter((section) => section.id !== id);
-    const now = new Date();
-    const affectedIds = new Set(tasksRef.current.filter((task) => getTaskSectionId(task, sectionsRef.current, now) === id).map((task) => task.id));
     setLiveSections(() => nextSections);
-    setLiveTasks((prev) =>
-      prev.map((task) => (affectedIds.has(task.id) ? { ...task, sectionId: null } : task)),
-    );
-  }, [setLiveSections, setLiveTasks]);
+  }, [setLiveSections]);
 
   const toggleSectionHidden = useCallback((id: string) => {
     setLiveSections((prev) =>
@@ -673,7 +673,7 @@ export function useTasks(): TasksApi {
     setBoards(sampleBoards);
     const sampleSections = sectionsRef.current.some((section) => !section.hidden && isCustomSection(section))
       ? sectionsRef.current
-      : [...sectionsRef.current, ...SAMPLE_SECTIONS.map((section) => ({ ...section, id: `custom-${makeId(8)}` }))];
+      : [...sectionsRef.current, ...createSampleSections()];
     const sampleTasks = distributeSampleTasks(samples, sampleSections);
     setLiveSections(() => sampleSections);
     setLiveTasks(() => sampleTasks);

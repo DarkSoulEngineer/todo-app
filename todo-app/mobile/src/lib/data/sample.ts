@@ -24,15 +24,25 @@ export const SAMPLE_SECTIONS: BoardSection[] = [
   { id: "sample-backlog", title: "Backlog" },
   { id: "sample-progress", title: "In progress" },
   { id: "sample-done", title: "Done" },
+  { id: "sample-ideas", title: "Ideas" },
+  { id: "sample-review", title: "Review" },
+  { id: "sample-later", title: "Later" },
 ];
+
+/** Demo-only lists: vary the count (2–6); ordinary boards never use these. */
+export function createSampleSections(): BoardSection[] {
+  const count = 2 + Math.floor(Math.random() * (SAMPLE_SECTIONS.length - 1));
+  return SAMPLE_SECTIONS.slice(0, count).map((section) => ({ ...section, id: `custom-${makeId(8)}` }));
+}
 
 /** Randomly places samples in real, visible custom lists without changing status. */
 export function distributeSampleTasks(tasks: Task[], sections: BoardSection[] = SAMPLE_SECTIONS): Task[] {
   const targets = sections.filter((section) => !section.hidden && isCustomSection(section));
   if (!targets.length) throw new Error("Sample tasks need a visible custom list.");
-  return tasks.map((task) => ({
+  const offset = Math.floor(Math.random() * targets.length);
+  return tasks.map((task, index) => ({
     ...task,
-    sectionId: targets[Math.floor(Math.random() * targets.length)].id,
+    sectionId: targets[(index + offset) % targets.length].id,
   }));
 }
 

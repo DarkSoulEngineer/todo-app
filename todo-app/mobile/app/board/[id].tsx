@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { JanusLogo } from "@/components/ui/janus-logo";
 import { PriorityStars } from "@/components/ui/priority-stars";
 import { StatusIcon } from "@/components/ui/status-icon";
+import { tactileCardSurface } from "@/components/ui/tactile";
 import { Sheet } from "@/components/ui/sheet";
 import { anchorFromEvent, type MenuAnchor } from "@/components/ui/anchored-menu";
 import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
@@ -262,21 +263,29 @@ export default function WorkspaceScreen() {
     exitSelectionMode();
     toast.success(`${selectedTasks.length} ${selectedTasks.length === 1 ? "task" : "tasks"} deleted`, { action: { label: "Undo", onPress: () => api.restore(before) } });
   };
-  const addNewTask = (due?: string | null, sectionId?: string | null) => { setEditorProjectId(currentProjectId); setEditorTask(null); setInitialDueAt(due ?? null); setInitialSectionId(sectionId ?? null); setEditorVisible(true); };
+  const addNewTask = (due?: string | null, sectionId?: string | null) => {
+    const target = sections.find((section) => section.id === sectionId && !section.hidden) ?? sections.find((section) => !section.hidden);
+    if (!target) { setAddSectionOpen(true); toast.show("Create a list before adding a card"); return; }
+    const selectedDate = due === undefined && mode === "calendar" && selectedCalendarDay ? new Date(selectedCalendarDay) : null;
+    selectedDate?.setHours(9, 0, 0, 0);
+    setEditorProjectId(currentProjectId); setEditorTask(null); setInitialDueAt(due ?? selectedDate?.toISOString() ?? null); setInitialSectionId(target.id); setEditorVisible(true);
+  };
   const saveTaskSection = (taskId: string, sectionId: string | null) => {
-    if (sectionId === null) { api.setTaskSectionId(taskId, null); return; }
+    if (sectionId === null) return;
     const section = sections.find((item) => item.id === sectionId);
     if (!section) return;
     if (isCustomSection(section)) api.setTaskSectionId(taskId, section.id);
     else api.assignTaskToSection(taskId, section.id);
   };
   const saveTask = (draft: TaskDraft, sectionId: string | null) => {
+    if (!sectionId || !sections.some((section) => section.id === sectionId)) { toast.error("Choose a list before saving"); return; }
     if (editorTask) { api.updateTask(editorTask.id, draft); const currentSectionId = getTaskSectionId(editorTask, sections, now) ?? null; if (sectionId !== currentSectionId) saveTaskSection(editorTask.id, sectionId); toast.success("Task updated"); }
-    else { const task = api.addTask(draft); if (sectionId) saveTaskSection(task.id, sectionId); toast.success("Task added", { description: draft.title }); }
+    else { api.addTask(draft, sectionId); toast.success("Task added", { description: draft.title }); }
     setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null);
   };
   const autoSaveTask = (draft: TaskDraft, sectionId: string | null) => {
     if (!editorTask) return;
+    if (!sections.some((section) => section.id === sectionId)) return;
     const liveTask = tasks.find((task) => task.id === editorTask.id);
     if (!liveTask) return;
     api.updateTask(liveTask.id, draft);
@@ -360,23 +369,26 @@ export default function WorkspaceScreen() {
   const deleteList = () => {
     const target = deleteSectionTarget;
     if (!target) return;
+    if (tasks.some((task) => task.sectionId === target.id)) {
+      setDeleteSectionTarget(null);
+      toast.error("Move or delete this list’s cards first", { description: "Only empty lists can be deleted." });
+      return;
+    }
     const before = api.snapshot();
     api.deleteSection(target.id);
     setDeleteSectionTarget(null);
     toast.success(`“${target.title}” deleted`, {
-      description: "Cards in this list were kept.",
+      description: "The empty list was removed.",
       action: { label: "Undo", onPress: () => api.restore(before) },
     });
   };
   const moveTaskToSection = (task: Task, sectionId: string | null) => {
-    const target = sectionId === null ? null : sections.find((section) => section.id === sectionId);
-    if (sectionId !== null && !target) return;
-    if (sectionId === null && task.sectionId === null) return;
+    const target = sections.find((section) => section.id === sectionId);
+    if (!target) return;
     if (sectionId !== null && getTaskSectionId(task, sections, now) === sectionId) return;
     const before = api.snapshot();
-    if (sectionId === null) api.setTaskSectionId(task.id, null);
-    else if (target && isCustomSection(target)) api.setTaskSectionId(task.id, sectionId);
-    else if (target) api.assignTaskToSection(task.id, sectionId);
+    if (isCustomSection(target)) api.setTaskSectionId(task.id, target.id);
+    else api.assignTaskToSection(task.id, target.id);
     toast.success(`Moved to ${target?.title ?? "list"}`, {
       action: { label: "Undo", onPress: () => api.restore(before) },
     });
@@ -402,7 +414,7 @@ export default function WorkspaceScreen() {
   const dropTask = (taskId: string, sectionId: string | null, beforeTaskId: string | null) => {
     const task = tasks.find((item) => item.id === taskId);
     const section = sections.find((item) => item.id === sectionId && !item.hidden);
-    if (!task || (sectionId !== null && !section)) return;
+    if (!task || !section) return;
     const siblings = visibleTasks.filter((item) => (getTaskSectionId(item, sections, now) ?? null) === sectionId).map((item) => item.id);
     const orderedIds = taskDropOrder(taskId, siblings, beforeTaskId);
     if (!orderedIds) return;
@@ -413,7 +425,7 @@ export default function WorkspaceScreen() {
     if (!sameSection) api.setTaskSectionId(taskId, sectionId);
     api.reorderTasks(orderedIds);
     setSort("manual");
-    toast.success(sameSection ? "Card reordered" : `Moved to ${section?.title ?? "No list"}`, {
+    toast.success(sameSection ? "Card reordered" : `Moved to ${section.title}`, {
       description: previousSort === "manual" ? undefined : "Switched to manual order",
       action: { label: "Undo", onPress: () => { api.restore(before); setSort(previousSort); } },
     });
@@ -602,7 +614,7 @@ export default function WorkspaceScreen() {
         ...(sections.findIndex((section) => section.id === sectionMenu.id) < sections.length - 1 ? [{ label: "Move list right", icon: "arrow-forward-outline" as const, onPress: () => moveSection(sectionMenu, "right") }] : []),
         ...(isCustomSection(sectionMenu) ? [{ label: "Delete list", icon: "trash-outline" as const, destructive: true, onPress: () => setDeleteSectionTarget(sectionMenu) }] : []),
       ] : []} onClose={() => setSectionMenu(null)} anchor={smallMenuAnchor} />
-      <ConfirmationDialog visible={deleteSectionTarget !== null} title="Delete list?" description={`“${deleteSectionTarget?.title ?? ""}” will be removed. Its cards will move to the first available list. An Inbox list will be created if needed.`} confirmLabel="Delete list" cancelLabel="Keep list" onClose={() => setDeleteSectionTarget(null)} onConfirm={deleteList} />
+      <ConfirmationDialog visible={deleteSectionTarget !== null} title="Delete list?" description={`“${deleteSectionTarget?.title ?? ""}” can be removed once it is empty. Move or delete its cards first.`} confirmLabel="Delete list" cancelLabel="Keep list" onClose={() => setDeleteSectionTarget(null)} onConfirm={deleteList} />
       <TextEntrySheet visible={renameSectionTarget !== null} title="Rename list" initialValue={renameSectionTarget?.title ?? ""} placeholder="List name" onClose={() => setRenameSectionTarget(null)} onSubmit={(value) => { if (renameSectionTarget) api.renameSection(renameSectionTarget.id, value); setRenameSectionTarget(null); }} />
       <CreateListDialog visible={addSectionOpen} title={sectionTitle} onChangeTitle={setSectionTitle} onClose={() => setAddSectionOpen(false)} onCreate={(title) => { api.addSection(title); setSectionTitle(""); setAddSectionOpen(false); }} />
       {splitView || mode !== "calendar" ? null : <Sheet visible={calendarDay !== null} onClose={() => setCalendarDay(null)}>
@@ -645,11 +657,11 @@ function ListView({ tasks, boards, now, hasRefinements, selectedTaskId, compact 
       const eventType = task.completed ? "Completed" : task.canceled ? "Canceled" : task.createdAt === task.updatedAt ? "Added" : "Updated";
       const statusColor = status === "completed" ? theme.colors.success : status === "canceled" ? theme.colors.mutedForeground : status === "overdue" ? theme.colors.destructive : theme.colors.primary;
       const board = boards.find((item) => item.id === task.category);
-      if (compact) return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} accessibilityState={{ selected: selectedTaskId === task.id }} onPress={() => onTask(task)} style={({ pressed }) => ({ minHeight: 68, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 6, borderRadius: 10, borderWidth: 1, borderColor: selectedTaskId === task.id ? theme.colors.primary : theme.colors.border, backgroundColor: selectedTaskId === task.id ? theme.colors.primarySoft : theme.colors.card, opacity: pressed ? 0.8 : 1 })}>
+      if (compact) return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} accessibilityState={{ selected: selectedTaskId === task.id }} onPress={() => onTask(task)} style={({ pressed }) => [{ minHeight: 68, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: selectedTaskId === task.id ? theme.colors.primary : theme.colors.border, backgroundColor: theme.colors.card }, tactileCardSurface({ pressed, selected: selectedTaskId === task.id, dark: theme.scheme === "dark" })]}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Ionicons name={task.completed ? "checkmark-circle-outline" : task.canceled ? "ban-outline" : "create-outline"} size={17} color={statusColor} /><Text numberOfLines={1} style={{ flex: 1, color: theme.colors.foreground, fontSize: 14, fontWeight: "700" }}>{task.title}</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>{format(parseISO(stamp), "p")}</Text></View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, marginLeft: 25 }}><Text style={{ color: statusColor, fontSize: 11, fontWeight: "600" }}>{eventType}</Text><PriorityStars priority={task.priority} size={11} />{task.dueAt ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>Due {format(parseISO(task.dueAt), "MMM d")}</Text> : null}{board ? <Text numberOfLines={1} style={{ color: theme.colors.mutedForeground, fontSize: 11 }}>{board.label}</Text> : null}</View>
       </Pressable>;
-      return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} accessibilityState={{ selected: selectedTaskId === task.id }} onPress={() => onTask(task)} style={({ pressed }) => [{ borderWidth: selectedTaskId === task.id ? 1 : StyleSheet.hairlineWidth, borderColor: selectedTaskId === task.id ? theme.colors.primary : theme.colors.border, backgroundColor: selectedTaskId === task.id ? theme.colors.primarySoft : theme.colors.card, borderRadius: 17, padding: 13, marginBottom: 8, opacity: pressed ? 0.8 : 1 }]}>
+      return <Pressable key={task.id} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`} accessibilityState={{ selected: selectedTaskId === task.id }} onPress={() => onTask(task)} style={({ pressed }) => [{ borderWidth: 1, borderColor: selectedTaskId === task.id ? theme.colors.primary : theme.colors.border, backgroundColor: theme.colors.card, borderRadius: 17, padding: 13, marginBottom: 8 }, tactileCardSurface({ pressed, selected: selectedTaskId === task.id, dark: theme.scheme === "dark" })]}>
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}><StatusIcon status={status} size={17} /><View style={{ flex: 1, minWidth: 0 }}><Text style={{ color: theme.colors.foreground, fontSize: 15, lineHeight: 20, fontWeight: "700", textDecorationLine: task.completed ? "line-through" : "none" }} numberOfLines={2}>{task.title}</Text><Text style={{ color: theme.colors.mutedForeground, fontSize: 12, marginTop: 3 }}>{eventType} · {format(parseISO(stamp), "p")}</Text></View><Ionicons name="chevron-forward" size={17} color={theme.colors.mutedForeground} /></View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7, marginTop: 11, marginLeft: 40 }}><Text style={{ color: statusColor, fontSize: 11, fontWeight: "800" }}>{STATUS_LABELS[status]}</Text><PriorityStars priority={task.priority} />{task.dueAt ? <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><Ionicons name="time-outline" size={14} color={theme.colors.mutedForeground} /><Text style={{ color: theme.colors.mutedForeground, fontSize: 11, fontWeight: "600" }}>{format(parseISO(task.dueAt), "MMM d, h:mm a")}</Text></View> : null}{board ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 11, fontWeight: "600" }}>· {board.label}</Text> : null}</View>
       </Pressable>;

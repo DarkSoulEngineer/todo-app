@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
+import { tactileSurface } from "./tactile";
+import { SelectionLed } from "@/components/ui/selection-led";
 
 export interface SegmentedOption {
   key: string;
@@ -25,22 +27,25 @@ export function SegmentedControl({ options, value, onChange }: { options: Segmen
           <Pressable
             key={option.key}
             onPress={() => onChange(option.key)}
-            style={[
+            style={({ pressed }) => [
               styles.item,
-              active && { backgroundColor: theme.colors.card, borderRadius: theme.radius.md },
+              { backgroundColor: active ? theme.colors.primarySoft : theme.colors.card, borderColor: active ? theme.colors.primary : theme.colors.border, borderRadius: theme.radius.md },
+              tactileSurface({ pressed, selected: active, accent: theme.colors.primary, dark: theme.scheme === "dark" }),
             ]}
             accessibilityRole="button"
+            aria-pressed={active}
             accessibilityState={{ selected: active }}
           >
             <Text
               style={[
                 styles.label,
-                { color: active ? theme.colors.foreground : theme.colors.mutedForeground, fontWeight: active ? "600" : "500" },
+                { color: active ? theme.colors.accentForeground : theme.colors.mutedForeground, fontWeight: "600" },
               ]}
               numberOfLines={1}
             >
               {option.label}
             </Text>
+            <SelectionLed selected={active} />
           </Pressable>
         );
       })}
@@ -52,12 +57,13 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 4,
-    gap: 4,
+    padding: 5,
+    paddingBottom: 7,
+    gap: 6,
   },
   item: {
     flex: 1,
-    height: 36,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,

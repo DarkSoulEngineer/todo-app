@@ -24,7 +24,7 @@ export function CreateListDialog({ visible, title, onChangeTitle, onClose, onCre
     <Text style={[styles.label, !windowed && styles.mobileLabel, { color: colors.mutedForeground }]}>LIST NAME</Text>
     <Input autoFocus value={title} onChangeText={onChangeTitle} placeholder="e.g. In progress" accessibilityLabel="List name" accessibilityHint="Required" returnKeyType="done" onSubmitEditing={submit} style={windowed ? styles.windowInput : styles.mobileInput} />
   </>;
-  const createButton = <Button label="Add list" disabled={!title.trim()} onPress={submit} style={windowed ? styles.primary : styles.mobileButton} />;
+  const createButton = <Button variant="secondary" label="Add list" disabled={!title.trim()} onPress={submit} style={windowed ? styles.primary : styles.mobileButton} />;
 
   if (windowed) return <EditorWindow visible={visible} title="Add a list" icon="list-outline" closeLabel="Close list editor" testID="create-list-window" width={560} height={300} onClose={onClose}>
     <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroll} contentContainerStyle={styles.content}>{field}</ScrollView>

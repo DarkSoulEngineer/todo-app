@@ -45,7 +45,10 @@ export default function NewTaskRoute() {
     () => (workspaceReady && requestedCategory && api.boards.some((board) => board.id === requestedCategory) ? requestedCategory : null),
     [api.boards, requestedCategory, workspaceReady],
   );
-  const section = workspaceReady ? api.sections.find((item) => item.id === sectionId) : undefined;
+  const section = workspaceReady ? api.sections.find((item) => item.id === sectionId && !item.hidden) ?? api.sections.find((item) => !item.hidden) : undefined;
+  useEffect(() => {
+    if (workspaceReady && !section) router.replace(`/board/${currentProjectId}`);
+  }, [currentProjectId, section, workspaceReady]);
   const returnToOrigin = () => {
     if (origin === "desktop" && boardId) return router.replace(`/board/${boardId}`);
     if (origin === "my-tasks" || origin === "calendar") return router.replace("/top-tasks");
@@ -56,16 +59,16 @@ export default function NewTaskRoute() {
   // Do not mount the form until hydration and any requested project switch
   // have completed. This prevents a fast submit from being written into the
   // temporary empty workspace used while the provider hydrates.
-  if (!workspaceReady) return null;
+  if (!workspaceReady || !section) return null;
 
   return (
     <ReferenceNewTaskScreen
       boardLabel={api.currentProjectName || "Current board"}
-      sectionLabel={section?.title ?? "No list"}
+      sectionLabel={section.title}
       initialDraft={{ ...(dueAt ? { dueAt } : {}), ...(categoryId ? { category: categoryId } : {}) }}
       onCancel={returnToOrigin}
       onSubmit={(draft, attachments) => {
-        if (!workspaceReady) return;
+        if (!workspaceReady || !section) return;
         // `null` is a meaningful explicit “None” selection. Only accept a
         // submitted category when it belongs to the active workspace; never
         // replace an explicit null with the route's initial category.
@@ -74,8 +77,7 @@ export default function NewTaskRoute() {
           : draft.category && api.boards.some((board) => board.id === draft.category)
             ? draft.category
             : null;
-        const task = api.addTask({ ...draft, category: selectedCategory });
-        if (section) api.assignTaskToSection(task.id, section.id);
+        const task = api.addTask({ ...draft, category: selectedCategory }, section.id);
         attachments.forEach((attachment) => api.addAttachment(task.id, attachment));
         returnToOrigin();
       }}

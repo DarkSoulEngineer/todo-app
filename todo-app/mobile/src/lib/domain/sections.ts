@@ -8,7 +8,7 @@ export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed"
 /**
  * A new board starts from scratch: no columns at all. The predefined
  * Upcoming/Overdue/Completed/Canceled layout is gone: the user adds their own
- * sections. Cards remain unassigned until the user chooses a list.
+ * sections. New cards require a real list.
  */
 export function defaultSections(): BoardSection[] {
   return [];
@@ -18,14 +18,9 @@ export function isCustomSection(section: BoardSection): boolean {
   return section.status === undefined;
 }
 
-/** Display-only group for cards the user has not assigned to a list. Never saved. */
-export const UNASSIGNED_SECTION_ID = "__janus_unassigned__";
-
+/** Only user-created lists appear on the board. Legacy unassigned cards stay in Activity. */
 export function getDisplaySections(tasks: Task[], sections: BoardSection[], now: Date): BoardSection[] {
-  const visible = sections.filter((section) => !section.hidden);
-  return tasks.some((task) => !getTaskSectionId(task, sections, now))
-    ? [{ id: UNASSIGNED_SECTION_ID, title: "No list" }, ...visible]
-    : visible;
+  return sections.filter((section) => !section.hidden);
 }
 
 function asStatus(value: unknown): TaskStatus | undefined {

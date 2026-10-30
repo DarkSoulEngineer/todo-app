@@ -1,7 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Input } from "@/components/ui/input";
+import { tactileSurface } from "@/components/ui/tactile";
+import { SelectionLed } from "@/components/ui/selection-led";
 import { useReferenceTheme } from "@/components/reference/reference-theme";
 import { useTheme } from "@/providers/theme-provider";
 import { themes as catalog } from "@/theme/palettes";
@@ -9,9 +10,9 @@ import { getThemeById, type ThemeColors } from "@/theme/tokens";
 
 type Mode = "light" | "dark";
 
-const MODES: { value: Mode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: "light", label: "Light", icon: "sunny-outline" },
-  { value: "dark", label: "Dark", icon: "moon-outline" },
+const MODES: { value: Mode; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
 ];
 
 function Swatches({ colors }: { colors: ThemeColors }) {
@@ -45,26 +46,26 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
   };
 
   return <View style={styles.root}>
-    <View accessibilityRole="radiogroup" accessibilityLabel="Appearance mode" style={[styles.modeSwitch, { backgroundColor: colors.surfaceLow }]}>
+    <View accessibilityRole="radiogroup" accessibilityLabel="Appearance mode" style={[styles.modeSwitch, { backgroundColor: colors.surfaceLow, borderColor: colors.outlineVariant }]}>
       {MODES.map((option) => {
         const active = mode === option.value;
         return <Pressable key={option.value} accessibilityRole="radio" accessibilityLabel={`Use ${option.label.toLowerCase()} appearance`} accessibilityState={{ checked: active, disabled }} aria-checked={active} disabled={disabled}
           onPress={() => selectMode(option.value)}
-          style={({ pressed }) => [styles.modeButton, active && { backgroundColor: colors.card }, { opacity: pressed ? 0.75 : disabled ? 0.5 : 1 }]}>
-          <Ionicons name={option.icon} size={16} color={active ? colors.primary : colors.muted} />
-          <Text style={[type.bodyStrong, { color: active ? colors.text : colors.muted, fontSize: 13 }]}>{option.label}</Text>
+          style={({ pressed }) => [styles.modeButton, { backgroundColor: active ? colors.primaryFixed : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }, tactileSurface({ pressed, selected: active, disabled, accent: colors.primary, dark: mode === "dark" })]}>
+          <Text style={[type.bodyStrong, { color: active ? colors.onSecondaryContainer : colors.muted, fontSize: 13 }]}>{option.label}</Text>
+          <SelectionLed selected={active} />
         </Pressable>;
       })}
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Choose interface theme" accessibilityState={{ expanded: open, disabled }} disabled={disabled}
       onPress={() => { setOpen(!open); setQuery(""); }}
-      style={({ pressed }) => [styles.trigger, { backgroundColor: colors.surfaceLow, borderColor: colors.outlineVariant, opacity: pressed ? 0.75 : 1 }]}>
+      style={({ pressed }) => [styles.trigger, { backgroundColor: colors.surfaceHigh, borderColor: open ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }, tactileSurface({ pressed, selected: open, disabled, accent: colors.primary, dark: mode === "dark" })]}>
       <Swatches colors={theme.colors} />
       <View style={styles.copy}>
         <Text style={type.bodyStrong}>{selected?.name ?? "System"}</Text>
         <Text style={[type.caption, { color: colors.muted }]}>{preference === "system" ? "Follows your device appearance" : `${theme.scheme === "dark" ? "Dark" : "Light"} palette`}</Text>
       </View>
-      <Text style={[type.caption, { color: colors.primary }]}>{open ? "Close" : "Change"}</Text>
+      <Text style={[type.caption, { color: colors.primary, width: 48, textAlign: "right" }]}>{open ? "Close" : "Change"}</Text>
     </Pressable>
     {open ? <View style={[styles.menu, { borderColor: colors.outlineVariant }]}>
       <Input autoFocus value={query} onChangeText={setQuery} placeholder="Search themes" accessibilityLabel="Search themes" autoCorrect={false} />
@@ -81,10 +82,10 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
                 }
                 setPreference(entry.id); setOpen(false); setQuery("");
               }}
-              style={({ pressed }) => [styles.option, { backgroundColor: active ? colors.secondaryContainer : pressed ? colors.surfaceLow : "transparent" }]}>
+              style={({ pressed }) => [styles.option, { backgroundColor: active ? colors.secondaryContainer : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }, tactileSurface({ pressed, selected: active, disabled, accent: colors.primary, dark: mode === "dark" })]}>
               <Swatches colors={preview.colors} />
-              <Text numberOfLines={1} style={[type.body, styles.copy, { fontWeight: active ? "600" : "400" }]}>{entry.id === "system" ? "System (follow device)" : entry.name}</Text>
-              {active ? <Text style={[type.caption, { color: colors.onSecondaryContainer }]}>Selected</Text> : null}
+              <Text numberOfLines={1} style={[type.body, styles.copy, { fontWeight: "600" }]}>{entry.id === "system" ? "System (follow device)" : entry.name}</Text>
+              <SelectionLed selected={active} />
             </Pressable>;
           })}
           {!options.length ? <Text accessibilityLiveRegion="polite" style={[type.caption, styles.empty, { color: colors.muted }]}>No themes match your search.</Text> : null}
@@ -95,15 +96,15 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 8 },
-  modeSwitch: { padding: 4, borderRadius: 999, flexDirection: "row", gap: 4 },
-  modeButton: { flex: 1, minHeight: 36, borderRadius: 999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 10 },
-  trigger: { minHeight: 64, padding: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 12 },
+  root: { gap: 14 },
+  modeSwitch: { padding: 5, paddingBottom: 7, borderWidth: 1, borderRadius: 16, flexDirection: "row", gap: 8 },
+  modeButton: { flex: 1, minHeight: 44, borderRadius: 11, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
+  trigger: { minHeight: 68, padding: 12, borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   swatches: { flexDirection: "row", gap: 3 },
   swatch: { width: 12, height: 24, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth },
   copy: { flex: 1, minWidth: 0, gap: 3 },
-  menu: { padding: 8, gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10 },
+  menu: { padding: 10, gap: 12, borderWidth: 1, borderRadius: 14 },
   options: { maxHeight: 300 },
-  option: { minHeight: 48, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, flexDirection: "row", alignItems: "center", gap: 10 },
+  option: { minHeight: 48, marginBottom: 8, marginHorizontal: 2, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 10 },
   empty: { padding: 12 },
 });

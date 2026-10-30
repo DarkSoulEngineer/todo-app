@@ -40,22 +40,20 @@ function text(node) {
   return node && typeof node === "object" ? text(node.props?.children) : "";
 }
 
-test("feed cards keep status tags icon-only and show event/custom tags as text chips", () => {
-  for (const [tag, extra, expected] of [["Done", { completed: true }, "completed"], ["Canceled", { canceled: true }, "canceled"], ["Overdue", {}, "overdue"]]) {
+test("feed cards hide status glyphs and show event/custom tags as text chips", () => {
+  for (const [tag, extra] of [["Done", { completed: true }], ["Canceled", { canceled: true }], ["Overdue", {}]]) {
     const tree = render(null, { tags: [tag, "Christmas", "Custom label"], ...extra });
     const labels = find(tree, (node) => node.type === "Chip").map((node) => node.props.label);
     assert.deepEqual(labels, ["Christmas", "Custom label"]);
-    assert.equal(find(tree, (node) => node.type === "StatusIcon")[0].props.status, expected);
+    assert.equal(find(tree, (node) => node.type === "StatusIcon").length, 0);
   }
 });
 
-test("overdue metadata is one icon-only status badge, not duplicated text or clock", () => {
-  for (const [minutes, duration] of [[6 * 24 * 60, "6d"], [3 * 60, "3h"], [45, "45m"]]) {
+test("overdue metadata has no status glyph or redundant clock", () => {
+  for (const minutes of [6 * 24 * 60, 3 * 60, 45]) {
     const tree = render(new Date(now.getTime() - minutes * 60_000).toISOString());
     const badges = find(tree, (node) => node.type === "StatusIcon");
-    assert.equal(badges.length, 1);
-    assert.equal(badges[0].props.status, "overdue");
-    assert.equal(badges[0].props.detail, `Overdue by ${duration}`);
+    assert.equal(badges.length, 0);
     assert.equal(find(tree, (node) => node.type === "Ionicons" && node.props.name === "time-outline").length, 0);
     assert.equal(text(tree).toLowerCase().includes("overdue"), false);
   }
@@ -87,11 +85,11 @@ test("passive tags and metadata do not intercept the shared card press", () => {
   }
 });
 
-test("upcoming deadlines show no status glyph while completed and canceled do", () => {
+test("upcoming, completed and canceled cards show no status glyph", () => {
   const future = new Date(2026, 9, 27, 15).toISOString();
   const upcoming = render(future);
   assert.equal(find(upcoming, (node) => node.type === "StatusIcon").length, 0);
   assert.equal(find(upcoming, (node) => node.type === "Ionicons" && node.props.name === "time-outline").length, 1);
-  assert.equal(find(render(null, { completed: true }), (node) => node.type === "StatusIcon")[0].props.status, "completed");
-  assert.equal(find(render(null, { canceled: true }), (node) => node.type === "StatusIcon")[0].props.status, "canceled");
+  assert.equal(find(render(null, { completed: true }), (node) => node.type === "StatusIcon").length, 0);
+  assert.equal(find(render(null, { canceled: true }), (node) => node.type === "StatusIcon").length, 0);
 });
