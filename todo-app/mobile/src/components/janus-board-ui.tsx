@@ -403,7 +403,10 @@ function TaskEditorForm({
   const tagsControl = <View style={{ gap: 10 }}>
     {tagChips.length ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : null}
     <SpecialCardTagPicker tags={tags} onChange={setTags} />
-    <View style={styles.wrapRow}>{tags.filter((tag) => !classifySpecialCardTag(tag)).map((tag) => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Remove tag ${tag}`} onPress={() => setTags((current) => toggleCardTag(current, tag))} style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary }]}><Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{tag} ×</Text></Pressable>)}</View>
+    <View style={styles.wrapRow}>{tags.filter((tag) => {
+      const special = classifySpecialCardTag(tag);
+      return !special || special.group === "easter-egg";
+    }).map((tag) => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Remove tag ${tag}`} onPress={() => setTags((current) => toggleCardTag(current, tag))} style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary }]}><Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{tag} ×</Text></Pressable>)}</View>
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Input accessibilityLabel="New card tag" placeholder="Add a tag" value={tagInput} onChangeText={setTagInput} onSubmitEditing={addTag} returnKeyType="done" style={{ flex: 1, minWidth: 0, borderRadius: 12 }} /><Button variant="secondary" label="Add" onPress={addTag} disabled={!tagInput.trim()} /></View>
   </View>;
 
@@ -527,11 +530,11 @@ function TextEntrySheetForm({ visible, title, description, placeholder, initialV
   return <Sheet visible={visible} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.colors.foreground }]}>{title}</Text>{description ? <Text style={[styles.sheetDescription, { color: theme.colors.mutedForeground }]}>{description}</Text> : null}<Input autoFocus value={value} onChangeText={setValue} placeholder={placeholder} onSubmitEditing={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 12 }} /><Button variant="secondary" label={actionLabel} disabled={!value.trim()} onPress={() => { if (value.trim()) onSubmit(value.trim()); }} style={{ marginTop: 14 }} /></Sheet>;
 }
 
-export function BoardCard({ label, count, completed, createdAt, overdue = 0, dueSoon = 0, color, onPress, onMenu }: { label: string; count: number; completed: number; createdAt?: string; overdue?: number; dueSoon?: number; color: string; onPress: () => void; onMenu: () => void }) {
+export function BoardCard({ label, count, completed, canceled = 0, createdAt, overdue = 0, dueSoon = 0, color, onPress, onMenu }: { label: string; count: number; completed: number; canceled?: number; createdAt?: string; overdue?: number; dueSoon?: number; color: string; onPress: () => void; onMenu: () => void }) {
   const { theme } = useTheme();
   const progress = count === 0 ? 0 : completed / count;
   const createdLabel = createdAt && isValid(parseISO(createdAt)) ? `Created ${format(parseISO(createdAt), "MMM d, yyyy")}` : null;
-  const openCount = Math.max(0, count - completed);
+  const openCount = Math.max(0, count - completed - canceled);
   
   return (
     <View style={[styles.boardCardNew, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>

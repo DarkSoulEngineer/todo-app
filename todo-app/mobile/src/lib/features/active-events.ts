@@ -1,6 +1,6 @@
 import { SEASONAL_CARD_THEMES } from "@/lib/features/card-themes";
 
-export type EventOverride = string | null;
+export type EventOverride = "all" | null;
 
 /** Gregorian Easter Sunday (Meeus/Jones/Butcher). */
 function easterDate(year: number): Date {
@@ -15,7 +15,7 @@ function easterDate(year: number): Date {
 
 /** Local calendar days, not UTC. Birthday has no automatic date until configured. */
 export function getActiveEventThemes(now = new Date(), override: EventOverride = null) {
-  if (override !== null) return SEASONAL_CARD_THEMES.filter((entry) => entry.id === override);
+  if (override === "all") return SEASONAL_CARD_THEMES;
   const month = now.getMonth() + 1, day = now.getDate();
   const easter = easterDate(now.getFullYear());
   return SEASONAL_CARD_THEMES.filter(({ id }) => {

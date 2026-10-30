@@ -327,16 +327,14 @@ export function createSampleTasks(now: Date = new Date()): Task[] {
   // When a debug event is active, sprinkle a few extra sample cards carrying
   // that event's tag so the seasonal styling shows up on the demo board.
   const overrideId = typeof getEventOverride === "function" ? getEventOverride() : null;
-  const eventTheme = overrideId
-    ? SEASONAL_CARD_THEMES.find((entry) => entry.id === overrideId) ?? null
-    : null;
-  if (eventTheme) {
+  if (overrideId === "all") {
     const extraCount = 1 + Math.floor(Math.random() * 3);
     const chosen = new Set<number>();
     while (chosen.size < Math.min(extraCount, tasks.length)) {
       chosen.add(Math.floor(Math.random() * tasks.length));
     }
     for (const index of chosen) {
+      const eventTheme = SEASONAL_CARD_THEMES[Math.floor(Math.random() * SEASONAL_CARD_THEMES.length)];
       tasks[index] = {
         ...tasks[index],
         tags: [...(tasks[index].tags ?? []), eventTheme.label],

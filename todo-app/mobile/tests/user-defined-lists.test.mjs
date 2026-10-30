@@ -125,7 +125,7 @@ test("editor saves one event and one status plus unlimited ordinary tags on mobi
     const app = setup({ width });
     let tree = app.render();
     const pressSpecial = (label) => {
-      if (label.startsWith("Event tag ")) activeEvents.setEventOverride(cardThemes.classifySpecialCardTag(label.slice(10)).theme.id);
+      if (label.startsWith("Event tag ")) activeEvents.setEventOverride("all");
       const component = label.startsWith("Status tag ") ? "CardStatusPicker" : "SpecialCardTagPicker";
       const picker = nodes(tree).find((node) => node.type?.name === component);
       nodes(picker.type(picker.props)).find((node) => node.props?.accessibilityLabel === label).props.onPress();

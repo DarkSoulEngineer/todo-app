@@ -38,7 +38,7 @@ const { BoardManagerContent } = await load("../src/components/board/board-manage
   "@/components/ui/mobile-top-bar": { MobileTopBarAction: "Action", MobileSearchField: "Search" },
   "@/components/ui/section-heading": { SectionHeading: "Heading" },
   "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },
-  "@/lib/data/manager-state": { getTaskMetrics: () => metrics },
+  "@/lib/data/manager-state": { getTaskMetrics: () => metrics, getBoardTaskMetrics: () => metrics },
   "@/theme/layout": { mobileContentStyle: { maxWidth: 600, width: "100%" }, mobileBottomNavClearance: 112 },
   "@/lib/features/home-layout": layoutModule,
   "./board-drag-cell": { BoardDragCell: "BoardDragCell" },

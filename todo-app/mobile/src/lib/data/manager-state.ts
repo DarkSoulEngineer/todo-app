@@ -144,9 +144,17 @@ export function getTaskMetrics(tasks: readonly Task[], now = Date.now()): TaskMe
   };
 }
 
+/** Home board counts include tasks assigned to lists currently visible on that board. */
+export function getBoardTaskMetrics(project: Pick<JanusProject, "workspace">, now = Date.now()): TaskMetrics {
+  const visibleSectionIds = new Set(project.workspace.sections.filter((section) => !section.hidden).map((section) => section.id));
+  const availableTasks = project.workspace.tasks.filter((task) => task.sectionId && visibleSectionIds.has(task.sectionId));
+  return getTaskMetrics(availableTasks, now);
+}
+
 export function getWorkspaceMetrics(projects: readonly JanusProject[], now = Date.now()): TaskMetrics {
-  return getTaskMetrics(
-    projects.flatMap((project) => project.workspace.tasks),
-    now,
-  );
+  const visibleTasks = projects.flatMap((project) => {
+    const visibleSectionIds = new Set(project.workspace.sections.filter((section) => !section.hidden).map((section) => section.id));
+    return project.workspace.tasks.filter((task) => task.sectionId && visibleSectionIds.has(task.sectionId));
+  });
+  return getTaskMetrics(visibleTasks, now);
 }

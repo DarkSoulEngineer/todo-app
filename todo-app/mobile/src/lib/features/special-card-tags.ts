@@ -106,7 +106,7 @@ export function applyCategoryCardTag(task: Task, boards: readonly Board[]): Task
 /** One-time compatibility conversion. Never re-infer tags after the version mark. */
 export function migrateCardTags(task: Task, listTitle = "", boards: readonly Board[] = []): Task {
   let tags = normalizeCardTags(task.tags);
-  if (task.specialTagsVersion !== 1 && !tags.some((tag) => ["event", "easter-egg"].includes(classifySpecialCardTag(tag)?.group ?? ""))) {
+  if (task.specialTagsVersion !== 1 && !tags.some((tag) => classifySpecialCardTag(tag)?.group === "event")) {
     const event = detectSeasonalCardTheme(task.title) ?? detectSeasonalCardTheme(listTitle);
     if (event) tags = normalizeCardTags([...tags, event.label]);
   }
