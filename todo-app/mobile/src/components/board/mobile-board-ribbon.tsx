@@ -8,6 +8,8 @@ import { useMobileBoardColors } from "./mobile-board-colors";
 import { Sheet } from "@/components/ui/sheet";
 import { RibbonScrollView } from "@/components/ui/ribbon-scroll-view";
 import { usePreferences } from "@/providers/preferences-provider";
+import { useToast } from "@/providers/toast-provider";
+import { NotificationPanel } from "./notification-panel";
 
 const CONTROL_SIZE = 44;
 
@@ -72,6 +74,8 @@ export function MobileBoardRibbon(props: Props) {
   const c = useMobileBoardColors();
   const insets = useSafeAreaInsets();
   const { fontScale, width } = useWindowDimensions();
+  const { notifications } = useToast();
+  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
   const compactInsights = props.mode === "insights" && Platform.OS === "web" && width >= 768;
   const tabActionStyle = [styles.tabAction, compactInsights && styles.compactTabAction];
   const [tab, setTab] = useState<Tab>("home");
@@ -80,6 +84,7 @@ export function MobileBoardRibbon(props: Props) {
   const [expanded, setExpanded] = useState(true);
   const [previousTab, setPreviousTab] = useState<Tab>("home");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const searchInput = useRef<ComponentRef<typeof TextInput> | null>(null);
   const clearSearch = useCallback(() => {
@@ -167,6 +172,12 @@ export function MobileBoardRibbon(props: Props) {
       {context.search ? <Pressable accessibilityRole="button" accessibilityLabel="Search tasks" onPress={() => { if (props.query.length > 0) { setSearchOpen(true); searchInput.current?.focus(); } else { setSearchOpen((value) => !value); setSearchFocused(false); } resetHideTimer(); }} style={[styles.tabAction, searchVisible && { backgroundColor: c.input }]}>
         <Ionicons name="search-outline" size={18} color={searchVisible ? c.primary : c.foreground} />
       </Pressable> : null}
+      <Pressable accessibilityRole="button" accessibilityLabel={unreadNotifications ? `Notifications, ${unreadNotifications} unread` : "Notifications"} accessibilityState={{ expanded: notificationsOpen }} onPress={() => { setNotificationsOpen(true); resetHideTimer(); }} style={[styles.tabAction, notificationsOpen && { backgroundColor: c.input }]}>
+        <View style={styles.notificationButtonIcon}>
+          <Ionicons name="notifications-outline" size={18} color={notificationsOpen ? c.primary : c.foreground} />
+          {unreadNotifications ? <View testID="board-notification-indicator" pointerEvents="none" style={[styles.filterDot, { backgroundColor: c.destructive, borderColor: c.card }]} /> : null}
+        </View>
+      </Pressable>
       <Pressable accessibilityRole="switch" accessibilityLabel={pinned ? "Unpin ribbon" : "Pin ribbon open"} accessibilityHint={pinned ? "The ribbon will auto-hide after some seconds of inactivity." : "The ribbon will stay open continuously."} accessibilityState={{ checked: pinned }} onPress={togglePin} style={tabActionStyle}>{pinned ? <MaterialCommunityIcons name="pin" size={18} color={c.primary} /> : <MaterialCommunityIcons name="pin-off-outline" size={18} color={c.mutedForeground} />}</Pressable>
     </View>
     {searchVisible ? <View style={styles.searchRow}><View style={[styles.search, { borderColor: searchFocused ? c.primary : c.borderStrong, backgroundColor: c.input }]}><Ionicons name="search-outline" size={16} color={c.mutedForeground} /><TextInput ref={searchInput} autoFocus onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} selectionColor={c.primary} cursorColor={c.primary} underlineColorAndroid="transparent" accessibilityLabel="Filter tasks and labels" value={props.query} onChangeText={props.onQuery} placeholder="Search tasks…" placeholderTextColor={c.mutedForeground} style={[styles.input, { color: c.foreground }, Platform.OS === "web" && { outlineWidth: 0 }]} />{props.query ? <Pressable hitSlop={1} accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { clearSearch(); resetHideTimer(); }} style={styles.searchClear}><View style={styles.iconFace}><Ionicons name="close" size={19} color={c.mutedForeground} /></View></Pressable> : null}</View></View> : null}
@@ -190,16 +201,18 @@ export function MobileBoardRibbon(props: Props) {
       <Text style={[styles.moreHint, { color: c.mutedForeground }]}>Choose a tab. Swipe tool rows or use their arrows for more options.</Text>
       {visibleTabs.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Show ${item.label} ribbon tab`} accessibilityState={{ selected: shownTab === item.value }} onPress={() => { openTab(item.value); setMoreOpen(false); }} style={[styles.moreOption, { backgroundColor: shownTab === item.value ? c.primarySoft : "transparent" }]}>
         <Ionicons name={item.icon} size={20} color={c.foreground} />
-        <Text style={{ flex: 1, color: c.foreground, fontSize: 15 }}>{item.label}{item.value === "hidden" ? ` (${hiddenSections.length})` : item.value === "filters" && props.filtersActive ? " · Active" : ""}</Text>
+        <Text style={{ flex: 1, color: c.foreground, fontSize: 15 }}>{item.label}{item.value === "hidden" ? ` (${hiddenSections.length})` : item.value === "filters" && props.filtersActive ? " · Active" : item.value === "notifications" && unreadNotifications ? ` · ${unreadNotifications} unread` : ""}</Text>
         {shownTab === item.value ? <Ionicons name="checkmark" size={20} color={c.primary} /> : null}
       </Pressable>)}
     </Sheet>
+    <NotificationPanel visible={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
   </View>;
 }
 
 const styles = StyleSheet.create({
   compactTab: { minHeight: CONTROL_SIZE, paddingHorizontal: 5, gap: 5 },
   compactTabAction: { width: 36, height: CONTROL_SIZE },
+  notificationButtonIcon: { position: "relative" },
   moreTitle: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
   moreHint: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
   moreOption: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, borderRadius: 10 },

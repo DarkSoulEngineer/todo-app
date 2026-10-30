@@ -1,6 +1,6 @@
 import { makeId } from "@/lib/utils/id";
 import { applyCategoryCardTag, applySectionCardStatus, migrateCardTags, setCardStatus } from "@/lib/features/special-card-tags";
-import { celebrateTaskCompletion } from "@/lib/features/task-completion-celebration";
+import { celebrateTaskCompletion, celebrateTaskCompletions } from "@/lib/features/task-completion-celebration";
 import {
   defaultBoards,
   type Board,
@@ -78,6 +78,8 @@ export interface TasksApi {
   removeSubtask: (taskId: string, subtaskId: string) => void;
   /** Set status directly (used by board move actions). */
   setTaskStatus: (id: string, status: "completed" | "canceled" | "open") => void;
+  /** Apply one status update and one celebration to a batch of tasks. */
+  setTasksStatus: (ids: string[], status: "completed" | "canceled" | "open") => void;
   /** Move a task to a due date (used by calendar actions), or clear it. */
   setTaskDueAt: (id: string, dueAt: string | null) => void;
   /** Assign a task to a list without changing tags, state, or appearance. */
@@ -181,7 +183,12 @@ export function useTasks(): TasksApi {
       if (cancelled) return;
       projectsRef.current = registry;
       setProjectsState(registry);
-      setVersions(storedVersions);
+      const projectIds = new Set(registry.projects.map((project) => project.id));
+      const scopedVersions = storedVersions
+        .map((version) => ({ ...version, projectId: version.projectId || registry.currentId }))
+        .filter((version) => projectIds.has(version.projectId));
+      versionsRef.current = scopedVersions;
+      setVersions(scopedVersions);
       if (registry.projects.length > 0) {
         const active = activeProject(registry);
         if (!active) {
@@ -495,6 +502,23 @@ export function useTasks(): TasksApi {
     [updateById, recordTask],
   );
 
+  const setTasksStatus = useCallback(
+    (ids: string[], status: "completed" | "canceled" | "open") => {
+      const selectedIds = new Set(ids);
+      if (!selectedIds.size) return;
+      selectedIds.forEach(recordTask);
+      const transitions: { previous: Task; next: Task; taskId: string }[] = [];
+      setLiveTasks((previous) => previous.map((task) => {
+        if (!selectedIds.has(task.id)) return task;
+        const next = applyCategoryCardTag(setCardStatus(task, status), boardsRef.current);
+        transitions.push({ previous: task, next, taskId: task.id });
+        return next;
+      }));
+      if (status === "completed") celebrateTaskCompletions(transitions);
+    },
+    [recordTask, setLiveTasks],
+  );
+
   const setTaskDueAt = useCallback(
     (id: string, dueAt: string | null) => {
       updateTaskAnywhere(id, (task) => ({ ...task, dueAt, updatedAt: new Date().toISOString() }));
@@ -689,26 +713,35 @@ export function useTasks(): TasksApi {
   }, [setLiveSections, setLiveTasks]);
 
   const createVersion = useCallback(() => {
+    const projectId = activeIdRef.current ?? "";
+    if (!projectId) return;
+    const currentProjectVersions = versionsRef.current.filter((item) => item.projectId === projectId);
     const version: WorkspaceVersion = {
       id: `${Date.now()}-${makeId(6)}`,
-      label: `Version ${versionsRef.current.length + 1}`,
+      projectId,
+      label: `Version ${currentProjectVersions.length + 1}`,
       createdAt: new Date().toISOString(),
       taskCount: tasksRef.current.length,
       workspace: snapshot(),
     };
-    setVersions((prev) => [version, ...prev]);
+    const next = [version, ...versionsRef.current];
+    versionsRef.current = next;
+    setVersions(next);
   }, [snapshot]);
 
   const restoreVersion = useCallback(
     (id: string) => {
-      const version = versionsRef.current.find((item) => item.id === id);
+      const projectId = activeIdRef.current;
+      const version = versionsRef.current.find((item) => item.id === id && item.projectId === projectId);
       if (version) restore(version.workspace);
     },
     [restore],
   );
 
   const deleteVersion = useCallback((id: string) => {
-    setVersions((prev) => prev.filter((item) => item.id !== id));
+    const next = versionsRef.current.filter((item) => item.id !== id);
+    versionsRef.current = next;
+    setVersions(next);
   }, []);
 
   // ---- Boards as project tenants -------------------------------------------
@@ -900,6 +933,9 @@ export function useTasks(): TasksApi {
       if (!registry.projects.some((project) => project.id === id)) return false;
       const projects = registry.projects.filter((project) => project.id !== id);
       const wasCurrent = registry.currentId === id;
+      const nextVersions = versionsRef.current.filter((version) => version.projectId !== id);
+      versionsRef.current = nextVersions;
+      setVersions(nextVersions);
       if (projects.length === 0) {
         applyRegistry(
           {
@@ -944,6 +980,7 @@ export function useTasks(): TasksApi {
       addSubtask,
       removeSubtask,
       setTaskStatus,
+      setTasksStatus,
       setTaskDueAt,
       setTaskSectionId,
       assignTaskToSection,
@@ -965,7 +1002,7 @@ export function useTasks(): TasksApi {
       revertTask,
       clearTaskHistory,
       loadSample,
-      versions,
+      versions: versions.filter((version) => version.projectId === (projectsState?.currentId ?? "")),
       createVersion,
       restoreVersion,
       deleteVersion,
@@ -1000,6 +1037,7 @@ export function useTasks(): TasksApi {
       addSubtask,
       removeSubtask,
       setTaskStatus,
+      setTasksStatus,
       setTaskDueAt,
       setTaskSectionId,
       assignTaskToSection,
@@ -1022,6 +1060,7 @@ export function useTasks(): TasksApi {
       clearTaskHistory,
       loadSample,
       versions,
+      projectsState?.currentId,
       createVersion,
       restoreVersion,
       deleteVersion,

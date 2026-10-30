@@ -234,12 +234,7 @@ export default function WorkspaceScreen() {
     });
     if (!eligibleTasks.length) return;
     const before = api.snapshot();
-    eligibleTasks.forEach((task) => {
-      if (status === "completed") api.toggleComplete(task.id);
-      else if (status === "canceled") api.toggleCancel(task.id);
-      else if (task.completed) api.toggleComplete(task.id);
-      else api.toggleCancel(task.id);
-    });
+    api.setTasksStatus(eligibleTasks.map((task) => task.id), status);
     toast.success(message, { action: { label: "Undo", onPress: () => api.restore(before) } });
   };
   const runBulkPriority = (priority: Priority) => {

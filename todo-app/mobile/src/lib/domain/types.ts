@@ -67,6 +67,7 @@ export interface BoardSection {
 /** A saved point-in-time snapshot of a workspace. */
 export interface WorkspaceVersion {
   id: string;
+  projectId: string;
   label: string;
   createdAt: string;
   taskCount: number;

@@ -33,6 +33,7 @@ const { createTask, applyDraft, applyTaskPatch } = load("lib/domain/task-factory
 const { deriveStatus } = load("lib/domain/status");
 const { buildWorkspace } = load("lib/data/workspace");
 const { useTasks } = load("hooks/use-tasks");
+const completionCelebrations = load("lib/features/task-completion-celebration");
 const now = new Date("2026-10-30T12:00:00Z");
 const draft = (extra = {}) => ({ title: "Task", description: "Notes", priority: "medium", category: null, dueAt: "2035-01-01T12:00:00Z", subtasks: [], ...extra });
 const workspace = (tasks, sections = []) => ({ tasks, sections, boards: [] });
@@ -110,6 +111,22 @@ test("direct Complete, Cancel and Restore actions synchronize the exclusive stat
   assert.deepEqual(api.snapshot().tasks[0].tags, ["Work", "Halloween", "Canceled"]);
   api.setTaskStatus(task.id, "open");
   assert.deepEqual(api.snapshot().tasks[0].tags, ["Work", "Halloween"]);
+});
+
+test("bulk status completion updates selected tasks with one celebration", () => {
+  const api = useTasks();
+  api.addSection("Tasks");
+  const first = api.addTask(draft({ tags: ["Work"] }));
+  const second = api.addTask(draft({ tags: ["Halloween"], subtasks: [{ id: "check", title: "Check", done: true }] }));
+  const received = [];
+  const unsubscribe = completionCelebrations.subscribeToTaskCompletionCelebrations((event) => received.push(event));
+  api.setTasksStatus([first.id, second.id], "completed");
+  unsubscribe();
+  assert.equal(api.snapshot().tasks.filter((task) => task.completed).length, 2);
+  assert.deepEqual(api.snapshot().tasks.map((task) => task.tags), [["Work", "Done"], ["Halloween", "Done"]]);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].title, "2 tasks completed");
+  assert.equal(received[0].completedChecklistItems, 1);
 });
 
 test("moving into status-named sections applies matching status tags without affecting ordinary sections", () => {

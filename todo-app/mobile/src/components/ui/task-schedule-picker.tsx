@@ -77,7 +77,6 @@ function ScheduleTimePanel({ date, onApply, onClear, showTitle = true }: { date:
       {showTitle ? <Text accessibilityRole="header" style={[styles.monthTitle, styles.panelTitle, { color: c.foreground }]}>Time</Text> : <View style={styles.flex} />}
       {onClear ? <Pressable accessibilityRole="button" accessibilityLabel="Remove due date" onPress={onClear} style={({ pressed }) => [styles.clearDateButton, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name="close" size={17} color={c.mutedForeground} /></Pressable> : null}
     </View> : null}
-    {date ? null : <Text style={[styles.hint, { color: c.mutedForeground }]}>Choose a date to add a time</Text>}
     <View style={styles.timeFields}>
       <View style={styles.timeField}><Text style={[styles.caption, { color: c.mutedForeground }]}>HOUR</Text><Input accessibilityLabel="Due hour" accessibilityHint="0 to 23" editable={Boolean(date)} placeholder="—" inputMode="numeric" maxLength={2} value={hour} onChangeText={(text) => { const value = text.replace(/\D/g, ""); setHour(value); tryApply(value, minute); }} selectTextOnFocus style={styles.timeInput} /></View>
       <Text style={[styles.colon, { color: c.mutedForeground }]}>:</Text>

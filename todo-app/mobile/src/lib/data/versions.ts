@@ -48,6 +48,7 @@ function normalizeVersion(value: unknown): WorkspaceVersion | null {
 
   return {
     id: record.id,
+    projectId: typeof record.projectId === "string" ? record.projectId : "",
     label: record.label.trim(),
     createdAt: record.createdAt,
     taskCount: workspace.tasks.length,

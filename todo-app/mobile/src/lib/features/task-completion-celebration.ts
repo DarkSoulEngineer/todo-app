@@ -9,6 +9,7 @@ export interface TaskCompletionCelebrationEvent {
 }
 
 type CompletionState = Pick<Task, "completed" | "canceled" | "title" | "priority" | "subtasks">;
+type CompletionTransition = { previous: CompletionState; next: CompletionState; taskId: string };
 type Listener = (celebration: TaskCompletionCelebrationEvent) => void;
 type MeasureOrigin = (callback: (origin: { x: number; y: number } | null) => void) => void;
 
@@ -37,13 +38,25 @@ export function subscribeToTaskCompletionCelebrations(listener: Listener): () =>
 }
 
 export function celebrateTaskCompletion(previous: CompletionState, next: CompletionState, taskId?: string): void {
-  if (previous.completed || !next.completed || next.canceled) return;
+  if (!taskId) {
+    celebrateTaskCompletions([{ previous, next, taskId: "" }]);
+    return;
+  }
+  celebrateTaskCompletions([{ previous, next, taskId }]);
+}
 
+export function celebrateTaskCompletions(transitions: CompletionTransition[]): void {
+  const completed = transitions.filter(({ previous, next }) => !previous.completed && next.completed && !next.canceled);
+  if (!completed.length) return;
+  const priorityRank: Record<Priority, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+  const priority = completed.reduce((highest, item) => priorityRank[item.next.priority] > priorityRank[highest] ? item.next.priority : highest, "low" as Priority);
+  const first = completed[0];
+  const taskId = first.taskId || undefined;
   const celebration = {
     id: ++nextCelebrationId,
-    title: next.title,
-    priority: next.priority,
-    completedChecklistItems: next.subtasks.filter((subtask) => subtask.done).length,
+    title: completed.length === 1 ? first.next.title : `${completed.length} tasks completed`,
+    priority,
+    completedChecklistItems: completed.reduce((sum, item) => sum + item.next.subtasks.filter((subtask) => subtask.done).length, 0),
     origin: null as { x: number; y: number } | null,
   };
   const delayMs = taskId ? dispatchDelays.get(taskId) ?? 0 : 0;

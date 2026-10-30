@@ -45,6 +45,20 @@ test("celebrations use the registered task card center and unregister safely", (
   unsubscribe();
 });
 
+test("bulk completion publishes one aggregate celebration for all newly completed tasks", () => {
+  const received = [];
+  const unsubscribe = exports.subscribeToTaskCompletionCelebrations((event) => received.push(event));
+  exports.celebrateTaskCompletions([
+    { previous: task(), next: task({ completed: true, priority: "low", subtasks: [{ id: "a", title: "A", done: true }] }), taskId: "first" },
+    { previous: task(), next: task({ completed: true, priority: "critical", subtasks: [{ id: "b", title: "B", done: true }, { id: "c", title: "C", done: true }] }), taskId: "second" },
+  ]);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].title, "2 tasks completed");
+  assert.equal(received[0].priority, "critical");
+  assert.equal(received[0].completedChecklistItems, 3);
+  unsubscribe();
+});
+
 test("edit-screen completion celebrations wait for the inspector dismissal", async () => {
   const received = [];
   const unsubscribe = exports.subscribeToTaskCompletionCelebrations((event) => received.push(event));

@@ -17,6 +17,7 @@ const sameDeps = (a, b) => a && a.length === b.length && a.every((value, index) 
 function setup({ width = 400, fontScale = 1, preferences = { ribbonPinned: false } } = {}) {
   const slots = [];
   const timers = new Map();
+  const notifications = [];
   let cursor = 0;
   let nextTimer = 0;
   let effects = [];
@@ -42,6 +43,21 @@ function setup({ width = 400, fontScale = 1, preferences = { ribbonPinned: false
         slots[index]?.cleanup?.();
         slots[index] = { deps, cleanup: effect() };
       });
+
+      test("Notifications button opens a board-scoped right-side popup and shows unread count", () => {
+        const app = setup();
+        app.notifications.push({
+          id: 1, projectId: "board", message: "Moved to In progress", description: "Task Alpha", tone: "success", read: false,
+        });
+        let tree = app.render();
+        const notificationButton = button(tree, "Notifications, 1 unread");
+        assert.ok(notificationButton);
+        assert.ok(nodes(tree).some((node) => node.props?.testID === "board-notification-indicator"));
+        notificationButton.props.onPress();
+        tree = app.render();
+        const panel = nodes(tree).find((node) => node.type === "NotificationPanel");
+        assert.equal(panel.props.visible, true);
+      });
     },
   };
   const colors = new Proxy({ primary: "#86b840", borderStrong: "#555555" }, { get: (target, key) => target[key] ?? "#888888" });
@@ -53,6 +69,10 @@ function setup({ width = 400, fontScale = 1, preferences = { ribbonPinned: false
     "@/components/ui/sheet": { Sheet: "Sheet" },
     "@/components/ui/ribbon-scroll-view": { RibbonScrollView: "RibbonScrollView" },
     "@/providers/preferences-provider": { usePreferences: () => ({ ribbonPinned: preferences.ribbonPinned, setRibbonPinned: (pinned) => { preferences.ribbonPinned = pinned; } }) },
+    "@/providers/toast-provider": { useToast: () => ({
+      notifications,
+    }) },
+    "./notification-panel": { NotificationPanel: "NotificationPanel" },
   };
   const exports = {};
   vm.runInNewContext(source, {
@@ -61,7 +81,7 @@ function setup({ width = 400, fontScale = 1, preferences = { ribbonPinned: false
     clearTimeout: (id) => timers.delete(id),
   });
   return {
-    props, timers,
+    props, timers, notifications,
     render() { cursor = 0; effects = []; const tree = exports.MobileBoardRibbon(props); effects.forEach((effect) => effect()); return tree; },
     elapse() { const pending = [...timers.values()]; timers.clear(); pending.forEach((callback) => callback()); },
   };
