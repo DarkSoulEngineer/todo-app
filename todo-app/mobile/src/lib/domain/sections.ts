@@ -2,46 +2,30 @@ import { makeId } from "@/lib/utils/id";
 import { deriveStatus } from "@/lib/domain/status";
 import type { BoardSection, Task, TaskStatus } from "@/lib/domain/types";
 
-/** Order of the built-in, status-backed columns. */
+/** Legacy status ids accepted only for migration. */
 export const STATUS_SECTIONS: TaskStatus[] = ["upcoming", "overdue", "completed", "canceled"];
-
-/** The list that canceled tasks are automatically moved into. */
-export const CANCELED_SECTION_TITLE = "Canceled";
-
-export function isCanceledSection(section: BoardSection): boolean {
-  return section.title.trim().toLowerCase() === CANCELED_SECTION_TITLE.toLowerCase();
-}
-
-export function findCanceledSection(sections: BoardSection[]): BoardSection | undefined {
-  return sections.find(isCanceledSection);
-}
 
 /**
  * A new board starts from scratch: no columns at all. The predefined
  * Upcoming/Overdue/Completed/Canceled layout is gone: the user adds their own
- * sections, and a card is only ever placed in a column that exists.
+ * sections. Cards remain unassigned until the user chooses a list.
  */
 export function defaultSections(): BoardSection[] {
   return [];
-}
-
-export function isStatusSection(
-  section: BoardSection,
-): section is BoardSection & { status: TaskStatus } {
-  return typeof section.status === "string";
 }
 
 export function isCustomSection(section: BoardSection): boolean {
   return section.status === undefined;
 }
 
-/** Gives new or displaced cards a real list, creating one only when needed. */
-export function ensureDefaultTaskSection(sections: BoardSection[]): BoardSection {
-  const existing = sections.find((section) => !section.hidden && isCustomSection(section));
-  if (existing) return existing;
-  const section = { id: `custom-${makeId(8)}`, title: "Inbox" };
-  sections.push(section);
-  return section;
+/** Display-only group for cards the user has not assigned to a list. Never saved. */
+export const UNASSIGNED_SECTION_ID = "__janus_unassigned__";
+
+export function getDisplaySections(tasks: Task[], sections: BoardSection[], now: Date): BoardSection[] {
+  const visible = sections.filter((section) => !section.hidden);
+  return tasks.some((task) => !getTaskSectionId(task, sections, now))
+    ? [{ id: UNASSIGNED_SECTION_ID, title: "No list" }, ...visible]
+    : visible;
 }
 
 function asStatus(value: unknown): TaskStatus | undefined {
@@ -83,13 +67,17 @@ export function normalizeSections(value: unknown): BoardSection[] {
   return result;
 }
 
-/** Drops `sectionId` references that no longer point at a custom section. */
-export function reconcileSectionIds(tasks: { sectionId: string | null }[], sections: BoardSection[]): void {
-  if (tasks.length && !sections.length) ensureDefaultTaskSection(sections);
-  const customIds = new Set(sections.filter(isCustomSection).map((section) => section.id));
+/** Migrate legacy status lists to ordinary lists without moving their cards. */
+export function reconcileSectionIds(tasks: Task[], sections: BoardSection[]): void {
+  const ids = new Set(sections.map((section) => section.id));
+  const legacySections = sections.filter((section) => section.status !== undefined);
+  const now = new Date();
   for (const task of tasks) {
-    if (task.sectionId && !customIds.has(task.sectionId)) task.sectionId = null;
+    if (task.sectionId && ids.has(task.sectionId)) continue;
+    const status = legacySections.length ? deriveStatus(task, now) : undefined;
+    task.sectionId = legacySections.find((section) => section.status === status)?.id ?? null;
   }
+  for (const section of sections) delete section.status;
 }
 
 /**
@@ -101,9 +89,7 @@ export function getTaskSectionId(task: Task, sections: BoardSection[], now: Date
     const customSection = sections.find((s) => s.id === task.sectionId);
     if (customSection && isCustomSection(customSection)) return customSection.id;
   }
-  const status = deriveStatus(task, now);
-  const statusSection = sections.find((s) => s.status === status);
-  return statusSection?.id ?? sections.find((section) => !section.hidden && isCustomSection(section))?.id;
+  return undefined;
 }
 
 /**

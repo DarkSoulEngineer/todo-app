@@ -69,7 +69,7 @@ export function RadialDiagram({ slices, total }: { slices: ChartSlice[]; total: 
   </View>;
 }
 
-export function WeekdayDiagram({ values }: { values: number[] }) {
+export function WeekdayDiagram({ values, height = 190 }: { values: number[]; height?: number }) {
   const { theme: { colors: c, fontFamily } } = useTheme();
   const observedMax = Math.max(1, ...values);
   const max = observedMax > 4 ? Math.ceil(observedMax / 4) * 4 : observedMax;
@@ -77,7 +77,7 @@ export function WeekdayDiagram({ values }: { values: number[] }) {
   const palette = [c.success, c.info, c.primary, c.warning, c.primary, c.info, c.success];
   const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return <View testID="insights-weekday-diagram" accessible accessibilityRole="image" accessibilityLabel={`Completions by weekday: ${values.map((value, index) => `${labels[index]} ${value}`).join(", ")}`}>
-    <Svg fontFamily={fontFamily || undefined} width="100%" height={190} viewBox="0 0 350 190">
+    <Svg fontFamily={fontFamily || undefined} width="100%" height={height} viewBox="0 0 350 190" preserveAspectRatio="none">
       {ticks.map((fraction) => <G key={fraction}><Line x1={28} x2={348} y1={18 + fraction * 140} y2={18 + fraction * 140} stroke={c.border} strokeWidth={0.6} /><SvgText x={20} y={21 + fraction * 140} textAnchor="end" fontSize={9} fill={c.mutedForeground}>{Math.round(max * (1 - fraction))}</SvgText></G>)}
       {values.map((value, index) => <G key={index}><Rect x={38 + index * 44} y={18} width={24} height={140} rx={4} fill={c.secondary} fillOpacity={0.6} /><Rect x={38 + index * 44} y={158 - (value / max) * 140} width={24} height={Math.max(0, (value / max) * 140)} rx={4} fill={palette[index]} /><SvgText x={50 + index * 44} y={178} textAnchor="middle" fontSize={9} fill={c.mutedForeground}>{labels[index]}</SvgText>{value ? <SvgText x={50 + index * 44} y={Math.max(11, 151 - (value / max) * 140)} textAnchor="middle" fontSize={9} fill={c.foreground}>{value}</SvgText> : null}</G>)}
     </Svg>

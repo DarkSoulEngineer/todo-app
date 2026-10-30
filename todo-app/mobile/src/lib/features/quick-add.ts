@@ -9,7 +9,6 @@ import {
   setMinutes,
   startOfDay,
 } from "date-fns";
-import { CATEGORIES } from "@/lib/domain/categories";
 import type { Board } from "@/lib/domain/boards";
 import type { Priority, TaskDraft } from "@/lib/domain/types";
 
@@ -90,7 +89,7 @@ function extractPriority(input: string): { rest: string; priority: Priority | nu
 
 function extractCategory(
   input: string,
-  boards: readonly Pick<Board, "id" | "label">[] = CATEGORIES,
+  boards: readonly Pick<Board, "id" | "label">[] = [],
 ): { rest: string; category: string | null } {
   const categoryTokens: Record<string, string> = {};
   for (const board of boards) {
@@ -293,7 +292,7 @@ export function parseQuickAdd(
   const priorityPart = extractPriority(working);
   working = priorityPart.rest;
 
-  const categoryPart = extractCategory(working, boards ?? CATEGORIES);
+  const categoryPart = extractCategory(working, boards ?? []);
   working = categoryPart.rest;
 
   const datePart = extractDate(working, now);

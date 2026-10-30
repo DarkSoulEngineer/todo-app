@@ -1,13 +1,10 @@
 import { makeId } from "@/lib/utils/id";
 import {
-  BUILT_IN_BOARDS,
   defaultBoards,
-  missingBuiltInBoards,
   type Board,
   type BoardColorId,
 } from "@/lib/domain/boards";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { overdueAt, rescheduleToNextDay } from "@/lib/utils/datetime";
 import {
   createSampleTasks,
   distributeSampleTasks,
@@ -15,12 +12,9 @@ import {
   SAMPLE_SECTIONS,
 } from "@/lib/data/sample";
 import {
-  CANCELED_SECTION_TITLE,
-  findCanceledSection,
   getTaskSectionId,
-  ensureDefaultTaskSection,
+  reconcileSectionIds,
   isCustomSection,
-  isStatusSection,
 } from "@/lib/domain/sections";
 import {
   activeProject,
@@ -85,13 +79,13 @@ export interface TasksApi {
   setTaskStatus: (id: string, status: "completed" | "canceled" | "open") => void;
   /** Move a task to a due date (used by calendar actions), or clear it. */
   setTaskDueAt: (id: string, dueAt: string | null) => void;
-  /** Assign a task to a board section (status or custom) honouring its meaning. */
+  /** Assign a task to a list without changing its status or due date. */
   assignTaskToSection: (taskId: string, sectionId: string) => void;
   /** Point a task at a custom section (or null to release it). */
   setTaskSectionId: (taskId: string, sectionId: string | null) => void;
   addSection: (title: string) => BoardSection;
   renameSection: (id: string, title: string) => void;
-  /** Removes a custom section; its tasks return to their status column. */
+  /** Removes a list; its tasks remain unassigned until the user places them. */
   deleteSection: (id: string) => void;
   toggleSectionHidden: (id: string) => void;
   reorderSections: (orderedIds: string[]) => void;
@@ -104,16 +98,6 @@ export interface TasksApi {
   renameBoard: (id: string, label: string) => void;
   recolorBoard: (id: string, color: BoardColorId) => void;
   deleteBoard: (id: string) => { label: string; affected: number } | null;
-  /** Puts the built-in boards that are missing back on offer. */
-  restoreBuiltInBoards: () => void;
-  /** @deprecated Board API wrapper: use the board actions above. */
-  deletedCategories: string[];
-  /** @deprecated Board API wrapper: use the board actions above. */
-  deleteCategory: (id: string) => { label: string; affected: number } | null;
-  /** @deprecated Board API wrapper: use the board actions above. */
-  restoreCategory: (id: string) => void;
-  /** @deprecated Board API wrapper: use the board actions above. */
-  restoreCategories: () => void;
   clearCompleted: () => number;
   getCompletedIds: () => string[];
   /** Immutable copy of the workspace, for reversible bulk actions. */
@@ -272,33 +256,6 @@ export function useTasks(): TasksApi {
     setBoards(next);
   }, []);
 
-  /**
-   * Canceling a task always gives it a real "Canceled" list to live in. The
-   * list is custom (not status-backed) so it can still be renamed, hidden, or
-   * deleted like every other list on the board.
-   */
-  const ensureCanceledSection = useCallback((): BoardSection => {
-    const existing = findCanceledSection(sectionsRef.current);
-    if (existing) {
-      const isEmpty = !tasksRef.current.some(
-        (task) => getTaskSectionId(task, sectionsRef.current, new Date()) === existing.id,
-      );
-      const visible = existing.hidden ? { ...existing, hidden: false } : existing;
-      if (isEmpty) {
-        setLiveSections((prev) => [...prev.filter((section) => section.id !== existing.id), visible]);
-      } else if (existing.hidden) {
-        setLiveSections((prev) => prev.map((section) => section.id === existing.id ? visible : section));
-      }
-      return visible;
-    }
-    const section: BoardSection = {
-      id: `custom-${makeId(8)}`,
-      title: CANCELED_SECTION_TITLE,
-    };
-    setLiveSections((prev) => [...prev, section]);
-    return section;
-  }, [setLiveSections]);
-
   const updateById = useCallback((id: string, updater: (task: Task) => Task) => {
     setLiveTasks((prev) => prev.map((task) => (task.id === id ? updater(task) : task)));
   }, [setLiveTasks]);
@@ -388,12 +345,9 @@ export function useTasks(): TasksApi {
 
   const addTask = useCallback((draft: TaskDraft): Task => {
     const task = createTask(draft);
-    const nextSections = [...sectionsRef.current];
-    task.sectionId = ensureDefaultTaskSection(nextSections).id;
-    if (nextSections.length !== sectionsRef.current.length) setLiveSections(() => nextSections);
     setLiveTasks((prev) => [...prev, task]);
     return task;
-  }, [setLiveSections, setLiveTasks]);
+  }, [setLiveTasks]);
 
   const updateTask = useCallback(
     (id: string, draft: TaskDraft) => {
@@ -463,17 +417,13 @@ export function useTasks(): TasksApi {
 
   const toggleComplete = useCallback(
     (id: string) => {
-      const canceledSection = findCanceledSection(sectionsRef.current);
       updateTaskAnywhere(id, (task) => {
         const completed = !task.completed;
-        const leaveCanceledList =
-          completed && task.sectionId !== null && task.sectionId === canceledSection?.id;
         return {
           ...task,
           completed,
           canceled: completed ? false : task.canceled,
           completedAt: completed ? new Date().toISOString() : null,
-          sectionId: leaveCanceledList ? null : task.sectionId,
           updatedAt: new Date().toISOString(),
         };
       });
@@ -487,29 +437,17 @@ export function useTasks(): TasksApi {
       if (!current) return;
       recordTask(id);
       const canceling = !current.canceled;
-      const canceledSection = canceling
-        ? ensureCanceledSection()
-        : findCanceledSection(sectionsRef.current);
       updateById(id, (task) => {
-        const restoreFromCanceledList =
-          !canceling && task.sectionId !== null && task.sectionId === canceledSection?.id;
         return {
           ...task,
           canceled: canceling,
           completed: canceling ? false : task.completed,
           completedAt: canceling ? null : task.completedAt,
-          sectionId: canceling
-            ? canceledSection && isCustomSection(canceledSection)
-              ? canceledSection.id
-              : null
-            : restoreFromCanceledList
-              ? null
-              : task.sectionId,
           updatedAt: new Date().toISOString(),
         };
       });
     },
-    [ensureCanceledSection, recordTask, updateById],
+    [recordTask, updateById],
   );
 
   const toggleSubtask = useCallback(
@@ -555,22 +493,15 @@ export function useTasks(): TasksApi {
   const setTaskStatus = useCallback(
     (id: string, status: "completed" | "canceled" | "open") => {
       if (!tasksRef.current.some((task) => task.id === id)) return;
-      const canceledSection =
-        status === "canceled"
-          ? ensureCanceledSection()
-          : findCanceledSection(sectionsRef.current);
       recordTask(id);
       updateById(id, (task) => {
         const stamp = new Date().toISOString();
-        const inCanceledList =
-          task.sectionId !== null && task.sectionId === canceledSection?.id;
         if (status === "completed") {
           return {
             ...task,
             completed: true,
             canceled: false,
             completedAt: stamp,
-            sectionId: null,
             updatedAt: stamp,
           };
         }
@@ -580,10 +511,6 @@ export function useTasks(): TasksApi {
             completed: false,
             canceled: true,
             completedAt: null,
-            sectionId:
-              canceledSection && isCustomSection(canceledSection)
-                ? canceledSection.id
-                : null,
             updatedAt: stamp,
           };
         }
@@ -592,12 +519,11 @@ export function useTasks(): TasksApi {
           completed: false,
           canceled: false,
           completedAt: null,
-          sectionId: inCanceledList ? null : task.sectionId,
           updatedAt: stamp,
         };
       });
     },
-    [ensureCanceledSection, updateById, recordTask],
+    [updateById, recordTask],
   );
 
   const setTaskDueAt = useCallback(
@@ -609,6 +535,7 @@ export function useTasks(): TasksApi {
 
   const setTaskSectionId = useCallback(
     (id: string, sectionId: string | null) => {
+      if (sectionId !== null && !sectionsRef.current.some((section) => section.id === sectionId)) return;
       recordTask(id);
       updateById(id, (task) => ({
         ...task,
@@ -619,11 +546,7 @@ export function useTasks(): TasksApi {
     [recordTask, updateById],
   );
 
-  /**
-   * Moves a task into a board section. Status sections set the matching status
-   * (and clear `sectionId`); custom sections set `sectionId` and leave status
-   * flags alone.
-   */
+  /** Placement is independent of task status, due date, and list title. */
   const assignTaskToSection = useCallback(
     (taskId: string, sectionId: string) => {
       const section = sectionsRef.current.find((item) => item.id === sectionId);
@@ -631,54 +554,7 @@ export function useTasks(): TasksApi {
 
       recordTask(taskId);
       const stamp = new Date().toISOString();
-      updateById(taskId, (task) => {
-        if (isStatusSection(section)) {
-          switch (section.status) {
-            case "completed":
-              return {
-                ...task,
-                completed: true,
-                canceled: false,
-                completedAt: stamp,
-                sectionId: null,
-                updatedAt: stamp,
-              };
-            case "canceled":
-              return {
-                ...task,
-                completed: false,
-                canceled: true,
-                completedAt: null,
-                sectionId: null,
-                updatedAt: stamp,
-              };
-            case "overdue":
-              return {
-                ...task,
-                completed: false,
-                canceled: false,
-                completedAt: null,
-                sectionId: null,
-                dueAt: overdueAt(new Date()),
-                updatedAt: stamp,
-              };
-            case "upcoming": {
-              const due = task.dueAt ? Date.parse(task.dueAt) : Number.POSITIVE_INFINITY;
-              const overdue = due < Date.now();
-              return {
-                ...task,
-                completed: false,
-                canceled: false,
-                completedAt: null,
-                sectionId: null,
-                dueAt: overdue ? rescheduleToNextDay(task.dueAt, new Date()) : task.dueAt,
-                updatedAt: stamp,
-              };
-            }
-          }
-        }
-        return { ...task, sectionId: section.id, updatedAt: stamp };
-      });
+      updateById(taskId, (task) => ({ ...task, sectionId: section.id, updatedAt: stamp }));
     },
     [recordTask, updateById],
   );
@@ -706,10 +582,9 @@ export function useTasks(): TasksApi {
     const nextSections = sectionsRef.current.filter((section) => section.id !== id);
     const now = new Date();
     const affectedIds = new Set(tasksRef.current.filter((task) => getTaskSectionId(task, sectionsRef.current, now) === id).map((task) => task.id));
-    const fallbackId = affectedIds.size ? ensureDefaultTaskSection(nextSections).id : null;
     setLiveSections(() => nextSections);
     setLiveTasks((prev) =>
-      prev.map((task) => (affectedIds.has(task.id) ? { ...task, sectionId: fallbackId } : task)),
+      prev.map((task) => (affectedIds.has(task.id) ? { ...task, sectionId: null } : task)),
     );
   }, [setLiveSections, setLiveTasks]);
 
@@ -808,29 +683,6 @@ export function useTasks(): TasksApi {
     return { label: board.label, affected };
   }, [setLiveBoards, setLiveTasks]);
 
-  const restoreBuiltInBoards = useCallback(() => {
-    setLiveBoards((prev) => {
-      const missing = missingBuiltInBoards(prev);
-      return missing.length > 0 ? [...prev, ...missing] : prev;
-    });
-  }, [setLiveBoards]);
-
-  const restoreBoard = useCallback((id: string) => {
-    const builtIn = BUILT_IN_BOARDS.find((board) => board.id === id);
-    if (!builtIn) return;
-    setLiveBoards((prev) => (prev.some((board) => board.id === id) ? prev : [...prev, { ...builtIn }]));
-  }, [setLiveBoards]);
-
-  // Deprecated wrappers around the board API, kept so category-named
-  // consumers can share the domain hook with the web build.
-  const deletedCategories = useMemo(
-    () => missingBuiltInBoards(boards).map((board) => board.id),
-    [boards],
-  );
-  const deleteCategory = useCallback((id: string) => deleteBoard(id), [deleteBoard]);
-  const restoreCategory = useCallback((id: string) => restoreBoard(id), [restoreBoard]);
-  const restoreCategories = useCallback(() => restoreBuiltInBoards(), [restoreBuiltInBoards]);
-
   const snapshot = useCallback(
     (): Workspace => ({
       tasks: tasksRef.current.map((task) => ({
@@ -847,6 +699,7 @@ export function useTasks(): TasksApi {
     // later edit must not mutate the saved workspace behind that caller's back.
     const nextTasks = workspace.tasks.map(cloneTask);
     const nextSections = workspace.sections.map((section) => ({ ...section }));
+    reconcileSectionIds(nextTasks, nextSections);
     const nextBoards = workspace.boards.map((board) => ({ ...board }));
     tasksRef.current = nextTasks;
     sectionsRef.current = nextSections;
@@ -1138,11 +991,6 @@ export function useTasks(): TasksApi {
       renameBoard,
       recolorBoard,
       deleteBoard,
-      restoreBuiltInBoards,
-      deletedCategories,
-      deleteCategory,
-      restoreCategory,
-      restoreCategories,
       clearCompleted,
       getCompletedIds,
       snapshot,
@@ -1199,11 +1047,6 @@ export function useTasks(): TasksApi {
       renameBoard,
       recolorBoard,
       deleteBoard,
-      restoreBuiltInBoards,
-      deletedCategories,
-      deleteCategory,
-      restoreCategory,
-      restoreCategories,
       clearCompleted,
       getCompletedIds,
       snapshot,

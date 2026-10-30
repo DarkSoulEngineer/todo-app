@@ -1,6 +1,5 @@
 import { isValid, parseISO } from "date-fns";
 import { defaultBoards, normalizeBoards } from "@/lib/domain/boards";
-import { isCategoryId } from "@/lib/domain/categories";
 import { defaultSections, normalizeSections, reconcileSectionIds } from "@/lib/domain/sections";
 import type { ActivityEvent, Attachment, Priority, Subtask, Task, Workspace } from "@/lib/domain/types";
 import { makeId } from "@/lib/utils/id";
@@ -167,22 +166,9 @@ function extractParts(parsed: unknown): {
   };
 }
 
-/** Keeps known category ids only, de-duplicated, in the order they appear. */
-function normalizeDeletedCategories(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const item of value) {
-    if (!isCategoryId(item) || seen.has(item)) continue;
-    seen.add(item);
-    result.push(item);
-  }
-  return result;
-}
-
 /** Builds a validated workspace from unknown persisted/imported data. */
 export function buildWorkspace(parsed: unknown): Workspace | null {
-  const { tasks: rawTasks, sections: rawSections, boards: rawBoards, deletedCategories: rawDeleted } =
+  const { tasks: rawTasks, sections: rawSections, boards: rawBoards } =
     extractParts(parsed);
   if (!Array.isArray(rawTasks)) return null;
 
@@ -230,9 +216,8 @@ export function buildWorkspace(parsed: unknown): Workspace | null {
     });
   const sections = normalizeSections(rawSections);
   reconcileSectionIds(tasks, sections);
-  // Older payloads have no boards: start from the built-ins minus whatever the
-  // user had deleted as a category.
-  const boards = normalizeBoards(rawBoards, normalizeDeletedCategories(rawDeleted));
+  // Preserve explicitly saved tags; do not invent presets on load/import.
+  const boards = normalizeBoards(rawBoards);
   return { tasks, sections, boards };
 }
 

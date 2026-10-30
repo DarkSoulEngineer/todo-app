@@ -82,7 +82,7 @@ export interface Board {
   color: BoardColorId;
 }
 
-/** The boards every user starts with, carrying the historical category ids. */
+/** Historical tag definitions, retained for explicitly requested demo data only. */
 export const BUILT_IN_BOARDS: Board[] = [
   { id: "work", label: "Work", color: "blue" },
   { id: "personal", label: "Personal", color: "pink" },
@@ -93,7 +93,7 @@ export const BUILT_IN_BOARDS: Board[] = [
 ];
 
 export function defaultBoards(): Board[] {
-  return BUILT_IN_BOARDS.map((board) => ({ ...board }));
+  return [];
 }
 
 export function boardColor(color: BoardColorId | LegacyBoardColorId): BoardColor {
@@ -121,19 +121,6 @@ export function normalizeBoardColor(value: unknown): BoardColorId {
   return DEFAULT_BOARD_COLOR;
 }
 
-/** The built-in boards missing from `boards`, in their original order. */
-export function missingBuiltInBoards(boards: Board[]): Board[] {
-  const present = new Set(boards.map((board) => board.id));
-  return BUILT_IN_BOARDS.filter((board) => !present.has(board.id));
-}
-
-/** Gets the board color by label (e.g., "Work" -> a palette entry). */
-export function getBoardColorByLabel(label: string): BoardColor | null {
-  const normalized = label.toLowerCase().trim();
-  const board = BUILT_IN_BOARDS.find((b) => b.label.toLowerCase() === normalized);
-  return board ? boardColor(board.color) : null;
-}
-
 /** Turns one unknown persisted entry into a Board, or null when unusable. */
 function normalizeBoard(value: unknown): Board | null {
   if (typeof value !== "object" || value === null) return null;
@@ -147,14 +134,11 @@ function normalizeBoard(value: unknown): Board | null {
 /**
  * Builds the board list from unknown persisted data.
  *
- * A missing array is a first run or an upgrade: fall back to the built-ins minus
- * the ids recorded as deleted by the previous version. An empty array is a real
- * state (the user deleted everything) and is kept as-is.
+ * Missing and empty arrays stay empty. Only explicitly saved tags are loaded.
  */
-export function normalizeBoards(value: unknown, deletedBuiltIns: readonly string[] = []): Board[] {
+export function normalizeBoards(value: unknown): Board[] {
   if (!Array.isArray(value)) {
-    const removed = new Set(deletedBuiltIns);
-    return defaultBoards().filter((board) => !removed.has(board.id));
+    return [];
   }
 
   const seen = new Set<string>();

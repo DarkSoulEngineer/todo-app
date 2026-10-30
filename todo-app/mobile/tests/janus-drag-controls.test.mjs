@@ -27,7 +27,12 @@ const { MobileTaskColumns } = await load("../src/components/board/mobile-task-co
   "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 20 }) },
   "@/theme/layout": { mobileBottomNavClearance: 112 },
   "@/components/ui/anchored-menu": { anchorFromEvent: (event) => ({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }) },
-  "@/lib/domain/sections": { getTaskSectionId: (task) => task.sectionId, isCustomSection: (section) => section.status === undefined },
+  "@/lib/domain/sections": {
+    UNASSIGNED_SECTION_ID: "__janus_unassigned__",
+    getTaskSectionId: (task, sections) => sections.some((section) => section.id === task.sectionId) ? task.sectionId : undefined,
+    getDisplaySections: (tasks, sections) => tasks.some((task) => !sections.some((section) => section.id === task.sectionId)) ? [{ id: "__janus_unassigned__", title: "No list" }, ...sections.filter((section) => !section.hidden)] : sections.filter((section) => !section.hidden),
+    isCustomSection: (section) => section.status === undefined,
+  },
   "./mobile-board-colors": { useMobileBoardColors: () => ({}) },
   "./mobile-column-task-card": { MobileColumnTaskCard: "Card" },
   "./board-column-carousel": { BoardColumnCarousel: "Carousel" },
@@ -41,6 +46,25 @@ const { MobileTaskColumns } = await load("../src/components/board/mobile-task-co
 function renderColumns(overrides = {}) {
   return MobileTaskColumns({ tasks: [{ id: "one", title: "One", sectionId: "a" }], sections: [{ id: "a", title: "First" }], boards: [], now: new Date(), selectionMode: false, selectedTaskIds: new Set(), focused: false, compact: false, zoom: 1, showMoveArrows: false, ...overrides });
 }
+
+test("unassigned cards remain visible in normal and focused views without creating an editable list", () => {
+  for (const focused of [false, true]) {
+    const added = [], moved = [];
+    const tree = renderColumns({ focused, tasks: [{ id: "one", title: "One", sectionId: null }], showMoveArrows: true, onAddTask: (id) => added.push(id), onMove: (task, id) => moved.push(id) });
+    assert.ok(nodes(tree).find((node) => node.props?.testID === "janus-unassigned-header"));
+    assert.equal(nodes(tree).find((node) => node.props?.testID === "janus-column-name-__janus_unassigned__"), undefined);
+    const card = nodes(tree).find((node) => node.type === "Card");
+    assert.ok(card);
+    nodes(tree).find((node) => node.props?.accessibilityLabel === "Add unassigned card").props.onPress();
+    assert.deepEqual(added, [null]);
+    if (!focused) {
+      const group = nodes(tree).find((node) => node.type === "DragCell" && node.props.id === "section:__janus_unassigned__");
+      assert.equal(group.props.enabled, false);
+      card.props.onMoveRight();
+      assert.deepEqual(moved, ["a"]);
+    }
+  }
+});
 
 test("right-clicking list headers and holders opens list actions at the pointer without hijacking card menus", () => {
   for (const focused of [false, true]) {
@@ -86,17 +110,17 @@ test("double-click and tablet double-tap rename the exact list without cross-lis
   } finally { platform = "web"; width = 1440; }
 });
 
-test("list title long-press opens actions and built-in status lists cannot be renamed", () => {
+test("migrated lists can be renamed regardless of their former status title", () => {
   const renamed = [], menus = [];
-  const section = { id: "a", title: "Completed", status: "completed" };
+  const section = { id: "a", title: "Completed" };
   const tree = renderColumns({ sections: [section], onRenameSection: (value) => renamed.push(value.id), onSectionMenu: (value) => menus.push(value.id) });
   const title = nodes(tree).find((node) => node.props?.testID === "janus-column-name-a");
   const event = { nativeEvent: { pageX: 20, pageY: 30 }, stopPropagation() {} };
   title.props.onPress(event);
   title.props.onPress(event);
   title.props.onLongPress(event);
-  assert.deepEqual(renamed, []);
-  assert.deepEqual(menus, ["a", "a", "a"]);
+  assert.deepEqual(renamed, ["a"]);
+  assert.deepEqual(menus, ["a"]);
 });
 
 test("cards and lists are draggable immediately without an extra arrange row", () => {
@@ -214,7 +238,7 @@ test("phone resolutions disable both card and list dragging; tablets and desktop
   } finally { width = 1440; }
 });
 
-test("Board Actions toggle dragging on and off, with no toggle on other views", async () => {
+test("workspace ribbon toggles dragging on and off in the board columns", async () => {
   const slots = [];
   let cursor = 0;
   const fallback = new Proxy({}, { get: (_, key) => key });
@@ -235,26 +259,22 @@ test("Board Actions toggle dragging on and off, with no toggle on other views", 
     "@/lib/features/navigation-commands": { createNavigationCommands: () => [] },
     "@/lib/features/ribbon-context": { getRibbonContext: () => ({}) },
     "@/lib/domain/constants": { SORT_OPTIONS: [], PRIORITY_ORDER: [] },
+    "@/lib/utils/ribbon-label": { ribbonLabel: (label) => label },
   }, { get: (target, key) => target[key] ?? fallback });
   const { default: WorkspaceScreen } = await load("../app/board/[id].tsx", mocks);
   const render = () => { cursor = 0; return WorkspaceScreen(); };
   let tree = render();
   const columns = (tree) => nodes(tree).find((node) => node.type === "MobileTaskColumns");
-  const toggle = (tree) => nodes(tree).find((node) => node.props?.label === "Disable dragging" || node.props?.label === "Enable dragging");
+  // The ribbon now owns its controls; exercise the real callback passed to it.
+  const ribbon = (tree) => nodes(tree).find((node) => node.type === "MobileBoardRibbon");
   assert.equal(columns(tree).props.dragEnabled, true);
-  assert.equal(toggle(tree).props.label, "Disable dragging");
-  toggle(tree).props.onPress();
+  assert.equal(ribbon(tree).props.dragEnabled, true);
+  ribbon(tree).props.onToggleDrag();
   tree = render();
   assert.equal(columns(tree).props.dragEnabled, false);
-  assert.equal(toggle(tree).props.label, "Enable dragging");
-  toggle(tree).props.onPress();
+  assert.equal(ribbon(tree).props.dragEnabled, false);
+  ribbon(tree).props.onToggleDrag();
   tree = render();
   assert.equal(columns(tree).props.dragEnabled, true);
-  try {
-    for (width of [390, 600, 767, 768, 1024, 1440]) {
-      assert.equal(Boolean(toggle(render())), width >= 768, `drag action visibility at ${width}px`);
-    }
-  } finally { width = 1440; }
-  slots[0] = "calendar";
-  assert.equal(toggle(render()), undefined);
+  assert.equal(ribbon(tree).props.dragEnabled, true);
 });

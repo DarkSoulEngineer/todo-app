@@ -35,12 +35,12 @@ export interface Task {
   /** ISO date-time string, or null when the task has no deadline. */
   dueAt: string | null;
   priority: Priority;
-  /** Category id from `lib/categories.ts`, or null when untagged. */
+  /** User-defined tag id, or null when untagged. */
   category: string | null;
   completed: boolean;
   canceled: boolean;
   subtasks: Subtask[];
-  /** Id of a custom board section, or null when the task lives in a status column. */
+  /** Id of the user-chosen list, or null when unassigned. */
   sectionId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -51,15 +51,14 @@ export interface Task {
 }
 
 /**
- * A board column. When `status` is set the column is backed by a derived task
- * status (Upcoming/Overdue/Completed/Canceled). Custom sections omit `status`
- * and collect tasks through `Task.sectionId`.
+ * A user-defined board column. Legacy `status` metadata is accepted during
+ * import and migrated to explicit task assignments, then removed.
  */
 export interface BoardSection {
   id: string;
   title: string;
   status?: TaskStatus;
-  /** Status sections can be hidden rather than removed. */
+  /** Any list can be hidden without removing it or its cards. */
   hidden?: boolean;
 }
 

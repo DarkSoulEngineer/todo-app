@@ -20,7 +20,7 @@ function setup(width, empty = false) {
   const slots = [], cache = new Map();
   let cursor = 0, nextId = 0;
   let colors = Object.fromEntries(["primary", "info", "success", "warning", "destructive", "foreground", "mutedForeground", "card", "border", "secondary", "backgroundAlt", "primarySoft", "successSoft", "destructiveSoft"].map((key, index) => [key, `rgb(${index + 1}, 10, 20)`]));
-  const react = { useMemo: (fn) => fn(), useId: () => `chart-${nextId++}`, useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = initial; return [slots[index], (next) => { slots[index] = next; }]; } };
+  const react = { Children: require("react").Children, useMemo: (fn) => fn(), useId: () => `chart-${nextId++}`, useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = initial; return [slots[index], (next) => { slots[index] = next; }]; } };
   const host = new Proxy({}, { get: (_, key) => key });
   const mocks = {
     react,
@@ -84,14 +84,99 @@ test("resizing preserves actual chart totals and a single working export", () =>
   }
 });
 
-test("empty data renders honest zero charts, no invalid geometry and a disabled export", () => {
+test("filter counts appear only for active filters and disappear again when cleared", () => {
+  const app = setup(1200);
+  const defaults = app.load("@/lib/features/insights-filters").DEFAULT_FILTERS;
+  assert.equal(field(app.render(), "insights-filter-count"), undefined);
+  for (const filter of [{ status: "completed" }, { boardId: "work" }, { priority: "high" }, { dateRange: "30d" }]) {
+    app.props.filters = { ...defaults, ...filter };
+    assert.ok(field(app.render(), "insights-filter-count"));
+  }
+  app.props.filters = { ...defaults };
+  assert.equal(field(app.render(), "insights-filter-count"), undefined);
+});
+
+test("desktop overview balances card heights and expands the weekly chart, without restoring the comparison block", () => {
+  const app = setup(1200);
+  let tree = app.render();
+  assert.equal(flatten(field(tree, "insights-bottom-row").props.style).alignItems, "stretch");
+  assert.equal(flatten(field(tree, "insights-weekly").props.style).flexGrow, 1);
+  const chart = nodes(field(tree, "insights-weekday-diagram")).find((node) => node.type === "Svg");
+  assert.equal(chart.props.height, 270);
+  assert.ok(!nodes(tree).some((node) => node.props?.children === "Current / previous period"));
+  app.props.filters = { ...app.load("@/lib/features/insights-filters").DEFAULT_FILTERS, boardId: "work" };
+  tree = app.render();
+  assert.equal(flatten(field(tree, "insights-bottom-row").props.style).alignItems, "flex-start", "filtered modules remain content-sized");
+});
+
+test("empty data renders one compact empty state instead of blank charts, with disabled export", () => {
   const tree = setup(1200, true).render();
-  assert.ok(nodes(tree).some((node) => node.props?.children === "No completions in this period"));
+  assert.ok(field(tree, "insights-empty-results"));
+  const watermark = field(tree, "insights-empty-watermark");
+  assert.ok(watermark);
+  assert.equal(watermark.props.pointerEvents, "none");
+  assert.equal(flatten(watermark.props.style).opacity, 0.08);
+  assert.equal(field(tree, "insights-empty-results").type, "View", "no empty banner card");
+  assert.ok(nodes(watermark).some((node) => node.props?.accessibilityLabel === "Janus logo"));
+  for (const id of ["insights-top-row", "insights-bottom-row", "insights-area-diagram", "insights-weekday-diagram"]) assert.equal(field(tree, id), undefined);
   assert.equal(nodes(tree).find((node) => node.props?.accessibilityLabel === "Export filtered tasks as CSV").props.disabled, true);
   for (const node of nodes(tree)) {
     if (node.props?.d) assert.doesNotMatch(node.props.d, /NaN|Infinity/);
     if (typeof node.props?.height === "number") assert.ok(node.props.height >= 0);
   }
+});
+
+test("modular grids pack only visible cards and omit empty rows", () => {
+  const app = setup(1200);
+  const { InsightsModuleGrid } = app.load("@/components/insights/insights-module-grid");
+  const jsx = require("react/jsx-runtime").jsx;
+  for (const columns of [1, 2, 3]) for (const count of [0, 1, 2, 3]) {
+    const children = Array.from({ length: 3 }, (_, index) => index < count ? jsx("Card", {}, `card-${index}`) : null);
+    const tree = InsightsModuleGrid({ columns, children });
+    if (!count) { assert.equal(tree, null); continue; }
+    assert.equal(tree.props.children.length, count);
+    assert.equal(flatten(tree.props.style).alignItems, columns > 1 ? "flex-start" : undefined);
+    for (const item of tree.props.children) {
+      if (columns > 1) {
+        assert.equal(item.props.style.flexGrow, 1);
+        assert.equal(item.props.style.flexBasis, `${90 / Math.min(columns, count)}%`);
+      }
+    }
+  }
+});
+
+test("all filter combinations retain useful content, including fully scoped and empty selections", () => {
+  for (const width of [390, 768, 1200]) {
+    const app = setup(width);
+    const defaults = app.load("@/lib/features/insights-filters").DEFAULT_FILTERS;
+    app.props.tasks.push({ ...app.props.tasks[0], id: "canceled", completed: false, completedAt: null, canceled: true });
+    for (const status of ["all", "completed", "canceled", "overdue"]) for (const boardId of ["all", "work", "missing"]) for (const priority of ["all", "high", "low"]) {
+      app.props.filters = { ...defaults, status, boardId, priority };
+      const tree = app.render();
+      const empty = status === "overdue" || boardId === "missing" || priority === "low";
+      assert.equal(Boolean(field(tree, "insights-empty-results")), empty);
+      if (empty) {
+        assert.equal(field(tree, "insights-bottom-row"), undefined);
+      } else {
+        assert.ok(field(tree, status === "canceled" ? "insights-filtered-summary" : "insights-performance"));
+      }
+    }
+  }
+});
+
+test("matching tasks without completions use compact messages, but previous-period data stays visible", () => {
+  const app = setup(1200);
+  app.props.tasks[0] = { ...app.props.tasks[0], completed: false, completedAt: null };
+  let tree = app.render();
+  assert.ok(field(tree, "insights-performance"));
+  assert.equal(field(tree, "insights-area-diagram"), undefined);
+  assert.equal(field(tree, "insights-sparkline"), undefined);
+  assert.equal(field(tree, "insights-weekday-diagram"), undefined);
+  assert.ok(nodes(tree).some((node) => node.props?.children === "A fresh start for this period"));
+  app.props.tasks.push({ ...app.props.tasks[0], id: "previous", completed: true, completedAt: "2026-10-20T11:00:00Z" });
+  tree = app.render();
+  assert.ok(field(tree, "insights-area-diagram"));
+  assert.ok(field(tree, "insights-sparkline"));
 });
 
 test("date controls select real chart details, dismiss them, and clear stale selections after a period change", () => {

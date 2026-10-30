@@ -33,7 +33,7 @@ function load(path) {
 }
 
 const { createSampleTasks, distributeSampleTasks } = load("lib/data/sample");
-const { getTaskSectionId, reconcileSectionIds } = load("lib/domain/sections");
+const { getTaskSectionId, getDisplaySections, reconcileSectionIds, UNASSIGNED_SECTION_ID } = load("lib/domain/sections");
 const { useTasks } = load("hooks/use-tasks");
 const lists = [{ id: "a", title: "A" }, { id: "b", title: "B" }];
 const workspace = (sections, tasks = []) => ({ sections, tasks, boards: [] });
@@ -71,8 +71,8 @@ test("sample loading on an existing board never leaves cards unassigned", () => 
   assert.ok(result.tasks.every((task) => lists.some((section) => section.id === task.sectionId)));
 });
 
-test("empty, hidden-only, and status-only boards get visible sample lists", () => {
-  for (const sections of [[], [{ id: "hidden", title: "Hidden", hidden: true }], [{ id: "status", title: "Completed", status: "completed" }]]) {
+test("explicit sample loading adds demo lists only when no visible lists exist", () => {
+  for (const sections of [[], [{ id: "hidden", title: "Hidden", hidden: true }]]) {
     const api = useTasks();
     api.restore(workspace(sections));
     api.loadSample();
@@ -85,31 +85,115 @@ test("empty, hidden-only, and status-only boards get visible sample lists", () =
   }
 });
 
-test("unassigned cards resolve into a real list, and hidden cards stay hidden", () => {
+test("unassigned cards stay unassigned, and hidden cards stay hidden", () => {
   const task = createSampleTasks()[0];
   const now = new Date();
-  assert.equal(getTaskSectionId({ ...task, sectionId: null }, lists, now), "a");
-  assert.equal(getTaskSectionId({ ...task, sectionId: "missing" }, lists, now), "a");
+  assert.equal(getTaskSectionId({ ...task, sectionId: null }, lists, now), undefined);
+  assert.equal(getTaskSectionId({ ...task, sectionId: "missing" }, lists, now), undefined);
   assert.equal(getTaskSectionId({ ...task, sectionId: "hidden" }, [...lists, { id: "hidden", title: "Hidden", hidden: true }], now), "hidden");
   const sections = [];
   const tasks = [{ sectionId: null }];
   reconcileSectionIds(tasks, sections);
-  assert.equal(sections.length, 1);
-  assert.equal(sections[0].title, "Inbox");
+  assert.equal(sections.length, 0);
 });
 
-test("new cards and cards from a deleted list stay in real lists", () => {
+test("new cards and cards from a deleted list remain unassigned without automatic lists", () => {
   const api = useTasks();
   const task = api.addTask({ title: "New card", description: "", priority: "medium", dueAt: null, category: null, subtasks: [] });
   const before = api.snapshot();
-  assert.equal(before.sections[0].id, task.sectionId);
-  api.deleteSection(task.sectionId);
+  assert.equal(before.sections.length, 0);
+  assert.equal(task.sectionId, null);
+  const list = api.addSection("My list");
+  api.setTaskSectionId(task.id, list.id);
+  api.deleteSection(list.id);
   const after = api.snapshot();
   assert.equal(after.tasks.length, 1);
-  assert.equal(after.tasks[0].sectionId, after.sections[0].id);
-  assert.notEqual(after.tasks[0].sectionId, task.sectionId);
+  assert.equal(after.tasks[0].sectionId, null);
+  assert.equal(after.sections.length, 0);
 
   api.restore(workspace(lists, [{ ...task, sectionId: "a" }]));
   api.deleteSection("a");
+  assert.equal(api.snapshot().tasks[0].sectionId, null);
+});
+
+test("fresh workspaces and missing tag data contain no preset tags or lists", () => {
+  const { defaultBoards, normalizeBoards } = load("lib/domain/boards");
+  const { emptyWorkspace, buildWorkspace } = load("lib/data/workspace");
+  assert.deepEqual(defaultBoards(), []);
+  assert.deepEqual(normalizeBoards(undefined), []);
+  assert.deepEqual(emptyWorkspace(), { tasks: [], boards: [], sections: [] });
+  const parsed = buildWorkspace({ tasks: [createSampleTasks()[0]] });
+  assert.deepEqual(parsed.boards, []);
+  assert.deepEqual(parsed.sections, []);
+  assert.equal(parsed.tasks[0].sectionId, null);
+});
+
+test("legacy status lists become editable lists and keep cards in their original columns", () => {
+  const api = useTasks();
+  const base = createSampleTasks()[0];
+  api.restore(workspace([{ id: "done", title: "Completed", status: "completed" }], [{ ...base, completed: true, sectionId: null }]));
+  assert.deepEqual(api.snapshot().sections, [{ id: "done", title: "Completed" }]);
+  assert.equal(api.snapshot().tasks[0].sectionId, "done");
+  api.renameSection("done", "Archive");
+  assert.equal(api.snapshot().sections[0].title, "Archive");
+  api.deleteSection("done");
+  assert.equal(api.snapshot().tasks[0].sectionId, null);
+  assert.deepEqual(api.snapshot().sections, []);
+});
+
+test("status changes never create lists, unhide lists, or change user-chosen assignments", () => {
+  for (const sectionId of [null, "a", "canceled"]) {
+    const api = useTasks();
+    const task = { ...createSampleTasks()[0], id: "test", completed: false, canceled: false, sectionId };
+    const sections = [...lists, { id: "canceled", title: "Canceled", hidden: true }];
+    api.restore(workspace(sections, [task]));
+    for (const action of [() => api.toggleCancel("test"), () => api.toggleCancel("test"), () => api.toggleComplete("test"), ...["canceled", "completed", "open"].map((status) => () => api.setTaskStatus("test", status))]) {
+      action();
+      assert.equal(api.snapshot().tasks[0].sectionId, sectionId);
+      assert.deepEqual(api.snapshot().sections, sections);
+    }
+  }
+});
+
+test("list assignment is explicit and independent of task status and deadlines", () => {
+  const api = useTasks();
+  const task = { ...createSampleTasks()[0], id: "test", sectionId: null };
+  api.restore(workspace(lists, [task]));
+  api.assignTaskToSection("test", "b");
+  const placed = api.snapshot().tasks[0];
+  for (const key of ["completed", "canceled", "completedAt", "dueAt", "category"]) assert.equal(placed[key], task[key]);
+  assert.equal(placed.sectionId, "b");
+  api.setTaskSectionId("test", "unknown");
   assert.equal(api.snapshot().tasks[0].sectionId, "b");
+  api.setTaskSectionId("test", null);
+  assert.equal(api.snapshot().tasks[0].sectionId, null);
+});
+
+test("No list is display-only and only appears when unassigned tasks exist", () => {
+  const task = { ...createSampleTasks()[0], sectionId: null };
+  const sections = structuredClone(lists);
+  assert.deepEqual(getDisplaySections([{ ...task, sectionId: "a" }], sections, new Date()), lists);
+  const displayed = getDisplaySections([task], sections, new Date());
+  assert.equal(displayed[0].id, UNASSIGNED_SECTION_ID);
+  assert.equal(displayed[0].title, "No list");
+  assert.deepEqual(sections, lists);
+});
+
+test("user-defined tags can be created, assigned, renamed and deleted without presets", () => {
+  const api = useTasks();
+  assert.deepEqual(api.snapshot().boards, []);
+  const tag = api.createBoard({ label: "My own tag", color: "teal" });
+  const task = api.addTask({ title: "Task", description: "", priority: "medium", dueAt: null, category: tag.id, subtasks: [] });
+  api.renameBoard(tag.id, "Renamed tag");
+  assert.equal(api.snapshot().tasks[0].category, tag.id);
+  assert.equal(api.snapshot().boards[0].label, "Renamed tag");
+  api.deleteBoard(tag.id);
+  assert.deepEqual(api.snapshot().boards, []);
+  assert.equal(api.snapshot().tasks.find((item) => item.id === task.id).category, null);
+});
+
+test("quick add recognizes only tags supplied by the user, not historical preset names", () => {
+  const { parseQuickAdd } = load("lib/features/quick-add");
+  assert.equal(parseQuickAdd("Task #work", new Date()).category, null);
+  assert.equal(parseQuickAdd("Task #studio", new Date(), [{ id: "mine", label: "Studio" }]).category, "mine");
 });

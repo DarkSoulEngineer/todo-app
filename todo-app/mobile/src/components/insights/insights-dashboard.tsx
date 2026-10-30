@@ -11,8 +11,10 @@ import { computeStats } from "@/lib/domain/tasks-selectors";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
 import { computeInsightsForWindow } from "@/lib/features/insights";
 import { bucketChartPoints, ringFraction } from "@/lib/features/insights-chart-geometry";
-import { DEFAULT_FILTERS, filterTasksByFilters, getPriorityCounts, getWeekdayCompletionCounts, windowEndFromPreset, windowStartFromPreset } from "@/lib/features/insights-filters";
+import { DEFAULT_FILTERS, filterTasksByFilters, getPriorityCounts, getWeekdayCompletionCounts, hasActiveFilters, windowEndFromPreset, windowStartFromPreset } from "@/lib/features/insights-filters";
 import { useTheme } from "@/providers/theme-provider";
+import { InsightsModuleGrid } from "./insights-module-grid";
+import { InsightsEmptyState, InsightsNoResults } from "./insights-empty-state";
 
 export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTERS, onExport }: InsightsPanelProps) {
   const { theme: { colors: c } } = useTheme();
@@ -55,6 +57,12 @@ export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTER
   };
   const dateLabel = `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`;
   const average = (period.windowTotal / Math.max(1, period.points.length)).toFixed(1);
+  const hasTasks = filtered.length > 0;
+  const hasTrend = period.windowTotal > 0 || period.previousWindowTotal > 0;
+  const hasDistribution = showCategories || showPriorities;
+  const fullOverview = showStatusBreakdown && showCategories && showPriorities && hasTrend;
+  const balancedRow = desktop && fullOverview;
+  const moduleStyle = balancedRow ? { flexGrow: 1 } : undefined;
 
   return <View testID="insights-dashboard" style={styles.dashboard}>
     <View style={styles.header}>
@@ -62,11 +70,12 @@ export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTER
       <Button variant="outline" size={tablet ? "md" : "sm"} label={tablet ? "Export report" : "Export"} accessibilityLabel="Export filtered tasks as CSV" onPress={exportFiltered} disabled={!filtered.length} />
     </View>
 
-    {showCompletions ? <View testID="insights-top-row" style={[styles.row, desktop && styles.horizontal]}>
+    {!hasTasks ? <InsightsNoResults /> : <>
+    {showCompletions ? <View testID="insights-top-row" style={[styles.row, desktop && styles.horizontal, desktop && !fullOverview && styles.contentSized]}>
       <View testID="insights-summary-column" style={[styles.summaryColumn, desktop ? { flex: 0.85 } : tablet && styles.horizontal]}>
-        <DiagramCard title="Completed tasks" caption="THIS PERIOD" testID="insights-completed-card" style={tablet ? { flex: 1 } : undefined}>
+        <DiagramCard title="Completed tasks" caption="THIS PERIOD" testID="insights-completed-card" style={tablet && !desktop ? { flex: 1 } : undefined}>
           <View style={styles.summaryMetric}><Text style={[styles.bigNumber, { color: c.foreground }]}>{period.windowTotal}</Text><ChangeBadge change={period.periodChange} /></View>
-          <AreaDiagram compact points={points} />
+          {hasTrend ? <AreaDiagram compact points={points} /> : <Text style={[styles.small, { color: c.mutedForeground, marginVertical: 12 }]}>No completions in this period</Text>}
           <View style={styles.split}><Text style={[styles.small, { color: c.mutedForeground }]}>Previous period</Text><Text style={[styles.small, { color: c.foreground, fontWeight: "700" }]}>{period.previousWindowTotal} completed</Text></View>
         </DiagramCard>
         {showStatusBreakdown ? <Card testID="insights-health-rings" style={[styles.healthCard, tablet && !desktop && { flex: 1, alignItems: "center" }]}>
@@ -81,35 +90,40 @@ export function InsightsDashboard({ tasks, boards, now, filters = DEFAULT_FILTER
           <View style={{ gap: 4 }}><Text style={[styles.performanceValue, { color: c.foreground }]}>{average}<Text style={{ color: c.mutedForeground, fontSize: 12, fontWeight: "500" }}> / day</Text></Text><Text style={[styles.small, { color: c.mutedForeground }]}>Average completions</Text></View>
           <View style={{ gap: 8 }}><LegendDot label="Current period" color={c.primary} /><LegendDot label="Previous period" color={c.info} dashed /></View>
         </View>
-        <AreaDiagram points={points} previous={previous} selected={selectedIndex < 0 ? null : selectedIndex} onSelect={(index) => setSelection({ key: points[index].key, period: periodKey })} />
+        {hasTrend ? <AreaDiagram points={points} previous={previous} selected={selectedIndex < 0 ? null : selectedIndex} onSelect={(index) => setSelection({ key: points[index].key, period: periodKey })} /> : <InsightsEmptyState title="No completions in this period" description="Choose a wider date range in Filters, or complete a task to start your trend." />}
         <View style={[styles.chartFooter, { borderColor: c.border }]}>
           {selected ? <Pressable testID="insights-trend-detail" accessibilityRole="button" accessibilityLabel="Dismiss trend detail" onPress={() => setSelection(null)} style={styles.selectedDetail}><Text accessibilityLiveRegion="polite" style={[styles.small, { flex: 1, color: c.foreground }]}>{selected.label} · {selected.count} current / {previous[selectedIndex]?.count ?? 0} previous</Text><Ionicons name="close" size={16} color={c.mutedForeground} /></Pressable> : <Text style={[styles.small, { color: c.mutedForeground }]}>{period.windowTotal || period.previousWindowTotal ? "Tap a date to compare periods" : "No completions in this period"}</Text>}
         </View>
       </DiagramCard>
     </View> : null}
 
-    <View testID="insights-bottom-row" style={[styles.row, tablet && styles.horizontal, tablet && !desktop && { flexWrap: "wrap" }]}>
-      {showStatusBreakdown ? <DiagramCard title="Task balance" caption="ALL MATCHING TASKS" testID="insights-balance" style={tablet ? { flex: 1, minWidth: desktop ? 0 : "44%" } : undefined}>
+    <InsightsModuleGrid testID="insights-bottom-row" columns={desktop ? 3 : tablet ? 2 : 1} equalHeight={balancedRow}>
+      {showStatusBreakdown ? <DiagramCard title="Task balance" caption="ALL MATCHING TASKS" testID="insights-balance" style={moduleStyle}>
         <RadialDiagram slices={balance} total={stats.total} />
         <View style={styles.balanceLegend}>{balance.map((slice) => <View key={slice.label} style={styles.split}><LegendDot label={slice.label} color={slice.color} /><Text style={[styles.small, { color: c.foreground, fontWeight: "700" }]}>{slice.value}<Text style={{ color: c.mutedForeground, fontWeight: "400" }}> / {stats.total}</Text></Text></View>)}</View>
         <View style={[styles.chartFooter, { borderColor: c.border }]}><Text style={[styles.small, { color: c.mutedForeground }]}>{Math.round(stats.completionRate * 100)}% of matching tasks completed</Text></View>
       </DiagramCard> : null}
 
-      {showCompletions ? <DiagramCard title="Weekly rhythm" caption="COMPLETIONS" testID="insights-weekly" style={tablet ? { flex: 1.2, minWidth: desktop ? 0 : "44%" } : undefined}>
-        <WeekdayDiagram values={weekday} />
+      {showCompletions ? <DiagramCard title="Weekly rhythm" caption="COMPLETIONS" testID="insights-weekly" style={moduleStyle}>
+        {period.windowTotal > 0 ? <View style={balancedRow ? { flexGrow: 1, justifyContent: "center" } : undefined}><WeekdayDiagram values={weekday} height={balancedRow ? 270 : 190} /></View> : <InsightsEmptyState title="A fresh start for this period" description="Your weekly rhythm will appear as you complete tasks." icon="calendar-outline" />}
         <View style={[styles.rhythmMetrics, { borderColor: c.border }]}>
           <RhythmMetric icon="flame-outline" label="Current streak" value={`${period.streak} days`} color={c.warning} />
           <RhythmMetric icon="trophy-outline" label="Best day" value={`${period.best} done`} color={c.primary} />
         </View>
-        <View style={[styles.periodCompare, { backgroundColor: c.backgroundAlt }]}><View style={{ flex: 1, gap: 4 }}><Text style={[styles.small, { color: c.mutedForeground }]}>Current / previous period</Text><Text style={{ color: c.foreground, fontSize: 18, fontWeight: "700" }}>{period.windowTotal}<Text style={{ color: c.mutedForeground, fontWeight: "400" }}> / {period.previousWindowTotal}</Text></Text></View><ChangeBadge change={period.periodChange} /></View>
       </DiagramCard> : null}
 
-      {showCategories || showPriorities ? <DiagramCard title="Task distribution" caption={showCategories && showPriorities ? "CATEGORIES & PRIORITY" : showCategories ? "CATEGORIES" : "PRIORITY"} testID="insights-distribution" style={tablet ? { flex: 1, minWidth: desktop ? 0 : "100%" } : undefined}>
+      {hasDistribution ? <DiagramCard title="Task distribution" caption={showCategories && showPriorities ? "CATEGORIES & PRIORITY" : showCategories ? "CATEGORIES" : "PRIORITY"} testID="insights-distribution" style={moduleStyle}>
         {showCategories ? <View testID="insights-category-bars" style={styles.categoryList}>{visibleCategories.length ? visibleCategories.map((item, index) => <View key={item.label} testID="insights-category-item" style={{ gap: 6 }}><View style={styles.split}><Text numberOfLines={1} style={[styles.small, { flex: 1, color: c.foreground }]}>{item.label}</Text><Text style={[styles.small, { color: c.mutedForeground }]}>{item.value} · {Math.round(ringFraction(item.value, stats.total) * 100)}%</Text></View><View style={[styles.categoryTrack, { backgroundColor: c.secondary }]}><View style={{ height: "100%", width: `${ringFraction(item.value, stats.total) * 100}%`, backgroundColor: palette[index % palette.length], borderRadius: 4 }} /></View></View>) : <Text style={[styles.small, { color: c.mutedForeground }]}>No category data for these filters</Text>}</View> : null}
         {showPriorities ? <View style={[styles.prioritySection, !showCategories && styles.standalonePriority, { borderColor: c.border }]}><DonutDiagram slices={priorities} total={stats.total} /><View style={{ flex: 1, gap: 10 }}>{priorities.map((slice) => <View key={slice.label} style={styles.split}><LegendDot label={slice.label} color={slice.color} /><Text style={[styles.small, { color: c.foreground }]}>{slice.value}</Text></View>)}</View></View> : null}
       </DiagramCard> : null}
-    </View>
-    <View style={styles.split}><View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Ionicons name="funnel-outline" size={12} color={c.mutedForeground} /><Text style={[styles.small, { color: c.mutedForeground }]}>{filtered.length} task{filtered.length === 1 ? "" : "s"} match current filters</Text></View><Text style={[styles.small, { color: c.mutedForeground }]}>Updated {format(now, "HH:mm")}</Text></View>
+      {!showCompletions && !showStatusBreakdown ? <DiagramCard title="Filtered task summary" caption="CURRENT SELECTION" testID="insights-filtered-summary">
+        <Text style={[styles.bigNumber, { color: c.foreground }]}>{stats.total}</Text>
+        <Text style={[styles.small, { color: c.mutedForeground }]}>Matching {filters.status} task{stats.total === 1 ? "" : "s"}</Text>
+        <View style={[styles.chartFooter, { borderColor: c.border }]}><Text style={[styles.small, { color: c.mutedForeground }]}>Completion charts are hidden for this status. Choose All statuses in Filters to see the full overview.</Text></View>
+      </DiagramCard> : null}
+    </InsightsModuleGrid>
+    </>}
+    <View style={[styles.split, { flexWrap: "wrap" }]}>{hasActiveFilters(filters) ? <View testID="insights-filter-count" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Ionicons name="funnel-outline" size={12} color={c.mutedForeground} /><Text style={[styles.small, { color: c.mutedForeground }]}>{filtered.length} task{filtered.length === 1 ? "" : "s"} match current filters</Text></View> : null}<Text style={[styles.small, { color: c.mutedForeground, marginLeft: "auto" }]}>Updated {format(now, "HH:mm")}</Text></View>
   </View>;
 }
 
@@ -142,6 +156,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 12 },
   row: { gap: 16 },
   horizontal: { flexDirection: "row", alignItems: "stretch" },
+  contentSized: { alignItems: "flex-start" },
   summaryColumn: { gap: 14, minWidth: 0 },
   diagramCard: { padding: 18, borderRadius: 16, minWidth: 0 },
   cardHeader: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 18 },
@@ -159,9 +174,8 @@ const styles = StyleSheet.create({
   selectedDetail: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 30 },
   balanceLegend: { gap: 12, marginTop: 10 },
   rhythmMetrics: { flexDirection: "row", gap: 20, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 18, marginTop: 18 },
-  periodCompare: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, padding: 12, borderRadius: 10, marginTop: 20 },
   changeBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 },
-  categoryList: { gap: 13, flexGrow: 1, minHeight: 160 },
+  categoryList: { gap: 13 },
   categoryTrack: { height: 6, borderRadius: 4, overflow: "hidden" },
   prioritySection: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 18, paddingTop: 16 },
   standalonePriority: { borderTopWidth: 0, marginTop: 0, paddingTop: 0 },

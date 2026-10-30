@@ -161,6 +161,7 @@ export function TaskEditor({
   visible,
   task,
   initialDueAt,
+  initialSectionId,
   boards,
   sections,
   onClose,
@@ -173,6 +174,7 @@ export function TaskEditor({
   visible: boolean;
   task: Task | null;
   initialDueAt?: string | null;
+  initialSectionId?: string | null;
   boards: Board[];
   sections: BoardSection[];
   onClose: () => void;
@@ -183,14 +185,15 @@ export function TaskEditor({
   presentation?: "sheet" | "panel";
 }) {
   const session = useOpenSession(visible);
-  const editorKey = `${session}:${task?.id ?? "new"}:${initialDueAt ?? ""}`;
-  return <TaskEditorForm key={editorKey} visible={visible} task={task} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={onClose} onSave={onSave} onAutoSave={onAutoSave} onDelete={onDelete} onCancelTask={onCancelTask} presentation={presentation} />;
+  const editorKey = `${session}:${task?.id ?? "new"}:${initialDueAt ?? ""}:${initialSectionId ?? ""}`;
+  return <TaskEditorForm key={editorKey} visible={visible} task={task} initialDueAt={initialDueAt} initialSectionId={initialSectionId} boards={boards} sections={sections} onClose={onClose} onSave={onSave} onAutoSave={onAutoSave} onDelete={onDelete} onCancelTask={onCancelTask} presentation={presentation} />;
 }
 
 function TaskEditorForm({
   visible,
   task,
   initialDueAt,
+  initialSectionId,
   boards,
   sections,
   onClose,
@@ -203,6 +206,7 @@ function TaskEditorForm({
   visible: boolean;
   task: Task | null;
   initialDueAt?: string | null;
+  initialSectionId?: string | null;
   boards: Board[];
   sections: BoardSection[];
   onClose: () => void;
@@ -221,7 +225,7 @@ function TaskEditorForm({
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [category, setCategory] = useState<string | null>(() => task?.category ?? null);
-  const [sectionId] = useState<string | null>(() => task ? getTaskSectionId(task, sections, new Date()) ?? null : null);
+  const [sectionId, setSectionId] = useState<string | null>(() => task ? getTaskSectionId(task, sections, new Date()) ?? null : initialSectionId ?? null);
   const [dueAt, setDueAt] = useState<string | null>(() => task?.dueAt ?? initialDueAt ?? null);
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => task?.subtasks.map((item) => ({ ...item })) ?? []);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -345,7 +349,7 @@ function TaskEditorForm({
   );
   const tagChips = boards.map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
 
-  const tagsControl = wideForm ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
+  const tagsControl = !boards.length ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 12 }}>Create your own tags using Actions → Add filter/tag.</Text> : wideForm ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskEditorChipRow}>{tagChips}</ScrollView>;
 
   const content = <>
             {!windowed ? <View style={styles.taskEditorHeader}>
@@ -370,6 +374,13 @@ function TaskEditorForm({
                 style={[styles.taskEditorTitleInput, windowed && styles.taskEditorWindowInput, { color: theme.colors.foreground, backgroundColor: theme.colors.input, borderColor: titleError ? theme.colors.destructive : theme.colors.border }]}
               />
               {titleError ? <Text accessibilityLiveRegion="polite" style={{ color: theme.colors.destructive, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{titleError}</Text> : null}
+              </View>
+              <View style={styles.taskEditorSectionHeading}>
+                <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>LIST</Text>
+                <View testID="task-editor-list-choices" style={[styles.wrapRow, { marginTop: 8 }]}>
+                  <Chip label="No list" active={sectionId === null} onPress={() => setSectionId(null)} />
+                  {sections.filter((section) => !section.hidden || section.id === sectionId).map((section) => <Chip key={section.id} label={section.title} active={sectionId === section.id} onPress={() => setSectionId(section.id)} />)}
+                </View>
               </View>
               <View testID="task-editor-notes-field">
               <Text style={[styles.taskEditorLabel, { color: theme.colors.mutedForeground }]}>NOTES</Text>

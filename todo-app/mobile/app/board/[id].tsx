@@ -188,7 +188,7 @@ export default function WorkspaceScreen() {
     const hiddenSectionIds = new Set(sections.filter((section) => section.hidden).map((section) => section.id));
     return visibleTasks.filter((task) => {
       const sectionId = getTaskSectionId(task, sections, now);
-      return sectionId !== undefined && !hiddenSectionIds.has(sectionId);
+      return sectionId === undefined || !hiddenSectionIds.has(sectionId);
     });
   }, [now, sections, visibleTasks]);
   const selectedTasks = useMemo(() => renderedBoardTasks.filter((task) => selectedTaskIds.has(task.id)), [renderedBoardTasks, selectedTaskIds]);
@@ -262,7 +262,7 @@ export default function WorkspaceScreen() {
   };
   const addNewTask = (due?: string | null, sectionId?: string | null) => { setEditorProjectId(currentProjectId); setEditorTask(null); setInitialDueAt(due ?? null); setInitialSectionId(sectionId ?? null); setEditorVisible(true); };
   const saveTaskSection = (taskId: string, sectionId: string | null) => {
-    if (sectionId === null) return;
+    if (sectionId === null) { api.setTaskSectionId(taskId, null); return; }
     const section = sections.find((item) => item.id === sectionId);
     if (!section) return;
     if (isCustomSection(section)) api.setTaskSectionId(taskId, section.id);
@@ -270,7 +270,7 @@ export default function WorkspaceScreen() {
   };
   const saveTask = (draft: TaskDraft, sectionId: string | null) => {
     if (editorTask) { api.updateTask(editorTask.id, draft); const currentSectionId = getTaskSectionId(editorTask, sections, now) ?? null; if (sectionId !== currentSectionId) saveTaskSection(editorTask.id, sectionId); toast.success("Task updated"); }
-    else { const task = api.addTask(draft); const targetSectionId = sectionId ?? initialSectionId; if (targetSectionId) saveTaskSection(task.id, targetSectionId); toast.success("Task added", { description: draft.title }); }
+    else { const task = api.addTask(draft); if (sectionId) saveTaskSection(task.id, sectionId); toast.success("Task added", { description: draft.title }); }
     setEditorVisible(false); setEditorTask(null); setInitialDueAt(null); setInitialSectionId(null);
   };
   const autoSaveTask = (draft: TaskDraft, sectionId: string | null) => {
@@ -397,21 +397,21 @@ export default function WorkspaceScreen() {
     });
   };
 
-  const dropTask = (taskId: string, sectionId: string, beforeTaskId: string | null) => {
+  const dropTask = (taskId: string, sectionId: string | null, beforeTaskId: string | null) => {
     const task = tasks.find((item) => item.id === taskId);
     const section = sections.find((item) => item.id === sectionId && !item.hidden);
-    if (!task || !section) return;
-    const siblings = visibleTasks.filter((item) => getTaskSectionId(item, sections, now) === sectionId).map((item) => item.id);
+    if (!task || (sectionId !== null && !section)) return;
+    const siblings = visibleTasks.filter((item) => (getTaskSectionId(item, sections, now) ?? null) === sectionId).map((item) => item.id);
     const orderedIds = taskDropOrder(taskId, siblings, beforeTaskId);
     if (!orderedIds) return;
-    const sameSection = getTaskSectionId(task, sections, now) === sectionId;
+    const sameSection = (getTaskSectionId(task, sections, now) ?? null) === sectionId;
     if (sameSection && orderedIds.every((value, index) => value === siblings[index])) return;
     const before = api.snapshot();
     const previousSort = sort;
-    if (!sameSection) api.assignTaskToSection(taskId, sectionId);
+    if (!sameSection) api.setTaskSectionId(taskId, sectionId);
     api.reorderTasks(orderedIds);
     setSort("manual");
-    toast.success(sameSection ? "Card reordered" : `Moved to ${section.title}`, {
+    toast.success(sameSection ? "Card reordered" : `Moved to ${section?.title ?? "No list"}`, {
       description: previousSort === "manual" ? undefined : "Switched to manual order",
       action: { label: "Undo", onPress: () => { api.restore(before); setSort(previousSort); } },
     });
@@ -548,7 +548,7 @@ export default function WorkspaceScreen() {
   const activeFilterBoard = boards.find((board) => board.id === boardFilter);
   const activeSortLabel = SORT_OPTIONS.find((option) => option.value === sort)?.label ?? "Sort";
   const showEditor = !activityUnavailable && (splitView || (editorVisible && (!editorTask || tasks.some((task) => task.id === editorTask.id))));
-  const taskEditor = <TaskEditor presentation={splitView ? "panel" : "sheet"} visible={showEditor} task={editorTask} initialDueAt={initialDueAt} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />;
+  const taskEditor = <TaskEditor presentation={splitView ? "panel" : "sheet"} visible={showEditor} task={editorTask} initialDueAt={initialDueAt} initialSectionId={initialSectionId} boards={boards} sections={sections} onClose={() => setEditorVisible(false)} onSave={saveTask} onAutoSave={editorTask ? autoSaveTask : undefined} onDelete={editorTask ? () => { const before = api.snapshot(); api.deleteTask(editorTask.id); setEditorVisible(false); toast.success("Task deleted", { action: { label: "Undo", onPress: () => api.restore(before) } }); } : undefined} onCancelTask={editorTask ? () => { api.toggleCancel(editorTask.id); setEditorVisible(false); } : undefined} />;
   const filterOptions = [{ label: "All boards", icon: boardFilter === "all" ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter("all"); setSelectedTaskIds(new Set()); } }, ...boards.map((board) => ({ label: board.label, icon: boardFilter === board.id ? "checkmark-circle" as const : "radio-button-off-outline" as const, onPress: () => { setBoardFilter(board.id); setSelectedTaskIds(new Set()); } }))];
   const filtersContent = mode === "insights" ? <InsightsFiltersRibbon filters={insightsFilters} onChange={setInsightsFilters} boards={boards} now={now} onOverlayChange={setInsightsOverlayOpen} /> : <RibbonScrollView accessibilityLabel="Board filters" contentContainerStyle={styles.optionTools}>
     {getRibbonContext(mode).sorting ? <View style={[styles.optionToolGroup, { borderColor: theme.colors.border }]}><View style={styles.optionActionRow}><Pressable accessibilityRole="button" accessibilityLabel={`Sort cards: ${activeSortLabel}`} accessibilityHint="Opens a dropdown of sort options." onPress={(event) => openSmallMenu(event, () => setSortMenu(true))} style={[styles.optionDropdown, { borderColor: theme.colors.border, backgroundColor: theme.colors.input }]}><Ionicons name="swap-vertical-outline" size={15} color={theme.colors.mutedForeground} /><Text numberOfLines={1} ellipsizeMode="tail" style={[styles.optionDropdownLabel, { maxWidth: 128, minWidth: 0, color: theme.colors.foreground }]}>{ribbonLabel(activeSortLabel)}</Text><Ionicons name="chevron-down" size={15} color={theme.colors.mutedForeground} /></Pressable></View><Text style={[styles.optionCaption, { color: theme.colors.mutedForeground }]}>SORT</Text></View> : null}
