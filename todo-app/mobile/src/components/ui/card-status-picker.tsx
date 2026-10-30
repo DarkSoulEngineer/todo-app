@@ -6,41 +6,39 @@ import { useTheme } from "@/providers/theme-provider";
 /**
  * Status is a property of the card, not an ordinary tag, so it gets its own
  * top-of-page control instead of living inside the Tags section.
- * A single flat rail keeps all four states visible and easy to scan.
+ * The neutral state is represented by no selected tag.
  */
 export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
   const { theme: { colors: c } } = useTheme();
   const current = STATUS_CARD_THEMES.find((entry) => tags.some((tag) => classifySpecialCardTag(tag)?.theme.id === entry.id));
-  const clearStatus = () => onChange(tags.filter((tag) => classifySpecialCardTag(tag)?.group !== "status"));
-  const options = [
-    { id: "open", label: "Open", color: c.primary, soft: c.primarySoft },
-    ...STATUS_CARD_THEMES.map((entry) => ({
-      id: entry.id,
-      label: entry.label,
-      color: entry.id === "done" ? c.success : entry.id === "overdue" ? c.destructive : c.foreground,
-      soft: entry.id === "done" ? c.successSoft : entry.id === "overdue" ? c.destructiveSoft : c.border,
-    })),
-  ];
-  return <View accessibilityRole="radiogroup" accessibilityLabel="Card status" testID="card-status-picker" style={[styles.track, { backgroundColor: c.secondary, borderColor: c.border }]}>
+  const options = STATUS_CARD_THEMES.map((entry) => ({
+    ...entry,
+    color: entry.id === "done" ? c.success : entry.id === "overdue" ? c.destructive : c.mutedForeground,
+    soft: entry.id === "done" ? c.successSoft : entry.id === "overdue" ? c.destructiveSoft : c.secondary,
+  }));
+  return <View testID="card-status-picker">
+    <View accessibilityRole="radiogroup" accessibilityLabel="Card status tags" style={[styles.track, { backgroundColor: c.secondary, borderColor: c.border }]}>
     {options.map((option) => {
-      const selected = option.id === "open" ? !current : current?.id === option.id;
+      const selected = current?.id === option.id;
       return <Pressable
         key={option.id}
         accessibilityRole="radio"
         accessibilityLabel={`Status tag ${option.label}`}
+        accessibilityHint={selected ? "Tap again to remove this status tag." : `Add the ${option.label} status tag.`}
         accessibilityState={{ checked: selected, selected }}
-        onPress={() => option.id === "open" ? clearStatus() : onChange(toggleCardTag(tags, option.label))}
-        style={({ pressed }) => [styles.segment, { backgroundColor: selected ? option.soft : "transparent", borderColor: selected ? option.color : "transparent" }, { opacity: pressed ? 0.7 : 1 }]}
+        onPress={() => onChange(toggleCardTag(tags, option.label))}
+        style={({ pressed }) => [styles.segment, { backgroundColor: selected ? option.soft : "transparent", borderColor: selected ? option.color : c.borderStrong }, { opacity: pressed ? 0.7 : 1 }]}
       >
         <Text numberOfLines={1} style={[styles.label, { color: selected ? option.color : c.mutedForeground, fontWeight: selected ? "800" : "600" }]}>{option.label}</Text>
       </Pressable>;
     })}
+    </View>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", gap: 3, padding: 3, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.10)" },
-  segment: { flex: 1, minHeight: 34, alignItems: "center", justifyContent: "center", paddingHorizontal: 4, borderWidth: 1, borderRadius: 9 },
+  track: { flexDirection: "row", gap: 4, padding: 4, borderWidth: StyleSheet.hairlineWidth, borderRadius: 13 },
+  segment: { flex: 1, minWidth: 0, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 6, borderWidth: 1, borderRadius: 10 },
   label: { fontSize: 12, letterSpacing: 0.1 },
 });
 

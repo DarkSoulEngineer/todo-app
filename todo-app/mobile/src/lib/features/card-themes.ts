@@ -170,10 +170,17 @@ export function detectStatusCardTheme(title: string): DecorativeCardTheme | null
 }
 
 /** Explicit event designs stay intact; ordinary cards reflect their actual state. */
-export function resolveCardDecoration(tags: readonly string[] = [], status: TaskStatus | null = null): DecorativeCardTheme | null {
+export function resolveCardDecoration(tags: readonly string[] = [], status: TaskStatus | null = null, eventOverride: string | null = null): DecorativeCardTheme | null {
   const special = tags.map(classifySpecialCardTag).filter((entry) => entry !== null);
   const event = special.findLast((entry) => entry.group === "event");
-  if (event) return event.theme;
+  // If an event override is set, show the event decoration; if no override is set,
+  // suppress event decorations so event-tagged cards are not displayed.
+  if (eventOverride !== null) {
+    if (event) return event.theme;
+  } else if (event) {
+    // No active event: suppress event decoration
+    // fall through to status/regular theming below
+  }
   const stateId = status === "completed" ? "done" : status;
   const actual = STATUS_CARD_THEMES.find((entry) => entry.id === stateId);
   if (actual) return actual;

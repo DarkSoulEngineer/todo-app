@@ -29,6 +29,7 @@ function setup({ value: initial = null, now = new Date(2026, 9, 30, 10, 15), wee
   const mocks = {
     react, "date-fns": dates,
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (style) => style } },
+    "@expo/vector-icons": { Ionicons: "Icon" },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { scheme: "dark", colors: { foreground: "#eee", mutedForeground: "#aaa", primary: "#fa0", card: "#222", cardElevated: "#333", secondary: "#444", border: "#555", success: "#0a8" } } }) },
     "@/providers/preferences-provider": { usePreferences: () => ({ calendarWeekStart: weekStart }) },
     "@/lib/utils/task-schedule": utils,
@@ -61,7 +62,7 @@ test("calendar and time controls are directly visible without launcher buttons o
   assert.equal(button(tree, "Set due date"), undefined);
   assert.equal(button(tree, "Edit due time"), undefined);
   assert.equal(button(app.timePanel(), "Due hour").props.editable, false);
-  assert.equal(button(app.timePanel(), "Apply time").props.disabled, true);
+  assert.equal(nodes(app.timePanel()).some((node) => node.props?.children === "Invalid time"), false);
   assert.ok(nodes(tree).some((node) => node.props?.children === "December 2026"));
   button(tree, "Next picker month").props.onPress();
   tree = app.render();
@@ -93,8 +94,24 @@ test("choosing a date sets local end of day, keeps the calendar visible and enab
   assert.equal(due.getMinutes(), 59);
   assert.equal(button(app.timePanel(), "Due hour").props.editable, true);
   assert.equal(nodes(app.render()).some((node) => node.props?.testID === "schedule-calendar"), true);
-  button(app.render(), "Clear due date").props.onPress();
-  assert.equal(app.changes.at(-1), null);
+  assert.equal(button(app.timePanel(), "Due hour").props.value, "23");
+  assert.equal(button(app.timePanel(), "Due minute").props.value, "59");
+});
+
+test("the clear-date X removes a selected date from schedule, edit, and calendar-origin time-only views", () => {
+  const scheduled = new Date(2026, 9, 31, 16, 30).toISOString();
+  const regular = setup({ value: scheduled });
+  button(regular.render(), "Remove due date").props.onPress();
+  assert.equal(regular.changes.at(-1), null);
+  assert.equal(button(regular.timePanel(), "Due hour").props.editable, false);
+  assert.equal(nodes(regular.render()).some((node) => node.props?.testID === "schedule-calendar"), true);
+
+  const calendarOrigin = setup({ value: scheduled, dateLocked: true });
+  assert.equal(nodes(calendarOrigin.render()).some((node) => node.props?.testID === "schedule-calendar"), false);
+  button(calendarOrigin.timePanel(), "Remove due date").props.onPress();
+  assert.equal(calendarOrigin.changes.at(-1), null);
+  assert.equal(nodes(calendarOrigin.render()).some((node) => node.props?.testID === "schedule-calendar"), true);
+  assert.equal(button(calendarOrigin.render(), "Choose Saturday, October 31, 2026") !== undefined, true);
 });
 
 test("quick dates preserve an existing local time across month and year boundaries", () => {
@@ -108,7 +125,7 @@ test("quick dates preserve an existing local time across month and year boundari
   }
 });
 
-test("date shortcuts have clear raised button surfaces and month arrows keep their compact faces", () => {
+test("date shortcuts show selection clearly and month arrows keep their compact faces", () => {
   const app = setup();
   const flatten = (style) => Object.assign({}, ...[style].flat().filter(Boolean));
   for (const label of ["Today", "Tomorrow", "+1 week"]) {
@@ -118,10 +135,7 @@ test("date shortcuts have clear raised button surfaces and month arrows keep the
     assert.equal(surface.backgroundColor, "#444");
     assert.equal(surface.borderWidth, 1);
     assert.equal(surface.borderRadius, 10);
-    assert.ok(surface.boxShadow);
-    const pressed = flatten(shortcut.props.style({ pressed: true }));
-    assert.equal(pressed.transform[0].translateY, 2);
-    assert.equal(pressed.minHeight, surface.minHeight);
+    assert.equal(flatten(shortcut.props.style({ pressed: true })).backgroundColor, "#444");
     const text = nodes(shortcut).find((node) => node.type === "Text");
     assert.equal(flatten(text.props.style).color, "#eee");
   }
@@ -148,47 +162,51 @@ test("date shortcuts have clear raised button surfaces and month arrows keep the
   }
 });
 
-test("time entry is a draft until applied, rejects invalid values, and preserves the chosen day", () => {
+test("time entry applies valid edits immediately and reports invalid values", () => {
   const original = new Date(2026, 9, 31, 16, 30);
   const app = setup({ value: original.toISOString() });
-  let panel = app.timePanel();
-  button(panel, "Due hour").props.onChangeText("99");
-  assert.equal(button(app.timePanel(), "Apply time").props.disabled, true);
-  button(app.timePanel(), "Apply time").props.onPress();
+  assert.equal(nodes(app.timePanel()).some((node) => node.props?.children === "Invalid time"), false);
+  button(app.timePanel(), "Due hour").props.onChangeText("99");
+  assert.ok(nodes(app.timePanel()).some((node) => node.props?.children === "Use hours 0-23 and minutes 0-59."));
   assert.deepEqual(app.changes, []);
-  button(app.timePanel(), "Morning").props.onPress();
-  assert.equal(button(app.timePanel(), "Due hour").props.value, "09");
-  assert.deepEqual(app.changes, [], "presets edit the draft only");
+  button(app.timePanel(), "Due hour").props.onChangeText("9");
+  assert.equal(button(app.timePanel(), "Due hour").props.value, "9", "valid edits keep the input mounted while saving");
+  assert.equal(nodes(app.timePanel()).some((node) => node.props?.children === "Use hours 0-23 and minutes 0-59."), false);
+  assert.deepEqual(app.changes, [new Date(2026, 9, 31, 9, 30).toISOString()]);
   button(app.timePanel(), "Due minute").props.onChangeText("07");
-  button(app.timePanel(), "Apply time").props.onPress();
+  assert.equal(app.changes.length, 2);
   const due = new Date(app.changes[0]);
   assert.equal(due.toDateString(), original.toDateString());
   assert.equal(due.getHours(), 9);
-  assert.equal(due.getMinutes(), 7);
-  assert.equal(button(app.timePanel(), "Due hour").props.value, "09");
+  assert.equal(due.getMinutes(), 30);
+  const updated = new Date(app.changes[1]);
+  assert.equal(updated.toDateString(), original.toDateString());
+  assert.equal(updated.getHours(), 9);
+  assert.equal(updated.getMinutes(), 7);
+  assert.equal(button(app.timePanel(), "Due hour").props.value, "9");
 });
 
-test("removing the date discards time drafts, and invalid stored dates are treated as unscheduled", () => {
+test("choosing another day resets the time fields to that date and invalid stored dates are unscheduled", () => {
   const app = setup({ value: new Date(2026, 9, 31, 16, 30).toISOString() });
-  button(app.timePanel(), "End of day").props.onPress();
-  assert.deepEqual(app.changes, []);
-  button(app.render(), "Clear due date").props.onPress();
-  assert.equal(button(app.timePanel(), "Due hour").props.value, "");
-  assert.equal(button(app.timePanel(), "Due hour").props.editable, false);
-  assert.equal(button(setup({ value: "invalid" }).timePanel(), "Apply time").props.disabled, true);
+  button(app.timePanel(), "Due hour").props.onChangeText("99");
+  button(app.render(), "Choose Sunday, November 1, 2026").props.onPress();
+  assert.equal(button(app.timePanel(), "Due hour").props.value, "16");
+  assert.equal(button(app.timePanel(), "Due minute").props.value, "30");
+  assert.equal(button(setup({ value: "invalid" }).timePanel(), "Due hour").props.editable, false);
   for (const [hour, minute] of [["", "00"], ["24", "00"], ["23", "60"], ["-1", "00"], ["aa", "00"], ["1.5", "00"]]) assert.equal(utils.applyScheduleTime(new Date(), hour, minute), null);
 });
 
-test("calendar and time sit side by side only when the measured container has room", () => {
+test("calendar and full-width time panel stay stacked at every container width", () => {
   const app = setup();
-  let tree = app.render();
   const flatten = (style) => Object.assign({}, ...[style].flat().filter(Boolean));
-  assert.equal(flatten(tree.props.children[0].props.style).flexDirection, undefined);
-  tree.props.onLayout({ nativeEvent: { layout: { width: 900 } } });
-  tree = app.render();
-  assert.equal(flatten(tree.props.children[0].props.style).flexDirection, "row");
-  tree.props.onLayout({ nativeEvent: { layout: { width: 280 } } });
-  assert.equal(flatten(app.render().props.children[0].props.style).flexDirection, undefined);
+  const content = (target) => nodes(target).find((node) => node.props?.testID === "schedule-content");
+  const tree = app.render();
+  assert.equal(flatten(content(tree).props.style).flexDirection, undefined);
+  const [calendar, timeColumn] = content(tree).props.children;
+  assert.equal(calendar.props.testID, "schedule-calendar");
+  assert.equal(timeColumn.type, "View");
+  assert.equal(timeColumn.props.children.type.name, "ScheduleTimePanel", "the time panel follows the calendar");
+  assert.equal(flatten(timeColumn.props.style).width, undefined, "time panel fills its column");
 });
 
 test("calendar-origin creation hides the duplicate calendar and date removal while keeping the selected day", () => {
@@ -198,16 +216,14 @@ test("calendar-origin creation hides the duplicate calendar and date removal whi
   assert.equal(nodes(tree).some((node) => node.props?.testID === "schedule-calendar"), false);
   assert.equal(button(tree, "Today"), undefined);
   assert.equal(button(tree, "Clear due date"), undefined);
-  assert.ok(nodes(tree).some((node) => typeof node.props?.children === "string" && node.props.children.includes("2 Jan 2027")));
+  assert.equal(nodes(app.timePanel()).some((node) => node.props?.children === "Time"), false);
   button(app.timePanel(), "Due hour").props.onChangeText("16");
   button(app.timePanel(), "Due minute").props.onChangeText("45");
-  button(app.timePanel(), "Apply time").props.onPress();
-  const changed = new Date(app.changes[0]);
+  const changed = new Date(app.changes.at(-1));
   assert.equal(changed.toDateString(), selected.toDateString());
   assert.equal(changed.getHours(), 16);
   assert.equal(changed.getMinutes(), 45);
   tree = app.render();
-  tree.props.onLayout({ nativeEvent: { layout: { width: 900 } } });
   assert.equal(nodes(app.render()).some((node) => node.props?.testID === "schedule-calendar"), false);
 });
 

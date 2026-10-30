@@ -29,6 +29,7 @@ const { MobileColumnTaskCard, taskCardBorderRadius } = await load("../src/compon
   "./mobile-board-colors": { useMobileBoardColors: () => colors },
   "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
   "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
+  "@/hooks/use-active-events": { useActiveEvents: () => ({ override: null }) },
   "@/lib/features/card-themes": cardThemes,
   "@/components/ui/seasonal-card-decoration": { SeasonalCardDecoration: "SeasonalCardDecoration" },
 });
@@ -84,6 +85,21 @@ test("status designs follow task state and complete case-insensitive names witho
   for (const title of ["D", "C", "O", "B", "V"]) assert.equal(nodes(render({ title })).find((node) => node.type === "SeasonalCardDecoration"), undefined);
 });
 
+test("overdue cards show a derived Overdue tag as well as the overdue card styling", () => {
+  const pastDue = { dueAt: new Date(now.getTime() - 60_000).toISOString() };
+  for (const changes of [pastDue, { ...pastDue, tags: ["Overdue"] }]) {
+    const tree = render(changes);
+    const tags = nodes(tree).filter((node) => node.props?.testID === "janus-card-status-tag-card-overdue");
+    assert.equal(tags.length, 1, "an overdue status tag is visible without being duplicated");
+    assert.ok(text(tags[0]).includes("Overdue"));
+    assert.equal(style(tree).borderLeftColor, colors.destructive);
+  }
+  for (const changes of [{ ...pastDue, completed: true }, { ...pastDue, canceled: true }, { dueAt: task.dueAt }]) {
+    const tree = render(changes);
+    assert.equal(nodes(tree).some((node) => node.props?.testID === "janus-card-status-tag-card-overdue"), false);
+  }
+});
+
 test("board cards have a subtle shadow in normal, compact, selected and calendar layouts", () => {
   for (const props of [{}, { compact: true }, { selected: true }, { calendarLayout: true }]) {
     const card = style(render({}, props));
@@ -97,12 +113,12 @@ test("board cards have a subtle shadow in normal, compact, selected and calendar
   assert.equal(calendar.borderWidth, 0.5);
 });
 
-test("basic status tags have no glyphs; event and ordinary custom tags keep text labels", () => {
+test("basic status tags have no glyphs; only overdue is also shown as a derived card label", () => {
   for (const [tag, changes] of [["Done", { completed: true }], ["Canceled", { canceled: true }], ["Overdue", {}]]) {
     const tree = render({ tags: ["Work custom", "Halloween", tag], ...changes });
     assert.ok(text(tree).includes("Halloween"));
     assert.ok(text(tree).includes("Work custom"));
-    assert.ok(!text(tree).includes(tag), `${tag} is not duplicated as text`);
+    assert.equal(text(tree).includes(tag), tag === "Overdue");
     assert.equal(nodes(tree).find((node) => node.type === "StatusIcon"), undefined);
   }
 });
@@ -132,6 +148,36 @@ test("checklist count and slim progress bar reflect zero, partial and full compl
     assert.equal(style(progress.props.children).backgroundColor, done === 2 ? colors.success : colors.primary);
   }
   assert.ok(!nodes(render()).some((node) => node.props?.accessibilityRole === "progressbar"));
+});
+
+test("checklist card badge distinguishes one item, multiple items, and fully completed checklists", () => {
+  const indicator = (subtasks) => nodes(render({ subtasks })).find((node) => node.props?.testID === "janus-card-checklist-indicator-card");
+
+  const singleOpen = indicator([{ id: "one", title: "Step", done: false }]);
+  assert.equal(style(singleOpen).width, 28);
+  assert.equal(nodes(singleOpen).find((node) => node.type === "Icon").props.name, "square-outline");
+  assert.equal(nodes(singleOpen).some((node) => node.type === "Text"), false);
+
+  const singleDone = indicator([{ id: "one", title: "Step", done: true }]);
+  assert.equal(nodes(singleDone).find((node) => node.type === "Icon").props.name, "checkbox");
+  assert.equal(style(singleDone).borderColor, colors.success);
+
+  const multiplePartial = indicator([
+    { id: "one", title: "First", done: true },
+    { id: "two", title: "Second", done: false },
+    { id: "three", title: "Third", done: false },
+  ]);
+  assert.equal(style(multiplePartial).minWidth, 48);
+  assert.equal(nodes(multiplePartial).find((node) => node.type === "Icon").props.name, "list");
+  assert.equal(text(multiplePartial), "1/3");
+
+  const multipleDone = indicator([
+    { id: "one", title: "First", done: true },
+    { id: "two", title: "Second", done: true },
+  ]);
+  assert.equal(nodes(multipleDone).find((node) => node.type === "Icon").props.name, "checkmark-done");
+  assert.equal(style(multipleDone).borderColor, colors.success);
+  assert.equal(indicator([]), undefined, "cards without checklist items keep their original design");
 });
 
 test("compact mode, zoom, theme contrast and selected state remain available", () => {
@@ -209,6 +255,7 @@ test("real React Native Web renders a group with sibling buttons, never nested H
     "@/components/ui/priority-stars": { PriorityStars: () => null },
     "@/components/ui/status-icon": { StatusIcon: () => null },
     "@/lib/features/card-themes": cardThemes,
+    "@/hooks/use-active-events": { useActiveEvents: () => ({ override: null }) },
     "@/components/ui/seasonal-card-decoration": decorations,
   });
   for (const title of [task.title, "Halloween party", "Birthday", "Valentine's Day", "DONE", "cAnCeLeD", "OVERDUE"]) for (const compact of [false, true]) for (const selectionMode of [false, true]) {

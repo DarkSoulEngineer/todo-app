@@ -23,8 +23,14 @@ export function tactileSurface({ pressed = false, selected = false, disabled = f
   dark?: boolean;
   accent?: string;
 } = {}): ViewStyle {
+  const down = !disabled && (pressed || selected);
   return {
     borderWidth: 1,
-    borderColor: selected && accent ? accent : undefined,
+    borderBottomWidth: 3,
+    borderBottomColor: selected && accent ? accent : dark ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.20)",
+    transform: [{ translateY: disabled ? 0 : pressed ? 2 : selected ? 1 : 0 }],
+    boxShadow: disabled ? "none" : down
+      ? "inset 0 1px 3px rgba(0,0,0,0.16), 0 1px 1px rgba(0,0,0,0.08)"
+      : `inset 0 1px 0 ${dark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.85)"}, 0 4px 0 rgba(0,0,0,0.16), 0 7px 12px rgba(0,0,0,0.16)`,
   };
 }

@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url), cache = new Map();
 const mocks = {
   react: { useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}], useRef: (current) => ({ current }), useCallback: (fn) => fn, useMemo: (fn) => fn(), useEffect() {} },
   "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (styles) => styles } },
-  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: {} } }) },
+  "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { success: "#45BF82", successSoft: "#1D3A2C", destructive: "#F36164", destructiveSoft: "#431B1D", mutedForeground: "#B0A79C", secondary: "#29231D", border: "#342D25", borderStrong: "#4A4035" } } }) },
   "@expo/vector-icons": { Ionicons: "Ionicons" },
   "@/components/ui/sheet": { Sheet: "Sheet" },
   "./tactile": { tactileSurface: () => ({}) },
@@ -194,18 +194,29 @@ test("the tag picker enforces independent selections on the actual controls", ()
   events.setEventOverride(null);
 });
 
-test("status tag buttons stay text-only whether selected or unselected", () => {
+test("the neutral status has no tag and explicit status buttons toggle independently", () => {
   const { CardStatusPicker } = load("components/ui/card-status-picker");
   const nodes = (node) => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(nodes) : [node, ...nodes(node.props?.children)];
   for (const selected of [[], ["Done"], ["Canceled"], ["Overdue"]]) {
     const tree = nodes(CardStatusPicker({ tags: selected, onChange() {} }));
-    for (const entry of [...themes.STATUS_CARD_THEMES, { id: "open", label: "Open" }]) {
+    const buttons = tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Status tag "));
+    assert.deepEqual(buttons.map((node) => node.props.accessibilityLabel), themes.STATUS_CARD_THEMES.map((entry) => `Status tag ${entry.label}`));
+    assert.equal(tree.some((node) => node.props?.children === "No status tag selected"), false);
+    for (const entry of themes.STATUS_CARD_THEMES) {
       const button = tree.find((node) => node.props?.accessibilityLabel === `Status tag ${entry.label}`);
       assert.deepEqual(nodes(button).filter((node) => node.type === "Text").map((node) => node.props.children), [entry.label]);
-      assert.equal(button.props.accessibilityState.selected, entry.id === "open" ? selected.length === 0 : selected.includes(entry.label));
+      assert.equal(button.props.accessibilityState.selected, selected.includes(entry.label));
       assert.equal(button.props.accessibilityRole, "radio");
+      const style = Object.assign({}, ...[button.props.style({ pressed: false })].flat());
+      assert.equal(style.minHeight, 44);
+      assert.equal(style.borderWidth, 1);
+      assert.equal(style.borderColor, selected.includes(entry.label) ? entry.id === "done" ? "#45BF82" : entry.id === "overdue" ? "#F36164" : "#B0A79C" : "#4A4035");
     }
   }
+  let updated;
+  const tree = nodes(CardStatusPicker({ tags: ["Work", "Done"], onChange: (tags) => { updated = tags; } }));
+  tree.find((node) => node.props?.accessibilityLabel === "Status tag Done").props.onPress();
+  assert.deepEqual(updated, ["Work"], "clearing a status removes its tag without adding an Open tag");
 });
 
 test("event availability follows local holiday dates and excludes unrelated events", () => {
@@ -243,7 +254,7 @@ test("picker hides the empty Event group and inactive saved events without dropp
   assert.equal(tree.some((node) => node.props?.children === "EVENT"), false);
   assert.equal(tree.filter((node) => node.props?.accessibilityLabel?.startsWith("Event tag ")).length, 0);
   const statuses = nodes(CardStatusPicker({ tags: selected, onChange: () => assert.fail("Rendering must not edit tags") }));
-  assert.equal(statuses.filter((node) => node.props?.accessibilityLabel?.startsWith("Status tag ")).length, 4);
+  assert.equal(statuses.filter((node) => node.props?.accessibilityLabel?.startsWith("Status tag ")).length, 3);
   assert.deepEqual(selected, ["Work", "Halloween"]);
   events.setEventOverride(null);
 });

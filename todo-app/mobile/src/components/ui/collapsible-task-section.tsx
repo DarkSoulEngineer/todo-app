@@ -4,14 +4,15 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 import { useTheme } from "@/providers/theme-provider";
 
 /** Keep fields mounted so hiding a section never discards an in-progress draft. */
-export function CollapsibleTaskSection({ title, summary, children, style }: {
+export function CollapsibleTaskSection({ title, summary, children, style, defaultExpanded = true }: {
   title: string;
   summary?: string;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  defaultExpanded?: boolean;
 }) {
   const { theme: { colors: c } } = useTheme();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   return <View style={style}>
     <Pressable accessibilityRole="button" accessibilityLabel={`${expanded ? "Collapse" : "Expand"} ${title} section`} accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded((current) => !current)} style={({ pressed }) => [styles.heading, { opacity: pressed ? 0.6 : 1 }]}>
       <Ionicons name={expanded ? "chevron-down" : "chevron-forward"} size={13} color={c.mutedForeground} />

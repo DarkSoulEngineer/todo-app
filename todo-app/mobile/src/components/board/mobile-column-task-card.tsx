@@ -8,6 +8,7 @@ import { boardColor, type Board } from "@/lib/domain/boards";
 import { PriorityStars } from "@/components/ui/priority-stars";
 import type { Task } from "@/lib/domain/types";
 import { classifySpecialCardTag, resolveCardDecoration } from "@/lib/features/card-themes";
+import { useActiveEvents } from "@/hooks/use-active-events";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
 import { useMobileBoardColors } from "./mobile-board-colors";
 
@@ -42,7 +43,10 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const accent = statusColor ?? priority.dot;
   const tagTone = board ? boardColor(board.color) : null;
   const settled = task.completed || task.canceled;
-  const decoration = resolveCardDecoration(task.tags, status);
+  const checklistComplete = task.subtasks.length > 0 && done === task.subtasks.length;
+  const checklistIndicatorColor = checklistComplete ? c.success : c.primary;
+  const { override } = useActiveEvents();
+  const decoration = resolveCardDecoration(task.tags, status, override);
   const cardTags = (task.tags ?? []).filter((tag) => classifySpecialCardTag(tag)?.group !== "status").sort((a, b) => Number(Boolean(classifySpecialCardTag(b))) - Number(Boolean(classifySpecialCardTag(a))));
   // A web button cannot contain the menu, move and checklist buttons. Keep the
   // card focusable as a group; Pressable already handles Enter for that group.
@@ -82,6 +86,7 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={(event) => { event.stopPropagation(); onSelect(); }} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <View style={styles.titleArea}>{compact ? title : <View accessible accessibilityLabel={due?.title ?? "No due date"} style={styles.timeBadge}><Text style={[styles.timeText, { color: c.foreground, fontSize: 11 * zoom }]}>{due && task.dueAt ? format(parseISO(task.dueAt), due.today ? "h:mm a" : "MMM d · h:mm a") : "Any time"}</Text></View>}</View>
       <View style={styles.actions}>
+        {task.subtasks.length > 0 ? <View testID={`janus-card-checklist-indicator-${task.id}`} accessible={false} importantForAccessibility="no" style={[styles.checklistIndicator, task.subtasks.length === 1 ? styles.singleChecklistIndicator : styles.multipleChecklistIndicator, { borderColor: checklistComplete ? c.success : c.borderStrong, backgroundColor: checklistComplete ? c.successSoft : c.backgroundAlt }]}><Ionicons name={task.subtasks.length === 1 ? checklistComplete ? "checkbox" : "square-outline" : checklistComplete ? "checkmark-done" : "list"} size={14} color={checklistIndicatorColor} />{task.subtasks.length > 1 ? <Text style={[styles.checklistIndicatorText, { color: checklistIndicatorColor }]}>{done}/{task.subtasks.length}</Text> : null}</View> : null}
         {onMoveLeft || onMoveRight ? <View pointerEvents={hideMoveArrows ? "none" : "auto"} accessibilityElementsHidden={hideMoveArrows} importantForAccessibility={hideMoveArrows ? "no-hide-descendants" : "auto"} style={{ flexDirection: "row", opacity: hideMoveArrows ? 0 : 1 }}>
           {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}
           {onMoveRight ? action("arrow-forward", `Move ${task.title} to next column`, onMoveRight) : null}
@@ -92,6 +97,7 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
     {!compact ? title : null}
     {!compact ? <View style={styles.meta}>
       <PriorityStars priority={task.priority} zoom={zoom} />
+      {status === "overdue" ? <View testID={`janus-card-status-tag-${task.id}-overdue`} accessibilityLabel="Overdue status tag" style={styles.tag}><View style={[styles.tagDot, { backgroundColor: c.destructive }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.destructive, fontSize: 10 * zoom }]}>Overdue</Text></View> : null}
       {board && tagTone && classifySpecialCardTag(board.label)?.group !== "status" ? <View style={styles.tag}><View style={[styles.tagDot, { backgroundColor: tagTone.dot }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.foreground, fontSize: 10 * zoom }]}>{board.label}</Text></View> : null}
       {cardTags.slice(0, 4).map((tag) => <View key={tag} style={styles.tag}><View style={[styles.tagDot, { backgroundColor: classifySpecialCardTag(tag)?.theme.accent ?? c.mutedForeground }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.foreground, fontSize: 10 * zoom }]}>{tag}</Text></View>)}
       {cardTags.length > 4 ? <Text style={{ color: c.mutedForeground, fontSize: 10 }}>+{cardTags.length - 4}</Text> : null}
@@ -110,6 +116,10 @@ const styles = StyleSheet.create({
   calendarCard: { flexGrow: 1, minHeight: 108, paddingLeft: 13, borderWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
   calendarTopRow: { marginTop: 0, marginBottom: 0 },
   checklistSummary: { flexDirection: "row", alignItems: "center", gap: 4 },
+  checklistIndicator: { height: 28, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderWidth: 1, marginTop: 8 },
+  singleChecklistIndicator: { width: 28, borderRadius: 14 },
+  multipleChecklistIndicator: { minWidth: 48, paddingHorizontal: 7, borderRadius: 10 },
+  checklistIndicatorText: { fontSize: 10, lineHeight: 14, fontWeight: "800", fontVariant: ["tabular-nums"] },
   topRow: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: -6, marginBottom: -2 }, titleArea: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center", alignItems: "flex-start" }, checkbox: { width: 36, height: 44, alignItems: "center", justifyContent: "center", flexShrink: 0 }, title: { fontWeight: "600", letterSpacing: -0.2 },
   actions: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", flexShrink: 0, gap: 2 }, action: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 7 },
   timeBadge: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" }, timeText: { flexShrink: 1, fontWeight: "700", fontVariant: ["tabular-nums"] },

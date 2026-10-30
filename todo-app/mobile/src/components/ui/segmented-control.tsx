@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
-import { tactileSurface } from "./tactile";
 import { SelectionLed } from "@/components/ui/selection-led";
 
 export interface SegmentedOption {
@@ -30,7 +29,6 @@ export function SegmentedControl({ options, value, onChange }: { options: Segmen
             style={({ pressed }) => [
               styles.item,
               { backgroundColor: active ? theme.colors.primarySoft : theme.colors.card, borderColor: active ? theme.colors.primary : theme.colors.border, borderRadius: theme.radius.md },
-              tactileSurface({ pressed, selected: active, accent: theme.colors.primary, dark: theme.scheme === "dark" }),
             ]}
             accessibilityRole="button"
             aria-pressed={active}

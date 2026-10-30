@@ -156,10 +156,29 @@ test("month and week selections keep exactly one lit tile, including Today and p
     assert.equal(flatten(badge.props.style).borderRadius, 10);
     assert.equal(flatten(nodes(badge).find((node) => node.type === "Text").props.style).color, colors.foreground);
     const cell = nodes(tree).find((node) => node.props?.testID === `calendar-day-${dates.format(day, "yyyy-MM-dd")}`);
-    assert.ok(nodes(cell).some((node) => Array.isArray(node.props?.children) && node.props.children.join("") === "+2") || mode === "week");
+    assert.equal(nodes(cell).find((node) => node.props?.testID === `calendar-task-count-${dates.format(day, "yyyy-MM-dd")}`).props.children, "+4");
     const selection = nodes(cell).find((node) => node.props?.accessibilityLabel?.startsWith("Select "));
     assert.equal(selection.props["aria-pressed"], true);
     selection.props.onPress();
+  }
+});
+
+test("calendar shows exact task counts through nine and a 9+ badge above that", () => {
+  for (const mode of ["month", "week"]) for (const [count, expected] of [[1, "+1"], [9, "+9"], [10, "9+"], [14, "9+"]]) {
+    const entries = Array.from({ length: count }, (_, index) => ({
+      id: `count-${index}`,
+      title: `Task ${index}`,
+      priority: "medium",
+      completed: false,
+      canceled: false,
+      dueAt: new Date(2026, 9, 28, 9, index).toISOString(),
+    }));
+    const { tree } = render(mode, true, null, entries);
+    const cell = nodes(tree).find((node) => node.props?.testID === `calendar-day-${dates.format(day, "yyyy-MM-dd")}`);
+    const badge = nodes(cell).find((node) => node.props?.testID === `calendar-task-count-${dates.format(day, "yyyy-MM-dd")}`);
+    assert.equal(badge.props.children, expected);
+    const selectDay = nodes(cell).find((node) => node.props?.accessibilityLabel === `Select ${dates.format(day, "EEEE, MMMM d")}`);
+    assert.match(selectDay.props.accessibilityHint, new RegExp(`${count} ${count === 1 ? "task" : "tasks"} due`));
   }
 });
 

@@ -48,8 +48,10 @@ test("navigation bindings use Shift and disabled quick actions keep commands/hel
   assert.equal(logic.commandShortcut({ key: "/" }, false, false), "palette");
   assert.equal(logic.commandShortcut({ key: "?", shiftKey: true }, false, false), "help");
   for (const [key, id] of [["1", "view-board"], ["2", "view-list"], ["3", "view-calendar"], ["4", "view-insights"], ["[", "previous-board"], ["]", "next-board"]]) {
-    assert.equal(logic.commandShortcut({ key }, false), id);
+    assert.equal(logic.commandShortcut({ key }, false), null);
     assert.equal(logic.commandShortcut({ key }, false, false), null);
+    assert.equal(logic.commandShortcut({ key, shiftKey: true }, false), id);
+    assert.equal(logic.commandShortcut({ key, ctrlKey: true }, false), id);
   }
   assert.equal(logic.commandShortcut({ key: "n" }, false, false), null);
   assert.equal(logic.commandShortcut({ key: "ArrowOops", altKey: true }, false), null);

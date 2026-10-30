@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Input } from "@/components/ui/input";
-import { tactileSurface } from "@/components/ui/tactile";
 import { SelectionLed } from "@/components/ui/selection-led";
 import { useReferenceTheme } from "@/components/reference/reference-theme";
 import { useTheme } from "@/providers/theme-provider";
@@ -51,7 +50,7 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
         const active = mode === option.value;
         return <Pressable key={option.value} accessibilityRole="radio" accessibilityLabel={`Use ${option.label.toLowerCase()} appearance`} accessibilityState={{ checked: active, disabled }} aria-checked={active} disabled={disabled}
           onPress={() => selectMode(option.value)}
-          style={({ pressed }) => [styles.modeButton, { backgroundColor: active ? colors.primaryFixed : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }, tactileSurface({ pressed, selected: active, disabled, accent: colors.primary, dark: mode === "dark" })]}>
+          style={({ pressed }) => [styles.modeButton, { backgroundColor: active ? colors.primaryFixed : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
           <Text style={[type.bodyStrong, { color: active ? colors.onSecondaryContainer : colors.muted, fontSize: 13 }]}>{option.label}</Text>
           <SelectionLed selected={active} />
         </Pressable>;
@@ -59,7 +58,7 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Choose interface theme" accessibilityState={{ expanded: open, disabled }} disabled={disabled}
       onPress={() => { setOpen(!open); setQuery(""); }}
-      style={({ pressed }) => [styles.trigger, { backgroundColor: colors.surfaceHigh, borderColor: open ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }, tactileSurface({ pressed, selected: open, disabled, accent: colors.primary, dark: mode === "dark" })]}>
+      style={({ pressed }) => [styles.trigger, { backgroundColor: colors.surfaceHigh, borderColor: open ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
       <Swatches colors={theme.colors} />
       <View style={styles.copy}>
         <Text style={type.bodyStrong}>{selected?.name ?? "System"}</Text>
@@ -82,7 +81,7 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
                 }
                 setPreference(entry.id); setOpen(false); setQuery("");
               }}
-              style={({ pressed }) => [styles.option, { backgroundColor: active ? colors.secondaryContainer : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }, tactileSurface({ pressed, selected: active, disabled, accent: colors.primary, dark: mode === "dark" })]}>
+              style={({ pressed }) => [styles.option, { backgroundColor: active ? colors.secondaryContainer : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
               <Swatches colors={preview.colors} />
               <Text numberOfLines={1} style={[type.body, styles.copy, { fontWeight: "600" }]}>{entry.id === "system" ? "System (follow device)" : entry.name}</Text>
               <SelectionLed selected={active} />

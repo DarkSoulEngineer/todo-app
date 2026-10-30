@@ -24,7 +24,6 @@ import { ribbonLabel } from "@/lib/utils/ribbon-label";
 import { BottomSheetModal } from "@/components/ui/bottom-sheet-modal";
 import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
-import { tactileSurface } from "@/components/ui/tactile";
 import { CollapsibleTaskSection } from "@/components/ui/collapsible-task-section";
 import { SelectionLed } from "@/components/ui/selection-led";
 import { TaskSchedulePicker } from "@/components/ui/task-schedule-picker";
@@ -40,6 +39,7 @@ import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { classifySpecialCardTag, detectCardTheme, resolveCardDecoration } from "@/lib/features/card-themes";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
 import { SpecialCardTagPicker } from "@/components/ui/special-card-tag-picker";
+import { useActiveEvents } from "@/hooks/use-active-events";
 import { CardStatusPicker } from "@/components/ui/card-status-picker";
 import { mergeCardTagDraft, normalizeCardTags, toggleCardTag } from "@/lib/features/special-card-tags";
 import {
@@ -98,7 +98,6 @@ function Chip({ label, active, onPress, color, icon }: { label: string; active?:
       style={({ pressed }) => [
         styles.chip,
         { backgroundColor: active ? theme.colors.cardElevated : theme.colors.secondary, borderColor: active ? theme.colors.borderStrong : theme.colors.border, opacity: pressed ? 0.75 : 1 },
-        tactileSurface({ pressed, selected: active, dark: theme.scheme === "dark" }),
       ]}
     >
       {icon ? <Ionicons name={icon} size={14} color={theme.colors.secondaryForeground} /> : null}
@@ -133,7 +132,8 @@ export function TaskCard({
   const cardTheme = detectCardTheme(task.title, task.description);
   const doneSubtasks = task.subtasks.filter((item) => item.done).length;
   const status = deriveStatus(task, now);
-  const decoration = resolveCardDecoration(task.tags, status);
+  const { override } = useActiveEvents();
+  const decoration = resolveCardDecoration(task.tags, status, override);
   const cardTags = (task.tags ?? []).filter((tag) => classifySpecialCardTag(tag)?.group !== "status").sort((a, b) => Number(Boolean(classifySpecialCardTag(b))) - Number(Boolean(classifySpecialCardTag(a))));
   const taskAction = onLongPress ?? onPress;
   return (
@@ -363,7 +363,6 @@ function TaskEditorForm({
               opacity: pressed ? 0.75 : 1,
               gap: 6,
             },
-            tactileSurface({ pressed, selected: priority === item, dark: theme.scheme === "dark" }),
           ]}
         >
           <PriorityStars priority={item} size={13} zoom={1} />
@@ -427,7 +426,7 @@ function TaskEditorForm({
               </CollapsibleTaskSection>
               </View>
               <View testID="task-editor-schedule-field">
-              <CollapsibleTaskSection title={calendarDateFixed ? "Time" : "Schedule"} summary={dueAt && isValid(parseISO(dueAt)) ? format(parseISO(dueAt), "MMM d · HH:mm") : "Optional"}>
+              <CollapsibleTaskSection title={calendarDateFixed ? "Time" : "Schedule"} summary={dueAt && isValid(parseISO(dueAt)) ? format(parseISO(dueAt), "MMM d · HH:mm") : "Optional"} defaultExpanded={false}>
               <TaskSchedulePicker value={dueAt} onChange={setDueAt} dateLocked={calendarDateFixed} />
               </CollapsibleTaskSection>
               </View>

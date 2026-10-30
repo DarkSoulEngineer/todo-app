@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "@/providers/theme-provider";
-import { tactileSurface } from "./tactile";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "soft";
 type Size = "sm" | "md" | "lg" | "icon" | "icon-sm";
@@ -81,7 +80,6 @@ export function Button({ variant = "primary", size = "md", label, children, styl
         variantStyle,
         sizeStyle,
         style,
-        variant !== "ghost" ? tactileSurface({ pressed, disabled: Boolean(disabled), dark: theme.scheme === "dark" }) : null,
         { opacity: disabled ? 0.45 : pressed ? 0.9 : 1 },
       ]}
       {...props}

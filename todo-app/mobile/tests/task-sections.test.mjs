@@ -7,10 +7,10 @@ import ts from "typescript";
 const require = createRequire(import.meta.url);
 const source = readFileSync(new URL("../src/components/ui/collapsible-task-section.tsx", import.meta.url), "utf8");
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-function setup(title = "Tags") {
-  let expanded = true;
+function setup(title = "Tags", initialExpanded = true) {
+  let expanded = initialExpanded;
   const mocks = {
-    react: { useState: () => [expanded, (next) => { expanded = typeof next === "function" ? next(expanded) : next; }] },
+    react: { useState: (initial) => [expanded, (next) => { expanded = typeof next === "function" ? next(expanded) : next; }] },
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (styles) => styles } },
     "@expo/vector-icons": { Ionicons: "Icon" },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors: { mutedForeground: "muted" } } }) },
@@ -56,6 +56,30 @@ test("sections toggle independently and retain a live summary while collapsed", 
   assert.equal(collapsed.props.children[0].props.style({ pressed: false })[0].minHeight, 44);
 });
 
+test("the Schedule section starts collapsed but its header toggles the date and time controls", () => {
+  const section = setup("Schedule", false);
+  let tree = section.render("Oct 30 · 03:07");
+  let heading = tree.props.children[0];
+  let content = tree.props.children[1];
+  assert.equal(heading.props.accessibilityLabel, "Expand Schedule section");
+  assert.equal(heading.props.accessibilityState.expanded, false);
+  assert.equal(heading.props.children[2].props.children, "Oct 30 · 03:07");
+  assert.equal(content.props.style.display, "none");
+
+  heading.props.onPress();
+  tree = section.render("Oct 30 · 03:07");
+  heading = tree.props.children[0];
+  content = tree.props.children[1];
+  assert.equal(heading.props.accessibilityLabel, "Collapse Schedule section");
+  assert.equal(content.props.style, undefined);
+  assert.equal(content.props.children, section.draft);
+
+  heading.props.onPress();
+  tree = section.render("Optional");
+  assert.equal(tree.props.children[0].props.accessibilityLabel, "Expand Schedule section");
+  assert.equal(tree.props.children[0].props.children[2].props.children, "Optional");
+});
+
 test("Task/Create editors and the task inspector expose collapsible sections without hiding their title or actions", () => {
   const cases = [
     ["components/janus-board-ui.tsx", ["List", "Notes", "Priority", "Tags", "Schedule", "Checklist"]],
@@ -79,6 +103,8 @@ test("Task/Create editors and the task inspector expose collapsible sections wit
     assert.deepEqual(titles.sort(), expected.sort(), path);
     assert.ok(inside.every((text) => !text.includes('accessibilityLabel="Task title"') && !text.includes('label="Add task"')));
   }
+  const editor = readFileSync(new URL("../src/components/janus-board-ui.tsx", import.meta.url), "utf8");
+  assert.match(editor, /<CollapsibleTaskSection title=\{calendarDateFixed \? "Time" : "Schedule"\}[^>]*defaultExpanded=\{false\}/);
 });
 
 test("status is a top-of-form property, never nested inside the Tags section", () => {
@@ -108,4 +134,3 @@ test("status is a top-of-form property, never nested inside the Tags section", (
   assert.match(statusField, /<CardStatusPicker/);
   assert.match(source, /<CollapsibleTaskSection title="Tags"[\s\S]*?<\/CollapsibleTaskSection>/);
 });
-

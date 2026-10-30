@@ -28,6 +28,13 @@ interface KeyInput {
 export function commandShortcut(event: KeyInput, editing: boolean, singleKeyShortcuts = true): string | null {
   if (event.defaultPrevented || event.repeat || event.isComposing || editing) return null;
   const key = event.key.toLowerCase();
+  // Single numeric keys (1-9) require a modifier to avoid conflicting with typing.
+  if (singleKeyShortcuts && ["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key)) {
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      return ({ "1": "view-board", "2": "view-list", "3": "view-calendar", "4": "view-insights" } as Record<string, string>)[key] ?? null;
+    }
+    return null;
+  }
   // Leave every Ctrl/Command/Alt combination to the browser and operating system.
   if (event.ctrlKey || event.metaKey || event.altKey) return null;
   if (key === "?" || (key === "/" && event.shiftKey)) return "help";

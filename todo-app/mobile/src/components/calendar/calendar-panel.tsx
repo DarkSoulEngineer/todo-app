@@ -81,9 +81,11 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
       <View testID="main-calendar-grid" style={styles.grid}>
         {days.map((day) => {
           const dayTasks = tasksForDay(tasks, day);
+          const taskCount = dayTasks.length > 9 ? "9+" : dayTasks.length ? `+${dayTasks.length}` : null;
           const selected = selectedDay ? isSameDay(selectedDay, day) : false;
           const current = isSameDay(day, now);
           const outside = mode === "month" && !isSameMonth(day, anchor);
+          const taskHint = dayTasks.length ? `${dayTasks.length} ${dayTasks.length === 1 ? "task" : "tasks"} due` : null;
           return (
             <View
               key={day.toISOString()}
@@ -94,13 +96,13 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
                 outside && styles.cellOutside,
               ]}
             >
-              <Pressable accessibilityRole="button" accessibilityLabel={`Select ${format(day, "EEEE, MMMM d")}`} accessibilityHint={current ? "Today" : undefined} aria-pressed={selected} accessibilityState={{ selected }} onPress={() => onSelectDay(day)} style={StyleSheet.absoluteFill} />
+              <Pressable accessibilityRole="button" accessibilityLabel={`Select ${format(day, "EEEE, MMMM d")}`} accessibilityHint={[current ? "Today" : null, taskHint].filter(Boolean).join(". ") || undefined} aria-pressed={selected} accessibilityState={{ selected }} onPress={() => onSelectDay(day)} style={StyleSheet.absoluteFill} />
               <View pointerEvents="none" style={styles.cellHeader}>
                 <View testID={`calendar-date-${format(day, "yyyy-MM-dd")}`} style={[styles.dayBadge, selected && styles.dayBadgeSelected]}>
                   <Text style={[styles.dayNumber, current && !selected && styles.dayNumberToday]}>{format(day, "d")}</Text>
                   {selected ? <SelectionLed selected /> : null}
                 </View>
-                {dayTasks.length > (mode === "week" ? 5 : 2) ? <Text style={styles.moreLabel}>+{dayTasks.length - (mode === "week" ? 5 : 2)}</Text> : null}
+                {taskCount ? <Text testID={`calendar-task-count-${format(day, "yyyy-MM-dd")}`} style={styles.countLabel}>{taskCount}</Text> : null}
             </View>
             </View>
           );
@@ -159,6 +161,6 @@ function createStyles(colors: ThemeColors) {
     dayBadgeSelected: { backgroundColor: colors.secondary, borderColor: colors.borderStrong },
     dayNumber: { color: colors.foreground, fontSize: 12, lineHeight: 16, fontWeight: "600" },
     dayNumberToday: { color: colors.success },
-    moreLabel: { position: "absolute", right: 4, top: 2, color: colors.mutedForeground, fontSize: 10, lineHeight: 13, fontWeight: "700" },
+    countLabel: { position: "absolute", top: 2, right: 4, zIndex: 1, color: colors.mutedForeground, fontSize: 10, lineHeight: 13, fontWeight: "800" },
   });
 }
