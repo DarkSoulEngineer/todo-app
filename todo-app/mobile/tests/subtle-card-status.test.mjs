@@ -29,6 +29,7 @@ const { MobileColumnTaskCard } = await load("../src/components/board/mobile-colu
   "./mobile-board-colors": { useMobileBoardColors: () => colors },
   "@/components/ui/priority-stars": { PriorityStars: "PriorityStars" },
   "@/components/ui/status-icon": { StatusIcon: "StatusIcon" },
+  "@/components/ui/checklist-completion-medal": { ChecklistCompletionMedal: "ChecklistCompletionMedal" },
   "@/hooks/use-active-events": { useActiveEvents: () => ({ events: activeEvents, override: null }) },
   "@/lib/features/card-themes": themes,
   "@/components/ui/seasonal-card-decoration": { SeasonalCardDecoration: "SeasonalCardDecoration" },
@@ -56,6 +57,41 @@ test("status cards use one small icon, neutral surfaces, and no status scene or 
       assert.equal(style.borderLeftColor, colors.border);
       assert.ok(all.some((node) => node.props?.accessibilityLabel === "Actions for Task"));
     }
+  }
+});
+
+test("the completion medal replaces Done only for a done task with a nonempty fully checked checklist", () => {
+  for (const compact of [false, true]) {
+    for (const [changes, expected] of [
+      [{ completed: true, subtasks: [{ id: "one", done: true }, { id: "two", done: true }] }, 1],
+      [{ completed: true, subtasks: [{ id: "one", done: true }, { id: "two", done: false }] }, 0],
+      [{ completed: false, subtasks: [{ id: "one", done: true }] }, 0],
+      [{ canceled: true, subtasks: [{ id: "one", done: true }] }, 0],
+      [{ completed: true, subtasks: [] }, 0],
+    ]) {
+      const tree = render(changes, { compact, zoom: 1.5 });
+      const medals = nodes(tree).filter((node) => node.type === "ChecklistCompletionMedal");
+      assert.equal(medals.length, expected);
+      if (expected) {
+        assert.equal(medals[0].props.zoom, 1.5);
+        assert.equal(nodes(tree).some((node) => node.type === "StatusIcon"), false, "the medal replaces the ordinary Done check");
+      }
+    }
+  }
+});
+
+test("the smaller medal uses the theme accent, scales with zoom, and has an accessible explanation", async () => {
+  for (const [scheme, color] of [["light", "#6D28D9"], ["dark", "#E8BD70"]]) {
+    const { ChecklistCompletionMedal } = await load("../src/components/ui/checklist-completion-medal.tsx", {
+      "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", Path: "Path" },
+      "@/components/ui/hover-label": { HoverLabel: "HoverLabel" },
+      "@/providers/theme-provider": { useTheme: () => ({ theme: { scheme, colors: { accent: color } } }) },
+    });
+    const tree = ChecklistCompletionMedal({ zoom: 1.5 });
+    assert.equal(tree.props.accessibilityLabel, "Task and checklist fully completed");
+    assert.equal(nodes(tree).find((node) => node.type === "Circle").props.stroke, color);
+    assert.equal(nodes(tree).find((node) => node.type === "Svg").props.width, 21);
+    assert.equal(nodes(tree).find((node) => node.type === "Svg").props.height, 24.75);
   }
 });
 

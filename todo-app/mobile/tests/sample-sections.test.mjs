@@ -38,6 +38,39 @@ const { useTasks } = load("hooks/use-tasks");
 const lists = [{ id: "a", title: "A" }, { id: "b", title: "B" }];
 const workspace = (sections, tasks = []) => ({ sections, tasks, boards: [] });
 
+test("every sample generation includes the full completion/checklist visual test matrix", () => {
+  const now = new Date("2026-10-31T12:00:00Z");
+  for (let run = 0; run < 5; run++) {
+    const cases = createSampleTasks(now).filter((task) => task.tags.includes("Checklist demo"));
+    assert.equal(cases.length, 9);
+    const expected = [
+      ["Done · full checklist", true, false, 3, 3],
+      ["Done · partial checklist", true, false, 2, 3],
+      ["Done · unchecked checklist", true, false, 0, 3],
+      ["Done · no checklist", true, false, 0, 0],
+      ["Open · full checklist", false, false, 3, 3],
+      ["Open · partial checklist", false, false, 1, 3],
+      ["Open · unchecked checklist", false, false, 0, 3],
+      ["Canceled · full checklist", false, true, 3, 3],
+      ["Overdue · full checklist", false, false, 3, 3],
+    ];
+    for (const [title, completed, canceled, checked, total] of expected) {
+      const task = cases.find((task) => task.title === title);
+      assert.ok(task, title);
+      assert.equal(task.completed, completed);
+      assert.equal(task.canceled, canceled);
+      assert.equal(task.subtasks.length, total);
+      assert.equal(task.subtasks.filter((item) => item.done).length, checked);
+      assert.equal(Boolean(task.completedAt), completed);
+      assert.equal(task.tags.includes("Done"), completed);
+      assert.equal(task.tags.includes("Canceled"), canceled);
+    }
+    const medalCases = cases.filter((task) => task.completed && task.subtasks.length > 0 && task.subtasks.every((item) => item.done));
+    assert.deepEqual(medalCases.map((task) => task.title), ["Done · full checklist"]);
+    assert.ok(new Date(cases.find((task) => task.title === "Overdue · full checklist").dueAt) < now);
+  }
+});
+
 test("samples use randomized visible custom lists and preserve task data", () => {
   const tasks = createSampleTasks();
   const original = structuredClone(tasks);

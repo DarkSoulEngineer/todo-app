@@ -342,5 +342,36 @@ export function createSampleTasks(now: Date = new Date()): Task[] {
     }
   }
 
+  // Always include these visual test cases; random status buckets must not
+  // accidentally hide the medal, ordinary Done glyph, or open-checklist states.
+  const checklistCases = [
+    { title: "Done · full checklist", status: "Done", checked: [true, true, true], description: "Shows the completion medal instead of the normal Done checkmark." },
+    { title: "Done · partial checklist", status: "Done", checked: [true, false, true], description: "Shows the normal Done checkmark: one checklist item is still open." },
+    { title: "Done · unchecked checklist", status: "Done", checked: [false, false, false], description: "Marked Done, but no checklist items are checked. No medal." },
+    { title: "Done · no checklist", status: "Done", checked: [], description: "Shows the normal Done checkmark. An empty checklist does not earn a medal." },
+    { title: "Open · full checklist", status: null, checked: [true, true, true], description: "Every step is checked, but the task itself is not Done. No medal." },
+    { title: "Open · partial checklist", status: null, checked: [true, false, false], description: "An open task with checklist work still remaining." },
+    { title: "Open · unchecked checklist", status: null, checked: [false, false, false], description: "An open task before any checklist work begins." },
+    { title: "Canceled · full checklist", status: "Canceled", checked: [true, true, true], description: "Canceled tasks keep the canceled indicator, even with every step checked." },
+    { title: "Overdue · full checklist", status: "Overdue", checked: [true, true, true], description: "All steps are checked, but the task is still overdue rather than Done." },
+  ];
+  for (const [index, example] of checklistCases.entries()) {
+    const task = createTask({
+      title: example.title,
+      description: example.description,
+      priority: "medium",
+      category: categoryPool[index % categoryPool.length],
+      dueAt: addHours(now, example.status === "Overdue" ? -6 : 24).toISOString(),
+      tags: ["Checklist demo", ...(example.status ? [example.status] : [])],
+      subtasks: example.checked.map((done, step) => ({ id: makeId(8), title: `Example step ${step + 1}`, done })),
+    });
+    tasks.push({
+      ...task,
+      createdAt: subDays(now, 1).toISOString(),
+      updatedAt: now.toISOString(),
+      completedAt: task.completed ? now.toISOString() : null,
+    });
+  }
+
   return tasks;
 }

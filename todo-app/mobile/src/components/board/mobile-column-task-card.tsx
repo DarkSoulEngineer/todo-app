@@ -7,6 +7,7 @@ import { PRIORITY_META } from "@/lib/domain/constants";
 import { boardColor, type Board } from "@/lib/domain/boards";
 import { PriorityStars } from "@/components/ui/priority-stars";
 import { StatusIcon } from "@/components/ui/status-icon";
+import { ChecklistCompletionMedal } from "@/components/ui/checklist-completion-medal";
 import { registerTaskCompletionOrigin } from "@/lib/features/task-completion-celebration";
 import type { Task } from "@/lib/domain/types";
 import { classifySpecialCardTag, resolveCardDecoration } from "@/lib/features/card-themes";
@@ -96,7 +97,7 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={(event) => { event.stopPropagation(); onSelect(); }} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <View style={styles.titleArea}>{compact ? title : <View accessible accessibilityLabel={due?.title ?? "No due date"} style={styles.timeBadge}><Text style={[styles.timeText, { color: c.foreground, fontSize: 11 * zoom }]}>{due && task.dueAt ? format(parseISO(task.dueAt), due.today ? "h:mm a" : "MMM d · h:mm a") : "Any time"}</Text></View>}</View>
       <View style={styles.actions}>
-        <StatusIcon status={status} zoom={zoom} detail={status === "overdue" ? due?.title : undefined} />
+        {status === "completed" && task.subtasks.length > 0 && done === task.subtasks.length ? <ChecklistCompletionMedal zoom={zoom} /> : <StatusIcon status={status} zoom={zoom} detail={status === "overdue" ? due?.title : undefined} />}
         {onMoveLeft || onMoveRight ? <View pointerEvents={hideMoveArrows ? "none" : "auto"} accessibilityElementsHidden={hideMoveArrows} importantForAccessibility={hideMoveArrows ? "no-hide-descendants" : "auto"} style={{ flexDirection: "row", opacity: hideMoveArrows ? 0 : 1 }}>
           {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}
           {onMoveRight ? action("arrow-forward", `Move ${task.title} to next column`, onMoveRight) : null}

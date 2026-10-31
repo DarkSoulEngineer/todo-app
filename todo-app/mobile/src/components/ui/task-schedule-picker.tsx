@@ -38,7 +38,7 @@ export function TaskSchedulePicker({ value, onChange, dateLocked = false, now = 
         const selected = Boolean(due && isSameDay(day, due));
         return <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} accessibilityHint={format(day, "EEEE, MMMM d")} accessibilityState={{ selected }} aria-pressed={selected} onPress={() => chooseDay(day)} style={({ pressed }) => [styles.dateShortcut, { backgroundColor: selected ? c.primarySoft : pressed ? c.cardElevated : c.backgroundAlt, borderColor: selected ? c.primary : c.border, opacity: pressed ? 0.8 : 1 }]}>
           <View style={styles.dateShortcutHeading}>
-            <Ionicons name={selected ? "checkmark-circle-outline" : icon} size={14} color={selected ? c.primary : c.mutedForeground} />
+            <Ionicons name={icon} size={14} color={selected ? c.primary : c.mutedForeground} />
             <Text numberOfLines={1} style={[styles.dateShortcutText, { color: selected ? c.primary : c.foreground }]}>{label}</Text>
           </View>
           <Text numberOfLines={1} style={[styles.dateShortcutDate, { color: c.mutedForeground }]}>{format(day, "EEE, MMM d")}</Text>

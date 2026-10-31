@@ -40,6 +40,7 @@ import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { classifySpecialCardTag, detectCardTheme, resolveCardDecoration } from "@/lib/features/card-themes";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
 import { StatusIcon } from "@/components/ui/status-icon";
+import { ChecklistCompletionMedal } from "@/components/ui/checklist-completion-medal";
 import { SpecialCardTagPicker } from "@/components/ui/special-card-tag-picker";
 import { useActiveEvents } from "@/hooks/use-active-events";
 import { CardStatusPicker } from "@/components/ui/card-status-picker";
@@ -147,7 +148,7 @@ export function TaskCard({
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
-          <StatusIcon status={status} detail={status === "overdue" ? due?.title : undefined} />
+          {status === "completed" && task.subtasks.length > 0 && doneSubtasks === task.subtasks.length ? <ChecklistCompletionMedal /> : <StatusIcon status={status} detail={status === "overdue" ? due?.title : undefined} />}
            <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} accessibilityHint="Opens task actions" onPress={(event) => { event.stopPropagation(); (onActionPress ?? taskAction)(event); }} style={({ pressed }) => [styles.taskAction, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary, opacity: pressed ? 0.65 : 1 }]}>
              <Ionicons name="ellipsis-horizontal" size={19} color={theme.colors.mutedForeground} />
            </Pressable>

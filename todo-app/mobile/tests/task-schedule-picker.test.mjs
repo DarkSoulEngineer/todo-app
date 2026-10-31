@@ -71,7 +71,7 @@ test("date shortcuts use flat icon tiles, date previews, and a selected accent b
   const selected = button(app.render(), "Tomorrow");
   assert.equal(selected.props.accessibilityState.selected, true);
   assert.equal(Object.assign({}, ...selected.props.style({ pressed: false })).borderColor, "#fa0");
-  assert.equal(nodes(selected).find((node) => node.type === "Icon").props.name, "checkmark-circle-outline");
+  assert.equal(nodes(selected).find((node) => node.type === "Icon").props.name, "partly-sunny-outline", "selection keeps the original icon rather than adding a checkmark");
 });
 
 test("calendar and time controls are directly visible without launcher buttons or popup state", () => {
