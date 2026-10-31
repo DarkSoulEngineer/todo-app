@@ -30,7 +30,7 @@ function setup({ value: initial = null, now = new Date(2026, 9, 30, 10, 15), wee
     react, "date-fns": dates,
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable", StyleSheet: { create: (style) => style } },
     "@expo/vector-icons": { Ionicons: "Icon" },
-    "@/providers/theme-provider": { useTheme: () => ({ theme: { scheme: "dark", colors: { foreground: "#eee", mutedForeground: "#aaa", primary: "#fa0", card: "#222", cardElevated: "#333", secondary: "#444", border: "#555", success: "#0a8" } } }) },
+    "@/providers/theme-provider": { useTheme: () => ({ theme: { scheme: "dark", colors: { foreground: "#eee", mutedForeground: "#aaa", primary: "#fa0", primarySoft: "#fa0220", backgroundAlt: "#181818", card: "#222", cardElevated: "#333", secondary: "#444", border: "#555", success: "#0a8" } } }) },
     "@/providers/preferences-provider": { usePreferences: () => ({ calendarWeekStart: weekStart }) },
     "@/lib/utils/task-schedule": utils,
     "./button": { Button: "Button" }, "./input": { Input: "Input" }, "./selection-led": { SelectionLed: "Led" }, "./tactile": tactile,
@@ -54,6 +54,25 @@ function setup({ value: initial = null, now = new Date(2026, 9, 30, 10, 15), wee
     return child.type(child.props);
   } };
 }
+
+test("date shortcuts use flat icon tiles, date previews, and a selected accent border", () => {
+  const app = setup();
+  for (const label of ["Today", "Tomorrow", "+1 week"]) {
+    const tile = button(app.render(), label);
+    assert.equal(nodes(tile).some((node) => node.type === "Led"), false);
+    assert.equal(nodes(tile).filter((node) => node.type === "Icon").length, 1);
+    assert.equal(nodes(tile).filter((node) => node.type === "Text").length, 2);
+    const style = Object.assign({}, ...tile.props.style({ pressed: false }));
+    assert.equal(style.borderColor, "#555");
+    assert.equal(style.transform, undefined);
+    assert.equal(style.boxShadow, undefined);
+  }
+  button(app.render(), "Tomorrow").props.onPress();
+  const selected = button(app.render(), "Tomorrow");
+  assert.equal(selected.props.accessibilityState.selected, true);
+  assert.equal(Object.assign({}, ...selected.props.style({ pressed: false })).borderColor, "#fa0");
+  assert.equal(nodes(selected).find((node) => node.type === "Icon").props.name, "checkmark-circle-outline");
+});
 
 test("calendar and time controls are directly visible without launcher buttons or popup state", () => {
   const app = setup({ now: new Date(2026, 11, 30) });
@@ -131,11 +150,11 @@ test("date shortcuts show selection clearly and month arrows keep their compact 
   for (const label of ["Today", "Tomorrow", "+1 week"]) {
     const shortcut = button(app.render(), label);
     const surface = flatten(shortcut.props.style({ pressed: false }));
-    assert.equal(surface.minHeight, 44);
-    assert.equal(surface.backgroundColor, "#444");
+    assert.equal(surface.minHeight, 54);
+    assert.equal(surface.backgroundColor, "#181818");
     assert.equal(surface.borderWidth, 1);
     assert.equal(surface.borderRadius, 10);
-    assert.equal(flatten(shortcut.props.style({ pressed: true })).backgroundColor, "#444");
+    assert.equal(flatten(shortcut.props.style({ pressed: true })).backgroundColor, "#333");
     const text = nodes(shortcut).find((node) => node.type === "Text");
     assert.equal(flatten(text.props.style).color, "#eee");
   }
@@ -144,11 +163,11 @@ test("date shortcuts show selection clearly and month arrows keep their compact 
     const shortcut = button(app.render(), label);
     const text = nodes(shortcut).find((node) => node.type === "Text");
     assert.equal(shortcut.props.accessibilityState.selected, label === "Tomorrow");
-    assert.equal(flatten(text.props.style).color, "#eee");
+    assert.equal(flatten(text.props.style).color, label === "Tomorrow" ? "#fa0" : "#eee");
     assert.equal(flatten(text.props.style).fontWeight, "600");
     const surface = flatten(shortcut.props.style({ pressed: false }));
-    assert.equal(surface.backgroundColor, label === "Tomorrow" ? "#333" : "#444");
-    assert.equal(nodes(shortcut).find((node) => node.type === "Led").props.selected, label === "Tomorrow");
+    assert.equal(surface.backgroundColor, label === "Tomorrow" ? "#fa0220" : "#181818");
+    assert.equal(nodes(shortcut).some((node) => node.type === "Led"), false);
   }
   for (const label of ["Previous picker month", "Next picker month"]) {
     const arrow = button(app.render(), label);

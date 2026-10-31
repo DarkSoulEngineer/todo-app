@@ -63,7 +63,7 @@ test("tags combine one event design with status, and ordinary task state stays v
   assert.equal(themes.resolveCardDecoration(["DarkSoulEngineer"], "completed")?.id, "darksoulengineer");
   assert.equal(themes.resolveCardDecoration(["Janus"])?.id, "janus");
   assert.equal(themes.resolveCardDecoration(["Janus", "Halloween"], "completed")?.id, "janus");
-  assert.equal(themes.resolveCardDecoration(["Janus", "Halloween"], "completed", "halloween")?.id, "halloween");
+  assert.equal(themes.resolveCardDecoration(["Janus", "Halloween"], "completed", "halloween")?.id, "janus");
   assert.equal(themes.resolveCardDecoration([], "upcoming"), null);
 });
 
@@ -156,6 +156,27 @@ test("holiday cards use distinct event-specific artwork without event title labe
       if (node.props?.x1 !== undefined) assert.ok(Number.isFinite(node.props.x1));
     }
     h.cleanup();
+  }
+});
+
+test("custom object artwork is unframed, shaded, and vertically centered at both card sizes", () => {
+  for (const id of ["darksoulengineer", "janus"]) {
+    for (const compact of [false, true]) {
+      const h = decorationHarness({ id, compact });
+      const tree = expand(h.tree);
+      const all = nodes(tree);
+      const emblem = all.find((node) => node.props?.testID === `custom-artwork-${id}`);
+      const style = Object.assign({}, ...emblem.props.style);
+      assert.equal(style.top, "50%");
+      assert.equal(style.marginTop, -style.height / 2);
+      assert.equal(style.width, compact ? 44 : 96);
+      assert.equal(style.right, 16);
+      assert.equal(all.some((node) => node.type === "Circle" || node.type === "Ellipse"), false, "no circular frame or background ornaments");
+      assert.ok(all.some((node) => node.type === "LinearGradient"), "material shading remains vector-based");
+      assert.equal(all.filter((node) => node.type === "Svg").length, compact ? 1 : 2, "full cards add a quiet decorative layer; compact cards keep only the object");
+      assert.equal(all.some((node) => node.props?.testID === `custom-details-${id}`), !compact);
+      h.cleanup();
+    }
   }
 });
 

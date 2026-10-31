@@ -57,6 +57,18 @@ test("selecting another special tag replaces only its own group and supports rem
   assert.deepEqual(selected, ["Work", "Birthday"]);
 });
 
+test("Janus and DarkSoulEngineer artwork outrank event decorations regardless of tag order", () => {
+  for (const custom of themes.EASTER_EGG_CARD_THEMES) {
+    for (const event of themes.SEASONAL_CARD_THEMES) {
+      for (const override of [null, "all", event.id]) {
+        for (const input of [[custom.label, event.label], [event.label, custom.label]]) {
+          assert.equal(themes.resolveCardDecoration(input, "completed", override)?.id, custom.id);
+        }
+      }
+    }
+  }
+});
+
 test("custom easter-egg designs coexist and survive independent editor merges", () => {
   const selected = tags.normalizeCardTags(["Dark Soul Engineer", "Janus", "DSE", "Work"]);
   assert.deepEqual(selected, ["Janus", "DarkSoulEngineer", "Work"]);
@@ -221,6 +233,26 @@ test("special tags work with board filters, Insights status filters and text sea
   assert.equal(matchesQuery(task, "halloween"), true);
 });
 
+test("editor tags use a card-style colored dot and plain label without pill chrome", () => {
+  const { CardTagOption } = load("components/ui/card-tag-option");
+  let removed = false;
+  const tree = CardTagOption({ label: "DarkSoulEngineer", color: "#63E6D1", onPress: () => { removed = true; } });
+  const style = Object.assign({}, ...tree.props.style({ pressed: false }));
+  assert.equal(style.minHeight, 44);
+  assert.equal(style.borderWidth, undefined);
+  assert.equal(style.backgroundColor, undefined);
+  assert.equal(style.boxShadow, undefined);
+  const [dot, label] = tree.props.children;
+  assert.equal(Object.assign({}, ...dot.props.style).backgroundColor, "#63E6D1");
+  assert.equal(label.props.children, "DarkSoulEngineer");
+  tree.props.onPress();
+  assert.equal(removed, true);
+  const removable = CardTagOption({ label: "test", color: "#B0A79C", removable: true, onPress() {} });
+  assert.equal(removable.props.children[2].props.children, "×");
+  assert.equal(removable.props.accessibilityHint, "Tap to remove this tag.");
+  assert.equal(tree.props.children[2], null, "selection-only tags do not show a removal affordance");
+});
+
 test("the tag picker enforces independent selections on the actual controls", () => {
   const { SpecialCardTagPicker } = load("components/ui/special-card-tag-picker");
   const { CardStatusPicker } = load("components/ui/card-status-picker");
@@ -259,6 +291,7 @@ test("the neutral status has no tag and explicit status buttons toggle independe
       const style = Object.assign({}, ...[button.props.style].flat());
       assert.equal(style.minHeight, 44);
       assert.equal(style.borderWidth, 1);
+      assert.equal(style.borderColor, selected.includes(entry.label) ? { done: "#45BF82", canceled: "#B0A79C", overdue: "#F36164" }[entry.id] : "#342D25");
       assert.equal(style.borderRadius, 999);
       assert.equal(style.backgroundColor, undefined);
       assert.equal(style.boxShadow, "0 1px 3px rgba(0,0,0,0.16)");
@@ -288,6 +321,21 @@ test("event availability follows local holiday dates and excludes unrelated even
     assert.deepEqual(events.getActiveEventThemes(new Date(year, month - 1, day, 23, 59)).map((entry) => entry.id), [id]);
   }
   for (const date of [new Date(2026, 9, 30), new Date(2026, 10, 1), new Date(2026, 11, 24), new Date(2026, 3, 6)]) assert.deepEqual(events.getActiveEventThemes(date), []);
+});
+
+test("real holiday artwork works with debug off, while previews only add event availability", () => {
+  const halloween = new Date(2026, 9, 31);
+  const nextDay = new Date(2026, 10, 1);
+  const resolve = (tags, day, override = null) => themes.resolveCardDecoration(tags, "completed", override, events.getActiveEventThemes(day, override))?.id;
+  assert.equal(resolve(["Halloween"], halloween), "halloween");
+  assert.equal(resolve(["Christmas"], halloween), "done");
+  assert.equal(resolve(["Halloween"], nextDay), "done");
+  assert.equal(resolve(["Halloween"], nextDay, "all"), "halloween");
+  assert.equal(resolve(["Christmas"], halloween, "all"), "christmas");
+  assert.equal(resolve(["Halloween", "Janus"], halloween), "janus");
+  assert.equal(resolve(["Halloween", "DarkSoulEngineer"], halloween, "all"), "darksoulengineer");
+  assert.equal(resolve(["Halloween"], halloween, "all"), "halloween");
+  assert.equal(resolve(["Halloween"], halloween), "halloween", "turning preview off keeps the real holiday artwork");
 });
 
 test("debug toggle activates and deactivates every event and notifies subscribers", () => {

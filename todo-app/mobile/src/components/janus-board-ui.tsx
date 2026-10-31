@@ -26,6 +26,7 @@ import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
 import { CollapsibleTaskSection } from "@/components/ui/collapsible-task-section";
 import { SelectionLed } from "@/components/ui/selection-led";
+import { CardTagOption } from "@/components/ui/card-tag-option";
 import { TaskSchedulePicker } from "@/components/ui/task-schedule-picker";
 import { Card } from "@/components/ui/card";
 import { InsightsDashboard } from "@/components/insights/insights-dashboard";
@@ -38,6 +39,7 @@ import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/domain/constants";
 import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { classifySpecialCardTag, detectCardTheme, resolveCardDecoration } from "@/lib/features/card-themes";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
+import { StatusIcon } from "@/components/ui/status-icon";
 import { SpecialCardTagPicker } from "@/components/ui/special-card-tag-picker";
 import { useActiveEvents } from "@/hooks/use-active-events";
 import { CardStatusPicker } from "@/components/ui/card-status-picker";
@@ -133,18 +135,20 @@ export function TaskCard({
   const cardTheme = detectCardTheme(task.title, task.description);
   const doneSubtasks = task.subtasks.filter((item) => item.done).length;
   const status = deriveStatus(task, now);
-  const { override } = useActiveEvents();
-  const decoration = resolveCardDecoration(task.tags, status, override);
+  const { events, override } = useActiveEvents();
+  const resolvedDecoration = resolveCardDecoration(task.tags, status, override, events);
+  const decoration = resolvedDecoration && classifySpecialCardTag(resolvedDecoration.label)?.group !== "status" ? resolvedDecoration : null;
   const cardTags = (task.tags ?? []).filter((tag) => classifySpecialCardTag(tag)?.group !== "status").sort((a, b) => Number(Boolean(classifySpecialCardTag(b))) - Number(Boolean(classifySpecialCardTag(a))));
   const taskAction = onLongPress ?? onPress;
   return (
     <Pressable accessibilityLabel={`${task.canceled ? "Canceled task" : "Edit task"} ${task.title}`} onPress={onPress} onLongPress={onLongPress} // @ts-ignore
     onContextMenu={(event) => { event.preventDefault?.(); onLongPress?.(event.nativeEvent); }} delayLongPress={360} style={styles.taskPressable}>
-      <Card style={[styles.taskCard, { backgroundColor: task.canceled ? theme.colors.secondary : theme.colors.card, borderLeftColor: task.canceled ? theme.colors.mutedForeground : status === "completed" ? theme.colors.success : status === "overdue" ? theme.colors.destructive : decoration?.accent ?? cardTheme?.accent ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14, opacity: task.canceled ? 0.82 : 1 }]}>
+      <Card style={[styles.taskCard, { backgroundColor: theme.colors.card, borderLeftColor: status !== "upcoming" ? theme.colors.border : decoration?.border ?? cardTheme?.border ?? theme.colors.primary, borderLeftWidth: 3, padding: compact ? 12 : 14 }]}>
         {decoration ? <SeasonalCardDecoration theme={decoration} cardId={task.id} compact={compact} paused={compact} /> : null}
         <View pointerEvents="box-none">
         <View style={styles.taskTopline}>
           <Text style={[styles.taskTitle, { color: theme.colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
+          <StatusIcon status={status} detail={status === "overdue" ? due?.title : undefined} />
            <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${task.title}`} accessibilityHint="Opens task actions" onPress={(event) => { event.stopPropagation(); (onActionPress ?? taskAction)(event); }} style={({ pressed }) => [styles.taskAction, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary, opacity: pressed ? 0.65 : 1 }]}>
              <Ionicons name="ellipsis-horizontal" size={19} color={theme.colors.mutedForeground} />
            </Pressable>
@@ -392,21 +396,23 @@ function TaskEditorForm({
           <Text style={{ color: theme.colors.secondaryForeground, fontSize: 12, fontWeight: "600" }}>
             {PRIORITY_META[item].label}
           </Text>
-          <SelectionLed selected={priority === item} color={item === "critical" || item === "high" ? theme.colors.destructive : theme.colors.success} />
+          <SelectionLed selected={priority === item} color={theme.scheme === "light" ? PRIORITY_META[item].ink : PRIORITY_META[item].dot} />
         </Pressable>
       ))}
     </View>
   );
-  const tagChips = boards.filter((item) => !classifySpecialCardTag(item.label)).map((item) => { const tone = boardColor(item.color); return <Chip key={item.id} label={item.label} color={tone.dot} active={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
+  const tagChips = boards.filter((item) => !classifySpecialCardTag(item.label)).map((item) => { const tone = boardColor(item.color); return <CardTagOption key={item.id} label={item.label} color={tone.dot} selected={category === item.id} onPress={() => setCategory(category === item.id ? null : item.id)} />; });
 
   const addTag = () => { if (!tagInput.trim()) return; setTags((current) => normalizeCardTags([...current, tagInput])); setTagInput(""); };
+  const removableTags = tags.filter((tag) => {
+    const special = classifySpecialCardTag(tag);
+    return !special || special.group === "easter-egg";
+  });
   const tagsControl = <View style={{ gap: 10 }}>
     {tagChips.length ? <View testID="task-editor-tags-wrap" style={styles.wrapRow}>{tagChips}</View> : null}
     <SpecialCardTagPicker tags={tags} onChange={setTags} />
-    <View style={styles.wrapRow}>{tags.filter((tag) => {
-      const special = classifySpecialCardTag(tag);
-      return !special || special.group === "easter-egg";
-    }).map((tag) => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Remove tag ${tag}`} onPress={() => setTags((current) => toggleCardTag(current, tag))} style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.secondary }]}><Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{tag} ×</Text></Pressable>)}</View>
+    {removableTags.length ? <Text style={{ color: theme.colors.mutedForeground, fontSize: 9, fontWeight: "700", letterSpacing: 1 }}>SPECIAL</Text> : null}
+    <View style={styles.wrapRow}>{removableTags.map((tag) => <CardTagOption key={tag} label={tag} removable color={classifySpecialCardTag(tag)?.theme.accent ?? theme.colors.mutedForeground} accessibilityLabel={`Remove tag ${tag}`} accessibilityHint="Tap to remove this tag." onPress={() => setTags((current) => toggleCardTag(current, tag))} />)}</View>
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Input accessibilityLabel="New card tag" placeholder="Add a tag" value={tagInput} onChangeText={setTagInput} onSubmitEditing={addTag} returnKeyType="done" style={{ flex: 1, minWidth: 0, borderRadius: 12 }} /><Button variant="secondary" label="Add" onPress={addTag} disabled={!tagInput.trim()} /></View>
   </View>;
 

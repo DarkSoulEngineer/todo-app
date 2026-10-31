@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Input } from "@/components/ui/input";
-import { SelectionLed } from "@/components/ui/selection-led";
 import { useReferenceTheme } from "@/components/reference/reference-theme";
 import { useTheme } from "@/providers/theme-provider";
 import { themes as catalog } from "@/theme/palettes";
@@ -50,15 +49,14 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
         const active = mode === option.value;
         return <Pressable key={option.value} accessibilityRole="radio" accessibilityLabel={`Use ${option.label.toLowerCase()} appearance`} accessibilityState={{ checked: active, disabled }} aria-checked={active} disabled={disabled}
           onPress={() => selectMode(option.value)}
-          style={({ pressed }) => [styles.modeButton, { backgroundColor: active ? colors.primaryFixed : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
+          style={({ pressed }) => [styles.modeButton, { backgroundColor: active ? colors.primaryFixed : "transparent", borderColor: active ? colors.primary : "transparent", opacity: disabled ? 0.5 : pressed ? 0.75 : 1 }]}>
           <Text style={[type.bodyStrong, { color: active ? colors.onSecondaryContainer : colors.muted, fontSize: 13 }]}>{option.label}</Text>
-          <SelectionLed selected={active} />
         </Pressable>;
       })}
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Choose interface theme" accessibilityState={{ expanded: open, disabled }} disabled={disabled}
       onPress={() => { setOpen(!open); setQuery(""); }}
-      style={({ pressed }) => [styles.trigger, { backgroundColor: colors.surfaceHigh, borderColor: open ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
+      style={({ pressed }) => [styles.trigger, { backgroundColor: colors.surfaceHigh, borderColor: open ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : pressed ? 0.75 : 1 }]}>
       <Swatches colors={theme.colors} />
       <View style={styles.copy}>
         <Text style={type.bodyStrong}>{selected?.name ?? "System"}</Text>
@@ -81,10 +79,10 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
                 }
                 setPreference(entry.id); setOpen(false); setQuery("");
               }}
-              style={({ pressed }) => [styles.option, { backgroundColor: active ? colors.secondaryContainer : colors.card, borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : 1 }]}>
+              style={({ pressed }) => [styles.option, { backgroundColor: active ? colors.secondaryContainer : "transparent", borderColor: active ? colors.primary : colors.outlineVariant, opacity: disabled ? 0.5 : pressed ? 0.75 : 1 }]}>
               <Swatches colors={preview.colors} />
               <Text numberOfLines={1} style={[type.body, styles.copy, { fontWeight: "600" }]}>{entry.id === "system" ? "System (follow device)" : entry.name}</Text>
-              <SelectionLed selected={active} />
+              {active ? <Text style={[type.bodyStrong, { color: colors.primary }]}>✓</Text> : null}
             </Pressable>;
           })}
           {!options.length ? <Text accessibilityLiveRegion="polite" style={[type.caption, styles.empty, { color: colors.muted }]}>No themes match your search.</Text> : null}
@@ -96,8 +94,8 @@ export function ThemePicker({ disabled = false }: { disabled?: boolean }) {
 
 const styles = StyleSheet.create({
   root: { gap: 14 },
-  modeSwitch: { padding: 5, paddingBottom: 7, borderWidth: 1, borderRadius: 16, flexDirection: "row", gap: 8 },
-  modeButton: { flex: 1, minHeight: 44, borderRadius: 11, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
+  modeSwitch: { padding: 4, borderWidth: 1, borderRadius: 12, flexDirection: "row", gap: 4 },
+  modeButton: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 8, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
   trigger: { minHeight: 68, padding: 12, borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   swatches: { flexDirection: "row", gap: 3 },
   swatch: { width: 12, height: 24, borderRadius: 3, borderWidth: StyleSheet.hairlineWidth },

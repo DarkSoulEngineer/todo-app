@@ -1,8 +1,8 @@
 import Constants from "expo-constants";
 import { BlurTargetView } from "expo-blur";
 import { router } from "expo-router";
-import { useRef, useState, type ComponentRef } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ReferenceMobileBottomNav, type ReferenceMobileTab } from "@/components/reference/mobile/reference-mobile-bottom-nav";
 import { ScreenHeader } from "@/components/reference/mobile/reference-primitives";
@@ -13,8 +13,8 @@ import { useTasksContext } from "@/providers/tasks-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Sheet } from "@/components/ui/sheet";
+import { EditorWindow } from "@/components/ui/editor-window";
 import { Button } from "@/components/ui/button";
-import { SelectionLed } from "@/components/ui/selection-led";
 import { JanusLogo } from "@/components/ui/janus-logo";
 import { exportAllBoards, exportFullBackup, exportSettings, pickBackupFile } from "@/lib/data/transfer";
 import { mobileBottomNavClearance, mobileContentStyle } from "@/theme/layout";
@@ -39,7 +39,7 @@ const BACKUP_OPTIONS: { value: BackupScope; label: string; description: string }
   { value: "all", label: "Everything", description: "Preferences and all boards in one JSON file" },
 ];
 
-const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Commands", "Data & backups", "About"] as const;
+const SETTINGS_SECTIONS = ["Appearance", "Calendar", "Data & backups", "About"] as const;
 
 export default function SettingsRoute() {
   const api = useTasksContext();
@@ -48,6 +48,8 @@ export default function SettingsRoute() {
   const { calendarDefaultView, calendarWeekStart, setCalendarDefaultView, setCalendarWeekStart, savePreferences } = usePreferences();
   const { colors, type } = useReferenceTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const windowed = width >= 768;
   const styles = createStyles(colors);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
@@ -138,23 +140,12 @@ export default function SettingsRoute() {
           {SETTINGS_SECTIONS.map((label) => <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: section === label }} onPress={() => setSection(label)}
             style={({ pressed }) => [styles.sectionTab, { backgroundColor: section === label ? colors.primaryFixed : colors.card, borderColor: section === label ? colors.primary : colors.outlineVariant }]}>
             <Text style={[type.bodyStrong, { color: section === label ? colors.text : colors.muted }]}>{label}</Text>
-            <SelectionLed selected={section === label} />
           </Pressable>)}
         </ScrollView>
         {section === "Appearance" ? <View style={styles.sectionBlock}>
           <SectionHeading title="Theme & appearance" subtitle="Switch between Light and Dark, then pick a palette for that mode. Changes save automatically on this device." />
           <View style={styles.sectionCard}>
             <ThemePicker disabled={busy} />
-          </View>
-        </View> : null}
-
-        {section === "Commands" ? <View style={styles.sectionBlock}>
-          <SectionHeading title="Commands" subtitle="Search and run any action without leaving this screen." />
-          <View style={styles.sectionCard}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Open commands" onPress={() => setPaletteMode("commands")} style={({ pressed }) => [styles.actionRow]}>
-              <View style={styles.actionCopy}><Text style={type.bodyStrong}>Open commands</Text><Text style={[type.caption, { color: colors.muted }]}>Find boards, tasks, views, themes and settings</Text></View>
-              <Text style={[type.caption, { color: colors.primary }]}>Open</Text>
-            </Pressable>
           </View>
         </View> : null}
 
@@ -168,7 +159,6 @@ export default function SettingsRoute() {
                 return (
                   <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Open calendar in ${option.label.toLowerCase()} view`} onPress={() => setCalendarDefaultView(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
-                    <SelectionLed selected={selected} />
                   </Pressable>
                 );
               })}
@@ -180,7 +170,6 @@ export default function SettingsRoute() {
                 return (
                   <Pressable key={option.value} disabled={busy} accessibilityRole="button" aria-pressed={selected} accessibilityState={{ selected, disabled: busy }} accessibilityLabel={`Start weeks on ${option.label}`} onPress={() => setCalendarWeekStart(option.value)} style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
                     <Text style={[type.bodyStrong, { color: selected ? colors.primary : colors.muted }]}>{option.label}</Text>
-                    <SelectionLed selected={selected} />
                   </Pressable>
                 );
               })}
@@ -231,23 +220,30 @@ export default function SettingsRoute() {
       </BlurTargetView>
       <CommandPalette mode={paletteMode} onMode={setPaletteMode} commands={commands} blocked={busy || saveOpen || api.isLoading} />
       {hasProjects ? <ReferenceMobileBottomNav active="settings" onNavigate={navigate} blurTarget={blurTarget} /> : null}
-      <Sheet visible={saveOpen} onClose={() => { if (!busy) setSaveOpen(false); }}>
-        <Text accessibilityRole="header" style={type.title}>Save backup</Text>
+      <SettingsBackupDialog windowed={windowed} visible={saveOpen} onClose={() => { if (!busy) setSaveOpen(false); }}>
+        {!windowed ? <Text accessibilityRole="header" style={type.title}>Save backup</Text> : null}
         <Text style={[type.caption, { color: colors.muted, marginBottom: 12 }]}>What would you like to download or save?</Text>
         <View accessibilityRole="radiogroup">
           {BACKUP_OPTIONS.map((option) => (
             <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: scope === option.value, disabled: busy }} disabled={busy} onPress={() => setScope(option.value)} style={({ pressed }) => [styles.actionRow, scope === option.value && styles.segmentSelected, { opacity: busy ? 0.5 : 1 }]}>
               <View style={styles.actionCopy}><Text style={type.bodyStrong}>{option.label}</Text><Text style={[type.caption, { color: colors.muted }]}>{option.description}</Text></View>
-              <SelectionLed selected={scope === option.value} />
+              {scope === option.value ? <Text style={{ color: colors.primary }}>✓</Text> : null}
             </Pressable>
           ))}
         </View>
         <Text style={[type.caption, { color: colors.muted, marginVertical: 12 }]}>Saves a JSON file you can import into Janus later.</Text>
         <Button label={busy ? "Saving…" : "Save file"} disabled={busy} onPress={() => void handleSave()} />
         <Button label="Cancel" variant="ghost" disabled={busy} onPress={() => setSaveOpen(false)} />
-      </Sheet>
+      </SettingsBackupDialog>
     </View>
   );
+}
+
+function SettingsBackupDialog({ windowed, visible, onClose, children }: { windowed: boolean; visible: boolean; onClose: () => void; children: ReactNode }) {
+  if (windowed) return <EditorWindow visible={visible} title="Save backup" icon="download-outline" closeLabel="Close backup window" testID="settings-backup-window" width={560} height={540} onClose={onClose}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20 }}>{children}</ScrollView>
+  </EditorWindow>;
+  return <Sheet visible={visible} onClose={onClose}>{children}</Sheet>;
 }
 
 function createStyles(colors: ReferenceColors) { return StyleSheet.create({
@@ -255,12 +251,12 @@ function createStyles(colors: ReferenceColors) { return StyleSheet.create({
   content: { ...mobileContentStyle, gap: referenceSpacing.lg },
   sectionBlock: { gap: 12 },
   sectionCard: { padding: referenceSpacing.md, borderRadius: referenceRadii.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.outlineVariant, backgroundColor: colors.card },
-  sectionTabs: { flexDirection: "row", gap: 8, paddingBottom: 7, paddingHorizontal: 2 },
-  sectionTab: { minHeight: 44, justifyContent: "center", borderRadius: 12, paddingHorizontal: 14 },
+  sectionTabs: { flexDirection: "row", gap: 8, paddingBottom: 2, paddingHorizontal: 2 },
+  sectionTab: { minHeight: 44, justifyContent: "center", borderWidth: 1, borderRadius: 8, paddingHorizontal: 14 },
   firstRow: { borderTopWidth: 0 },
   settingLabel: { marginTop: referenceSpacing.md, marginBottom: 6, color: colors.muted },
   settingLabelFirst: { marginBottom: 10, color: colors.muted },
-  segmented: { padding: 5, paddingBottom: 7, borderWidth: 1, borderColor: colors.outlineVariant, borderRadius: referenceRadii.lg, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 8 },
+  segmented: { padding: 4, borderWidth: 1, borderColor: colors.outlineVariant, borderRadius: referenceRadii.md, backgroundColor: colors.surfaceLow, flexDirection: "row", gap: 4 },
   segment: { flex: 1, minHeight: 44, paddingHorizontal: 8, borderWidth: 1, borderColor: colors.outlineVariant, backgroundColor: colors.card, borderRadius: referenceRadii.md, alignItems: "center", justifyContent: "center" },
   segmentSelected: { backgroundColor: colors.primaryFixed, borderColor: colors.primary },
   actionRow: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 12, marginBottom: 10, borderRadius: 12, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: colors.outlineVariant, backgroundColor: colors.surfaceHigh },

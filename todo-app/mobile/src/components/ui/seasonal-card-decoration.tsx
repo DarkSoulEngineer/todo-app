@@ -43,7 +43,7 @@ export function SeasonalCardDecoration({ theme, cardId = "", paused = false, com
     return () => { disposed = true; animation?.stop(); motion.remove(); app.remove(); };
   }, [compact, paused, phase, staticDesign]);
 
-  return <View testID={`seasonal-decoration-${theme.id}`} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: theme.wash, borderRadius: 12, overflow: "hidden" }]}>
+  return <View testID={`seasonal-decoration-${theme.id}`} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: theme.wash, borderRadius: 12, overflow: "hidden", opacity: 0.35 }]}>
     {theme.id === "halloween" ? <HalloweenCardArtwork cardId={cardId} phase={phase} compact={compact} /> : theme.id === "darksoulengineer" || theme.id === "janus" ? <CustomCardArtwork id={theme.id} phase={phase} compact={compact} /> : staticDesign ? <StatusCardArtwork id={theme.id} color={theme.accent} compact={compact} /> : <SeasonalCardArtwork id={theme.id} phase={phase} compact={compact} />}
   </View>;
 }

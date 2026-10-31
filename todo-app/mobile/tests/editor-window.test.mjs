@@ -15,7 +15,7 @@ test("editor window fits safe areas, maximizes/restores and routes dismissal wit
   const state = [];
   const colors = { card: "#212121", backgroundAlt: "#181818", borderStrong: "#444444", border: "#333333", foreground: "#FFFFFF", mutedForeground: "#BBBBBB", secondary: "#454545", overlay: "#00000080" };
   const mocks = {
-    react: { useState(initial) { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value) => { state[index] = typeof value === "function" ? value(state[index]) : value; }]; } },
+    react: { useRef: (current) => ({ current }), useState(initial) { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value) => { state[index] = typeof value === "function" ? value(state[index]) : value; }]; } },
     "react-native": { Modal: "Modal", KeyboardAvoidingView: "KeyboardAvoidingView", Pressable: "Pressable", View: "View", Text: "Text", Platform: { OS: "web" }, StyleSheet: { create: (value) => value, absoluteFill: {}, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width, height }) },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 24, bottom: 20, left: 0, right: 0 }) },
     "@/providers/theme-provider": { useTheme: () => ({ theme: { colors } }) },

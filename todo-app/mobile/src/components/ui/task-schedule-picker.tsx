@@ -27,7 +27,7 @@ export function TaskSchedulePicker({ value, onChange, dateLocked = false, now = 
   };
   const weekdays = calendarWeekStart === 1 ? ["M", "T", "W", "T", "F", "S", "S"] : ["S", "M", "T", "W", "T", "F", "S"];
 
-  const shortcuts = [{ label: "Today", day: now }, { label: "Tomorrow", day: addDays(now, 1) }, { label: "+1 week", day: addDays(now, 7) }];
+  const shortcuts = [{ label: "Today", day: now, icon: "sunny-outline" as const }, { label: "Tomorrow", day: addDays(now, 1), icon: "partly-sunny-outline" as const }, { label: "+1 week", day: addDays(now, 7), icon: "calendar-outline" as const }];
   return <View testID="task-schedule-picker" style={[styles.root, timeOnly && styles.timeOnlyRoot, { borderColor: c.border, backgroundColor: c.card }]}>
     <View testID="schedule-content" style={styles.content}>
     {!timeOnly ? <View testID="schedule-calendar" style={styles.calendar}>
@@ -35,9 +35,15 @@ export function TaskSchedulePicker({ value, onChange, dateLocked = false, now = 
         <View style={styles.monthCopy}><Text accessibilityRole="header" accessibilityLiveRegion="polite" style={[styles.monthTitle, { color: c.foreground }]}>{format(month, "MMMM yyyy")}</Text><Text style={[styles.hint, { color: c.mutedForeground }]}>Choose a deadline</Text></View>
         <View style={styles.monthNavigation}>{[{ delta: -1, label: "Previous picker month", glyph: "‹" }, { delta: 1, label: "Next picker month", glyph: "›" }].map(({ delta, label, glyph }) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={() => setMonth(addMonths(month, delta))} style={({ pressed }) => [styles.monthArrow, { opacity: pressed ? 0.5 : 1 }]}><View pointerEvents="none" style={[styles.arrowFace, { borderColor: c.border }]}><Text style={[styles.arrow, { color: c.foreground }]}>{glyph}</Text></View></Pressable>)}{due ? <Pressable accessibilityRole="button" accessibilityLabel="Remove due date" onPress={() => onChange(null)} style={({ pressed }) => [styles.clearDateButton, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name="close" size={17} color={c.mutedForeground} /></Pressable> : null}</View>
       </View>
-      <View style={styles.dateShortcuts}>{shortcuts.map(({ label, day }) => {
+      <View style={styles.dateShortcuts}>{shortcuts.map(({ label, day, icon }) => {
         const selected = Boolean(due && isSameDay(day, due));
-        return <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} aria-pressed={selected} onPress={() => chooseDay(day)} style={({ pressed }) => [styles.dateShortcut, { backgroundColor: selected ? c.cardElevated : c.secondary, borderColor: c.border }]}><Text style={[styles.dateShortcutText, { color: c.foreground }]}>{label}</Text><SelectionLed selected={selected} /></Pressable>;
+        return <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} accessibilityHint={format(day, "EEEE, MMMM d")} accessibilityState={{ selected }} aria-pressed={selected} onPress={() => chooseDay(day)} style={({ pressed }) => [styles.dateShortcut, { backgroundColor: selected ? c.primarySoft : pressed ? c.cardElevated : c.backgroundAlt, borderColor: selected ? c.primary : c.border, opacity: pressed ? 0.8 : 1 }]}>
+          <View style={styles.dateShortcutHeading}>
+            <Ionicons name={selected ? "checkmark-circle-outline" : icon} size={14} color={selected ? c.primary : c.mutedForeground} />
+            <Text numberOfLines={1} style={[styles.dateShortcutText, { color: selected ? c.primary : c.foreground }]}>{label}</Text>
+          </View>
+          <Text numberOfLines={1} style={[styles.dateShortcutDate, { color: c.mutedForeground }]}>{format(day, "EEE, MMM d")}</Text>
+        </Pressable>;
       })}</View>
       <View style={styles.weekdays}>{weekdays.map((label, index) => <Text key={index} style={[styles.weekday, { color: c.mutedForeground }]}>{label}</Text>)}</View>
       <View style={styles.grid}>{days.map((day) => {
@@ -106,8 +112,10 @@ const styles = StyleSheet.create({
   arrowFace: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   arrow: { fontSize: 22, lineHeight: 24, fontWeight: "400" },
   dateShortcuts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, paddingBottom: 4 },
-  dateShortcut: { flex: 1, minWidth: 72, minHeight: 44, paddingHorizontal: 10, borderWidth: 1, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  dateShortcut: { flex: 1, minWidth: 80, minHeight: 54, paddingHorizontal: 6, paddingVertical: 6, gap: 2, borderWidth: 1, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  dateShortcutHeading: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   dateShortcutText: { fontSize: 12, lineHeight: 16, fontWeight: "600" },
+  dateShortcutDate: { fontSize: 10, lineHeight: 14, fontVariant: ["tabular-nums"] },
   shortcuts: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 4 },
   shortcut: { flexGrow: 1, paddingHorizontal: 8, borderRadius: 9 },
   weekdays: { flexDirection: "row" },

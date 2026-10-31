@@ -6,11 +6,13 @@ import { describeDue, deriveStatus } from "@/lib/domain/status";
 import { PRIORITY_META } from "@/lib/domain/constants";
 import { boardColor, type Board } from "@/lib/domain/boards";
 import { PriorityStars } from "@/components/ui/priority-stars";
+import { StatusIcon } from "@/components/ui/status-icon";
 import { registerTaskCompletionOrigin } from "@/lib/features/task-completion-celebration";
 import type { Task } from "@/lib/domain/types";
 import { classifySpecialCardTag, resolveCardDecoration } from "@/lib/features/card-themes";
 import { useActiveEvents } from "@/hooks/use-active-events";
 import { SeasonalCardDecoration } from "@/components/ui/seasonal-card-decoration";
+import { CustomChecklistDecoration } from "@/components/ui/custom-checklist-decoration";
 import { useMobileBoardColors } from "./mobile-board-colors";
 
 interface Props {
@@ -41,12 +43,13 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
   const priority = PRIORITY_META[task.priority];
   const derived = deriveStatus(task, now);
   const status = derived === "upcoming" ? null : derived;
-  const statusColor = status === "completed" ? c.success : status === "canceled" ? c.mutedForeground : status === "overdue" ? c.destructive : null;
-  const accent = statusColor ?? priority.dot;
+  const accent = status ? c.border : priority.dot;
   const tagTone = board ? boardColor(board.color) : null;
   const settled = task.completed || task.canceled;
-  const { override } = useActiveEvents();
-  const decoration = resolveCardDecoration(task.tags, status, override);
+  const { events, override } = useActiveEvents();
+  const resolvedDecoration = resolveCardDecoration(task.tags, status, override, events);
+  const decoration = resolvedDecoration && classifySpecialCardTag(resolvedDecoration.label)?.group !== "status" ? resolvedDecoration : null;
+  const customDecoration = decoration?.id === "darksoulengineer" || decoration?.id === "janus" ? decoration.id : null;
   const cardTags = (task.tags ?? []).filter((tag) => classifySpecialCardTag(tag)?.group !== "status").sort((a, b) => Number(Boolean(classifySpecialCardTag(b))) - Number(Boolean(classifySpecialCardTag(a))));
   // A web button cannot contain the menu, move and checklist buttons. Keep the
   // card focusable as a group; Pressable already handles Enter for that group.
@@ -84,12 +87,16 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
     unregisterOrigin.current = node ? registerTaskCompletionOrigin(task.id, (callback) => {
       node.measureInWindow((x, y, width, height) => callback({ x: x + width / 2, y: y + height / 2 }));
     }) : null;
-  }} testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, calendarLayout && styles.calendarCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : decoration?.border ?? c.border, borderLeftColor: statusColor ?? decoration?.accent ?? accent }]}>
-    {decoration ? <SeasonalCardDecoration theme={decoration} cardId={task.id} compact={compact} paused={!animateSeasonal || selectionMode || Boolean(hideMoveArrows) || Boolean(compact)} /> : null}
+  }} testID={`janus-card-${task.id}`} accessibilityRole={Platform.OS === "web" ? undefined : "button"} {...webCardProps} accessibilityLabel={task.title} accessibilityHint={selectionMode ? "Toggles card selection. Long press for task actions." : "Opens the task editor. Long press for task actions."} accessibilityState={{ selected }} onPress={onPress} onLongPress={(event) => { onMenu(event); }} {...contextMenu(onMenu)} style={[styles.card, compact && styles.compactCard, calendarLayout && styles.calendarCard, { backgroundColor: selected ? c.primarySoft : c.card, borderColor: selected ? c.primary : c.border, borderLeftColor: decoration?.border ?? accent }]}>
+    <View testID={`janus-card-summary-${task.id}`} style={{ gap: compact ? 0 : 8 }}>
+    {decoration ? <View testID={`janus-card-decoration-bounds-${task.id}`} pointerEvents="none" style={{ position: "absolute", top: compact ? -9 : -12, bottom: compact ? -9 : -12, left: compact ? -9 : -12, right: compact ? -9 : -12 }}>
+      <SeasonalCardDecoration theme={decoration} cardId={task.id} compact={compact} paused={!animateSeasonal || selectionMode || Boolean(hideMoveArrows) || Boolean(compact)} />
+    </View> : null}
     <View style={[styles.topRow, calendarLayout && styles.calendarTopRow]}>
       {selectionMode ? <Pressable accessibilityRole="checkbox" accessibilityLabel={`${selected ? "Deselect" : "Select"} ${task.title}`} aria-checked={selected} onPress={(event) => { event.stopPropagation(); onSelect(); }} hitSlop={6} style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.55 : 1 }]}><Ionicons name={selected ? "checkbox" : "square-outline"} size={20} color={selected ? c.primary : c.mutedForeground} /></Pressable> : null}
       <View style={styles.titleArea}>{compact ? title : <View accessible accessibilityLabel={due?.title ?? "No due date"} style={styles.timeBadge}><Text style={[styles.timeText, { color: c.foreground, fontSize: 11 * zoom }]}>{due && task.dueAt ? format(parseISO(task.dueAt), due.today ? "h:mm a" : "MMM d · h:mm a") : "Any time"}</Text></View>}</View>
       <View style={styles.actions}>
+        <StatusIcon status={status} zoom={zoom} detail={status === "overdue" ? due?.title : undefined} />
         {onMoveLeft || onMoveRight ? <View pointerEvents={hideMoveArrows ? "none" : "auto"} accessibilityElementsHidden={hideMoveArrows} importantForAccessibility={hideMoveArrows ? "no-hide-descendants" : "auto"} style={{ flexDirection: "row", opacity: hideMoveArrows ? 0 : 1 }}>
           {onMoveLeft ? action("arrow-back", `Move ${task.title} to previous column`, onMoveLeft) : null}
           {onMoveRight ? action("arrow-forward", `Move ${task.title} to next column`, onMoveRight) : null}
@@ -100,14 +107,14 @@ export function MobileColumnTaskCard({ task, board, now, compact, zoom = 1, sele
     {!compact ? title : null}
     {!compact ? <View style={styles.meta}>
       <PriorityStars priority={task.priority} zoom={zoom} />
-      {status === "overdue" ? <View testID={`janus-card-status-tag-${task.id}-overdue`} accessibilityLabel="Overdue status tag" style={styles.tag}><View style={[styles.tagDot, { backgroundColor: c.destructive }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.destructive, fontSize: 10 * zoom }]}>Overdue</Text></View> : null}
       {board && tagTone && classifySpecialCardTag(board.label)?.group !== "status" ? <View style={styles.tag}><View style={[styles.tagDot, { backgroundColor: tagTone.dot }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.foreground, fontSize: 10 * zoom }]}>{board.label}</Text></View> : null}
       {cardTags.slice(0, 4).map((tag) => <View key={tag} style={styles.tag}><View style={[styles.tagDot, { backgroundColor: classifySpecialCardTag(tag)?.theme.accent ?? c.mutedForeground }]} /><Text numberOfLines={1} style={[styles.tagText, { color: c.foreground, fontSize: 10 * zoom }]}>{tag}</Text></View>)}
       {cardTags.length > 4 ? <Text style={{ color: c.mutedForeground, fontSize: 10 }}>+{cardTags.length - 4}</Text> : null}
       {task.subtasks.length ? onToggleSubtask ? <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel={`Checklist for ${task.title}`} accessibilityHint={`${done} of ${task.subtasks.length} completed. Show or hide checklist.`} aria-expanded={expanded} onPress={(event) => { event.stopPropagation(); setExpanded(!expanded); }} style={styles.checklistToggle}>{checklistSummary}</Pressable> : <View style={styles.checklistSummary}>{checklistSummary}</View> : null}
     </View> : null}
     {!compact && task.subtasks.length ? <View testID={`janus-card-progress-${task.id}`} accessibilityRole="progressbar" accessibilityLabel="Checklist progress" accessibilityValue={{ min: 0, max: task.subtasks.length, now: done, text: `${done} of ${task.subtasks.length} completed` }} style={[styles.progressTrack, { backgroundColor: c.backgroundAlt }]}><View style={[styles.progressFill, { width: `${Math.round(done / task.subtasks.length * 100)}%`, backgroundColor: done === task.subtasks.length ? c.success : c.primary }]} /></View> : null}
-    {expanded && !compact && onToggleSubtask ? <View style={[styles.checklist, { borderColor: c.border }]}>{task.subtasks.map((subtask) => <Pressable key={subtask.id} accessibilityRole="checkbox" accessibilityLabel={subtask.title} aria-checked={subtask.done} disabled={selectionMode} onPress={(event) => { event.stopPropagation(); onToggleSubtask(subtask.id); }} style={styles.subtask}><Ionicons name={subtask.done ? "checkbox" : "square-outline"} size={16} color={subtask.done ? c.success : c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 12, flex: 1, textDecorationLine: subtask.done ? "line-through" : "none" }}>{subtask.title}</Text></Pressable>)}</View> : null}
+    </View>
+    {expanded && !compact && onToggleSubtask ? <View testID={`janus-card-checklist-${task.id}`} style={[styles.checklist, { borderColor: c.border }]}>{task.subtasks.map((subtask) => <Pressable key={subtask.id} accessibilityRole="checkbox" accessibilityLabel={subtask.title} aria-checked={subtask.done} disabled={selectionMode} onPress={(event) => { event.stopPropagation(); onToggleSubtask(subtask.id); }} style={styles.subtask}><Ionicons name={subtask.done ? "checkbox" : "square-outline"} size={16} color={subtask.done ? c.success : c.mutedForeground} /><Text style={{ color: c.mutedForeground, fontSize: 12, flex: 1, textDecorationLine: subtask.done ? "line-through" : "none" }}>{subtask.title}</Text>{customDecoration ? <CustomChecklistDecoration id={customDecoration} done={subtask.done} /> : null}</Pressable>)}</View> : null}
   </Pressable>;
 }
 
@@ -125,5 +132,5 @@ const styles = StyleSheet.create({
   meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }, tagDot: { width: 6, height: 6, borderRadius: 3 }, tag: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%", flexShrink: 1 }, tagText: { flexShrink: 1, fontWeight: "600" },
   checklistToggle: { minHeight: 28, flexDirection: "row", alignItems: "center", gap: 4 },
   progressTrack: { height: 3, borderRadius: 2, overflow: "hidden" }, progressFill: { height: "100%", borderRadius: 2 },
-  checklist: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 2 }, subtask: { flexDirection: "row", alignItems: "center", minHeight: 44, gap: 7 },
+  checklist: { paddingTop: 8, gap: 2 }, subtask: { flexDirection: "row", alignItems: "center", minHeight: 44, gap: 7 },
 });

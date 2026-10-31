@@ -6,7 +6,8 @@ import vm from "node:vm";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
-const native = { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", Platform: { OS: "web" }, StyleSheet: { create: (v) => v, hairlineWidth: 0.5 } };
+let viewportWidth = 390;
+const native = { View: "View", Text: "Text", Pressable: "Pressable", ScrollView: "ScrollView", Platform: { OS: "web" }, useWindowDimensions: () => ({ width: viewportWidth, height: 1000 }), StyleSheet: { create: (v) => v, hairlineWidth: 0.5 } };
 const colors = new Proxy({}, { get: (_, key) => key === "background" ? "#101020" : "#cccccc" });
 const reference = { useReferenceTheme: () => ({ colors, type: { body: {}, bodyStrong: {}, caption: {}, title: {} } }), referenceSpacing: { md: 12, lg: 16 }, referenceRadii: { md: 12, lg: 16 } };
 function hooks() {
@@ -43,6 +44,13 @@ function nodes(node) {
 const byLabel = (tree, label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
 const byText = (tree, text) => nodes(tree).find((node) => node.type === "Text" && node.props.children === text);
 
+test("settings-only controls have no LED or 3D surface dependencies", async () => {
+  for (const path of ["../app/settings.tsx", "../src/components/settings/theme-picker.tsx"]) {
+    const source = await readFile(new URL(path, import.meta.url), "utf8");
+    assert.doesNotMatch(source, /SelectionLed|tactileSurface|boxShadow|elevation/);
+  }
+});
+
 test("theme picker uses icon-free fixed-size mode buttons and only the palettes for that mode", async () => {
   const state = hooks();
   const choices = [];
@@ -77,8 +85,11 @@ test("theme picker uses icon-free fixed-size mode buttons and only the palettes 
     assert.equal(normal.flex, 1);
     assert.equal(normal.minHeight, 44);
     assert.equal(pressed.minHeight, normal.minHeight);
-    assert.equal(pressed.transform[0].translateY, 2);
+    assert.equal(pressed.transform, undefined, "flat settings controls do not shift when pressed");
+    assert.equal(normal.boxShadow, undefined);
+    assert.equal(normal.elevation, undefined);
   }
+  assert.equal(nodes(tree).some((node) => node.type === "SelectionLed"), false);
   assert.equal(byLabel(tree, "Choose interface theme").props.accessibilityState.expanded, false);
   byLabel(tree, "Choose interface theme").props.onPress();
   tree = state.render(ThemePicker, {});
@@ -151,7 +162,8 @@ test("System remains available in either mode and follows the device appearance"
   assert.deepEqual(choices, ["system"]);
 });
 
-test("settings sections keep calendar, export and import actions functional", async () => {
+for (const width of [390, 1024]) test(`settings sections and backup presentation work at ${width}px`, async () => {
+  viewportWidth = width;
   const state = hooks();
   const calls = [];
   const settings = { theme: "matrix", calendarDefaultView: "month", calendarWeekStart: 1 };
@@ -164,6 +176,7 @@ test("settings sections keep calendar, export and import actions functional", as
     "@/components/settings/theme-picker": { ThemePicker: "ThemePicker" },
     "@/components/settings/keyboard-settings": { KeyboardSettings: "KeyboardSettings" },
     "@/components/ui/command-palette": { CommandPalette: "CommandPalette" },
+    "@/components/ui/editor-window": { EditorWindow: "EditorWindow" },
     "@/components/ui/mobile-top-bar": { MobileTopBarAction: "MobileTopBarAction" },
     "@/lib/features/navigation-commands": { createNavigationCommands: () => [] },
     "@/components/reference/reference-theme": reference,
@@ -175,6 +188,8 @@ test("settings sections keep calendar, export and import actions functional", as
     "@/theme/layout": { mobileContentStyle: {}, mobileBottomNavClearance: 112 },
   });
   let tree = state.render(Settings);
+  assert.equal(nodes(tree).some((node) => node.props?.testID === "settings-window"), false, "only popups use a window, not the Settings page");
+  assert.equal(nodes(tree).some((node) => node.props?.accessibilityRole === "tab" && byText(node, "Commands")), false);
   assert.ok(nodes(tree).some((node) => node.type === "ThemePicker"));
   function section(name) {
     const tab = nodes(tree).find((node) => node.props?.accessibilityRole === "tab" && byText(node, name));
@@ -186,14 +201,17 @@ test("settings sections keep calendar, export and import actions functional", as
   byLabel(tree, "Open calendar in week view").props.onPress();
   byLabel(tree, "Start weeks on Sunday").props.onPress();
   assert.deepEqual(calls.slice(0, 2), [["view", "week"], ["week", 0]]);
-  section("Commands");
-  byLabel(tree, "Open commands").props.onPress();
+  nodes(tree).find((node) => node.type === "Header").props.actions.props.onPress();
   tree = state.render(Settings);
   assert.equal(nodes(tree).find((node) => node.type === "CommandPalette").props.mode, "commands");
   section("Data & backups");
   byLabel(tree, "Save backup").props.onPress();
   tree = state.render(Settings);
-  assert.equal(nodes(tree).find((node) => node.type === "Sheet").props.visible, true);
+  const backup = nodes(tree).find((node) => typeof node.type === "function" && node.type.name === "SettingsBackupDialog");
+  const dialog = backup.type(backup.props);
+  assert.equal(dialog.type, width >= 768 ? "EditorWindow" : "Sheet");
+  assert.equal(dialog.props.visible, true);
+  if (width >= 768) assert.equal(dialog.props.testID, "settings-backup-window");
   nodes(tree).find((node) => node.type === "Button" && node.props.label === "Save file").props.onPress();
   await new Promise(setImmediate);
   assert.ok(calls.some(([action, value]) => action === "export" && value === "matrix"));

@@ -175,20 +175,14 @@ export function detectStatusCardTheme(title: string): DecorativeCardTheme | null
   return STATUS_CARD_THEMES.find((entry) => entry.keywords.includes(name)) ?? null;
 }
 
-/** Explicit event designs stay intact; ordinary cards reflect their actual state. */
-export function resolveCardDecoration(tags: readonly string[] = [], status: TaskStatus | null = null, eventOverride: string | null = null): DecorativeCardTheme | null {
+/** Custom artwork wins over events; ordinary cards reflect their actual state. */
+export function resolveCardDecoration(tags: readonly string[] = [], status: TaskStatus | null = null, eventOverride: string | null = null, activeEvents: readonly DecorativeCardTheme[] = []): DecorativeCardTheme | null {
   const special = tags.map(classifySpecialCardTag).filter((entry) => entry !== null);
-  const event = special.findLast((entry) => entry.group === "event");
-  // If an event override is set, show the event decoration; if no override is set,
-  // suppress event decorations so event-tagged cards are not displayed.
-  if (eventOverride !== null) {
-    if (event) return event.theme;
-  } else if (event) {
-    // No active event: suppress event decoration
-    // fall through to status/regular theming below
-  }
   const easterEgg = special.findLast((entry) => entry.group === "easter-egg");
   if (easterEgg) return easterEgg.theme;
+  const event = special.findLast((entry) => entry.group === "event");
+  // Debug adds previews; disabling it never suppresses a real holiday.
+  if (event && (eventOverride !== null || activeEvents.some((entry) => entry.id === event.theme.id))) return event.theme;
   const stateId = status === "completed" ? "done" : status;
   const actual = STATUS_CARD_THEMES.find((entry) => entry.id === stateId);
   if (actual) return actual;

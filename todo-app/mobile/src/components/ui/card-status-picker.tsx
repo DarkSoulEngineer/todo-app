@@ -25,7 +25,7 @@ export function CardStatusPicker({ tags, onChange }: { tags: string[]; onChange:
         accessibilityHint={selected ? "Tap again to remove this status tag." : `Add the ${option.label} status tag.`}
         accessibilityState={{ checked: selected, selected }}
         onPress={() => onChange(toggleCardTag(tags, option.label))}
-        style={[styles.segment, { borderColor: c.border }]}
+        style={[styles.segment, { borderColor: selected ? option.color : c.border }]}
       >
         {({ pressed }) => <>
           <View style={[styles.statusDot, { backgroundColor: option.color, opacity: selected || pressed ? 1 : 0.7 }]} />
