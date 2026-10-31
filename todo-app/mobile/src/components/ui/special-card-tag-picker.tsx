@@ -6,12 +6,12 @@ import { useTheme } from "@/providers/theme-provider";
 import { CardTagOption } from "@/components/ui/card-tag-option";
 
 /** Event tags stay in the Tags section; status now lives at the top of the editor. */
-export function SpecialCardTagPicker({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+export function SpecialCardTagPicker({ tags, onChange, showLabel = true }: { tags: string[]; onChange: (tags: string[]) => void; showLabel?: boolean }) {
   const { theme: { colors: c } } = useTheme();
   const { events } = useActiveEvents();
   if (!events.length) return null;
   return <View testID="special-card-tag-picker" style={styles.group}>
-    <Text style={[styles.label, { color: c.mutedForeground }]}>EVENT</Text>
+    {showLabel ? <Text style={[styles.label, { color: c.mutedForeground }]}>EVENT</Text> : null}
     <View style={styles.options}>{events.map((entry) => {
       const selected = tags.some((tag) => classifySpecialCardTag(tag)?.theme.id === entry.id);
       return <CardTagOption key={entry.id} label={entry.label} color={entry.accent} selected={selected} accessibilityLabel={`Event tag ${entry.label}`} accessibilityHint="Choose at most one event tag. Tap again to remove." onPress={() => onChange(toggleCardTag(tags, entry.label))} />;

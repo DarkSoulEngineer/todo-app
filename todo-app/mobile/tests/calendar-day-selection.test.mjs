@@ -115,7 +115,7 @@ test("Today navigates and selects the current date in month/week, mobile/split a
   }
 });
 
-test("selection uses a rounded date tile with an LED without tinting cells or changing task previews", () => {
+test("selection uses a rounded date tile without tinting cells or changing task previews", () => {
   const flatten = (styles) => Object.assign({}, ...[styles].flat().filter(Boolean));
   const { tree } = render("month", true, day);
   const cell = nodes(tree).find((node) => node.props?.testID === `calendar-day-${dates.format(day, "yyyy-MM-dd")}`);
@@ -126,7 +126,7 @@ test("selection uses a rounded date tile with an LED without tinting cells or ch
   assert.equal(flatten(badge.props.style).borderRadius, 10);
   assert.equal(flatten(badge.props.style).height, 44);
   assert.equal(flatten(badge.props.style).flex, 1);
-  assert.equal(nodes(badge).find((node) => node.type === "SelectionLed").props.selected, true);
+  assert.equal(nodes(badge).some((node) => node.type === "SelectionLed"), false, "selection has no LED bar above the date");
   const previews = nodes(cell).filter((node) => node.props?.accessibilityLabel === `View tasks for ${dates.format(day, "EEEE, MMMM d")}`);
   for (const preview of previews) {
     assert.equal(flatten(preview.props.style({ pressed: false })).backgroundColor, undefined);
@@ -146,12 +146,12 @@ test("today uses the picker's green text instead of a circle when another day is
   assert.equal(nodes(badge).some((node) => node.type === "SelectionLed"), false);
 });
 
-test("month and week selections keep exactly one lit tile, including Today and populated days", () => {
+test("month and week selections keep exactly one selected tile, including Today and populated days", () => {
   const flatten = (style) => Object.assign({}, ...style.filter(Boolean));
   for (const mode of ["month", "week"]) for (const split of [false, true]) {
     const { tree } = render(mode, split, day);
-    const leds = nodes(tree).filter((node) => node.type === "SelectionLed");
-    assert.equal(leds.length, 1);
+    const pressed = nodes(tree).filter((node) => node.props?.["aria-pressed"] === true);
+    assert.equal(pressed.length, 1);
     const badge = nodes(tree).find((node) => node.props?.testID === `calendar-date-${dates.format(day, "yyyy-MM-dd")}`);
     assert.equal(flatten(badge.props.style).borderRadius, 10);
     assert.equal(flatten(nodes(badge).find((node) => node.type === "Text").props.style).color, colors.foreground);

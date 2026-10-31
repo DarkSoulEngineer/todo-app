@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "r
 import { useTheme } from "@/providers/theme-provider";
 import type { Task } from "@/lib/domain/types";
 import type { ThemeColors } from "@/theme/tokens";
-import { SelectionLed } from "@/components/ui/selection-led";
 
 export type CalendarMode = "month" | "week";
 
@@ -100,7 +99,6 @@ export function CalendarPanel({ anchor, mode, selectedDay, tasks, now, weekStart
               <View pointerEvents="none" style={styles.cellHeader}>
                 <View testID={`calendar-date-${format(day, "yyyy-MM-dd")}`} style={[styles.dayBadge, selected && styles.dayBadgeSelected]}>
                   <Text style={[styles.dayNumber, current && !selected && styles.dayNumberToday]}>{format(day, "d")}</Text>
-                  {selected ? <SelectionLed selected /> : null}
                 </View>
                 {taskCount ? <Text testID={`calendar-task-count-${format(day, "yyyy-MM-dd")}`} style={styles.countLabel}>{taskCount}</Text> : null}
             </View>

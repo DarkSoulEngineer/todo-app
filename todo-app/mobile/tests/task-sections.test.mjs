@@ -82,7 +82,7 @@ test("the Schedule section starts collapsed but its header toggles the date and 
 
 test("Task/Create editors and the task inspector expose collapsible sections without hiding their title or actions", () => {
   const cases = [
-    ["components/janus-board-ui.tsx", ["List", "Notes", "Priority", "Tags", "Schedule", "Checklist"]],
+    ["components/janus-board-ui.tsx", ["Notes", "Priority", "Tags", "Schedule", "Checklist", "Event"]],
     ["components/reference/mobile/reference-new-task-screen.tsx", ["Board", "Notes", "Priority", "Tags", "Schedule", "Checklist", "Attachments"]],
     ["components/reference/mobile/reference-task-inspector-screen.tsx", ["Notes", "Tags", "Attachments", "Checklist", "Activity"]],
   ];

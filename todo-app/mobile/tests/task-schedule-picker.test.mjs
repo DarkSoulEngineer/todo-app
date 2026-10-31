@@ -117,10 +117,12 @@ test("choosing a date sets local end of day, keeps the calendar visible and enab
   assert.equal(button(app.timePanel(), "Due minute").props.value, "59");
 });
 
-test("the clear-date X removes a selected date from schedule, edit, and calendar-origin time-only views", () => {
+test("the clear-date button labels that it removes the date in schedule, edit, and calendar-origin time-only views", () => {
   const scheduled = new Date(2026, 9, 31, 16, 30).toISOString();
   const regular = setup({ value: scheduled });
-  button(regular.render(), "Remove due date").props.onPress();
+  const clear = button(regular.render(), "Remove due date");
+  assert.equal(nodes(clear).find((node) => node.type === "Text").props.children, "Clear date", "the X carries visible text so it cannot be mistaken for closing the section");
+  clear.props.onPress();
   assert.equal(regular.changes.at(-1), null);
   assert.equal(button(regular.timePanel(), "Due hour").props.editable, false);
   assert.equal(nodes(regular.render()).some((node) => node.props?.testID === "schedule-calendar"), true);
